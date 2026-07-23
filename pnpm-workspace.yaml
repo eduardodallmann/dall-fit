@@ -1,0 +1,7 @@
+packages:
+  - api
+  - ui
+  - packages/*
+
+allowBuilds:
+  '@swc/core': true

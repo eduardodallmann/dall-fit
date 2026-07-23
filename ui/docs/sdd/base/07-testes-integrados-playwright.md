@@ -1,0 +1,280 @@
+# Testes integrados com Playwright
+
+## Objetivo e limite
+
+Playwright é o padrão para testes integrados comportamentais do frontend. Ele sobe
+a aplicação real com Vite, abre o Chromium e interage com a interface pela mesma
+fronteira disponível ao usuário.
+
+Esses testes validam a aplicação frontend de ponta a ponta dentro do navegador:
+renderização, integrações entre componentes, requests do cliente HTTP, estados
+produzidos pelo MSW e navegação entre rotas. Como a API é simulada, eles não são
+E2E do sistema completo. O comportamento real do backend permanece coberto pelos
+E2E da API.
+
+Playwright não substitui Vitest:
+
+- Vitest, JSDOM e Testing Library cobrem unidades, componentes, hooks, validações e
+  branches locais;
+- Playwright cobre comportamento integrado observável em uma rota e jornadas que
+  atravessam várias rotas;
+- E2E da API cobrem transporte HTTP, wiring e infraestrutura reais do backend.
+
+Os testes Playwright não geram cobertura V8, não alimentam o LCOV e não existem
+para elevar percentual de linhas.
+
+## Rede e MSW
+
+Testes integrados do frontend nunca acessam a API real. O `webServer` do Playwright
+inicia o Vite com:
+
+```env
+VITE_ENABLE_API_MOCKS=true
+```
+
+O bootstrap da UI deve aguardar o Service Worker do MSW antes do primeiro render.
+O cliente HTTP, services, hooks e componentes usados em produção permanecem reais;
+somente a resposta da fronteira de rede é interceptada.
+
+Quando a UI possuir uma variável para a URL da API, a configuração Playwright
+define um valor local e fictício compatível com os handlers. Tokens, API keys e
+credenciais usados nos testes são exclusivamente locais e reconhecíveis como
+fictícios.
+
+Toda request precisa de handler explícito. O handler sentinela descrito em
+`05-mocks-de-api.md` retorna `501 MOCK_NOT_IMPLEMENTED` para uma operação sem
+cenário, impedindo acesso acidental ao backend.
+
+Não usar `page.route`, mock do cliente HTTP ou substituição de módulos para simular
+a API em testes integrados. Handlers e fixtures MSW são a fonte única dos cenários
+de rede no desenvolvimento, no Vitest e no Playwright.
+
+## Organização
+
+Quando o primeiro teste integrado for implementado, adotar:
+
+```text
+ui/
+├── playwright.config.ts
+└── tests/
+    ├── setup.ts
+    └── integration/
+        ├── flows/
+        │   └── <flow>.spec.ts
+        ├── helpers/
+        │   └── <helper>.ts
+        └── routes/
+            └── <flow>/
+                └── <route>.spec.ts
+```
+
+- `tests/integration/routes/<flow>/<route>.spec.ts` valida uma rota isolada,
+  iniciando diretamente pelo link reproduzível documentado nela;
+- `tests/integration/flows/<flow>.spec.ts` valida a jornada entre rotas, incluindo
+  avanço, retorno, bloqueios, decisões e dados preservados;
+- `tests/integration/helpers/` contém somente preparação transversal, como montagem
+  de URL e contexto fictício;
+- helpers não escondem ações ou asserts que expressem regras do cenário.
+
+Um flow da raiz pode descrever UI e API. Seu spec Playwright valida somente a
+jornada observável no frontend com MSW. Os endpoints reais participantes são
+validados separadamente pelos E2E da API e ambos aparecem na cobertura automatizada
+do documento de flow.
+
+O spec de flow não repete todos os estados já cobertos nos specs de rota. O caminho
+feliz completo deve começar pela entrada documentada e atravessar as etapas reais
+quando essa continuidade for o comportamento relevante. Cenários alternativos
+podem começar no estado reproduzível mais próximo para manter isolamento e clareza.
+
+## Relação com os cenários do SDD
+
+Todo cenário relevante de `routes/` ou `flows/` recebe cobertura proporcional ao
+risco:
+
+- comportamento isolado ou puramente local fica no Vitest;
+- interação real de usuário, integração entre partes da tela e navegação ficam no
+  Playwright;
+- contrato e infraestrutura reais do backend ficam nos E2E da API;
+- cenário não automatizado registra a justificativa no documento vivo.
+
+O título do teste Playwright deve manter o identificador e o nome do cenário
+documentado:
+
+```ts
+test.describe('Rota profile', () => {
+  test('Cenário 1 — Carregamento com sucesso', async ({ page }) => {
+    await page.goto('/profile');
+
+    await expect(
+      page.getByRole('heading', { name: 'Meu perfil' }),
+    ).toBeVisible();
+  });
+});
+```
+
+O exemplo de query só é válido quando ela pertencer ao contrato real da aplicação.
+Não criar query, header ou parâmetro de produção apenas para selecionar mock.
+Preferir path, query, body ou identificadores fictícios que já façam parte do
+contrato. Quando isso não bastar, seguir o seletor exclusivo de desenvolvimento
+definido em `05-mocks-de-api.md`.
+
+Cada teste inicia seu próprio estado, não depende da ordem da suíte e não reutiliza
+estado mutável deixado por outro teste.
+
+## Configuração alvo
+
+`ui/playwright.config.ts` segue este formato:
+
+```ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/integration',
+  fullyParallel: true,
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: 'http://127.0.0.1:3100',
+    trace: 'on-first-retry',
+  },
+  webServer: {
+    command: 'pnpm dev --host 127.0.0.1 --port 3100',
+    env: {
+      VITE_ENABLE_API_MOCKS: 'true',
+    },
+    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === 'true',
+    timeout: 120_000,
+    url: 'http://127.0.0.1:3100',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
+});
+```
+
+A porta `3100` é exclusiva dos testes integrados e evita colisão com o Vite usado
+manualmente. Por padrão, não reutilizar servidor existente. A reutilização é
+permitida apenas para depuração local explícita com
+`PLAYWRIGHT_REUSE_SERVER=true`, depois de confirmar que o servidor da porta `3100`
+foi iniciado com MSW habilitado.
+
+Playwright pode executar arquivos em paralelo. Por isso, fixtures e seletores de
+cenário não podem depender de memória global mutável, ordem ou dados compartilhados
+entre testes. A regra de execução serial aplica-se somente aos E2E do backend.
+
+## Scripts obrigatórios
+
+Ao adotar Playwright, `ui/package.json` disponibiliza:
+
+```json
+{
+  "scripts": {
+    "test:integration": "playwright test",
+    "test:integration:debug": "playwright test --debug",
+    "test:integration:install": "playwright install chromium",
+    "test:integration:install:ci": "playwright install --with-deps chromium",
+    "test:integration:ui": "playwright test --ui"
+  }
+}
+```
+
+A raiz expõe `test:integration` como agregador explícito do frontend:
+
+```json
+{
+  "scripts": {
+    "test:integration": "pnpm -C ui test:integration"
+  }
+}
+```
+
+Esse nome não cria uma suíte intermediária no backend. A API continua possuindo
+somente unitários e E2E.
+
+## Como executar
+
+Na primeira utilização da máquina, instalar o Chromium:
+
+```bash
+pnpm -C ui test:integration:install
+```
+
+Executar toda a suíte a partir da raiz:
+
+```bash
+pnpm test:integration
+```
+
+Executar diretamente no projeto da UI:
+
+```bash
+pnpm -C ui test:integration
+```
+
+Abrir a interface interativa ou o debugger:
+
+```bash
+pnpm -C ui test:integration:ui
+pnpm -C ui test:integration:debug
+```
+
+Executar somente um spec ou cenário:
+
+```bash
+pnpm -C ui exec playwright test tests/integration/routes/<flow>/<route>.spec.ts
+pnpm -C ui exec playwright test --grep 'Cenário 1'
+```
+
+Em CI, quando a imagem precisar também das dependências de sistema e oferecer
+`sudo` não interativo:
+
+```bash
+pnpm -C ui test:integration:install:ci
+pnpm test:integration
+```
+
+O CI executa testes unitários e cobertura antes da suíte integrada. Relatórios HTML,
+traces e resultados ficam em `ui/playwright-report/` e `ui/test-results/` e não são
+versionados.
+
+## Critérios para um teste estável
+
+- consultar elementos por role, nome, label ou texto acessível;
+- interagir como o usuário, evitando acesso ao estado interno do React;
+- esperar estados observáveis, nunca usar timeout fixo para sincronização;
+- usar `delay(...)` no handler MSW para estados de loading;
+- validar requests pelo navegador somente quando método, URL, headers ou payload
+  forem parte do comportamento relevante;
+- usar dados mínimos, fictícios e determinísticos;
+- cobrir caminho feliz, branches, erros e navegação conforme risco;
+- não duplicar no Playwright toda combinação já protegida em nível unitário.
+
+## Layout e screenshots
+
+Playwright comportamental não exige screenshot. A validação visual continua
+condicionada à existência de referências em
+`routes/assets/<route-slug>/`, conforme
+`06-referencias-visuais-de-layout.md`.
+
+Quando houver regressão visual automatizada, suas golden images executáveis ficam
+junto dos testes Playwright e não substituem as imagens curadas do SDD.
+
+## Estado de adoção
+
+Esta política é normativa, mas Playwright ainda não está instalado porque a UI não
+possui rotas e integrações que justifiquem uma suíte de navegador. A primeira
+entrega com cenário integrado deve adicionar atomicamente:
+
+1. `@playwright/test`;
+2. `ui/playwright.config.ts`;
+3. scripts da UI e o agregador da raiz;
+4. Chromium local/CI;
+5. estrutura `ui/tests/integration/`;
+6. MSW Browser e handlers necessários;
+7. ignores para relatórios e resultados;
+8. execução no pipeline.
+
+Até essa adoção, os comandos desta página descrevem o contrato alvo e ainda não
+estão disponíveis no workspace.
