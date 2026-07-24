@@ -50,6 +50,28 @@ override possível, entrar no arquivo de escopo correto e ter justificativa.
 Prettier é configurado uma vez na raiz. Imports de tipos usam `import type`;
 identificadores e arquivos usam inglês, salvo texto de produto.
 
+## Revisão final de código sem uso
+
+Ao final de toda implementação, antes da entrega, revisar tanto `api/` quanto
+`ui/`, mesmo quando a mudança estiver concentrada em apenas um dos projetos. A
+revisão verifica se a implementação ou o refactor deixou sem uso:
+
+- componentes e wrappers React;
+- funções, hooks e métodos;
+- classes, helpers e adapters;
+- imports, exports e arquivos que existiam somente para o código removido.
+
+Código comprovadamente sem uso deve ser removido na mesma mudança, junto de testes,
+exports e documentação que tenham se tornado obsoletos. ESLint e typecheck ajudam
+a encontrar parte desses casos, mas não substituem a inspeção de referências e da
+composição da aplicação.
+
+Antes de remover um símbolo aparentemente sem consumidores, confirmar usos
+indiretos por framework, decorators, injeção de dependência, configuração,
+carregamento dinâmico ou API pública. Um ponto de extensão intencional pode
+permanecer apenas quando sua finalidade vigente estiver explícita no código ou no
+SDD proprietário.
+
 ## Testes
 
 API e UI usam Vitest, mas mantêm ambientes e configurações independentes:

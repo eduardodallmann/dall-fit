@@ -128,6 +128,12 @@ devem ser interpretadas como a verdade vigente.
 
 ## Quality gates
 
+Ao final de toda implementação, revise `api/` e `ui/` e remova componentes,
+wrappers, hooks, funções, métodos, classes, helpers, imports, exports e arquivos
+que tenham ficado sem uso. Confirme antes os usos indiretos por framework,
+decorators, injeção de dependência, configuração, carregamento dinâmico ou API
+pública; lint e typecheck não substituem essa inspeção.
+
 Para mudanças em código, configuração, contratos executáveis, mocks, testes ou
 comportamento observável, execute e aprove:
 

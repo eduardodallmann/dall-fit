@@ -47,7 +47,9 @@ está registrada em
    e decisões próprios.
 4. Implementar a mudança e os testes.
 5. Atualizar na mesma mudança toda documentação viva cujo comportamento mudou.
-6. Executar os comandos de validação aplicáveis a partir da raiz.
+6. Revisar API e UI para remover componentes, funções e métodos que tenham ficado
+   sem uso após a implementação.
+7. Executar os comandos de validação aplicáveis a partir da raiz.
 
 Uma feature não substitui a documentação viva. Padrões permanentes descobertos
 durante uma demanda devem ser incorporados em `base/`; decisões com trade-offs
