@@ -10,6 +10,20 @@ Dependências compartilhadas por tooling transversal, como ESLint e Prettier, fi
 na raiz. Dependências necessárias para executar ou testar uma aplicação permanecem
 no `package.json` dessa aplicação.
 
+## Desenvolvimento local
+
+O comando abaixo, executado na raiz, inicia API e UI simultaneamente:
+
+```bash
+pnpm dev
+```
+
+A raiz usa a execução recursiva e paralela do pnpm, filtrada explicitamente pelos
+pacotes `dall-fit-api` e `dall-fit-app`. Cada aplicação preserva seu próprio script
+`dev`: NestJS em watch mode na API e Vite na UI. A saída mantém o prefixo do pacote
+para identificar a origem de cada log, e encerrar o processo da raiz encerra os
+dois servidores.
+
 ## Comandos agregadores
 
 Todos os quality gates são iniciados na raiz:

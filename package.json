@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "pnpm -C packages/types build && pnpm -C api build && pnpm -C ui build",
+    "dev": "pnpm --recursive --parallel --stream --filter dall-fit-api --filter dall-fit-app run dev",
     "format": "prettier --write .",
     "lint": "pnpm typecheck && eslint .",
     "lint:fix": "pnpm format && pnpm typecheck && eslint . --fix",
