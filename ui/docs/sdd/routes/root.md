@@ -6,7 +6,7 @@ Exibir a tela inicial do scaffold e confirmar o funcionamento da interação Rea
 
 ## Entradas e pré-condições
 
-- URL: `http://localhost:5173/`
+- URL: `http://localhost:3000/`
 - Parâmetros obrigatórios: não se aplica
 - Estado persistido: não se aplica
 - Permissões: não se aplica
@@ -15,7 +15,7 @@ Exibir a tela inicial do scaffold e confirmar o funcionamento da interação Rea
 
 - identificação `Dall Fit`;
 - título `Get started`;
-- orientação para editar `src/app.tsx`;
+- orientação para editar `src/routes/home/index.tsx`;
 - botão contador iniciado em zero, fornecido pelo HeroUI.
 
 ## Caminho feliz
@@ -43,20 +43,22 @@ ou teclado.
 
 ### Cenário 1 — Incrementar contador
 
-- Link para testar: `http://localhost:5173/`
+- Link para testar: `http://localhost:3000/`
 - Given: a rota inicial está carregada e o contador mostra zero
 - When: o usuário aciona o botão do contador uma vez
 - Then: o botão passa a mostrar o valor um
 
 ## Cobertura
 
-- Teste de componente: `src/app.test.tsx`
+- Teste de componente: `src/routes/home/__tests__/index.test.tsx`
+- Teste de composição do router e providers: `src/app.test.tsx`
 
 ## Estrutura técnica relevante
 
-- Arquivo da rota: `src/app.tsx`
+- Arquivo da rota: `src/routes/home/index.tsx`
+- Registro no router: `src/routes/routes.tsx`
 - Componentes HeroUI: `Button` e `Card` de `@heroui/react`
-- Apresentação própria: `src/app.styles.tsx`
+- Apresentação própria: `src/routes/home/styles.tsx`
 - Componentes core: não se aplica
 - Componentes exclusivos da rota: não se aplica
 - Integrações: não se aplica

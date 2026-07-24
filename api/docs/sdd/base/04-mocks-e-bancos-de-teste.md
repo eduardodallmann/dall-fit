@@ -34,6 +34,8 @@ a reação do service ao contrato da dependência, não MongoDB, Redis ou o driv
 ## E2E com MongoDB
 
 `mongodb-memory-server` inicia um processo `mongod` real e retorna uma URI temporária.
+O pacote é uma dependência de desenvolvimento da API e seu build script está
+autorizado no workspace.
 Usar:
 
 - `MongoMemoryServer` para CRUD, queries e índices comuns;
@@ -47,10 +49,14 @@ cache conhecido no CI para evitar downloads em toda execução.
 
 `redis-memory-server` inicia um processo `redis-server` real em porta livre. Os E2E
 usam o mesmo client e adapter usados em produção.
+O pacote é uma dependência de desenvolvimento da API e seu build script está
+autorizado no workspace. Seu `postinstall` baixa e compila o binário, exigindo
+`make`, compilador C e as ferramentas de build do sistema. A versão `8.8.1` está
+fixada em `redisMemoryServer.version` no `package.json` da raiz, e o binário
+compilado permanece no cache local do pacote.
 
-A versão do Redis deve ser fixada. Como a instalação pode baixar e compilar o
-binário, o ambiente local e o CI precisam das ferramentas exigidas pelo pacote e
-devem manter cache do resultado.
+O ambiente local e o CI precisam das ferramentas exigidas pelo pacote e devem
+manter cache do resultado para não recompilar o Redis em toda instalação.
 
 Não usar `ioredis-mock` ou implementação JavaScript equivalente nos E2E. Esses
 pacotes são mocks adequados apenas a testes unitários e não garantem semântica real
@@ -120,5 +126,6 @@ aplicação.
 - Unitários nunca iniciam bancos.
 - E2E sempre usam adapters reais quando MongoDB ou Redis participarem do fluxo.
 - E2E nunca executam em paralelo.
-- Dependências e scripts de download serão adicionados somente junto da primeira
-  funcionalidade que use cada banco.
+- `mongodb-memory-server` e `redis-memory-server` já estão instalados; setups,
+  versões fixadas dos binários e lifecycle hooks entram com o primeiro E2E que
+  usar cada banco.

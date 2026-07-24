@@ -14,6 +14,8 @@ Mock Service Worker intercepta requests na fronteira de rede:
   Chromium.
 
 Não inserir condicionais de mock em componentes, hooks, services ou no cliente HTTP.
+O client Axios e o MSW usam a mesma base `VITE_API_URL`; trocar entre backend real
+e mock não altera URLs nem contratos da aplicação.
 
 ## Estrutura
 
@@ -45,6 +47,7 @@ divergentes.
 Mocks são opt-in. Quando implementados, a variável será:
 
 ```env
+VITE_API_URL=http://localhost:4000
 VITE_ENABLE_API_MOCKS=true
 ```
 

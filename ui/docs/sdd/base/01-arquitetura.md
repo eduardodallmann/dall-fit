@@ -4,9 +4,18 @@
 
 A UI usa React 19, TypeScript, Vite, Tailwind CSS 4 e HeroUI 3. A estilização
 própria usa a API Tailwind Variants exportada por `@heroui/styles`.
-Vitest cobre testes unitários e de componentes; Playwright é o padrão dos testes
-integrados no navegador. `src/main.tsx` realiza o bootstrap e `src/app.tsx` é a
-composição inicial enquanto a arquitetura de rotas ainda não foi introduzida.
+
+A fundação de aplicação usa:
+
+- TanStack Router com árvore declarada manualmente;
+- TanStack Query para estado de servidor;
+- TanStack Form para formulários;
+- Axios como client HTTP;
+- Vitest para testes unitários e de componentes;
+- Playwright para testes integrados no navegador.
+
+`src/main.tsx` realiza o bootstrap e aplica `AppProviders`. `src/app.tsx` monta o
+`RouterProvider`, e a árvore tipada vive em `src/routes/routes.tsx`.
 
 ## Estrutura alvo
 
@@ -29,27 +38,73 @@ src/
 
 A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 
+## Inicialização e navegação
+
+1. `main.tsx` carrega os estilos globais.
+2. `AppProviders` aplica o `QueryClientProvider`.
+3. `App` aplica o `RouterProvider`.
+4. TanStack Router resolve a URL pela árvore manual de `routes/routes.tsx`.
+
+Não usar roteamento baseado em arquivos nem adicionar o plugin gerador do TanStack
+Router. Cada rota declara `getParentRoute`, `path` e componente; módulos de tela
+devem usar lazy loading quando sua separação produzir ganho real. Links,
+redirecionamentos, parâmetros e navegação programática usam APIs tipadas do
+TanStack Router, sem manipulação manual de `history`.
+
 ## Estado e integrações
 
 - estado local fica próximo do componente proprietário;
-- estado de servidor deve ter cache, loading, erro e invalidação explícitos;
-- chamadas HTTP passam por um cliente central e serviços tipados;
+- estado de servidor usa TanStack Query, com query keys estáveis e loading, erro,
+  cache e invalidação explícitos;
+- o `QueryClient` global desabilita refetch ao focar a janela, tenta novamente uma
+  vez e usa `staleTime` de 30 segundos por padrão; exceções ficam na query
+  proprietária;
+- chamadas HTTP passam por uma única instância Axios central e serviços tipados;
 - componentes não chamam `fetch` diretamente;
 - payloads compartilhados usam `@dall-fit/types`;
 - desenvolvimento e testes simulam a fronteira HTTP com MSW, reutilizando o mesmo
   cliente da aplicação;
 - credenciais e dados pessoais não aparecem em logs ou fixtures.
 
-Introduzir router, biblioteca de estado de servidor ou internacionalização exige
-atualizar esta base e registrar ADR quando houver trade-off transversal. O design
-system e suas regras vigentes estão definidos em
-`03-componentes-e-estilizacao.md`.
+O client Axios será criado em `src/core/http/api-client.ts` junto da primeira
+request real, usando `VITE_API_URL` como `baseURL`. Não criar instâncias paralelas
+nem usar Axios diretamente em componentes. Services HTTP pertencem ao domínio ou
+à rota proprietária; hooks TanStack Query consomem esses services.
+
+Formulários usam TanStack Form. A composição tipada permanece próxima da rota;
+helpers migram para `src/core/form/` somente quando houver reutilização real.
+Validação, erros por campo, submissão, estado disabled e erros da API devem ser
+observáveis e documentados na rota. Submissões assíncronas usam mutations do
+TanStack Query quando atravessarem a fronteira HTTP.
+
+Quando um formulário for dividido em componentes menores, usar a composição
+oficial com `createFormHook`, `createFormHookContexts` e `withForm`. O tipo da
+instância deve ser inferido por essa composição; não declarar `AnyFormApi`, não
+duplicar manualmente tipos internos do form e não usar casts para repassar a
+instância. Componentes de campo compartilhados só pertencem a `src/core/form/`
+quando possuírem contrato transversal real.
+
+Introduzir internacionalização ou alterar essas escolhas exige atualizar esta base
+e registrar ADR quando houver trade-off transversal. O design system e suas regras
+vigentes estão definidos em `03-componentes-e-estilizacao.md`.
 
 MSW será configurado junto da primeira integração HTTP, seguindo
 `05-mocks-de-api.md`; a fundação atual não instala dependências sem uso.
 
 Playwright será configurado junto do primeiro cenário integrado de rota ou flow,
 seguindo `07-testes-integrados-playwright.md`.
+
+## Ambiente local
+
+O Vite usa obrigatoriamente a porta `3000` e falha se ela estiver ocupada.
+`ui/.env.example` declara:
+
+- `VITE_API_URL=http://localhost:4000`, base da API usada pelo Axios;
+- `VITE_ENABLE_API_MOCKS=false`, opt-in dos mocks MSW.
+
+O `.env` local não é versionado. Toda variável exposta à UI usa prefixo `VITE_`,
+é tipada em `src/vite-env.d.ts` e deve ser tratada como informação pública
+incorporada ao bundle, nunca como segredo.
 
 ## Imports internos e compartilhados
 
@@ -63,3 +118,10 @@ import { WorkoutPage } from '~/routes/workout';
 Contratos do monorepo são consumidos por seus pacotes públicos no namespace
 `@dall-fit/*`, como `@dall-fit/types`. `~/` nunca aponta para a API ou para outro
 pacote do workspace, e `@/*` não é um alias válido.
+
+## Referências oficiais
+
+- [TanStack Router React](https://tanstack.com/router/latest/docs/framework/react/start/overview)
+- [TanStack Query React](https://tanstack.com/query/latest/docs/framework/react/overview)
+- [TanStack Form React](https://tanstack.com/form/latest/docs/framework/react)
+- [Axios](https://axios.rest/pages/getting-started/first-steps)

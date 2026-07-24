@@ -1,24 +1,19 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import App from '~/app';
+import { AppProviders } from '~/context/providers';
 
 describe('App', () => {
-  it('renders the starter screen and increments the counter', async () => {
-    const user = userEvent.setup();
-
-    render(<App />);
-
-    expect(
-      screen.getByRole('heading', { name: 'Get started' }),
-    ).toBeInTheDocument();
-
-    const counter = screen.getByRole('button', { name: 'Count is 0' });
-    await user.click(counter);
+  it('resolves the root route inside the application providers', async () => {
+    render(
+      <AppProviders>
+        <App />
+      </AppProviders>,
+    );
 
     expect(
-      screen.getByRole('button', { name: 'Count is 1' }),
+      await screen.findByRole('heading', { name: 'Get started' }),
     ).toBeInTheDocument();
   });
 });

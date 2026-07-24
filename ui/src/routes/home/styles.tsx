@@ -2,7 +2,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 
 import { tv } from '@heroui/styles';
 
-const appStyles = tv({
+const homeStyles = tv({
   slots: {
     page: 'flex min-h-svh items-center justify-center bg-background p-6 text-foreground',
     pageContent: 'w-full max-w-lg',
@@ -13,7 +13,7 @@ const appStyles = tv({
   },
 });
 
-const styles = appStyles();
+const styles = homeStyles();
 
 type MainProps = Omit<ComponentPropsWithoutRef<'main'>, 'className'>;
 type DivProps = Omit<ComponentPropsWithoutRef<'div'>, 'className'>;

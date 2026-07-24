@@ -29,7 +29,7 @@ pnpm -C api seed -- users:get-active
 
 ```bash
 curl --request GET \
-  --url http://localhost:3000/users/user-active-001 \
+  --url http://localhost:4000/users/user-active-001 \
   --header 'authorization: Bearer local-test-token'
 ```
 
@@ -48,7 +48,7 @@ MongoDB ou Redis.
 
 ```bash
 curl --request POST \
-  --url http://localhost:3000/users \
+  --url http://localhost:4000/users \
   --header 'content-type: application/json' \
   --data '{}'
 ```
@@ -123,7 +123,7 @@ negócio da aplicação.
 Cada cURL:
 
 - é copiável e executável contra a API local;
-- usa URL completa, normalmente `http://localhost:3000`;
+- usa URL completa, normalmente `http://localhost:4000`;
 - informa método, path, query, headers e body relevantes;
 - usa exatamente os dados preparados pelo seed;
 - contém somente credenciais locais, fictícias e seguras;

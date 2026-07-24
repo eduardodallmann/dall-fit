@@ -83,6 +83,18 @@ devem ser interpretadas como a verdade vigente.
   `https://heroui.com/react/llms.txt`, `llms-components.txt` e
   `llms-patterns.txt` depois de ler o SDD.
 
+## Arquitetura da UI
+
+- TanStack Router usa árvore manual tipada em `ui/src/routes/routes.tsx`; não use
+  roteamento baseado em arquivos;
+- estado de servidor usa TanStack Query pelo `QueryClientProvider` global;
+- formulários usam TanStack Form e composição tipada;
+- requests usam uma única instância Axios baseada em `VITE_API_URL`; componentes
+  não usam `fetch` nem criam clients paralelos;
+- a UI local usa a porta `3000` e a API local usa a porta `4000`;
+- siga `ui/docs/sdd/base/01-arquitetura.md` para providers, navegação, formulários,
+  ambiente e integrações.
+
 ## Arquitetura da API
 
 - o controller valida a entrada, registra log seguro, chama o command e devolve seu

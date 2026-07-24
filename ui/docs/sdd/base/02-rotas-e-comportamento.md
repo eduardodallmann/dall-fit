@@ -1,5 +1,12 @@
 # Rotas e comportamento funcional
 
+## Roteamento
+
+TanStack Router é o roteador oficial. A árvore é declarada manualmente em
+`src/routes/routes.tsx` e registrada por module augmentation para preservar
+tipagem de paths, parâmetros, links e navegação. Não usar roteamento por arquivos,
+strings de URL espalhadas em componentes nem acesso direto a `window.history`.
+
 ## Documentação viva
 
 Cada arquivo em `routes/` representa o estado atual de uma tela ou rota navegável.

@@ -139,7 +139,7 @@ pnpm -C api seed -- <endpoint-slug>:<scenario-slug>
 
 ```bash
 curl --request <METHOD> \
-  --url http://localhost:3000/<path> \
+  --url http://localhost:4000/<path> \
   --header 'content-type: application/json' \
   --data '<body-ficticio-e-completo>'
 ```
@@ -163,7 +163,7 @@ curl --request <METHOD> \
 
 ```bash
 curl --request <METHOD> \
-  --url http://localhost:3000/<path> \
+  --url http://localhost:4000/<path> \
   --header 'content-type: application/json' \
   --data '<body-invalido-que-aciona-o-cenario>'
 ```
@@ -189,7 +189,7 @@ pnpm -C api seed -- <endpoint-slug>:<alternative-scenario-slug>
 
 ```bash
 curl --request <METHOD> \
-  --url http://localhost:3000/<path-com-dados-do-seed>
+  --url http://localhost:4000/<path-com-dados-do-seed>
 ```
 
 - Given:
@@ -213,7 +213,7 @@ pnpm -C api seed -- <endpoint-slug>:<dependency-error-scenario-slug>
 
 ```bash
 curl --request <METHOD> \
-  --url http://localhost:3000/<path-com-dados-do-seed>
+  --url http://localhost:4000/<path-com-dados-do-seed>
 ```
 
 - Given:

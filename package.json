@@ -2,6 +2,9 @@
   "name": "dall-fit",
   "version": "0.0.0",
   "private": true,
+  "redisMemoryServer": {
+    "version": "8.8.1"
+  },
   "scripts": {
     "build": "pnpm -C packages/types build && pnpm -C api build && pnpm -C ui build",
     "dev": "pnpm --recursive --parallel --stream --filter dall-fit-api --filter dall-fit-app run dev",

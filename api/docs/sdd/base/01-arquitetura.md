@@ -2,9 +2,14 @@
 
 ## Stack
 
-A API usa NestJS 11, TypeScript e Node.js. O entrypoint é `src/main.ts`, a composição
-raiz está em `src/app.module.ts` e funcionalidades futuras devem ser organizadas em
-módulos por domínio.
+A API usa NestJS 11, TypeScript, Node.js, Mongoose para MongoDB e ioredis para
+Redis. `@nestjs/config` carrega o ambiente e uma função baseada em Zod valida e
+tipa seus valores antes do bootstrap. O entrypoint é
+`src/main.ts`, a composição raiz está em `src/app.module.ts` e funcionalidades
+futuras devem ser organizadas em módulos por domínio.
+
+O servidor HTTP usa a porta `4000` por padrão e aceita requests da origem da UI em
+`http://localhost:3000`. Ambos os valores são configuráveis por ambiente.
 
 ## Imports internos e compartilhados
 
@@ -152,6 +157,7 @@ coordenadas com consumidores antes de remover campos ou alterar semântica.
 - MongoDB é o banco NoSQL principal.
 - Redis armazena dados temporários, caches, sessões, locks ou idempotência conforme
   o caso de uso.
+- Mongoose e ioredis são os clients oficiais de produção.
 - services dependem de ports de repository ou cache, não de clients ou models
   concretos.
 - adapters de MongoDB e Redis implementam essas ports e permanecem na camada de
@@ -162,9 +168,28 @@ E2E, os adapters reais usam processos efêmeros iniciados por
 `mongodb-memory-server` e `redis-memory-server`, conforme
 `04-mocks-e-bancos-de-teste.md`.
 
+As dependências estão instaladas, mas a aplicação raiz não abre conexões vazias.
+`MongooseModule`, o client Redis e seus adapters entram junto do primeiro domínio
+que realmente consumir cada infraestrutura. Até lá, o endpoint técnico `/`
+continua iniciando sem exigir processos de banco ativos.
+
 ## Configuração e segurança
 
-- variáveis de ambiente são acessadas por módulo de configuração validado;
+- variáveis de ambiente são carregadas globalmente por `ConfigModule` e validadas
+  antes do bootstrap pelo schema Zod em
+  [`src/config/environment.ts`](../../../src/config/environment.ts);
+- a validação converte `PORT` para número, aplica os padrões locais, rejeita
+  protocolos inválidos de MongoDB e Redis, informa todas as chaves inválidas sem
+  expor seus valores e preserva variáveis predefinidas não pertencentes ao schema;
+- `api/.env.example` declara:
+  - `PORT`, porta HTTP, com padrão local `4000`;
+  - `CORS_ORIGIN`, origem permitida, com padrão local
+    `http://localhost:3000`;
+  - `MONGODB_URI`, URI do MongoDB principal;
+  - `REDIS_URL`, URI do Redis;
+- o `.env` local não é versionado;
+- valores padrão existem para desenvolvimento, mas ambientes implantados devem
+  declarar explicitamente seus próprios endereços e credenciais;
 - segredos e dados pessoais não aparecem em logs, fixtures ou documentação;
 - todo log segue a sanitização e a redaction definidas em
   `06-logging-e-rastreabilidade.md`;

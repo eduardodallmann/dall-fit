@@ -24,6 +24,16 @@ pacotes `dall-fit-api` e `dall-fit-app`. Cada aplicação preserva seu próprio 
 para identificar a origem de cada log, e encerrar o processo da raiz encerra os
 dois servidores.
 
+No desenvolvimento local:
+
+- UI: `http://localhost:3000`;
+- API: `http://localhost:4000`.
+
+Cada aplicação possui um `.env.example` versionado com valores locais seguros. O
+arquivo `.env` correspondente é local, ignorado pelo Git e deve ser criado a partir
+do exemplo. O repositório pode fornecer esse arquivo local durante a estruturação,
+mas credenciais e valores de ambientes reais nunca são versionados.
+
 ## Comandos agregadores
 
 Todos os quality gates são iniciados na raiz:
