@@ -5,6 +5,9 @@
   "redisMemoryServer": {
     "version": "8.8.1"
   },
+  "mongodbMemoryServer": {
+    "version": "8.0.12"
+  },
   "scripts": {
     "build": "pnpm -C packages/types build && pnpm -C api build && pnpm -C ui build",
     "dev": "pnpm --recursive --parallel --stream --filter dall-fit-api --filter dall-fit-app run dev",
@@ -14,6 +17,7 @@
     "test": "pnpm -C packages/types build && pnpm -C api test && pnpm -C ui test",
     "test:coverage": "pnpm -C packages/types build && pnpm -C api test:coverage && pnpm -C ui test:coverage",
     "test:coverage:ci": "pnpm -C packages/types build && pnpm -C api test:coverage:ci && pnpm -C ui test:coverage:ci",
+    "test:integration": "pnpm -C ui test:integration",
     "typecheck": "pnpm -C packages/types build && pnpm -C api typecheck && pnpm -C ui typecheck"
   },
   "devDependencies": {

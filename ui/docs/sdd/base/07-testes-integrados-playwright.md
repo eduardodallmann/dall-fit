@@ -264,18 +264,5 @@ junto dos testes Playwright e não substituem as imagens curadas do SDD.
 
 ## Estado de adoção
 
-Esta política é normativa, mas Playwright ainda não está instalado porque a UI não
-possui rotas e integrações que justifiquem uma suíte de navegador. A primeira
-entrega com cenário integrado deve adicionar atomicamente:
-
-1. `@playwright/test`;
-2. `ui/playwright.config.ts`;
-3. scripts da UI e o agregador da raiz;
-4. Chromium local/CI;
-5. estrutura `ui/tests/integration/`;
-6. MSW Browser e handlers necessários;
-7. ignores para relatórios e resultados;
-8. execução no pipeline.
-
-Até essa adoção, os comandos desta página descrevem o contrato alvo e ainda não
-estão disponíveis no workspace.
+Playwright foi adotado com a jornada de login. Configuração, scripts, Chromium,
+MSW Browser, specs de rota/flow e ignores seguem o contrato desta página.

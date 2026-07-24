@@ -17,4 +17,6 @@ de dependência, branch e saída conforme
 
 Índice atual:
 
-- [`GET /`](root.md): resposta inicial do scaffold.
+- [`Autenticação`](auth.md): início/callback Google e bypass restrito local/teste.
+- [`GET /auth/me`](current-person.md): pessoa vinculada à sessão.
+- [`GET /`](root.md): resposta técnica protegida por sessão.

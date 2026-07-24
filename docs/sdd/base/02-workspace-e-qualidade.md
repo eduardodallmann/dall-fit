@@ -52,8 +52,8 @@ Todos os quality gates são iniciados na raiz:
 Os comandos explícitos com `pnpm -C` tornam visível qual projeto falhou e preservam
 a autonomia de configuração de cada suíte.
 
-`test:integration` ainda não existe no workspace porque Playwright não foi adotado.
-Ele será criado na raiz e na UI junto do primeiro cenário integrado, conforme
+`test:integration` executa os cenários Playwright da UI. A adoção ocorreu com a
+jornada de login e segue
 `../../../ui/docs/sdd/base/07-testes-integrados-playwright.md`.
 
 O pacote `@dall-fit/types` também é compilado em `postinstall`, garantindo suas

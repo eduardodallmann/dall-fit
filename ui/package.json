@@ -10,6 +10,11 @@
     "lint:fix": "pnpm --dir .. exec eslint ui --fix",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:integration": "playwright test",
+    "test:integration:debug": "playwright test --debug",
+    "test:integration:install": "playwright install chromium",
+    "test:integration:install:ci": "playwright install --with-deps chromium",
+    "test:integration:ui": "playwright test --ui",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=coverage/junit.xml",
@@ -30,6 +35,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "6.10.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -39,8 +45,14 @@
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^29.1.1",
+    "msw": "^2.15.0",
     "typescript": "~6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }

@@ -59,8 +59,9 @@ O bootstrap só importa e inicia `browser.ts` quando:
 A aplicação aguarda o worker antes do primeiro render, evitando requests que escapem
 antes da interceptação. Builds de produção não importam nem iniciam o worker.
 
-`public/mockServiceWorker.js` é gerado pelo MSW, permanece ignorado pelo Git e não
-deve ser editado manualmente.
+`public/mockServiceWorker.js` é gerado pelo MSW, permanece versionado para que
+desenvolvimento e Playwright funcionem imediatamente e não deve ser editado
+manualmente.
 
 ## Regra obrigatória
 
@@ -135,6 +136,13 @@ Erros do frontend são documentados na rota; contratos HTTP permanecem no SDD da
 
 ## Estado de adoção
 
-MSW é o padrão aceito, mas ainda não foi instalado porque a UI atual não possui
-integrações HTTP. Dependências, worker, setups de Vitest e Playwright e estrutura
-serão adicionados atomicamente com a primeira request da aplicação.
+MSW foi adotado com autenticação. Os handlers vigentes cobrem início fictício do
+login e consulta da pessoa atual. No modo mock, a query exclusiva
+`mockAuth=unauthenticated` faz o client enviar
+`x-dall-fit-mock-auth: unauthenticated`; o header nunca é enviado quando mocks estão
+desabilitados e não pertence ao contrato da API.
+
+O handler de `POST /auth/google` devolve `/me` como URL de autorização,
+representando que o provedor e callback concluíram. `GET /auth/me` devolve a
+fixture autenticada por padrão, `401` no seletor `unauthenticated` e erro técnico
+no seletor `error`.

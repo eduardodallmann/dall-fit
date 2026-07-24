@@ -6,3 +6,9 @@ export interface Entity {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+export interface Person extends Entity {
+  name: string;
+  email: string;
+  photoUrl: string | null;
+}

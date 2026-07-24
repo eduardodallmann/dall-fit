@@ -5,5 +5,7 @@ packages:
 
 allowBuilds:
   '@swc/core': true
+  esbuild: true
   mongodb-memory-server: true
+  msw: true
   redis-memory-server: true

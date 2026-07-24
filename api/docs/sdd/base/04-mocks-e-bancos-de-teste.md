@@ -126,6 +126,6 @@ aplicação.
 - Unitários nunca iniciam bancos.
 - E2E sempre usam adapters reais quando MongoDB ou Redis participarem do fluxo.
 - E2E nunca executam em paralelo.
-- `mongodb-memory-server` e `redis-memory-server` já estão instalados; setups,
-  versões fixadas dos binários e lifecycle hooks entram com o primeiro E2E que
-  usar cada banco.
+- `mongodb-memory-server` e `redis-memory-server` estão instalados. O setup MongoDB
+  vigente atende os E2E de autenticação e `Person`; versão e lifecycle do Redis
+  efêmero entram somente no primeiro E2E que consumir Redis.

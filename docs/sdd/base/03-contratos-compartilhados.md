@@ -37,6 +37,17 @@ divergência em estruturas conhecidas pela API e pela UI.
 import { SortDirection, type ApiResponse, type Entity } from '@dall-fit/types';
 ```
 
+## Contratos vigentes de autenticação
+
+- `Person` é a representação pública compartilhada da pessoa autenticada. Contém
+  `id`, `name`, `email`, `photoUrl`, `createdAt` e `updatedAt`.
+- `CurrentPersonResponse` envolve `Person` em `ApiResponse`.
+- `StartGoogleLoginResponse` envolve a `authorizationUrl` temporária em
+  `ApiResponse`.
+- o identificador Google, documentos MongoDB, cookies e payloads de sessão são
+  detalhes exclusivos da API e não pertencem ao pacote.
+- `photoUrl` é anulável porque o claim de foto do provedor não é garantido.
+
 O pacote é compilado por `pnpm install` e novamente antes dos comandos agregadores
 da raiz. Durante desenvolvimento, execute `pnpm -C packages/types build` após mudar
 uma exportação pública caso o consumidor esteja sendo iniciado isoladamente.

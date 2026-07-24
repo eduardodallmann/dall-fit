@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
 
 import { AppController } from '~/app.controller';
-import { AppService } from '~/app.service';
+import { AuthModule } from '~/auth/auth.module';
+import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
+import { GetRootCommand } from '~/commands/get-root.command';
 import { validateEnvironment } from '~/config/environment';
+import { PersonModule } from '~/person/person.module';
 
 @Module({
   imports: [
@@ -12,8 +16,16 @@ import { validateEnvironment } from '~/config/environment';
       isGlobal: true,
       validate: validateEnvironment,
     }),
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.getOrThrow<string>('MONGODB_URI'),
+      }),
+    }),
+    PersonModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [GetRootCommand, SessionAuthGuard],
 })
 export class AppModule {}
