@@ -50,3 +50,16 @@ MSW será configurado junto da primeira integração HTTP, seguindo
 
 Playwright será configurado junto do primeiro cenário integrado de rota ou flow,
 seguindo `07-testes-integrados-playwright.md`.
+
+## Imports internos e compartilhados
+
+Imports de arquivos em `src/` usam `~/*`, resolvido para o `src/` exclusivo da UI
+por TypeScript, Vite e Vitest:
+
+```ts
+import { WorkoutPage } from '~/routes/workout';
+```
+
+Contratos do monorepo são consumidos por seus pacotes públicos no namespace
+`@dall-fit/*`, como `@dall-fit/types`. `~/` nunca aponta para a API ou para outro
+pacote do workspace, e `@/*` não é um alias válido.

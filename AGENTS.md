@@ -57,6 +57,10 @@ devem ser interpretadas como a verdade vigente.
 - execute comandos agregadores a partir da raiz;
 - ESLint e Prettier têm configuração única na raiz;
 - API e UI não importam arquivos internos uma da outra;
+- imports internos da API e da UI usam `~/*`, sempre resolvido para o `src/` do
+  próprio projeto;
+- imports compartilhados usam pacotes públicos `@dall-fit/*`; não use alias
+  genérico `@/*` nem caminhos internos de outro projeto;
 - contratos TypeScript usados pelos dois projetos vivem em `@dall-fit/types`;
 - exportações compartilhadas são feitas por `packages/types/src/index.ts`;
 - atualize produtor, consumidores, testes e SDD atomicamente ao mudar um contrato.

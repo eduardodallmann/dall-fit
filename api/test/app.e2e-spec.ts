@@ -4,7 +4,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { AppModule } from '../src/app.module';
+import { AppModule } from '~/app.module';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;

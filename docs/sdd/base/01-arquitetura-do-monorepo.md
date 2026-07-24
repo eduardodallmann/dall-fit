@@ -34,6 +34,28 @@ dall-fit/
    automaticamente em `types`; ele exige pacote próprio e, quando relevante, ADR.
 5. Cada aplicação mantém configuração e suíte de testes próprias.
 
+## Convenções de importação
+
+Código interno de cada aplicação usa `~/*`, resolvido sempre para o próprio
+diretório `src/`:
+
+```ts
+import { AppService } from '~/app.service';
+```
+
+O alias é independente em `api/` e `ui/`: `~/` nunca atravessa a fronteira entre
+os projetos. Imports compartilhados usam o nome público do pacote no namespace
+`@dall-fit/*`:
+
+```ts
+import type { Entity } from '@dall-fit/types';
+```
+
+Não existe alias genérico `@/*`. O prefixo `@` é reservado aos pacotes
+compartilhados do workspace e aos pacotes externos que já possuem namespace, como
+`@nestjs/*` e `@heroui/*`. API e UI não importam caminhos internos de
+`packages/types`; consomem somente suas exportações públicas.
+
 ## Inclusão de um projeto
 
 Um novo projeto deve:

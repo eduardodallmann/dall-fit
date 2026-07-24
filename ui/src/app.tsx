@@ -9,7 +9,7 @@ import {
   Page,
   PageContent,
   Title,
-} from './app.styles';
+} from '~/app.styles';
 
 function App() {
   const [count, setCount] = useState(0);
