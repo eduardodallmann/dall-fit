@@ -6,6 +6,20 @@ A API usa NestJS 11, TypeScript e Node.js. O entrypoint é `src/main.ts`, a comp
 raiz está em `src/app.module.ts` e funcionalidades futuras devem ser organizadas em
 módulos por domínio.
 
+## Imports internos e compartilhados
+
+Imports de arquivos em `src/` usam `~/*`, resolvido para o `src/` exclusivo da
+API. A configuração é compartilhada por TypeScript, build/watch do Nest e Vitest,
+incluindo E2E:
+
+```ts
+import { AppService } from '~/app.service';
+```
+
+Contratos do monorepo são consumidos pela API por seus pacotes públicos no
+namespace `@dall-fit/*`, como `@dall-fit/types`. `~/` nunca aponta para a UI ou
+para outro pacote do workspace, e `@/*` não é um alias válido.
+
 ## Responsabilidades por camada
 
 Para cada domínio, preferir:
