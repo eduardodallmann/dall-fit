@@ -14,5 +14,6 @@
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
   },
-  "explorer.compactFolders": false,
+  "tailwindCSS.classFunctions": ["tv"],
+  "explorer.compactFolders": false
 }

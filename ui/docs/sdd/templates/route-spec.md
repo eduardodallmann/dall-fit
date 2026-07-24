@@ -123,7 +123,9 @@ Para estados inexistentes, declarar “não se aplica”.
 ## Estrutura técnica relevante
 
 - Arquivo da rota:
-- Componentes:
+- Componentes HeroUI utilizados:
+- Componentes core utilizados ou criados:
+- Componentes exclusivos da rota:
 - Hooks e serviços:
 - Tipos compartilhados:
 

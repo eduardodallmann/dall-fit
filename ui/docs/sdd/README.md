@@ -27,8 +27,11 @@ pertencem a `../../../api/docs/sdd/endpoints/`.
 8. Executar os quality gates pela raiz.
 
 Toda construção ou alteração visual segue
-`base/03-componentes-e-estilizacao.md`. Cada documento de rota deve permitir que QA
-derive casos de teste sem consultar código ou conversa externa.
+`base/03-componentes-e-estilizacao.md`: consultar o catálogo oficial do HeroUI
+antes de criar componentes, separar composição em `index.tsx` e apresentação em
+`styles.tsx`, e usar `tv` de `@heroui/styles` em toda estilização própria. Cada
+documento de rota deve permitir que QA derive casos de teste sem consultar código
+ou conversa externa.
 
 Toda integração HTTP segue `base/05-mocks-de-api.md`.
 Testes integrados de rotas e flows seguem

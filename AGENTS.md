@@ -61,6 +61,24 @@ devem ser interpretadas como a verdade vigente.
 - exportações compartilhadas são feitas por `packages/types/src/index.ts`;
 - atualize produtor, consumidores, testes e SDD atomicamente ao mudar um contrato.
 
+## Design system da UI
+
+- consulte `ui/docs/sdd/base/03-componentes-e-estilizacao.md` e o catálogo oficial
+  do HeroUI antes de construir ou alterar uma tela;
+- use componentes existentes de `@heroui/react` antes de criar equivalentes
+  locais e preserve sua semântica, composição e acessibilidade;
+- componentes próprios e reutilizáveis vivem em `ui/src/core/components/`;
+  componentes exclusivos ficam na rota proprietária;
+- componentes visuais próprios separam composição em `index.tsx` e apresentação
+  em `styles.tsx`;
+- não escreva classes Tailwind ou estilos inline no JSX de composição; wrappers
+  visuais e classes ficam em `styles.tsx`;
+- use `tv`, `VariantProps` e funções de variantes de `@heroui/styles`; não adicione
+  dependência direta de `tailwind-variants`;
+- para confirmar APIs atuais, consulte os arquivos oficiais
+  `https://heroui.com/react/llms.txt`, `llms-components.txt` e
+  `llms-patterns.txt` depois de ler o SDD.
+
 ## Arquitetura da API
 
 - o controller valida a entrada, registra log seguro, chama o command e devolve seu

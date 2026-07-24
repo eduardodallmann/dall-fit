@@ -2,8 +2,10 @@
 
 ## Stack
 
-A UI usa React 19, TypeScript, Vite e Vitest. Playwright é o padrão dos testes
-integrados no navegador. `src/main.tsx` realiza o bootstrap e `src/App.tsx` é a
+A UI usa React 19, TypeScript, Vite, Tailwind CSS 4 e HeroUI 3. A estilização
+própria usa a API Tailwind Variants exportada por `@heroui/styles`.
+Vitest cobre testes unitários e de componentes; Playwright é o padrão dos testes
+integrados no navegador. `src/main.tsx` realiza o bootstrap e `src/app.tsx` é a
 composição inicial enquanto a arquitetura de rotas ainda não foi introduzida.
 
 ## Estrutura alvo
@@ -38,9 +40,10 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
   cliente da aplicação;
 - credenciais e dados pessoais não aparecem em logs ou fixtures.
 
-Introduzir router, biblioteca de estado de servidor, internacionalização ou design
-system exige atualizar esta base e registrar ADR quando houver trade-off
-transversal.
+Introduzir router, biblioteca de estado de servidor ou internacionalização exige
+atualizar esta base e registrar ADR quando houver trade-off transversal. O design
+system e suas regras vigentes estão definidos em
+`03-componentes-e-estilizacao.md`.
 
 MSW será configurado junto da primeira integração HTTP, seguindo
 `05-mocks-de-api.md`; a fundação atual não instala dependências sem uso.

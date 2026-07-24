@@ -13,11 +13,10 @@ Exibir a tela inicial do scaffold e confirmar o funcionamento da interação Rea
 
 ## Elementos e conteúdo
 
-- ilustração inicial com logos do React e Vite;
+- identificação `Dall Fit`;
 - título `Get started`;
-- orientação para editar `src/App.tsx`;
-- botão contador iniciado em zero;
-- links externos de documentação e comunidade.
+- orientação para editar `src/app.tsx`;
+- botão contador iniciado em zero, fornecido pelo HeroUI.
 
 ## Caminho feliz
 
@@ -36,9 +35,9 @@ Exibir a tela inicial do scaffold e confirmar o funcionamento da interação Rea
 
 ## Acessibilidade
 
-O contador é um botão nativo e pode ser acionado por mouse ou teclado. Imagens
-decorativas usam texto alternativo vazio; links e imagens informativas possuem nome
-acessível.
+O contador usa o componente `Button` do HeroUI, renderizado como `button` nativo,
+com nome acessível correspondente ao valor atual. Ele pode ser acionado por mouse
+ou teclado.
 
 ## Cenários funcionais
 
@@ -51,4 +50,13 @@ acessível.
 
 ## Cobertura
 
-- Teste de componente: `src/App.test.tsx`
+- Teste de componente: `src/app.test.tsx`
+
+## Estrutura técnica relevante
+
+- Arquivo da rota: `src/app.tsx`
+- Componentes HeroUI: `Button` e `Card` de `@heroui/react`
+- Apresentação própria: `src/app.styles.tsx`
+- Componentes core: não se aplica
+- Componentes exclusivos da rota: não se aplica
+- Integrações: não se aplica
