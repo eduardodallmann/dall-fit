@@ -3,6 +3,10 @@
 > Documento autocontido para orientar a implementação e validar a demanda sem
 > depender de conversa externa. Depois da entrega, permanece como registro
 > histórico e não representa necessariamente o comportamento atual.
+>
+> Criar ou refinar este documento não autoriza implementação nem atualização dos
+> SDDs vivos. Ao apresentá-lo, encerrar o trabalho e aguardar uma mensagem posterior
+> e explícita do usuário autorizando a implementação desta feature.
 
 ## Contexto e resultado esperado
 
@@ -60,10 +64,10 @@ observáveis. Não criar testes somente para aumentar cobertura de linhas.
 
 ## Riscos e decisões
 
-## Definição de pronto
+## Condições esperadas da entrega
 
-- [ ] Critérios de aceite atendidos
-- [ ] Contratos, endpoints, rotas e fluxos afetados atualizados
-- [ ] MSW, mocks unitários e E2E foram atualizados conforme o impacto
-- [ ] Migração entre produtor e consumidores é compatível
-- [ ] Quality gates da raiz aprovados ou dispensa `docs-only` registrada
+- Critérios de aceite atendidos
+- Contratos, endpoints, rotas e fluxos afetados atualizados
+- MSW, mocks unitários e E2E atualizados conforme o impacto
+- Migração entre produtor e consumidores compatível
+- Quality gates da raiz aprovados

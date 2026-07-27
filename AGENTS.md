@@ -33,7 +33,7 @@ devem ser interpretadas como a verdade vigente.
   feature em `docs/sdd/features/` antes da implementação, mesmo quando afeta
   somente um projeto;
 - features não registram status, ciclo de vida ou datas de conclusão;
-- a feature pode ser refinada enquanto orienta a implementação;
+- a feature pode ser refinada somente durante a fase de especificação;
 - depois que a demanda for entregue, nunca edite, renomeie, mova ou remova sua
   feature; uma correção ou evolução cria outra feature e referencia a anterior
   quando útil;
@@ -51,6 +51,35 @@ devem ser interpretadas como a verdade vigente.
 - use os templates do nível proprietário;
 - documentos em `base/`, `flows/`, `endpoints/` e `routes/` descrevem somente o
   estado atual, não um histórico de tickets.
+
+## Gate obrigatório entre feature e implementação
+
+Criar, escrever, documentar, detalhar, revisar ou refinar uma feature autoriza
+somente a fase de especificação:
+
+1. crie ou altere apenas o arquivo autocontido em `docs/sdd/features/`, usando o
+   template da raiz;
+2. não altere código, configuração, contratos executáveis, mocks ou testes;
+3. não atualize `base/`, ADRs, flows, endpoints ou routes para descrever um
+   comportamento que ainda não foi implementado;
+4. encerre o turno após apresentar a feature e aguarde a validação do usuário.
+
+A implementação só pode começar após uma mensagem posterior e explícita do usuário,
+como `implemente a feature <arquivo>` ou `pode iniciar a implementação da feature
+<arquivo>`. A autorização precisa ocorrer depois que a feature tiver sido
+apresentada; mencionar implementação no pedido inicial de criação da feature não
+remove a pausa obrigatória.
+
+Depois da autorização, trate a feature validada como contrato: implemente código,
+configuração, contratos, mocks e testes e atualize os SDDs vivos afetados na mesma
+entrega, sem alterar silenciosamente a feature. Se a implementação exigir mudança
+de escopo ou decisão registrada nela, pare, retorne à fase de especificação e
+aguarde nova validação e nova ordem de implementação.
+
+Quando o usuário disser explicitamente para não criar feature, não crie uma. Essa
+exceção é comum em ajustes estruturantes dos SDDs base; nesse caso, execute somente
+o escopo solicitado, que pode ser `docs-only` ou incluir implementação conforme a
+ordem explícita.
 
 ## Regras do monorepo
 

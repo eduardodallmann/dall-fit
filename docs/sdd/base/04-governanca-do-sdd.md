@@ -42,24 +42,49 @@ Uma correção exclusivamente editorial, sem demanda nem mudança de comportamen
 pode atualizar apenas a documentação viva. Uma feature spec nunca substitui
 endpoint, rota, fluxo ou base.
 
+Quando o usuário declarar explicitamente que a atividade não cria feature, essa
+decisão prevalece. Esse caminho é apropriado para ajustes estruturantes na
+documentação base e outras mudanças cujo escopo explícito não representa uma
+demanda a preservar em `features/`.
+
+## Separação entre especificação e implementação
+
+A criação de uma feature é uma atividade `docs-only` isolada. Durante essa fase:
+
+- somente o arquivo da feature é criado ou refinado;
+- os documentos vivos são lidos como contexto, mas continuam descrevendo o sistema
+  implementado no momento;
+- código, configuração, contratos executáveis, mocks e testes não são alterados;
+- a feature reúne autocontidamente todo o comportamento pretendido, impactos,
+  cenários, decisões, riscos e validações planejadas;
+- o agente apresenta o documento e encerra o trabalho para que o usuário o valide.
+
+A implementação exige uma ordem explícita em uma mensagem posterior à apresentação
+da feature. Pedidos para criar, documentar, detalhar, revisar ou refinar a feature
+não concedem essa autorização, mesmo quando a implementação estiver completamente
+descrita ou tiver sido mencionada no pedido inicial.
+
+Após a autorização, a feature validada funciona como contrato da entrega. Código,
+testes, mocks, contratos executáveis e documentos vivos são alterados juntos na
+fase de implementação. A feature não é modificada silenciosamente para se adequar
+ao código. Se surgir uma necessidade de mudar seu escopo ou uma decisão, a
+implementação para, a feature volta à fase de especificação e uma nova ordem é
+necessária depois da validação.
+
 ## Registro histórico de uma feature
 
-Uma feature não possui status, datas de criação ou conclusão nem seção de
-encerramento. O ticket relacionado e o histórico do repositório já preservam a
-cronologia da atividade.
+Uma feature não possui status, checklists de progresso, datas de criação ou
+conclusão nem seção de encerramento. O ticket relacionado e o histórico do
+repositório já preservam a cronologia da atividade.
 
-Enquanto orienta a implementação, a feature pode receber refinamentos de
-requisitos, decisões, cenários e riscos. Antes de considerar a demanda entregue,
-deve-se:
-
-1. atualizar todos os endpoints, rotas, flows, bases e contratos vivos afetados;
-2. atualizar os testes, mocks, seeds e referências visuais aplicáveis;
-3. executar as validações aplicáveis ou registrar a justificativa de dispensa;
-4. concluir a definição de pronto.
+Durante a fase de especificação, a feature pode receber refinamentos de requisitos,
+decisões, cenários e riscos. Depois que o usuário autoriza a implementação, seu
+conteúdo permanece estável como o contrato validado. As condições esperadas da
+entrega são declarativas, sem caixas que sejam marcadas durante o trabalho.
 
 Depois que a demanda for entregue, o arquivo deixa de acompanhar o sistema:
 
-- não editar conteúdo, checklist ou links;
+- não editar conteúdo ou links;
 - não renomear, mover ou remover o arquivo;
 - não adequar o texto ao comportamento atual.
 
