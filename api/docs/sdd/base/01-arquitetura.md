@@ -176,6 +176,28 @@ O domínio `Person` expõe ports de repository aos services. O adapter MongoDB m
 índice único para o identificador `sub` do Google e mapeia documentos para entidades
 antes de devolvê-los.
 
+## Infraestrutura de desenvolvimento local
+
+O comando abaixo inicia MongoDB e Redis reais em processos locais efêmeros, sem
+Docker:
+
+```bash
+pnpm -C api dev:infra
+```
+
+O MongoDB usa `127.0.0.1:27017`, database `dall-fit`, e o Redis usa
+`127.0.0.1:6379`, em conformidade com `api/.env.example`. As versões dos binários
+são fixadas no `package.json` da raiz. As portas não são substituídas
+automaticamente: se estiverem ocupadas, o comando falha para evitar que a API se
+conecte a um processo ou endereço inesperado.
+
+`pnpm -C api dev` executa `dev:infra` e `start:dev` juntos. O orquestrador encerra o
+outro processo se infraestrutura ou API terminar, e sinais de encerramento fecham
+MongoDB e Redis. Reloads do Nest preservam os dados enquanto a sessão de
+desenvolvimento estiver ativa; encerrar a sessão descarta todos os dados. O comando
+`pnpm dev` da raiz mantém sua interface e inicia esse ciclo da API em paralelo ao
+Vite da UI.
+
 ## Configuração e segurança
 
 - variáveis de ambiente são carregadas globalmente por `ConfigModule` e validadas

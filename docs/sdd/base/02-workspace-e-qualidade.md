@@ -19,15 +19,29 @@ pnpm dev
 ```
 
 A raiz usa a execução recursiva e paralela do pnpm, filtrada explicitamente pelos
-pacotes `dall-fit-api` e `dall-fit-app`. Cada aplicação preserva seu próprio script
-`dev`: NestJS em watch mode na API e Vite na UI. A saída mantém o prefixo do pacote
-para identificar a origem de cada log, e encerrar o processo da raiz encerra os
-dois servidores.
+pacotes `dall-fit-api` e `dall-fit-app`. A UI inicia o Vite. O script `dev` da API
+inicia sua infraestrutura local efêmera e o NestJS em watch mode com processos
+coordenados. A saída mantém prefixos para identificar a origem de cada log, e
+encerrar o processo da raiz encerra UI, API, MongoDB e Redis.
 
 No desenvolvimento local:
 
 - UI: `http://localhost:3000`;
 - API: `http://localhost:4000`.
+- MongoDB efêmero: `127.0.0.1:27017`, database `dall-fit`;
+- Redis efêmero: `127.0.0.1:6379`.
+
+Também é possível iniciar apenas a infraestrutura da API:
+
+```bash
+pnpm -C api dev:infra
+```
+
+MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
+`redis-memory-server`, sem Docker. Os dados permanecem durante os reloads do Nest na
+mesma sessão e são descartados quando o processo de desenvolvimento termina. As
+portas são fixas para corresponder ao `.env.example`; uma porta já ocupada faz o
+comando falhar, sem escolher silenciosamente outro endereço.
 
 Cada aplicação possui um `.env.example` versionado com valores locais seguros. O
 arquivo `.env` correspondente é local, ignorado pelo Git e deve ser criado a partir

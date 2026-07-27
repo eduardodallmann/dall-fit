@@ -62,6 +62,22 @@ Não usar `ioredis-mock` ou implementação JavaScript equivalente nos E2E. Esse
 pacotes são mocks adequados apenas a testes unitários e não garantem semântica real
 de comandos, TTL, atomicidade ou locks.
 
+## Uso em desenvolvimento local
+
+Os mesmos pacotes de processos locais também sustentam `pnpm -C api dev:infra`, mas
+o ciclo de vida de desenvolvimento não é compartilhado com os E2E:
+
+- desenvolvimento usa portas fixas compatíveis com `api/.env.example`;
+- os dados duram somente até o encerramento da sessão de desenvolvimento;
+- reloads do Nest não reiniciam os bancos;
+- E2E continuam criando instâncias próprias em portas temporárias, com isolamento e
+  limpeza por cenário;
+- um teste nunca reutiliza nem limpa os bancos iniciados por `dev:infra`.
+
+O uso comum dos binários reduz pré-requisitos locais e preserva a regra de não
+introduzir Docker, sem transformar os bancos de desenvolvimento em fixtures globais
+dos testes.
+
 ## Ciclo de vida E2E
 
 1. Iniciar MongoDB e Redis antes de compor o módulo Nest.

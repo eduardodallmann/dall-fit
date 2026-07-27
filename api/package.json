@@ -8,7 +8,8 @@
   "scripts": {
     "build": "nest build",
     "configure:google-oauth": "node ./scripts/configure-google-oauth.mjs",
-    "dev": "pnpm start:dev",
+    "dev": "concurrently --kill-others --no-color --names infra,api \"pnpm dev:infra\" \"pnpm start:dev\"",
+    "dev:infra": "node ./scripts/dev-infra.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -54,6 +55,7 @@
     "@types/node": "^26.1.1",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^4.1.10",
+    "concurrently": "^10.0.4",
     "mongodb-memory-server": "^11.2.0",
     "redis-memory-server": "^0.17.0",
     "source-map-support": "^0.5.21",
