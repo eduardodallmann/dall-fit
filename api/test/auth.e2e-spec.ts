@@ -205,9 +205,11 @@ describe('Authentication (e2e)', () => {
     }
   });
 
-  it('rejects a callback whose state differs before calling Google', async () => {
+  it('accepts Google metadata and rejects a callback whose state differs', async () => {
     const response = await request(app.getHttpServer())
-      .get('/callback?code=fake-code&state=wrong-state')
+      .get(
+        '/callback?code=fake-code&state=wrong-state&iss=https%3A%2F%2Faccounts.google.com&scope=email+profile+openid&authuser=0&prompt=consent',
+      )
       .set(
         'Cookie',
         `${OAUTH_STATE_COOKIE}=expected-state; ${OAUTH_NONCE_COOKIE}=fake-nonce`,

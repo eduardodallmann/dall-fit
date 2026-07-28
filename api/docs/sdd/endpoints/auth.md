@@ -42,6 +42,7 @@ local/teste, para automação sem o provedor externo.
 ### `GET /callback`
 
 - público, recebe `code` e `state`, ou `error`;
+- metadados adicionais devolvidos pelo Google são descartados antes da validação;
 - compara o state do query ao cookie e valida o nonce no ID token;
 - em sucesso grava `dall_fit_session`, limpa cookies temporários e responde `302`
   para `${UI_URL}/me`;
@@ -215,14 +216,16 @@ curl --request POST \
 
 ```bash
 curl --request GET \
-  --url 'http://localhost:4000/callback?code=fake-code&state=wrong-state' \
+  --url 'http://localhost:4000/callback?code=fake-code&state=wrong-state&iss=https%3A%2F%2Faccounts.google.com&scope=email+profile+openid&authuser=0&prompt=consent' \
   --cookie 'dall_fit_oauth_state=expected-state; dall_fit_oauth_nonce=fake-nonce' \
   --include
 ```
 
-- Given: query e cookie possuem states diferentes
+- Given: query e cookie possuem states diferentes, e a query contém os metadados
+  adicionais enviados pelo Google
 - When: chama o callback
-- Then: limpa cookies temporários e redireciona com erro genérico, sem chamar Google
+- Then: ignora os metadados adicionais, limpa cookies temporários e redireciona com
+  erro genérico, sem chamar Google
 
 O callback feliz real não possui cURL estático porque o código Google é de uso
 único. Ele é validado manualmente pelo início do cenário 1; unitários substituem o
