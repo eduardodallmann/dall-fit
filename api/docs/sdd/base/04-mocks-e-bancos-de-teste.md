@@ -51,9 +51,9 @@ cache conhecido no CI para evitar downloads em toda execução.
 usam o mesmo client e adapter usados em produção.
 O pacote é uma dependência de desenvolvimento da API e seu build script está
 autorizado no workspace. Seu `postinstall` baixa e compila o binário, exigindo
-`make`, compilador C e as ferramentas de build do sistema. A versão `8.8.1` está
-fixada em `redisMemoryServer.version` no `package.json` da raiz, e o binário
-compilado permanece no cache local do pacote.
+`make`, compilador C e as ferramentas de build do sistema. A versão do binário é
+fixada no [`package.json` da raiz](../../../../package.json), e o binário compilado
+permanece no cache local do pacote.
 
 O ambiente local e o CI precisam das ferramentas exigidas pelo pacote e devem
 manter cache do resultado para não recompilar o Redis em toda instalação.
@@ -94,19 +94,14 @@ URLs e credenciais apontam para instâncias efêmeras.
 
 ## Fixtures e cenários
 
-Factories criam documentos válidos com defaults seguros e permitem overrides
-explícitos:
+O E2E vigente de autenticação e `Person` está em
+[`api/test/auth.e2e-spec.ts`](../../../test/auth.e2e-spec.ts). Seeds locais são
+resolvidos por [`api/test/seeds/cli.ts`](../../../test/seeds/cli.ts). Esses arquivos,
+e não uma árvore reproduzida no SDD, são a fonte de verdade da organização atual.
 
-```text
-test/
-├── fixtures/
-│   ├── users.ts
-│   └── sessions.ts
-├── setup/
-│   ├── mongodb.ts
-│   └── redis.ts
-└── app.e2e-spec.ts
-```
+Quando factories ou helpers compartilhados surgirem por reutilização real, devem
+permanecer sob `api/test/`, próximos dos cenários consumidores e com nomes
+orientados ao domínio.
 
 Fixtures:
 
@@ -122,10 +117,10 @@ cURL estão em `05-seeds-e-curls-de-cenario.md`.
 
 ## Isolamento e execução serial
 
-E2E nunca executam em paralelo. `vitest.config.e2e.ts` mantém
-`fileParallelism: false`, o que limita a execução a um worker, e
-`maxConcurrency: 1`, que impede concorrência dentro do arquivo. Também é proibido
-marcar testes ou suites como `concurrent`.
+E2E nunca executam em paralelo. A configuração executável e canônica está em
+[`api/vitest.config.e2e.ts`](../../../vitest.config.e2e.ts) e garante execução
+serial entre arquivos e dentro de cada arquivo. Também é proibido marcar testes ou
+suites como `concurrent`.
 
 A execução serial é uma decisão de confiabilidade, mesmo que databases e namespaces
 pudessem ser isolados. Ela garante ordem previsível de setup, limpeza, seeds,

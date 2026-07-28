@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -12,6 +12,7 @@ import {
   type PersonHydratedDocument,
 } from '~/person/repositories/person.schema';
 
+@Injectable()
 export class MongoPersonRepository extends PersonRepository {
   private readonly logger = new Logger(MongoPersonRepository.name);
 

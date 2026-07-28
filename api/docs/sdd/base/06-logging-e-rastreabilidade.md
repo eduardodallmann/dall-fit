@@ -289,18 +289,13 @@ quando houver repetição real, mas não deve esconder quais campos são permiti
 
 ## Documentação dos endpoints
 
-Cada documento em `endpoints/` explica, em linguagem humana, os logs de seu fluxo e
-informa:
+Documentos em `endpoints/` não reproduzem mensagens, dados estruturados nem
+sequências de logs. Esta base define o contrato transversal e o código é sua
+implementação executável.
 
-- método e classe que emitem o log;
-- etapa registrada;
-- mensagem textual exata;
-- quais dados sanitizados acompanham a mensagem;
-- quais dados são ocultados;
-- logs específicos de cada branch e cenário de erro.
-
-O documento não copia a implementação do método. Mensagens de log e formatos
-estruturados são contratos de observabilidade e podem aparecer integralmente.
+Um endpoint documenta observabilidade somente quando existir requisito funcional
+excepcional, como auditoria, alerta ou métrica específica. Nesse caso, descreve o
+resultado esperado sem copiar chamadas ao logger.
 
 ## Validação e testes
 

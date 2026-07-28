@@ -23,8 +23,7 @@ rotas e exibir seu perfil.
 - Entrada: não se aplica
 - Saída: `{ data: Person }`
 - Status: `200`, `401 AUTHENTICATION_REQUIRED`
-- Dados sensíveis: nome, e-mail e foto aparecem somente na resposta autorizada;
-  nunca nos logs
+- Dados sensíveis: nome, e-mail e foto aparecem somente na resposta autorizada
 - Idempotência: GET seguro e idempotente
 
 ## Fluxo completo
@@ -33,11 +32,9 @@ rotas e exibir seu perfil.
 e JWT, chama `FindPersonByIdService`, que usa `MongoPersonRepository`, e anexa a
 entidade ao request. Qualquer falha funcional termina com `401`.
 
-`AuthController.getCurrentPerson` registra somente o ID técnico, chama
-`GetCurrentPersonCommand.execute`, registra um resumo dos campos presentes e
-devolve a resposta. O command mapeia explicitamente os campos públicos, sem
-`googleSubject`, registra somente ID e nomes de campos e retorna
-`CurrentPersonResponse`.
+`AuthController.getCurrentPerson` chama `GetCurrentPersonCommand.execute` e devolve
+a resposta. O command mapeia explicitamente os campos públicos, sem
+`googleSubject`, e retorna `CurrentPersonResponse`.
 
 ## Mapa de caminhos possíveis
 
@@ -92,23 +89,6 @@ curl --request GET \
 - Given: nenhum cookie
 - When: chama o endpoint
 - Then: recebe `401` com `AUTHENTICATION_REQUIRED`
-
-## Observabilidade e segurança
-
-Sequência normal:
-
-1. `SessionAuthGuard -> canActivate -> params:`;
-2. `SessionAuthGuard -> canActivate -> authSessionService return:`;
-3. `FindPersonByIdService -> execute -> personRepository return:`;
-4. `SessionAuthGuard -> canActivate -> findPersonByIdService return:`;
-5. `AuthController -> getCurrentPerson -> params:`;
-6. `GetCurrentPersonCommand -> execute -> response prepared:`;
-7. `GetCurrentPersonCommand -> execute -> return:`;
-8. `AuthController -> getCurrentPerson -> getCurrentPersonCommand return:`;
-9. `AuthController -> getCurrentPerson -> return:`.
-
-Todos os dados estruturados ocultam cookie, token, nome, e-mail, foto e
-`googleSubject`.
 
 ## Regras de negócio cobertas por testes
 

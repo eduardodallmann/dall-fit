@@ -61,17 +61,13 @@ local/teste, para automação sem o provedor externo.
 
 ### 1. Início — `AuthController.prepareGoogleLogin` e `startGoogleLogin`
 
-Os dois métodos registram parâmetros vazios e chamam
-`StartGoogleLoginCommand.execute`. O command gera `state` e `nonce`, registra
-apenas que ambos foram criados e chama
-`GoogleOAuthService.createAuthorizationUrl`.
+Os dois métodos chamam `StartGoogleLoginCommand.execute`. O command gera `state` e
+`nonce` e chama `GoogleOAuthService.createAuthorizationUrl`.
 O service usa os scopes `openid email profile`, `response_type=code`,
 `access_type=online`, `state`, `nonce` e `prompt=select_account`.
 
-Cada camada registra entrada, retorno da dependência e saída sem incluir os valores
-aleatórios ou a URL completa, pois ela contém dados de segurança. Ambos os métodos
-gravam cookies temporários. O POST devolve a URL em JSON à UI; o GET redireciona
-diretamente.
+Ambos os métodos gravam cookies temporários. O POST devolve a URL em JSON à UI; o
+GET redireciona diretamente.
 
 ### 2. Callback — `AuthController.completeGoogleLogin`
 
@@ -92,23 +88,20 @@ No caminho principal:
    nova, persiste os três dados pessoais; em pessoa existente, devolve o documento
    vigente. Se duas criações concorrerem, a que receber chave duplicada carrega o
    documento vencedor.
-7. O command registra o branch `newPerson` ou `existingPerson` apenas com ID
-   técnico.
-8. Chama `AuthSessionService.createSession`, que assina JWT contendo somente
+7. Chama `AuthSessionService.createSession`, que assina JWT contendo somente
    `sub=<personId>`.
-9. Monta o resultado de redirect e cookie sem registrar o token.
-10. O controller grava a sessão, limpa cookies OAuth e redireciona.
+8. Monta o resultado de redirect e cookie.
+9. O controller grava a sessão, limpa cookies OAuth e redireciona.
 
 Falhas de integração ou persistência não criam cookie de sessão. O erro técnico é
-registrado no ponto central e o navegador volta à UI com código genérico.
+tratado sem expor detalhes e o navegador volta à UI com código genérico.
 
 ### 3. Bypass — `AuthController.testLogin`
 
-`TestAuthBypassGuard` valida ambiente, flag e chave, registrando somente o resultado.
-Depois do DTO, `TestLoginCommand` prepara a mesma identidade interna que o adapter
-Google produziria, chama `FindOrCreatePersonService` e
-`AuthSessionService`, e o controller grava o cookie. A chave e os dados pessoais
-nunca são registrados.
+`TestAuthBypassGuard` valida ambiente, flag e chave. Depois do DTO,
+`TestLoginCommand` prepara a mesma identidade interna que o adapter Google
+produziria, chama `FindOrCreatePersonService` e `AuthSessionService`, e o controller
+grava o cookie.
 
 ## Mapa de caminhos possíveis
 
@@ -234,27 +227,6 @@ curl --request GET \
 O callback feliz real não possui cURL estático porque o código Google é de uso
 único. Ele é validado manualmente pelo início do cenário 1; unitários substituem o
 adapter e o E2E usa o cenário 2 para persistência e sessão.
-
-## Observabilidade e segurança
-
-Todos os métodos registram `params`, retornos de dependências, branches e `return`
-no padrão da base. Os nomes principais são:
-
-- `AuthController -> prepareGoogleLogin -> ...`;
-- `AuthController -> startGoogleLogin -> ...`;
-- `StartGoogleLoginCommand -> execute -> ...`;
-- `AuthController -> completeGoogleLogin -> ...`;
-- `CompleteGoogleLoginCommand -> execute -> stateValidated completed:`;
-- `CompleteGoogleLoginCommand -> execute -> newPerson branch:` ou
-  `existingPerson branch:`;
-- `GoogleOAuthService -> exchangeCode -> idTokenValidated completed:`;
-- `FindOrCreatePersonService -> execute -> personRepository return:`;
-- `AuthSessionService -> createSession -> return:`;
-- `TestAuthBypassGuard -> canActivate -> allowed branch:` ou `blocked branch:`.
-
-Dados estruturados limitam-se a flags, lista de claims presentes, operação,
-created, ID técnico e código de erro. URL de autorização completa, códigos, tokens,
-cookies, secrets, state, nonce, nome, e-mail e foto ficam ocultos.
 
 ## Regras de negócio cobertas por testes
 

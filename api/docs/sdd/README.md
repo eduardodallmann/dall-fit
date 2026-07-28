@@ -48,9 +48,10 @@ Cada cenário começa com o seed necessário e um cURL copiável que aciona exat
 aquele caminho. Quando não houver estado a preparar, declarar `não se aplica` e
 justificar. A convenção está em `base/05-seeds-e-curls-de-cenario.md`.
 
-Cada etapa do fluxo também documenta os logs de entrada, passos intermediários,
-dependências, branches e saída conforme
-`base/06-logging-e-rastreabilidade.md`.
+O código segue a política de logging de
+`base/06-logging-e-rastreabilidade.md`. Documentos de endpoint não reproduzem a
+sequência nem as mensagens emitidas; registram observabilidade somente quando ela
+for um requisito funcional excepcional.
 
 Alterações Markdown exclusivas dispensam validação automatizada. Demais mudanças
 devem aprovar `pnpm lint`, `pnpm test`, `pnpm test:coverage:ci` e `pnpm build`.

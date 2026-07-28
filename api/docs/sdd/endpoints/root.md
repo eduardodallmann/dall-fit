@@ -23,31 +23,28 @@ Confirmar que a API está disponível somente para uma pessoa com sessão válid
 - Saída: `string`
 - Status de sucesso: `200 OK`
 - Erro funcional: `401 AUTHENTICATION_REQUIRED`
-- Dados sensíveis: cookie de sessão, nunca incluído na resposta ou logs
+- Dados sensíveis: cookie de sessão, nunca incluído na resposta
 - Idempotência: GET seguro e idempotente
 
 ## Fluxo completo
 
 ### 1. Proteção — `SessionAuthGuard.canActivate`
 
-O guard registra apenas presença do cookie, valida o JWT por
-`AuthSessionService`, registra o resultado sanitizado, busca a pessoa pelo ID por
-`FindPersonByIdService` e anexa a entidade ao request. Cookie, JWT e dados pessoais
-ficam ocultos.
+O guard valida o JWT por `AuthSessionService`, busca a pessoa pelo ID por
+`FindPersonByIdService` e anexa a entidade ao request.
 
-Nos branches cookie ausente, token inválido/expirado ou pessoa inexistente, registra
-o código seguro e lança `401 AUTHENTICATION_REQUIRED` antes do controller.
+Nos branches cookie ausente, token inválido/expirado ou pessoa inexistente, lança
+`401 AUTHENTICATION_REQUIRED` antes do controller.
 
 ### 2. Entrada — `AppController.getRoot`
 
-O controller registra parâmetros vazios, chama `GetRootCommand.execute`, registra o
-retorno do command e sua própria saída e devolve o texto.
+O controller chama `GetRootCommand.execute` e devolve o texto.
 
 ### 3. Orquestração — `GetRootCommand.execute`
 
-O command registra parâmetros vazios, monta `Hello World!`, registra a saída e a
-devolve. Não há service de domínio ou repository neste trecho porque a única regra
-do conteúdo é estática; autenticação já foi resolvida pelo guard transversal.
+O command monta e devolve `Hello World!`. Não há service de domínio ou repository
+neste trecho porque a única regra do conteúdo é estática; autenticação já foi
+resolvida pelo guard transversal.
 
 ## Mapa de caminhos possíveis
 
@@ -102,21 +99,6 @@ curl --request GET \
 - When: chama `GET /`
 - Then: recebe `401` com código `AUTHENTICATION_REQUIRED`
 - Efeitos: controller e command não são executados
-
-## Observabilidade e segurança
-
-| Ordem | Classe e método                | Mensagem textual exata                                             | Dados sanitizados          | Dados ocultados |
-| ----: | ------------------------------ | ------------------------------------------------------------------ | -------------------------- | --------------- |
-|     1 | `SessionAuthGuard.canActivate` | `SessionAuthGuard -> canActivate -> params:`                       | presença do cookie e path  | cookie/JWT      |
-|     2 | `SessionAuthGuard.canActivate` | `SessionAuthGuard -> canActivate -> authSessionService return:`    | ID técnico                 | token           |
-|     3 | `SessionAuthGuard.canActivate` | `SessionAuthGuard -> canActivate -> findPersonByIdService return:` | encontrado e ID técnico    | dados pessoais  |
-|     4 | `AppController.getRoot`        | `AppController -> getRoot -> params:`                              | objeto vazio               | não se aplica   |
-|     5 | `AppController.getRoot`        | `AppController -> getRoot -> getRootCommand return:`               | tipo e tamanho da resposta | não se aplica   |
-|     6 | `GetRootCommand.execute`       | `GetRootCommand -> execute -> return:`                             | tipo e tamanho da resposta | não se aplica   |
-|     7 | `AppController.getRoot`        | `AppController -> getRoot -> return:`                              | tipo e tamanho da resposta | não se aplica   |
-
-Branches de rejeição usam `SessionAuthGuard -> canActivate -> <motivo> error:` com
-somente o código estável.
 
 ## Regras de negócio cobertas por testes
 
