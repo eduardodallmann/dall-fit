@@ -1,41 +1,56 @@
-import { useState } from 'react';
+import { Alert, Button, Card } from '@heroui/react';
+import { useMutation } from '@tanstack/react-query';
 
-import { Button, Card } from '@heroui/react';
+import { startGoogleLogin } from '~/auth/auth-service';
+import { homeStyles } from '~/routes/home/styles';
 
-import {
-  Description,
-  Eyebrow,
-  InlineCode,
-  Page,
-  PageContent,
-  Title,
-} from '~/routes/home/styles';
+const styles = homeStyles();
 
-export function HomePage() {
-  const [count, setCount] = useState(0);
+export interface HomePageProps {
+  hasAuthError?: boolean;
+}
+
+export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
+  const loginMutation = useMutation({
+    mutationFn: startGoogleLogin,
+    onSuccess: (authorizationUrl) => {
+      window.location.assign(authorizationUrl);
+    },
+  });
+  const showAuthError = hasAuthError || loginMutation.isError;
 
   return (
-    <Page>
-      <PageContent>
+    <main className={styles.page()}>
+      <div className={styles.pageContent()}>
+        {showAuthError ? (
+          <Alert status="danger">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Não foi possível entrar.</Alert.Title>
+              <Alert.Description>Tente novamente.</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        ) : null}
         <Card>
           <Card.Header>
-            <Eyebrow>Dall Fit</Eyebrow>
-            <Title>Get started</Title>
-            <Description>
-              Edit <InlineCode>src/routes/home/index.tsx</InlineCode> and save
-              to test HMR.
-            </Description>
+            <p className={styles.eyebrow()}>Dall Fit</p>
+            <h1 className={styles.title()}>Entre para continuar</h1>
+            <p className={styles.description()}>
+              Use sua conta Google para acessar sua área.
+            </p>
           </Card.Header>
           <Card.Footer>
             <Button
-              type="button"
-              onPress={() => setCount((currentCount) => currentCount + 1)}
+              isPending={loginMutation.isPending}
+              onPress={() => loginMutation.mutate()}
             >
-              Count is {count}
+              {loginMutation.isPending
+                ? 'Iniciando login'
+                : 'Entrar com Google'}
             </Button>
           </Card.Footer>
         </Card>
-      </PageContent>
-    </Page>
+      </div>
+    </main>
   );
 }

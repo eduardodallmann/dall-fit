@@ -168,10 +168,35 @@ E2E, os adapters reais usam processos efêmeros iniciados por
 `mongodb-memory-server` e `redis-memory-server`, conforme
 `04-mocks-e-bancos-de-teste.md`.
 
-As dependências estão instaladas, mas a aplicação raiz não abre conexões vazias.
-`MongooseModule`, o client Redis e seus adapters entram junto do primeiro domínio
-que realmente consumir cada infraestrutura. Até lá, o endpoint técnico `/`
-continua iniciando sem exigir processos de banco ativos.
+`MongooseModule` é inicializado pela aplicação porque o domínio `Person` persiste
+cadastros e valida a existência da pessoa em toda sessão autenticada. O client Redis
+continua ausente do wiring porque nenhum fluxo vigente o consome.
+
+O domínio `Person` expõe ports de repository aos services. O adapter MongoDB mantém
+índice único para o identificador `sub` do Google e mapeia documentos para entidades
+antes de devolvê-los.
+
+## Infraestrutura de desenvolvimento local
+
+O comando abaixo inicia MongoDB e Redis reais em processos locais efêmeros, sem
+Docker:
+
+```bash
+pnpm -C api dev:infra
+```
+
+O MongoDB usa `127.0.0.1:27017`, database `dall-fit`, e o Redis usa
+`127.0.0.1:6379`, em conformidade com `api/.env.example`. As versões dos binários
+são fixadas no `package.json` da raiz. As portas não são substituídas
+automaticamente: se estiverem ocupadas, o comando falha para evitar que a API se
+conecte a um processo ou endereço inesperado.
+
+`pnpm -C api dev` executa `dev:infra` e `start:dev` juntos. O orquestrador encerra o
+outro processo se infraestrutura ou API terminar, e sinais de encerramento fecham
+MongoDB e Redis. Reloads do Nest preservam os dados enquanto a sessão de
+desenvolvimento estiver ativa; encerrar a sessão descarta todos os dados. O comando
+`pnpm dev` da raiz mantém sua interface e inicia esse ciclo da API em paralelo ao
+Vite da UI.
 
 ## Configuração e segurança
 
@@ -187,6 +212,14 @@ continua iniciando sem exigir processos de banco ativos.
     `http://localhost:3000`;
   - `MONGODB_URI`, URI do MongoDB principal;
   - `REDIS_URL`, URI do Redis;
+  - `UI_URL`, destino dos redirecionamentos após autenticação;
+  - `GOOGLE_OAUTH_CREDENTIALS_BASE64`, JSON de cliente OAuth Web codificado em
+    base64;
+  - `AUTH_SESSION_SECRET`, chave HMAC com pelo menos 32 caracteres;
+  - `AUTH_SESSION_TTL_SECONDS`, validade da sessão;
+  - `AUTH_COOKIE_SECURE`, ativação explícita do atributo `Secure`;
+  - `AUTH_TEST_BYPASS_ENABLED` e `AUTH_TEST_BYPASS_KEY`, mecanismo restrito de
+    local/teste;
 - o `.env` local não é versionado;
 - valores padrão existem para desenvolvimento, mas ambientes implantados devem
   declarar explicitamente seus próprios endereços e credenciais;
@@ -199,3 +232,23 @@ continua iniciando sem exigir processos de banco ativos.
 
 Novos recursos de persistência, autenticação ou mensageria exigem atualização deste
 documento e ADR quando houver decisão transversal relevante.
+
+## Autenticação vigente
+
+O módulo `AuthModule` implementa OAuth 2.0 Authorization Code e OpenID Connect no
+backend. A credencial Google nunca chega à UI. `GoogleOAuthService` gera a URL,
+troca o código e valida o ID token; `AuthSessionService` emite e valida o JWT da
+aplicação.
+
+`SessionAuthGuard` é a fronteira reutilizável de endpoints privados. Ele lê o cookie
+`dall_fit_session`, valida assinatura e expiração e consulta `Person` no MongoDB.
+`Authenticated` aplica o guard e `CurrentPerson` entrega a entidade já validada ao
+controller. O token contém apenas o ID técnico, sem nome, e-mail ou foto.
+
+Cookies de sessão usam `HttpOnly`, `SameSite=Lax`, path `/`, expiração configurada
+e `Secure` conforme ambiente. `state` e `nonce` usam cookies temporários com as
+mesmas proteções e são removidos no callback.
+
+O bypass de autenticação aceita somente ambiente diferente de produção, flag
+explícita e chave própria. A validação de ambiente rejeita
+`AUTH_TEST_BYPASS_ENABLED=true` em produção.

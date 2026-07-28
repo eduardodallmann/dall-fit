@@ -93,25 +93,23 @@ verdade.
 
 Organizar o fluxo em hierarquia Markdown, seguindo a execução:
 
-1. entrada no controller, validação e logging seguro;
-2. chamada do command e log de seu retorno no controller;
-3. preparação de contratos e log de cada etapa interna relevante;
-4. decisões e logs de cada branch dentro do command;
-5. chamada de cada service e log do retorno no command;
-6. acesso a repository, Redis, mensageria ou serviço externo pelo service e log do
-   retorno ou conclusão;
+1. entrada no controller e validação;
+2. chamada do command pelo controller;
+3. preparação dos contratos necessários;
+4. decisões e branches dentro do command;
+5. chamada de cada service pelo command;
+6. acesso a repository, Redis, mensageria ou serviço externo pelo service;
 7. retorno dos resultados ao command;
-8. montagem e log da response pelo command;
-9. log e devolução pelo controller.
+8. montagem da response pelo command;
+9. devolução pelo controller.
 
 Cada branch relevante recebe subtítulo ou lista aninhada própria. O leitor deve
 visualizar claramente qual condição conduz a qual service e qual dependência é
 alcançada.
 
-Em cada etapa, informar a mensagem de log no padrão
-`NomeDaClasse -> nomeDoMetodo -> etapa:`, os dados sanitizados associados e os
-campos ocultados. O contrato completo está em
-`06-logging-e-rastreabilidade.md`.
+O código continua sujeito a `06-logging-e-rastreabilidade.md`, mas o documento do
+endpoint não replica mensagens, payloads sanitizados nem a sequência de logs.
+Observabilidade é documentada somente quando for requisito funcional excepcional.
 
 ### Todos os caminhos possíveis
 
@@ -128,8 +126,8 @@ Documentar o caminho feliz e todos os caminhos alternativos ou de erro conhecido
 - resposta e efeitos colaterais de cada caminho.
 
 Não agrupar erros com comportamentos diferentes em um cenário genérico. Cada cenário
-informa gatilho, sequência interna, resultado HTTP, efeitos persistidos, logs
-relevantes e possibilidade de recuperação.
+informa gatilho, sequência interna, resultado HTTP, efeitos persistidos e
+possibilidade de recuperação.
 
 Imediatamente abaixo do título de cada cenário, registrar o seed necessário e o
 cURL completo que aciona aquele caminho. Seed ausente é declarado como

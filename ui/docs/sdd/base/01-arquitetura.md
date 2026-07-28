@@ -14,8 +14,9 @@ A fundação de aplicação usa:
 - Vitest para testes unitários e de componentes;
 - Playwright para testes integrados no navegador.
 
-`src/main.tsx` realiza o bootstrap e aplica `AppProviders`. `src/app.tsx` monta o
-`RouterProvider`, e a árvore tipada vive em `src/routes/routes.tsx`.
+`src/main.tsx` aguarda a ativação opcional do MSW, realiza o bootstrap e aplica
+`AppProviders`. `src/app.tsx` monta o `RouterProvider`, e a árvore tipada vive em
+`src/routes/routes.tsx`.
 
 ## Estrutura alvo
 
@@ -66,10 +67,11 @@ TanStack Router, sem manipulação manual de `history`.
   cliente da aplicação;
 - credenciais e dados pessoais não aparecem em logs ou fixtures.
 
-O client Axios será criado em `src/core/http/api-client.ts` junto da primeira
-request real, usando `VITE_API_URL` como `baseURL`. Não criar instâncias paralelas
-nem usar Axios diretamente em componentes. Services HTTP pertencem ao domínio ou
-à rota proprietária; hooks TanStack Query consomem esses services.
+O client Axios vigente está em `src/core/http/api-client.ts`, usa `VITE_API_URL`
+como `baseURL` e `withCredentials=true` para enviar a sessão `HttpOnly` à API. Não
+criar instâncias paralelas nem usar Axios diretamente em componentes. Services HTTP
+pertencem ao domínio ou à rota proprietária; hooks TanStack Query consomem esses
+services.
 
 Formulários usam TanStack Form. A composição tipada permanece próxima da rota;
 helpers migram para `src/core/form/` somente quando houver reutilização real.
@@ -88,11 +90,23 @@ Introduzir internacionalização ou alterar essas escolhas exige atualizar esta 
 e registrar ADR quando houver trade-off transversal. O design system e suas regras
 vigentes estão definidos em `03-componentes-e-estilizacao.md`.
 
-MSW será configurado junto da primeira integração HTTP, seguindo
-`05-mocks-de-api.md`; a fundação atual não instala dependências sem uso.
-
-Playwright será configurado junto do primeiro cenário integrado de rota ou flow,
+MSW está configurado para as fronteiras de autenticação, seguindo
+`05-mocks-de-api.md`. Playwright está configurado para as rotas e a jornada de login,
 seguindo `07-testes-integrados-playwright.md`.
+
+## Proteção de rotas
+
+A árvore manual possui um layout sem path para rotas autenticadas. Seu
+`beforeLoad` usa o `QueryClient` recebido pelo router context para garantir
+`GET /auth/me` antes de carregar qualquer filho.
+
+- `401` lança redirect tipado para `/`;
+- outros erros permanecem erros da rota e são apresentados pelo componente de erro;
+- o contexto autenticado entrega `Person` aos filhos sem uma segunda request;
+- a proteção da UI é navegação e privacidade visual, nunca substitui o guard da API.
+
+Novas rotas privadas são adicionadas como filhas desse layout. Rotas públicas
+continuam filhas diretas da root route.
 
 ## Ambiente local
 

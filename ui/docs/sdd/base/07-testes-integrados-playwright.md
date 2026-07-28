@@ -51,22 +51,10 @@ de rede no desenvolvimento, no Vitest e no Playwright.
 
 ## Organização
 
-Quando o primeiro teste integrado for implementado, adotar:
-
-```text
-ui/
-├── playwright.config.ts
-└── tests/
-    ├── setup.ts
-    └── integration/
-        ├── flows/
-        │   └── <flow>.spec.ts
-        ├── helpers/
-        │   └── <helper>.ts
-        └── routes/
-            └── <flow>/
-                └── <route>.spec.ts
-```
+A configuração executável está em
+[`ui/playwright.config.ts`](../../../playwright.config.ts), e o setup compartilhado
+está em [`ui/tests/setup.ts`](../../../tests/setup.ts). Não reproduzir esses
+arquivos neste SDD.
 
 - `tests/integration/routes/<flow>/<route>.spec.ts` valida uma rota isolada,
   iniciando diretamente pelo link reproduzível documentado nela;
@@ -121,39 +109,17 @@ definido em `05-mocks-de-api.md`.
 Cada teste inicia seu próprio estado, não depende da ordem da suíte e não reutiliza
 estado mutável deixado por outro teste.
 
-## Configuração alvo
+## Configuração
 
-`ui/playwright.config.ts` segue este formato:
+[`ui/playwright.config.ts`](../../../playwright.config.ts) é a fonte de verdade da
+configuração. Ela mantém os seguintes invariantes:
 
-```ts
-import { defineConfig, devices } from '@playwright/test';
-
-export default defineConfig({
-  testDir: './tests/integration',
-  fullyParallel: true,
-  reporter: [['list'], ['html', { open: 'never' }]],
-  use: {
-    baseURL: 'http://127.0.0.1:3100',
-    trace: 'on-first-retry',
-  },
-  webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 3100',
-    env: {
-      VITE_API_URL: 'http://127.0.0.1:3100/api',
-      VITE_ENABLE_API_MOCKS: 'true',
-    },
-    reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === 'true',
-    timeout: 120_000,
-    url: 'http://127.0.0.1:3100',
-  },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-});
-```
+- specs carregados de `tests/integration`;
+- execução no Chromium;
+- Vite real iniciado na porta exclusiva `3100`;
+- MSW Browser habilitado e apontado para uma URL local fictícia;
+- trace preservado na primeira repetição;
+- servidor existente não reutilizado por padrão.
 
 A porta `3100` é exclusiva dos testes integrados e evita colisão com o Vite usado
 manualmente. Por padrão, não reutilizar servidor existente. A reutilização é
@@ -165,31 +131,12 @@ Playwright pode executar arquivos em paralelo. Por isso, fixtures e seletores de
 cenário não podem depender de memória global mutável, ordem ou dados compartilhados
 entre testes. A regra de execução serial aplica-se somente aos E2E do backend.
 
-## Scripts obrigatórios
+## Scripts
 
-Ao adotar Playwright, `ui/package.json` disponibiliza:
-
-```json
-{
-  "scripts": {
-    "test:integration": "playwright test",
-    "test:integration:debug": "playwright test --debug",
-    "test:integration:install": "playwright install chromium",
-    "test:integration:install:ci": "playwright install --with-deps chromium",
-    "test:integration:ui": "playwright test --ui"
-  }
-}
-```
-
-A raiz expõe `test:integration` como agregador explícito do frontend:
-
-```json
-{
-  "scripts": {
-    "test:integration": "pnpm -C ui test:integration"
-  }
-}
-```
+[`ui/package.json`](../../../package.json) é a fonte de verdade dos comandos de
+execução, depuração, interface interativa e instalação do Chromium.
+[`package.json`](../../../../package.json) expõe o agregador
+`test:integration` da raiz.
 
 Esse nome não cria uma suíte intermediária no backend. A API continua possuindo
 somente unitários e E2E.
@@ -264,18 +211,5 @@ junto dos testes Playwright e não substituem as imagens curadas do SDD.
 
 ## Estado de adoção
 
-Esta política é normativa, mas Playwright ainda não está instalado porque a UI não
-possui rotas e integrações que justifiquem uma suíte de navegador. A primeira
-entrega com cenário integrado deve adicionar atomicamente:
-
-1. `@playwright/test`;
-2. `ui/playwright.config.ts`;
-3. scripts da UI e o agregador da raiz;
-4. Chromium local/CI;
-5. estrutura `ui/tests/integration/`;
-6. MSW Browser e handlers necessários;
-7. ignores para relatórios e resultados;
-8. execução no pipeline.
-
-Até essa adoção, os comandos desta página descrevem o contrato alvo e ainda não
-estão disponíveis no workspace.
+Playwright foi adotado com a jornada de login. Configuração, scripts, Chromium,
+MSW Browser, specs de rota/flow e ignores seguem o contrato desta página.

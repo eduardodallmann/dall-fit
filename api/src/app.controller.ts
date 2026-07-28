@@ -1,13 +1,29 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 
-import { AppService } from '~/app.service';
+import { Authenticated } from '~/auth/decorators/authenticated';
+import { GetRootCommand } from '~/commands/get-root.command';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  private readonly logger = new Logger(AppController.name);
+
+  constructor(private readonly getRootCommand: GetRootCommand) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Authenticated()
+  getRoot(): string {
+    this.logger.log('AppController -> getRoot -> params:', { params: {} });
+
+    const commandResult = this.getRootCommand.execute();
+    this.logger.log('AppController -> getRoot -> getRootCommand return:', {
+      data: { length: commandResult.length, type: 'string' },
+    });
+
+    const result = commandResult;
+    this.logger.log('AppController -> getRoot -> return:', {
+      data: { length: result.length, type: 'string' },
+    });
+
+    return result;
   }
 }

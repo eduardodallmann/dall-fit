@@ -10,8 +10,9 @@
 - V8 para cobertura;
 - ESLint type-aware com regras Node definidas na raiz.
 
-As dependências de bancos efêmeros serão instaladas junto dos primeiros adapters de
-MongoDB e Redis. Não devem ser adicionadas antes de existir consumo real.
+`mongodb-memory-server` é usado pelos E2E do domínio `Person`. O ciclo de vida do
+Redis efêmero continua sem setup enquanto nenhum adapter Redis participar de um
+fluxo.
 
 ## Princípio de teste
 

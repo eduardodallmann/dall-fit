@@ -2,82 +2,91 @@
 
 ## Objetivo funcional
 
-Confirmar que o scaffold inicial da aplicação responde a uma chamada HTTP.
-
-Este é um endpoint técnico temporário e não representa a arquitetura exigida para
-endpoints de produto.
+Confirmar que a API está disponível somente para uma pessoa com sessão válida.
 
 ## Referências técnicas
 
-| Papel      | Símbolo                                           | Responsabilidade neste fluxo                                       |
-| ---------- | ------------------------------------------------- | ------------------------------------------------------------------ |
-| Controller | [`AppController`](../../../src/app.controller.ts) | Recebe `GET /` e devolve o resultado                               |
-| Command    | Não existe no scaffold atual                      | Exceção temporária; novos endpoints não podem repetir esse formato |
-| Service    | [`AppService`](../../../src/app.service.ts)       | Produz a mensagem estática                                         |
-| Saída      | `string`                                          | Texto simples devolvido ao consumidor                              |
+| Papel      | Símbolo                                                              | Responsabilidade neste fluxo         |
+| ---------- | -------------------------------------------------------------------- | ------------------------------------ |
+| Proteção   | [`Authenticated`](../../../src/auth/decorators/authenticated.ts)     | Aplica o guard de sessão             |
+| Guard      | [`SessionAuthGuard`](../../../src/auth/guards/session-auth.guard.ts) | Valida sessão e existência da pessoa |
+| Controller | [`AppController`](../../../src/app.controller.ts)                    | Recebe `GET /` e chama o command     |
+| Command    | [`GetRootCommand`](../../../src/commands/get-root.command.ts)        | Monta a resposta estática            |
+| Saída      | `string`                                                             | Texto devolvido ao consumidor        |
 
 ## Contrato HTTP resumido
 
 - Método e path: `GET /`
-- Autenticação: não se aplica no scaffold atual
+- Autenticação: cookie `dall_fit_session` obrigatório
+- Autorização/permissões: pessoa autenticada; sem papéis adicionais
 - Entrada: não se aplica
 - Saída: `string`
-- Status: `200 OK`
-- Idempotência: o GET é seguro e idempotente
+- Status de sucesso: `200 OK`
+- Erro funcional: `401 AUTHENTICATION_REQUIRED`
+- Dados sensíveis: cookie de sessão, nunca incluído na resposta
+- Idempotência: GET seguro e idempotente
 
-## Fluxo completo atual
+## Fluxo completo
 
-### 1. Entrada — `AppController`
+### 1. Proteção — `SessionAuthGuard.canActivate`
 
-O Nest direciona `GET /` para `AppController.getHello`. Como não existem parâmetros,
-body ou headers de negócio, não há entrada para validar.
+O guard valida o JWT por `AuthSessionService`, busca a pessoa pelo ID por
+`FindPersonByIdService` e anexa a entidade ao request.
 
-O controller atual não registra log explícito. Essa ausência pertence ao scaffold e
-é uma exceção temporária a
-[`06-logging-e-rastreabilidade.md`](../base/06-logging-e-rastreabilidade.md).
+Nos branches cookie ausente, token inválido/expirado ou pessoa inexistente, lança
+`401 AUTHENTICATION_REQUIRED` antes do controller.
 
-### 2. Chamada direta ao `AppService`
+### 2. Entrada — `AppController.getRoot`
 
-O controller chama diretamente `AppService.getHello`. Não existe command, branch ou
-orquestração porque o scaffold apenas devolve um valor estático.
+O controller chama `GetRootCommand.execute` e devolve o texto.
 
-Essa chamada direta é uma exceção documentada e temporária. Quando o endpoint for
-removido ou transformado em comportamento de produto, deverá receber um command e
-seguir `../base/01-arquitetura.md`.
+### 3. Orquestração — `GetRootCommand.execute`
 
-### 3. Saída
-
-`AppService.getHello` devolve `Hello World!`. O controller retorna esse texto, e o
-Nest responde com status `200`.
-
-Não há repository, MongoDB, Redis, mensageria ou serviço externo nesse fluxo.
-
-### 4. Exceção de logging
-
-`AppController.getHello` e `AppService.getHello` ainda não registram entrada,
-retorno da dependência ou saída e usam retornos diretos. O endpoint técnico foi
-criado antes da política de logging e permanece como exceção documentada porque
-esta demanda não altera código.
-
-Qualquer mudança futura nesses métodos deve remover a exceção e aplicar
-integralmente o padrão de entrada, retorno da dependência e saída antes de devolver
-o valor.
+O command monta e devolve `Hello World!`. Não há service de domínio ou repository
+neste trecho porque a única regra do conteúdo é estática; autenticação já foi
+resolvida pelo guard transversal.
 
 ## Mapa de caminhos possíveis
 
-| Caminho              | Gatilho         | Sequência interna    | Resultado                | Efeitos |
-| -------------------- | --------------- | -------------------- | ------------------------ | ------- |
-| Aplicação disponível | Chamada `GET /` | Controller → Service | `200` com `Hello World!` | Nenhum  |
-
-Não existem validações, branches ou erros funcionais definidos. Falhas de bootstrap
-ou infraestrutura acontecem fora do comportamento deste endpoint.
+| Caminho         | Gatilho                | Sequência interna                          | Resultado | Efeitos |
+| --------------- | ---------------------- | ------------------------------------------ | --------- | ------- |
+| Sessão válida   | cookie válido e pessoa | Guard → Controller → Command               | `200`     | Nenhum  |
+| Sessão ausente  | sem cookie             | Guard interrompe                           | `401`     | Nenhum  |
+| Sessão inválida | JWT inválido/expirado  | Guard → AuthSessionService → interrupção   | `401`     | Nenhum  |
+| Pessoa removida | ID do JWT não existe   | Guard → FindPersonByIdService → repository | `401`     | Nenhum  |
 
 ## Cenários detalhados
 
-### Cenário 1 — Aplicação disponível
+### Cenário 1 — Pessoa autenticada
 
-**Seed:** não se aplica — o endpoint não consulta MongoDB, Redis ou qualquer estado
-prévio.
+**Seed**
+
+```bash
+pnpm -C api seed -- auth:person-existing
+```
+
+**cURL**
+
+```bash
+curl --request POST \
+  --url http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' \
+  --header 'x-auth-test-key: local-auth-test-key' \
+  --cookie-jar /tmp/dall-fit-cookie.txt \
+  --data '{"googleSubject":"google-existing-001","name":"Taylor Fit","email":"taylor.fit@example.test","photoUrl":"https://example.test/avatar.png"}' \
+&& curl --request GET \
+  --url http://localhost:4000/ \
+  --cookie /tmp/dall-fit-cookie.txt
+```
+
+- Given: o bypass local está habilitado e a fixture existe
+- When: o login fictício cria a sessão e o consumidor chama `GET /`
+- Then: recebe `200` e `Hello World!`
+- Efeitos colaterais: o login reutiliza a pessoa; o GET não possui efeitos
+
+### Cenário 2 — Sessão ausente
+
+**Seed:** não se aplica — o caminho termina antes de consultar MongoDB.
 
 **cURL**
 
@@ -86,19 +95,14 @@ curl --request GET \
   --url http://localhost:4000/
 ```
 
-- Given: a API foi iniciada com sucesso
-- When: o consumidor chama `GET /`
-- Sequência interna:
-  1. `AppController` recebe a chamada
-  2. `AppController` chama `AppService`
-  3. `AppService` devolve a mensagem estática
-- Then: o consumidor recebe status `200` e o texto `Hello World!`
-- Efeitos colaterais: não se aplica
-- Logs: não se aplica nesta versão — exceção técnica documentada acima
+- Given: o request não possui cookie
+- When: chama `GET /`
+- Then: recebe `401` com código `AUTHENTICATION_REQUIRED`
+- Efeitos: controller e command não são executados
 
-## Regras cobertas por testes
+## Regras de negócio cobertas por testes
 
-| Regra                                      | Teste                                                           |
-| ------------------------------------------ | --------------------------------------------------------------- |
-| O controller devolve a mensagem do service | [`app.controller.spec.ts`](../../../src/app.controller.spec.ts) |
-| A aplicação responde via HTTP              | [`app.e2e-spec.ts`](../../../test/app.e2e-spec.ts)              |
+| Regra                          | Teste unitário                     | Teste E2E          | Mock ou fixture |
+| ------------------------------ | ---------------------------------- | ------------------ | --------------- |
+| resposta após autenticação     | `app.controller.spec.ts` e command | `auth.e2e-spec.ts` | pessoa MongoDB  |
+| ausência de sessão é rejeitada | `session-auth.guard.spec.ts`       | `auth.e2e-spec.ts` | sem cookie      |

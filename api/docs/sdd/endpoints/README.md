@@ -11,10 +11,12 @@ caminhos felizes, alternativos e de erro conhecidos devem ser detalhados.
 Cada cenário começa com o seed necessário e o cURL que o reproduz localmente,
 conforme `../base/05-seeds-e-curls-de-cenario.md`.
 
-Cada etapa registra também as mensagens e os dados sanitizados de entrada, retorno
-de dependência, branch e saída conforme
-`../base/06-logging-e-rastreabilidade.md`.
+O código segue `../base/06-logging-e-rastreabilidade.md`, mas estes documentos não
+reproduzem sequências ou mensagens de log. Observabilidade aparece em um endpoint
+somente quando constituir requisito funcional excepcional.
 
 Índice atual:
 
-- [`GET /`](root.md): resposta inicial do scaffold.
+- [`Autenticação`](auth.md): início/callback Google e bypass restrito local/teste.
+- [`GET /auth/me`](current-person.md): pessoa vinculada à sessão.
+- [`GET /`](root.md): resposta técnica protegida por sessão.

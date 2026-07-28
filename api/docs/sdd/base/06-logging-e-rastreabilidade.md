@@ -289,18 +289,13 @@ quando houver repetição real, mas não deve esconder quais campos são permiti
 
 ## Documentação dos endpoints
 
-Cada documento em `endpoints/` explica, em linguagem humana, os logs de seu fluxo e
-informa:
+Documentos em `endpoints/` não reproduzem mensagens, dados estruturados nem
+sequências de logs. Esta base define o contrato transversal e o código é sua
+implementação executável.
 
-- método e classe que emitem o log;
-- etapa registrada;
-- mensagem textual exata;
-- quais dados sanitizados acompanham a mensagem;
-- quais dados são ocultados;
-- logs específicos de cada branch e cenário de erro.
-
-O documento não copia a implementação do método. Mensagens de log e formatos
-estruturados são contratos de observabilidade e podem aparecer integralmente.
+Um endpoint documenta observabilidade somente quando existir requisito funcional
+excepcional, como auditoria, alerta ou métrica específica. Nesse caso, descreve o
+resultado esperado sem copiar chamadas ao logger.
 
 ## Validação e testes
 
@@ -319,9 +314,16 @@ A proteção contra vazamento de dados sensíveis merece teste próprio quando h
 sanitizador ou payload de risco. O foco geral da suíte continua sendo regra de
 negócio, não cobertura de linhas de logging.
 
-## Exceção atual
+## Autenticação e dados pessoais
 
-O endpoint técnico `GET /` é um scaffold anterior a esta política e ainda não
-possui logging. A exceção está registrada em `../endpoints/root.md`. Ela termina
-quando esse endpoint ou seus métodos forem alterados, removidos ou transformados em
-comportamento de produto.
+Nos fluxos de autenticação, os sanitizadores e resumos obedecem ainda a estas
+restrições:
+
+- código OAuth, ID token, JWT da aplicação, cookies, `state`, `nonce`, segredo e
+  credencial base64 nunca são registrados;
+- nome, e-mail e URL da foto nunca são registrados;
+- logs podem conter somente flags de presença, nomes de campos, status, operação,
+  resultado de validação e IDs técnicos necessários;
+- claims externos são resumidos por campos presentes e nunca pelo payload integral.
+
+O endpoint `GET /` segue integralmente esta política desde sua proteção por sessão.

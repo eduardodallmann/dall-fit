@@ -38,18 +38,43 @@ A estratégia transversal de MSW, mocks de repositories e bancos efêmeros nos E
 está registrada em
 `adr/ADR-0001-estrategia-de-mocks-e-bancos-de-teste.md`.
 
-## Fluxo obrigatório
+## Fluxo obrigatório em duas fases
+
+### Fase 1 — especificação da feature
 
 1. Ler os documentos `base/` deste nível e dos projetos afetados.
-2. Ler os fluxos, endpoints e rotas afetados.
-3. Criar uma spec em `features/` para a demanda antes da implementação. A feature
-   pode afetar um ou vários projetos, mas deve possuir escopo, critérios de aceite
-   e decisões próprios.
-4. Implementar a mudança e os testes.
-5. Atualizar na mesma mudança toda documentação viva cujo comportamento mudou.
-6. Revisar API e UI para remover componentes, funções e métodos que tenham ficado
-   sem uso após a implementação.
-7. Executar os comandos de validação aplicáveis a partir da raiz.
+2. Ler os fluxos, endpoints e rotas afetados para compreender a verdade vigente.
+3. Criar ou refinar somente a spec autocontida em `features/`, com escopo, critérios
+   de aceite, decisões, impactos e plano de testes suficientes para que o usuário
+   valide tudo que será executado.
+4. Não alterar código, configuração, contratos executáveis, mocks, testes ou SDDs
+   vivos nesta fase.
+5. Apresentar a feature, encerrar o trabalho e aguardar uma ordem posterior e
+   explícita do usuário para iniciar sua implementação.
+
+O pedido de criação, documentação, detalhamento, revisão ou refinamento de uma
+feature nunca autoriza sua implementação no mesmo turno. Essa separação é um limite
+de autorização, não apenas uma ordem recomendada.
+
+### Fase 2 — implementação autorizada
+
+Somente uma mensagem posterior à apresentação da feature, como `implemente a
+feature <arquivo>`, inicia esta fase:
+
+1. reler a feature validada e os SDDs vivos afetados;
+2. implementar código, configuração, contratos, mocks e testes;
+3. atualizar na mesma entrega toda documentação viva cujo comportamento mudou;
+4. revisar API e UI para remover componentes, funções e métodos que tenham ficado
+   sem uso;
+5. executar os comandos de validação aplicáveis a partir da raiz.
+
+A feature validada não é silenciosamente adaptada durante a implementação. Se uma
+descoberta exigir mudança em seu escopo ou decisões, a implementação deve parar e a
+demanda retorna à fase de especificação para nova validação e nova autorização.
+
+Quando o usuário determinar explicitamente que uma atividade não cria feature,
+seguir somente o escopo solicitado. Essa exceção é apropriada, por exemplo, para
+ajustes estruturantes na própria documentação base.
 
 Uma feature não substitui a documentação viva. Padrões permanentes descobertos
 durante uma demanda devem ser incorporados em `base/`; decisões com trade-offs
@@ -59,7 +84,8 @@ relevantes devem ser registradas em `adr/`.
 
 `features/` contém documentos autocontidos que permitem entender o problema, o
 escopo, os critérios e as decisões de uma atividade sem depender de conversas
-externas. Ela pode ser refinada enquanto orienta a implementação.
+externas. Ela pode ser refinada durante a fase de especificação. A ordem explícita
+de implementação transforma o conteúdo validado no contrato da entrega.
 
 Depois que a demanda for entregue, a feature:
 

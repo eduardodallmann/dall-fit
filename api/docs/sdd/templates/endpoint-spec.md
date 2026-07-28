@@ -49,12 +49,8 @@ Explicar humanamente:
 
 1. quais dados chegam e por qual tipo;
 2. quais validações acontecem antes do command;
-3. quais parâmetros sanitizados acompanham
-   `<Controller> -> <método> -> params:`;
-4. qual command é chamado;
-5. o que acompanha `<Controller> -> <método> -> <command> return:`;
-6. o que acompanha `<Controller> -> <método> -> return:`;
-7. o que o controller devolve após registrar o resultado.
+3. qual command é chamado;
+4. o que o controller devolve.
 
 ### 2. Orquestração — `<Command>`
 
@@ -68,21 +64,18 @@ esperados pelos services.
    - dado entregue ao service:
    - regra ou operação executada:
    - resultado devolvido ao command:
-   - log sanitizado do retorno:
 3. Próxima decisão:
 4. Montagem da response:
-5. Log e retorno da response:
+5. Retorno da response:
 
 #### Branch — `<condição humana>`
 
 - Gatilho:
-- Log emitido ao entrar no branch:
 - Decisão tomada pelo command:
 - Service chamado:
   - responsabilidade do service:
   - repository ou integração acessada pelo service:
   - resultado ou erro possível:
-  - log do retorno ou erro:
 - Continuação do fluxo:
 - Response e efeitos:
 
@@ -98,11 +91,7 @@ hierarquia Command → Service → Repository/integração visível.
 - Regra, cálculo ou operação:
 - Objeto, entidade ou array preparado para a dependência:
 - Repository, Redis, mensageria ou serviço externo acessado:
-- Log de entrada:
-- Log do retorno ou conclusão da dependência:
-- Logs de branches:
 - Resultado devolvido ao command:
-- Log de saída:
 - Erros possíveis:
 
 Repetir para cada service. Não copiar o método; explicar sua responsabilidade no
@@ -110,9 +99,8 @@ fluxo.
 
 ### 4. Saída
 
-Explicar como o command combina os resultados, monta o tipo de saída, registra sua
-response, devolve-a ao controller e como o controller registra e retorna o mesmo
-resultado.
+Explicar como o command combina os resultados, monta o tipo de saída, devolve-a ao
+controller e como o controller retorna o resultado.
 
 ## Mapa de caminhos possíveis
 
@@ -152,8 +140,6 @@ curl --request <METHOD> \
 - Then:
 - Response:
 - Persistência, cache, mensagem ou chamada externa:
-- Sequência de logs seguros:
-- Métricas:
 
 ### Cenário 2 — Falha de validação
 
@@ -175,7 +161,6 @@ curl --request <METHOD> \
 - Then:
 - Response:
 - Efeitos que não acontecem:
-- Sequência de logs seguros:
 
 ### Cenário 3 — Branch alternativo
 
@@ -196,7 +181,6 @@ curl --request <METHOD> \
 - When:
 - Condição avaliada pelo command:
 - Services e dependências chamados:
-- Branch e sequência de logs seguros:
 - Then:
 - Response:
 - Efeitos:
@@ -220,7 +204,6 @@ curl --request <METHOD> \
 - When:
 - Repository, Redis, mensageria ou serviço externo que falha:
 - Propagação ou tratamento do erro:
-- Sequência de logs seguros:
 - Then:
 - Response:
 - Retry ou recuperação:
@@ -233,24 +216,6 @@ verificar que o caminho realmente não existe.
 Em documentos reais, substituir todos os placeholders. Cada cURL deve funcionar
 após o seed e acionar exatamente o cenário descrito. Seguir
 `../base/05-seeds-e-curls-de-cenario.md`.
-
-## Observabilidade e segurança
-
-Seguir `../base/06-logging-e-rastreabilidade.md`. Listar toda etapa do fluxo; não
-resumir apenas a entrada do controller.
-
-| Ordem | Classe e método | Etapa                  | Mensagem textual exata | Dados sanitizados | Dados ocultados |
-| ----: | --------------- | ---------------------- | ---------------------- | ----------------- | --------------- |
-|     1 |                 | Entrada                |                        | `{ params }`      |                 |
-|     2 |                 | Etapa intermediária    |                        | `{ data }`        |                 |
-|     3 |                 | Retorno de dependência |                        | `{ data }`        |                 |
-|     4 |                 | Branch                 |                        | `{ data }`        |                 |
-|     5 |                 | Retorno                |                        | `{ data }`        |                 |
-
-- Erros funcionais e técnicos registrados:
-- Métricas:
-- Traces:
-- Alertas:
 
 ## Regras de negócio cobertas por testes
 

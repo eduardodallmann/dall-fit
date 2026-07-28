@@ -28,13 +28,13 @@ Para cada necessidade visual ou interativa:
 2. usar diretamente sua API, variantes semânticas e compound components;
 3. quando a necessidade for uma composição de domínio, compor componentes HeroUI;
 4. somente quando não houver componente adequado, criar um componente próprio;
-5. elementos sem comportamento próprio, como containers semânticos, tornam-se
-   wrappers estilizados no arquivo `styles.tsx`.
+5. elementos sem comportamento próprio, como containers semânticos, permanecem
+   explícitos no JSX e recebem classes produzidas por `styles.ts`.
 
 Não recriar localmente `Button`, `Card`, `Alert`, `Input`, `Modal`, `Select` ou
 outro componente existente no HeroUI. Um wrapper só é válido quando cria uma API
 de domínio, aplica uma composição recorrente ou acrescenta variantes que o design
-system não possui.
+system não possui; não criar wrapper apenas para anexar uma classe a um elemento.
 
 ## Integração vigente
 
@@ -76,9 +76,9 @@ A fonte Inter Variable é fornecida localmente por `@fontsource-variable/inter`.
 `--font-sans`. Não carregar uma segunda cópia por CDN, Google Fonts ou regra
 `@font-face` manual.
 
-Componentes e wrappers consomem os tokens por nomes semânticos, como
+Componentes consomem os tokens por nomes semânticos, como
 `bg-background`, `text-foreground`, `bg-surface`, `text-muted` e `border-border`.
-Não copiar valores OKLCH ou raios do tema para `styles.tsx`. Uma mudança global
+Não copiar valores OKLCH ou raios do tema para `styles.ts`. Uma mudança global
 do Theme Builder substitui os tokens em `src/index.css`; exceções locais continuam
 expressas pelas variantes públicas do HeroUI ou por `tv`.
 
@@ -93,7 +93,7 @@ Todo componente visual próprio segue:
 ```text
 component-name/
 ├── index.tsx
-├── styles.tsx
+├── styles.ts              # somente quando houver estilização própria
 ├── types.ts                 # somente quando o contrato justificar
 ├── use-component-name.ts    # somente quando houver lógica coesa e complexa
 └── __tests__/
@@ -109,82 +109,94 @@ uma rota. Não criar abstração transversal por possibilidade futura.
 
 ## Separação obrigatória de apresentação
 
-`index.tsx` concentra API, estado, eventos, condições e composição. Toda
-estilização própria fica em `styles.tsx`.
+`index.tsx` concentra API, estado, eventos, condições, semântica e composição. Toda
+definição de estilização própria fica em `styles.ts`.
 
 O arquivo principal:
 
-- usa componentes do HeroUI e wrappers importados de `./styles`;
+- usa componentes do HeroUI e elementos semânticos nativos;
 - não contém strings de classes Tailwind;
 - não declara `tv`, slots, variants ou compound variants;
 - não usa `style={{ ... }}`;
-- não renderiza `<div className="...">`, `<main className="...">` ou equivalente;
+- pode aplicar em `className` somente o resultado de uma função importada de
+  `./styles`, como `styles.content()` ou `buttonStyles({ tone })`;
+- recebe e encaminha variantes por nomes semânticos, sem conhecer as utilities que
+  as implementam;
 - preserva semântica, foco, teclado, labels e estados acessíveis.
 
-O arquivo `styles.tsx`:
+O arquivo `styles.ts`:
 
-- declara as funções `tv`;
+- declara e exporta as funções `tv`;
 - mantém `base`, `slots`, `variants`, `compoundVariants` e
   `defaultVariants`;
-- exporta wrappers visuais pequenos, como `Page`, `Content`, `Header` e
-  `Actions`;
-- aplica `className={styles.slot(...)}` internamente nesses wrappers;
-- tipa o elemento HTML ou componente HeroUI que envolve;
+- exporta tipos de variantes públicas derivados com
+  `VariantProps<typeof variantFunction>`;
+- não renderiza JSX nem exporta wrappers cuja única responsabilidade seja anexar
+  classes;
 - não contém regra de negócio, acesso a hooks de domínio ou transformação de
   dados.
 
-O sufixo `.tsx` é necessário porque esses wrappers renderizam elementos React. Um
-arquivo `styles.ts` sem JSX só é aceito quando exportar exclusivamente funções de
-variantes consumidas por outro arquivo de apresentação; ele nunca contém
-comportamento.
+O sufixo é `.ts` porque o arquivo exporta exclusivamente funções e tipos, sem JSX.
+Um componente de apresentação com API própria continua em seu `index.tsx`; não é
+movido para o arquivo de estilos.
 
 ### Exemplo de container estilizado
 
-```tsx
-// styles.tsx
-import type { ComponentPropsWithoutRef } from 'react';
+```ts
+// styles.ts
+import { tv, type VariantProps } from '@heroui/styles';
 
-import { tv } from '@heroui/styles';
-
-const pageLayoutStyles = tv({
+export const pageLayoutStyles = tv({
   slots: {
     page: 'flex min-h-svh flex-col bg-background text-foreground',
     content: 'mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6',
   },
+  variants: {
+    density: {
+      compact: {
+        content: 'gap-3',
+      },
+      comfortable: {
+        content: 'gap-6',
+      },
+    },
+  },
+  defaultVariants: {
+    density: 'comfortable',
+  },
 });
 
-const styles = pageLayoutStyles();
-
-type PageProps = Omit<ComponentPropsWithoutRef<'main'>, 'className'>;
-type ContentProps = Omit<ComponentPropsWithoutRef<'div'>, 'className'>;
-
-export function Page(props: Readonly<PageProps>) {
-  return <main {...props} className={styles.page()} />;
-}
-
-export function Content(props: Readonly<ContentProps>) {
-  return <div {...props} className={styles.content()} />;
-}
+export type PageLayoutVariants = VariantProps<typeof pageLayoutStyles>;
 ```
 
 ```tsx
 // index.tsx
+import type { ReactNode } from 'react';
+
 import { Card } from '@heroui/react';
 
-import { Content, Page } from './styles';
+import { pageLayoutStyles, type PageLayoutVariants } from './styles';
 
-export function WorkoutPage() {
+interface WorkoutPageProps extends PageLayoutVariants {
+  children: ReactNode;
+}
+
+export function WorkoutPage({ children, density }: Readonly<WorkoutPageProps>) {
+  const styles = pageLayoutStyles({ density });
+
   return (
-    <Page>
-      <Content>
-        <Card>{/* composição da rota */}</Card>
-      </Content>
-    </Page>
+    <main className={styles.page()}>
+      <div className={styles.content()}>
+        <Card>{children}</Card>
+      </div>
+    </main>
   );
 }
 ```
 
-O JSX de composição expressa intenção sem carregar detalhes visuais.
+O JSX mantém a semântica explícita e expressa intenção sem carregar strings ou
+definições visuais. Variantes são valores semânticos; suas classes continuam
+encapsuladas em `styles.ts`.
 
 ## Tailwind Variants pelo HeroUI
 
@@ -204,7 +216,7 @@ Usar:
 - `VariantProps<typeof styles>` para derivar tipos;
 - `extend` para estender uma função de variantes do HeroUI.
 
-Responsividade usa modifiers Tailwind dentro do `styles.tsx`, como `sm:`, `md:` e
+Responsividade usa modifiers Tailwind dentro do `styles.ts`, como `sm:`, `md:` e
 `lg:`. Não usar `withTV`, `withTv` ou `responsiveVariants`.
 
 Nomes de variantes descrevem intenção, como `tone: 'positive'`, e não a utility,
@@ -216,14 +228,14 @@ O VS Code reconhece classes em `tv` por meio de
 ## Customização do HeroUI
 
 Preferir as props e variantes públicas do HeroUI. Se um componente precisar de
-uma variante própria recorrente, criar um wrapper em `styles.tsx`, estendendo a
-função de variantes exportada por `@heroui/styles`.
+uma variante própria recorrente, criar o componente em `index.tsx` e estender em
+`styles.ts` a função de variantes exportada por `@heroui/styles`.
 
-```tsx
-import { Button, type ButtonRootProps } from '@heroui/react';
+```ts
+// styles.ts
 import { buttonVariants, tv, type VariantProps } from '@heroui/styles';
 
-const actionStyles = tv({
+export const actionStyles = tv({
   extend: buttonVariants,
   variants: {
     emphasis: {
@@ -236,7 +248,14 @@ const actionStyles = tv({
   },
 });
 
-type ActionVariants = VariantProps<typeof actionStyles>;
+export type ActionVariants = VariantProps<typeof actionStyles>;
+```
+
+```tsx
+// index.tsx
+import { Button, type ButtonRootProps } from '@heroui/react';
+
+import { actionStyles, type ActionVariants } from './styles';
 
 export type ActionProps = Readonly<
   Omit<ButtonRootProps, 'className'> &
@@ -271,12 +290,11 @@ Seguir a recomendação atual do HeroUI:
 - wrappers HeroUI omitem `className` quando precisam controlá-la e a reintroduzem
   explicitamente;
 - variantes próprias derivam de `VariantProps<typeof variantFunction>`;
-- wrappers de elementos nativos usam `ComponentPropsWithoutRef<'element'>`;
 - props públicas são exportadas e usam `Readonly`;
 - props condicionais usam unions quando isso impedir combinações inválidas.
 
-`styles.tsx` não transforma dados de negócio. Ele recebe somente props visuais
-tipadas ou props nativas necessárias ao elemento.
+`styles.ts` não transforma dados de negócio. A função `tv` recebe somente variantes
+visuais tipadas e `className` quando a API pública permitir customização.
 
 ## Compound components e composição
 
@@ -374,8 +392,9 @@ afetem composição ou responsividade validam o layout conforme
 
 - [ ] O catálogo HeroUI foi consultado antes de criar componente local
 - [ ] `index.tsx` não contém classes Tailwind nem estilos inline
-- [ ] Toda apresentação própria está em `styles.tsx` com `tv`
-- [ ] Wrappers preservam props nativas ou tipos públicos do HeroUI
+- [ ] Toda definição de apresentação própria está em `styles.ts` com `tv`
+- [ ] `className` no JSX recebe somente resultados importados de funções de estilo
+- [ ] Não existem wrappers cuja única responsabilidade seja anexar classes
 - [ ] Props e variantes são derivadas e tipadas, não duplicadas manualmente
 - [ ] Componentes extensos foram decompostos em partes nomeadas e testáveis
 - [ ] O JSX não contém ternários extensos ou aninhados

@@ -15,10 +15,12 @@ pnpm-debug.log*
 .env.*
 !.env.example
 *.local
+client_secret_*.json
 
 # Test and quality artifacts
 .scannerwork
 test-results
+playwright-report
 vitest-report
 
 # Editors and operating systems

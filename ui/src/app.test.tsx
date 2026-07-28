@@ -1,11 +1,19 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import App from '~/app';
 import { AppProviders } from '~/context/providers';
+import { queryClient } from '~/context/query-client';
+import { router } from '~/routes/routes';
 
 describe('App', () => {
-  it('resolves the root route inside the application providers', async () => {
+  beforeEach(async () => {
+    queryClient.clear();
+    window.history.replaceState({}, '', '/');
+    await router.navigate({ to: '/' });
+  });
+
+  it('resolves the public root route inside the application providers', async () => {
     render(
       <AppProviders>
         <App />
@@ -13,7 +21,7 @@ describe('App', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Get started' }),
+      await screen.findByRole('heading', { name: 'Entre para continuar' }),
     ).toBeInTheDocument();
   });
 });

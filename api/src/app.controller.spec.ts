@@ -1,24 +1,27 @@
-import { Test, type TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppController } from '~/app.controller';
-import { AppService } from '~/app.service';
+import type { GetRootCommand } from '~/commands/get-root.command';
 
 describe('AppController', () => {
+  const getRootCommand = {
+    execute: vi.fn(),
+  };
   let appController: AppController;
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
-
-    appController = app.get<AppController>(AppController);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    appController = new AppController(
+      getRootCommand as unknown as GetRootCommand,
+    );
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('returns the response prepared by the command', () => {
+    getRootCommand.execute.mockReturnValue('Hello World!');
+
+    const result = appController.getRoot();
+
+    expect(result).toBe('Hello World!');
+    expect(getRootCommand.execute).toHaveBeenCalledOnce();
   });
 });

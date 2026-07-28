@@ -29,7 +29,7 @@ pertencem a `../../../api/docs/sdd/endpoints/`.
 Toda construção ou alteração visual segue
 `base/03-componentes-e-estilizacao.md`: consultar o catálogo oficial do HeroUI
 antes de criar componentes, separar composição em `index.tsx` e apresentação em
-`styles.tsx`, e usar `tv` de `@heroui/styles` em toda estilização própria. Cada
+`styles.ts`, e usar `tv` de `@heroui/styles` em toda estilização própria. Cada
 documento de rota deve permitir que QA derive casos de teste sem consultar código
 ou conversa externa.
 
