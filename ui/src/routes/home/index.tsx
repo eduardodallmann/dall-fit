@@ -2,13 +2,9 @@ import { Alert, Button, Card } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 
 import { startGoogleLogin } from '~/auth/auth-service';
-import {
-  Description,
-  Eyebrow,
-  Page,
-  PageContent,
-  Title,
-} from '~/routes/home/styles';
+import { homeStyles } from '~/routes/home/styles';
+
+const styles = homeStyles();
 
 export interface HomePageProps {
   hasAuthError?: boolean;
@@ -24,8 +20,8 @@ export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
   const showAuthError = hasAuthError || loginMutation.isError;
 
   return (
-    <Page>
-      <PageContent>
+    <main className={styles.page()}>
+      <div className={styles.pageContent()}>
         {showAuthError ? (
           <Alert status="danger">
             <Alert.Indicator />
@@ -37,11 +33,11 @@ export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
         ) : null}
         <Card>
           <Card.Header>
-            <Eyebrow>Dall Fit</Eyebrow>
-            <Title>Entre para continuar</Title>
-            <Description>
+            <p className={styles.eyebrow()}>Dall Fit</p>
+            <h1 className={styles.title()}>Entre para continuar</h1>
+            <p className={styles.description()}>
               Use sua conta Google para acessar sua área.
-            </Description>
+            </p>
           </Card.Header>
           <Card.Footer>
             <Button
@@ -54,7 +50,7 @@ export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
             </Button>
           </Card.Footer>
         </Card>
-      </PageContent>
-    </Page>
+      </div>
+    </main>
   );
 }

@@ -102,10 +102,11 @@ ordem explícita.
   locais e preserve sua semântica, composição e acessibilidade;
 - componentes próprios e reutilizáveis vivem em `ui/src/core/components/`;
   componentes exclusivos ficam na rota proprietária;
-- componentes visuais próprios separam composição em `index.tsx` e apresentação
-  em `styles.tsx`;
-- não escreva classes Tailwind ou estilos inline no JSX de composição; wrappers
-  visuais e classes ficam em `styles.tsx`;
+- componentes visuais próprios separam composição em `index.tsx` e funções de
+  apresentação em `styles.ts`;
+- não escreva classes Tailwind literais, `tv` ou estilos inline no JSX de
+  composição; `styles.ts` concentra classes e variantes, e `index.tsx` aplica
+  somente os resultados tipados dessas funções em `className`;
 - use `tv`, `VariantProps` e funções de variantes de `@heroui/styles`; não adicione
   dependência direta de `tailwind-variants`;
 - para confirmar APIs atuais, consulte os arquivos oficiais

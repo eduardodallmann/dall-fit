@@ -2,15 +2,9 @@ import { Avatar, Card } from '@heroui/react';
 
 import type { Person } from '@dall-fit/types';
 
-import {
-  DetailLabel,
-  DetailList,
-  DetailValue,
-  Eyebrow,
-  Page,
-  PageContent,
-  Title,
-} from '~/routes/me/styles';
+import { meStyles } from '~/routes/me/styles';
+
+const styles = meStyles();
 
 export interface MePageProps {
   person: Person;
@@ -20,8 +14,8 @@ export function MePage({ person }: Readonly<MePageProps>) {
   const initials = getInitials(person.name);
 
   return (
-    <Page>
-      <PageContent>
+    <main className={styles.page()}>
+      <div className={styles.pageContent()}>
         <Card>
           <Card.Header>
             <Avatar size="lg">
@@ -30,24 +24,24 @@ export function MePage({ person }: Readonly<MePageProps>) {
               )}
               <Avatar.Fallback>{initials}</Avatar.Fallback>
             </Avatar>
-            <Eyebrow>Dall Fit</Eyebrow>
-            <Title>Sua conta</Title>
+            <p className={styles.eyebrow()}>Dall Fit</p>
+            <h1 className={styles.title()}>Sua conta</h1>
           </Card.Header>
           <Card.Content>
-            <DetailList>
+            <dl className={styles.detailList()}>
               <div>
-                <DetailLabel>Nome</DetailLabel>
-                <DetailValue>{person.name}</DetailValue>
+                <dt className={styles.detailLabel()}>Nome</dt>
+                <dd className={styles.detailValue()}>{person.name}</dd>
               </div>
               <div>
-                <DetailLabel>E-mail</DetailLabel>
-                <DetailValue>{person.email}</DetailValue>
+                <dt className={styles.detailLabel()}>E-mail</dt>
+                <dd className={styles.detailValue()}>{person.email}</dd>
               </div>
-            </DetailList>
+            </dl>
           </Card.Content>
         </Card>
-      </PageContent>
-    </Page>
+      </div>
+    </main>
   );
 }
 

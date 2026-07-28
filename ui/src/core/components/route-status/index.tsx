@@ -1,36 +1,35 @@
 import { Card, Spinner } from '@heroui/react';
 
-import {
-  Description,
-  Page,
-  PageContent,
-  Title,
-} from '~/core/components/route-status/styles';
+import { routeStatusStyles } from '~/core/components/route-status/styles';
+
+const styles = routeStatusStyles();
 
 export function ProtectedRoutePending() {
   return (
-    <Page>
-      <PageContent>
+    <main className={styles.page()}>
+      <div className={styles.pageContent()}>
         <Spinner aria-label="Carregando sua conta" size="lg" />
-        <Description>Carregando sua conta</Description>
-      </PageContent>
-    </Page>
+        <p className={styles.description()}>Carregando sua conta</p>
+      </div>
+    </main>
   );
 }
 
 export function ProtectedRouteError() {
   return (
-    <Page>
-      <PageContent>
+    <main className={styles.page()}>
+      <div className={styles.pageContent()}>
         <Card>
           <Card.Header>
-            <Title>Não foi possível carregar sua conta</Title>
-            <Description>
+            <h1 className={styles.title()}>
+              Não foi possível carregar sua conta
+            </h1>
+            <p className={styles.description()}>
               Recarregue a página para tentar novamente.
-            </Description>
+            </p>
           </Card.Header>
         </Card>
-      </PageContent>
-    </Page>
+      </div>
+    </main>
   );
 }

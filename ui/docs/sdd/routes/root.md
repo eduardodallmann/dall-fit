@@ -106,7 +106,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Arquivo da rota: `src/routes/home/index.tsx`
 - Componentes HeroUI utilizados: `Alert`, `Button` e `Card`
 - Componentes core: não se aplica
-- Componentes exclusivos: wrappers em `src/routes/home/styles.tsx`
+- Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
 - Hooks e serviços: mutation TanStack Query e `startGoogleLogin`
 - Tipos compartilhados: `StartGoogleLoginResponse`
 

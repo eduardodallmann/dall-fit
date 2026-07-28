@@ -123,7 +123,7 @@ Não se aplica — não existem imagens em `routes/assets/me/`.
 - Arquivo da rota: `src/routes/me/index.tsx`
 - Componentes HeroUI: `Avatar`, `Card`, `Spinner`
 - Componentes core: estados de rota protegida
-- Componentes exclusivos: wrappers em `src/routes/me/styles.tsx`
+- Componentes exclusivos: estilos tipados em `src/routes/me/styles.ts`
 - Hooks e serviços: `currentPersonQueryOptions`, `getCurrentPerson`
 - Tipos compartilhados: `Person`, `CurrentPersonResponse`
 
