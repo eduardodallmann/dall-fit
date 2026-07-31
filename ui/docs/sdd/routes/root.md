@@ -70,7 +70,7 @@ Não se aplica — não há formulário nem entrada local.
 ## Navegação
 
 - Entrada: direta ou redirect.
-- Avanço: endpoint externo da API e, após conclusão, `/me`.
+- Avanço: endpoint externo da API e, após conclusão, `/dash`.
 - Retorno: browser pode voltar à entrada pública.
 - Botão voltar do navegador: comportamento normal.
 - Dados preservados: nenhum dado pessoal na UI pública.
@@ -116,7 +116,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 | --------------------------- | --------------- | ---------- |
 | conteúdo e destino do login | componente home | rota root  |
 | alerta de callback          | componente home | rota root  |
-| avanço até `/me` mockado    | não se aplica   | flow login |
+| avanço até `/dash` mockado  | não se aplica   | flow login |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.

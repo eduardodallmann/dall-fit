@@ -108,10 +108,26 @@ A árvore manual possui um layout sem path para rotas autenticadas. Seu
 Novas rotas privadas são adicionadas como filhas desse layout. Rotas públicas
 continuam filhas diretas da root route.
 
+Depois da proteção, o componente do layout autenticado renderiza um shell visual
+compartilhado e o `Outlet`. O shell recebe a `Person` do contexto, sem consultar a
+API novamente, e apresenta:
+
+- um `aside` persistente a partir do breakpoint `md` de `768px`;
+- um botão icon-only e um `Drawer` HeroUI dispensável abaixo de `768px`;
+- o mesmo conteúdo de identidade e navegação nas duas apresentações;
+- a região `main` reservada ao conteúdo da rota filha.
+
+Os componentes reutilizáveis do shell e do menu vivem em
+`src/core/components/authenticated-shell/` e
+`src/core/components/application-menu/`. O menu usa `Avatar`, `Typography` e
+`Chip` do HeroUI, ícones individuais de `lucide-react` e links tipados do TanStack
+Router. Ao entrar no breakpoint persistente, qualquer `Drawer` aberto é fechado e
+não conserva estado para uma futura volta ao viewport móvel.
+
 O ponto de extensão `adminRoute` declara um layout sem path cujo pai é o layout
 autenticado. Seu `beforeLoad` reutiliza `Person` do contexto: `isAdmin: true` permite
 o filho futuro e a ausência da chave redireciona com substituição de histórico para
-`/me`. Enquanto não possui rota navegável filha, ele não é agregado à `routeTree`,
+`/dash`. Enquanto não possui rota navegável filha, ele não é agregado à `routeTree`,
 pois uma branch sem path e vazia competiria com `/`. A primeira rota administrativa
 deve ser adicionada como filha desse layout e agregá-lo à árvore; seu endpoint
 também deve aplicar a autorização da API.

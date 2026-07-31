@@ -11,6 +11,8 @@ describe('authService', () => {
   });
 
   it('prepares login through the API and returns its authorization URL', async () => {
-    await expect(startGoogleLogin()).resolves.toBe('http://localhost:4000/me');
+    await expect(startGoogleLogin()).resolves.toBe(
+      'http://localhost:4000/dash',
+    );
   });
 });

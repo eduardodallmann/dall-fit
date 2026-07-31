@@ -17,8 +17,9 @@ import {
 } from '~/core/components/route-status';
 import { assertAdminAccess } from '~/routes/admin-access';
 import {
+  AuthenticatedRouteComponent,
+  DashRouteComponent,
   HomeRouteComponent,
-  MeRouteComponent,
 } from '~/routes/route-components';
 
 interface RouterContext {
@@ -29,7 +30,7 @@ interface HomeSearch {
   authError?: 'oauth_failed';
 }
 
-interface MeSearch {
+interface DashSearch {
   mockAuth?: MockAuthScenario;
 }
 
@@ -72,6 +73,7 @@ const authenticatedRoute = createRoute({
       throw error;
     }
   },
+  component: AuthenticatedRouteComponent,
   errorComponent: ProtectedRouteError,
   pendingComponent: ProtectedRoutePending,
 });
@@ -88,10 +90,10 @@ export const adminRoute = createRoute({
   component: Outlet,
 });
 
-const meRoute = createRoute({
+const dashRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
-  path: '/me',
-  validateSearch: (search: Record<string, unknown>): MeSearch => {
+  path: '/dash',
+  validateSearch: (search: Record<string, unknown>): DashSearch => {
     const mockAuth: MockAuthScenario | undefined =
       search.mockAuth === 'admin' ||
       search.mockAuth === 'error' ||
@@ -102,12 +104,12 @@ const meRoute = createRoute({
 
     return result;
   },
-  component: MeRouteComponent,
+  component: DashRouteComponent,
 });
 
 const routeTree = rootRoute.addChildren([
   homeRoute,
-  authenticatedRoute.addChildren([meRoute]),
+  authenticatedRoute.addChildren([dashRoute]),
 ]);
 
 export const router = createRouter({

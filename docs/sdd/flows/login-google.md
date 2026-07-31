@@ -8,7 +8,8 @@
 - Problema resolvido: identificar a pessoa sem cadastro manual e estabelecer uma
   sessão reconhecida pela API e pela UI.
 - Resultado esperado: após consentimento válido, a pessoa possui cadastro
-  persistido e visualiza seus dados em `/me`.
+  persistido e entra em `/dash`, onde o menu autenticado apresenta sua identidade
+  e a navegação inicial.
 
 ## Entrada e pré-condições
 
@@ -25,8 +26,8 @@ as fronteiras externas sem acessar a API.
 |     2 | Preparar início OAuth     | `/`        | `POST /auth/google`    |
 |     3 | Consentimento Google      | externa    | não se aplica          |
 |     4 | Retorno do Google         | externa    | `GET /callback`        |
-|     5 | Validação da rota privada | `/me`      | `GET /auth/me`         |
-|     6 | Exibição do cadastro      | `/me`      | resposta já consultada |
+|     5 | Validação da rota privada | `/dash`    | `GET /auth/me`         |
+|     6 | Menu autenticado          | `/dash`    | resposta já consultada |
 
 `POST /auth/test-login` substitui as etapas 2 e 3 somente em local/teste.
 
@@ -41,11 +42,12 @@ as fronteiras externas sem acessar a API.
    `isAdmin`; se já houver, reutiliza o cadastro sem duplicá-lo nem alterar a
    condição administrativa.
 6. A API emite o cookie de sessão, remove cookies temporários e redireciona a
-   `/me`.
+   `/dash`.
 7. A rota-pai protegida consulta `GET /auth/me`.
 8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
-   público. A tela mostra os dados e, quando recebe `isAdmin: true`, o indicador
-   `Admin`.
+   público. O layout autenticado mostra avatar, nome, e-mail, navegação `Home` e,
+   quando recebe `isAdmin: true`, o indicador `Admin`; a região própria de
+   `/dash` permanece vazia.
 9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
 
 ## Dados compartilhados
@@ -64,7 +66,7 @@ as fronteiras externas sem acessar a API.
 ## Estados e exceções
 
 - Caminho completo: consentimento aceito, claims válidas, cadastro encontrado ou
-  criado, sessão emitida e `/me` carregada.
+  criado, sessão emitida e `/dash` carregada com o menu autenticado.
 - Interrupção ou retomada: negar consentimento ou falhar o callback retorna a `/`
   sem sessão; um novo acionamento reinicia o fluxo.
 - Erro recuperável: sessão ausente/expirada redireciona à entrada pública; falha
@@ -80,20 +82,22 @@ as fronteiras externas sem acessar a API.
 - Link para testar: `http://localhost:3000/`
 - Given: não existe cadastro para a conta Google
 - When: a pessoa conclui o consentimento
-- Then: a API cria `Person`, emite a sessão e `/me` exibe nome, e-mail e foto
+- Then: a API cria `Person`, emite a sessão e `/dash` mostra o menu com nome,
+  e-mail e foto
 
 ### Cenário 2 — Jornada integrada fictícia
 
 - Link para testar: `http://127.0.0.1:3100/`
 - Given: o Vite está iniciado pelo Playwright com MSW Browser e o handler de
-  `POST /auth/google` devolve `/me` como URL fictícia
+  `POST /auth/google` devolve `/dash` como URL fictícia
 - When: a pessoa aciona `Entrar com Google`
-- Then: o handler simula o retorno autenticado e `/me` exibe a fixture
+- Then: o handler simula o retorno autenticado e `/dash` exibe a fixture no menu,
+  com `Home` ativo e conteúdo de rota vazio
 
 ### Cenário 3 — Acesso privado sem sessão
 
 - Link para testar:
-  `http://127.0.0.1:3100/me?mockAuth=unauthenticated`
+  `http://127.0.0.1:3100/dash?mockAuth=unauthenticated`
 - Given: o handler de pessoa atual responde `401`
 - When: a rota-pai protegida valida a sessão
 - Then: a UI redireciona para `/` sem renderizar dados privados
@@ -103,7 +107,7 @@ as fronteiras externas sem acessar a API.
 - Regras e caminhos de negócio protegidos: primeiro cadastro, reutilização,
   validação de `state`/`nonce`, sessão válida/expirada e pessoa removida.
 - Unitários e componentes da UI: home, consulta de pessoa, autorização
-  administrativa e apresentação comum/administrativa de `/me`.
+  administrativa, iniciais e apresentação comum/administrativa do menu.
 - Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
 - E2E dos endpoints da API e fixtures MongoDB/Redis:
   `api/test/auth.e2e-spec.ts` com MongoDB efêmero; Redis não participa.

@@ -56,7 +56,7 @@ describe('CompleteGoogleLoginCommand', () => {
       });
 
       expect(result).toEqual({
-        redirectUrl: 'http://localhost:3000/me',
+        redirectUrl: 'http://localhost:3000/dash',
         session: { maxAgeMs: 600_000, token: 'signed-session' },
         succeeded: true,
       });

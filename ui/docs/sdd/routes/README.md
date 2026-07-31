@@ -6,4 +6,4 @@ Este diretório contém a documentação funcional viva das telas. Use
 Índice atual:
 
 - [`/`](root.md): entrada pública e início do login Google.
-- [`/me`](me.md): dados da pessoa em rota protegida.
+- [`/dash`](dash.md): entrada autenticada com menu responsivo e conteúdo vazio.
