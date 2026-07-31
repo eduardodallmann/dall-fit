@@ -11,4 +11,5 @@ export interface Person extends Entity {
   name: string;
   email: string;
   photoUrl: string | null;
+  isAdmin?: true;
 }

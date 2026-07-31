@@ -1,4 +1,4 @@
-import { Avatar, Card } from '@heroui/react';
+import { Avatar, Card, Chip } from '@heroui/react';
 
 import type { Person } from '@dall-fit/types';
 
@@ -25,6 +25,11 @@ export function MePage({ person }: Readonly<MePageProps>) {
               <Avatar.Fallback>{initials}</Avatar.Fallback>
             </Avatar>
             <p className={styles.eyebrow()}>Dall Fit</p>
+            {person.isAdmin === true ? (
+              <Chip color="accent" variant="soft">
+                <Chip.Label>Admin</Chip.Label>
+              </Chip>
+            ) : null}
             <h1 className={styles.title()}>Sua conta</h1>
           </Card.Header>
           <Card.Content>

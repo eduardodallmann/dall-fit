@@ -37,13 +37,15 @@ as fronteiras externas sem acessar a API.
 3. A UI navega para a URL; o Google autentica a pessoa e retorna um código ao
    callback.
 4. A API compara `state`, troca o código, valida o ID token e o `nonce`.
-5. Se não houver `Person` para o `sub`, a API persiste nome, e-mail e foto; se já
-   houver, reutiliza o cadastro sem duplicá-lo.
+5. Se não houver `Person` para o `sub`, a API persiste nome, e-mail e foto sem
+   `isAdmin`; se já houver, reutiliza o cadastro sem duplicá-lo nem alterar a
+   condição administrativa.
 6. A API emite o cookie de sessão, remove cookies temporários e redireciona a
    `/me`.
 7. A rota-pai protegida consulta `GET /auth/me`.
 8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
-   público; a tela mostra os dados.
+   público. A tela mostra os dados e, quando recebe `isAdmin: true`, o indicador
+   `Admin`.
 9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
 
 ## Dados compartilhados
@@ -55,6 +57,7 @@ as fronteiras externas sem acessar a API.
 | e-mail          | ID token verificado | API e UI          | MongoDB                     | dado pessoal, não é chave          |
 | URL da foto     | ID token            | API e UI          | MongoDB                     | pode ser ausente                   |
 | ID de `Person`  | MongoDB             | sessão e API      | MongoDB e JWT               | único dado da pessoa no JWT        |
+| `isAdmin`       | operação autorizada | API e UI          | MongoDB                     | somente `true`; ausência é `false` |
 | sessão          | API                 | browser e API     | cookie `HttpOnly` stateless | não acessível ao JavaScript        |
 | `state`/`nonce` | API                 | Google e callback | cookies temporários         | removidos ao terminar              |
 
@@ -99,7 +102,8 @@ as fronteiras externas sem acessar a API.
 
 - Regras e caminhos de negócio protegidos: primeiro cadastro, reutilização,
   validação de `state`/`nonce`, sessão válida/expirada e pessoa removida.
-- Unitários e componentes da UI: home, consulta de pessoa e apresentação de `/me`.
+- Unitários e componentes da UI: home, consulta de pessoa, autorização
+  administrativa e apresentação comum/administrativa de `/me`.
 - Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
 - E2E dos endpoints da API e fixtures MongoDB/Redis:
   `api/test/auth.e2e-spec.ts` com MongoDB efêmero; Redis não participa.

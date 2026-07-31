@@ -137,12 +137,12 @@ Erros do frontend são documentados na rota; contratos HTTP permanecem no SDD da
 ## Estado de adoção
 
 MSW foi adotado com autenticação. Os handlers vigentes cobrem início fictício do
-login e consulta da pessoa atual. No modo mock, a query exclusiva
-`mockAuth=unauthenticated` faz o client enviar
-`x-dall-fit-mock-auth: unauthenticated`; o header nunca é enviado quando mocks estão
-desabilitados e não pertence ao contrato da API.
+login e consulta da pessoa atual. No modo mock, a query exclusiva `mockAuth` faz o
+client enviar `x-dall-fit-mock-auth` com o cenário selecionado; o header nunca é
+enviado quando mocks estão desabilitados e não pertence ao contrato da API.
 
 O handler de `POST /auth/google` devolve `/me` como URL de autorização,
 representando que o provedor e callback concluíram. `GET /auth/me` devolve a
-fixture autenticada por padrão, `401` no seletor `unauthenticated` e erro técnico
-no seletor `error`.
+fixture autenticada sem `isAdmin` por padrão, a fixture com `isAdmin: true` no
+seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
+`error`.

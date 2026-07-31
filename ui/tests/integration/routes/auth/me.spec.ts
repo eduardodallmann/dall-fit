@@ -10,9 +10,18 @@ test.describe('Rota /me', () => {
     await expect(page.getByText('Alex Runner')).toBeVisible();
     await expect(page.getByText('alex.runner@example.test')).toBeVisible();
     await expect(page.getByRole('img', { name: 'Alex Runner' })).toBeVisible();
+    await expect(page.getByText('Admin')).not.toBeVisible();
   });
 
-  test('Cenário 2 — Sessão ausente', async ({ page }) => {
+  test('Cenário 2 — Pessoa administradora', async ({ page }) => {
+    await page.goto('/me?mockAuth=admin');
+
+    await expect(page.getByText('Admin')).toBeVisible();
+    await expect(page.getByText('Alex Runner')).toBeVisible();
+    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+  });
+
+  test('Cenário 3 — Sessão ausente', async ({ page }) => {
     await page.goto('/me?mockAuth=unauthenticated');
 
     await expect(page).toHaveURL('/');
@@ -22,7 +31,7 @@ test.describe('Rota /me', () => {
     await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
   });
 
-  test('Cenário 3 — Erro de integração', async ({ page }) => {
+  test('Cenário 4 — Erro de integração', async ({ page }) => {
     await page.goto('/me?mockAuth=error');
 
     await expect(

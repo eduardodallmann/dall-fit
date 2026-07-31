@@ -108,6 +108,14 @@ A árvore manual possui um layout sem path para rotas autenticadas. Seu
 Novas rotas privadas são adicionadas como filhas desse layout. Rotas públicas
 continuam filhas diretas da root route.
 
+O ponto de extensão `adminRoute` declara um layout sem path cujo pai é o layout
+autenticado. Seu `beforeLoad` reutiliza `Person` do contexto: `isAdmin: true` permite
+o filho futuro e a ausência da chave redireciona com substituição de histórico para
+`/me`. Enquanto não possui rota navegável filha, ele não é agregado à `routeTree`,
+pois uma branch sem path e vazia competiria com `/`. A primeira rota administrativa
+deve ser adicionada como filha desse layout e agregá-lo à árvore; seu endpoint
+também deve aplicar a autorização da API.
+
 ## Ambiente local
 
 O Vite usa obrigatoriamente a porta `3000` e falha se ela estiver ocupada.

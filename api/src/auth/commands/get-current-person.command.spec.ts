@@ -25,5 +25,27 @@ describe('GetCurrentPersonCommand', () => {
       updatedAt: '2026-07-24T12:00:00.000Z',
     });
     expect(result.data).not.toHaveProperty('googleSubject');
+    expect(result.data).not.toHaveProperty('isAdmin');
+  });
+
+  it('includes the admin flag without exposing the Google identifier', () => {
+    const command = new GetCurrentPersonCommand();
+
+    const result = command.execute({
+      id: 'person-admin-001',
+      googleSubject: 'google-admin-subject',
+      name: 'Admin Runner',
+      email: 'admin.runner@example.test',
+      photoUrl: null,
+      isAdmin: true,
+      createdAt: '2026-07-31T12:00:00.000Z',
+      updatedAt: '2026-07-31T12:00:00.000Z',
+    });
+
+    expect(result.data).toMatchObject({
+      id: 'person-admin-001',
+      isAdmin: true,
+    });
+    expect(result.data).not.toHaveProperty('googleSubject');
   });
 });
