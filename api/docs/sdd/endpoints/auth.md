@@ -45,7 +45,7 @@ local/teste, para automação sem o provedor externo.
 - metadados adicionais devolvidos pelo Google são descartados antes da validação;
 - compara o state do query ao cookie e valida o nonce no ID token;
 - em sucesso grava `dall_fit_session`, limpa cookies temporários e responde `302`
-  para `${UI_URL}/me`;
+  para `${UI_URL}/dash`;
 - em falha limpa cookies temporários e responde `302` para
   `${UI_URL}/?authError=oauth_failed`, sem sessão.
 
@@ -113,8 +113,8 @@ pertença à identidade fictícia.
 | ------------------ | ---------------------------------- | -------------------------------------------------------- | ------------------------------ | ---------------------------------- |
 | preparar OAuth     | POST da UI                         | Controller → Command → GoogleOAuthService                | `200` com URL                  | cookies temporários                |
 | início direto      | GET público                        | Controller → Command → GoogleOAuthService                | `302` Google                   | cookies temporários                |
-| callback novo      | claims válidas, pessoa ausente     | Controller → Command → Google → Person → Mongo → Session | `302 /me`                      | cria pessoa sem `isAdmin` e sessão |
-| callback existente | claims válidas, pessoa presente    | mesmo fluxo, branch existente                            | `302 /me`                      | preserva pessoa e cria sessão      |
+| callback novo      | claims válidas, pessoa ausente     | Controller → Command → Google → Person → Mongo → Session | `302 /dash`                    | cria pessoa sem `isAdmin` e sessão |
+| callback existente | claims válidas, pessoa presente    | mesmo fluxo, branch existente                            | `302 /dash`                    | preserva pessoa e cria sessão      |
 | callback inválido  | erro, state/nonce/claims inválidos | Controller/Command interrompe                            | `302 /?authError=oauth_failed` | limpa temporários                  |
 | bypass válido      | local/teste + chave                | Guard → Controller → Command → Person → Session          | `204`                          | pessoa/sessão                      |
 | bypass bloqueado   | produção, flag/chave inválida      | Guard interrompe                                         | `404`                          | nenhum                             |

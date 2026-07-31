@@ -5,15 +5,16 @@ test.describe('Fluxo Login com Google', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Entrar com Google' }).click();
 
-    await expect(page).toHaveURL('/me');
-    await expect(
-      page.getByRole('heading', { name: 'Sua conta' }),
-    ).toBeVisible();
+    await expect(page).toHaveURL('/dash');
+    await expect(page.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     await expect(page.getByText('alex.runner@example.test')).toBeVisible();
   });
 
   test('Cenário 3 — Acesso privado sem sessão', async ({ page }) => {
-    await page.goto('/me?mockAuth=unauthenticated');
+    await page.goto('/dash?mockAuth=unauthenticated');
 
     await expect(page).toHaveURL('/');
     await expect(

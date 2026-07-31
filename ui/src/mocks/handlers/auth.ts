@@ -7,7 +7,7 @@ import {
 
 export const authHandlers = [
   http.post('*/auth/google', ({ request }) => {
-    const authorizationUrl = new URL('/me', request.url).toString();
+    const authorizationUrl = new URL('/dash', request.url).toString();
     const result = HttpResponse.json({ data: { authorizationUrl } });
 
     return result;

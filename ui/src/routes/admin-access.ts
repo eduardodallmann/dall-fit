@@ -7,5 +7,5 @@ export function assertAdminAccess(person: Person): void {
     return;
   }
 
-  redirect({ replace: true, throw: true, to: '/me' });
+  redirect({ replace: true, throw: true, to: '/dash' });
 }

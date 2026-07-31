@@ -16,7 +16,7 @@ describe('assertAdminAccess', () => {
     expect(() => assertAdminAccess(person)).not.toThrow();
   });
 
-  it('redirects a person without the admin flag to /me', () => {
+  it('redirects a person without the admin flag to /dash', () => {
     let thrown: unknown;
 
     try {
@@ -31,6 +31,6 @@ describe('assertAdminAccess', () => {
       throw new Error('Expected an admin route redirect.');
     }
 
-    expect(thrown.options).toMatchObject({ replace: true, to: '/me' });
+    expect(thrown.options).toMatchObject({ replace: true, to: '/dash' });
   });
 });

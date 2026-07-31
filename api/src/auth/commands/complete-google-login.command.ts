@@ -29,7 +29,7 @@ export class CompleteGoogleLoginCommand {
     private readonly authSessionService: AuthSessionService,
   ) {
     const uiUrl = configService.getOrThrow<string>('UI_URL');
-    this.successUrl = new URL('/me', uiUrl).toString();
+    this.successUrl = new URL('/dash', uiUrl).toString();
     this.failureUrl = new URL('/?authError=oauth_failed', uiUrl).toString();
   }
 

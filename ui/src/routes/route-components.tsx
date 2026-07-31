@@ -1,7 +1,18 @@
-import { useRouteContext, useSearch } from '@tanstack/react-router';
+import { Outlet, useRouteContext, useSearch } from '@tanstack/react-router';
 
+import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { HomePage } from '~/routes/home';
-import { MePage } from '~/routes/me';
+
+export function AuthenticatedRouteComponent() {
+  const { person } = useRouteContext({ from: '/_authenticated' });
+  const result = (
+    <AuthenticatedShell person={person}>
+      <Outlet />
+    </AuthenticatedShell>
+  );
+
+  return result;
+}
 
 export function HomeRouteComponent() {
   const search = useSearch({ from: '/' });
@@ -12,9 +23,8 @@ export function HomeRouteComponent() {
   return result;
 }
 
-export function MeRouteComponent() {
-  const { person } = useRouteContext({ from: '/_authenticated' });
-  const result = <MePage person={person} />;
+export function DashRouteComponent() {
+  const result = null;
 
   return result;
 }
