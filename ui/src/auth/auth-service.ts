@@ -6,7 +6,8 @@ import type {
 
 import { apiClient } from '~/core/http/api-client';
 
-export type MockAuthScenario = 'authenticated' | 'error' | 'unauthenticated';
+export type MockAuthScenario =
+  'admin' | 'authenticated' | 'error' | 'unauthenticated';
 
 export async function startGoogleLogin(): Promise<string> {
   const response =

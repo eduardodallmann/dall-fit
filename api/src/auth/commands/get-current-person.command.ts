@@ -18,6 +18,7 @@ export class GetCurrentPersonCommand {
       name: person.name,
       email: person.email,
       photoUrl: person.photoUrl,
+      ...(person.isAdmin === true ? { isAdmin: true as const } : {}),
       createdAt: person.createdAt,
       updatedAt: person.updatedAt,
     };

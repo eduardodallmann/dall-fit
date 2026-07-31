@@ -174,7 +174,9 @@ continua ausente do wiring porque nenhum fluxo vigente o consome.
 
 O domínio `Person` expõe ports de repository aos services. O adapter MongoDB mantém
 índice único para o identificador `sub` do Google e mapeia documentos para entidades
-antes de devolvê-los.
+antes de devolvê-los. Uma pessoa administradora possui `isAdmin: true`; pessoas
+comuns omitem o campo. Não existe default `false`, coleção separada nem consulta
+adicional para descobrir essa condição.
 
 ## Infraestrutura de desenvolvimento local
 
@@ -244,6 +246,12 @@ aplicação.
 `dall_fit_session`, valida assinatura e expiração e consulta `Person` no MongoDB.
 `Authenticated` aplica o guard e `CurrentPerson` entrega a entidade já validada ao
 controller. O token contém apenas o ID técnico, sem nome, e-mail ou foto.
+
+`AdminOnly` é o ponto de extensão para endpoints administrativos. Ele aplica
+`SessionAuthGuard` e depois `AdminAuthorizationGuard`; o segundo guard reutiliza a
+`Person` anexada ao request e permite somente `isAdmin: true`, sem acessar banco ou
+service novamente. Pessoa autenticada sem a chave recebe
+`403 ADMIN_ACCESS_REQUIRED`. Nenhum endpoint vigente usa essa proteção.
 
 Cookies de sessão usam `HttpOnly`, `SameSite=Lax`, path `/`, expiração configurada
 e `Secure` conforme ambiente. `state` e `nonce` usam cookies temporários com as

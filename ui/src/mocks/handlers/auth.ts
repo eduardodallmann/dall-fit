@@ -1,6 +1,9 @@
 import { delay, http, HttpResponse } from 'msw';
 
-import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
+import {
+  adminPersonFixture,
+  authenticatedPersonFixture,
+} from '~/mocks/fixtures/person';
 
 export const authHandlers = [
   http.post('*/auth/google', ({ request }) => {
@@ -35,6 +38,12 @@ export const authHandlers = [
         },
         { status: 503 },
       );
+
+      return result;
+    }
+
+    if (scenario === 'admin') {
+      const result = HttpResponse.json({ data: adminPersonFixture });
 
       return result;
     }

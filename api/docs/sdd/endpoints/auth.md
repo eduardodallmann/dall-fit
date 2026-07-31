@@ -55,6 +55,7 @@ local/teste, para automação sem o provedor externo.
   produção e `x-auth-test-key` corresponde à configuração;
 - recebe identidade fictícia completa e executa o mesmo cadastro e emissão de
   sessão;
+- rejeita campos adicionais, inclusive tentativas de enviar `isAdmin`;
 - responde `204`, grava `dall_fit_session` e não chama Google;
 - fora das condições responde `404`, evitando divulgar o recurso.
 
@@ -86,9 +87,10 @@ No caminho principal:
 5. O service prepara o objeto de persistência e chama
    `PersonRepository.findOrCreateByGoogleSubject`.
 6. O adapter consulta pelo `sub` e cria sob proteção de índice único. Em pessoa
-   nova, persiste os três dados pessoais; em pessoa existente, devolve o documento
-   vigente. Se duas criações concorrerem, a que receber chave duplicada carrega o
-   documento vencedor.
+   nova, persiste os três dados pessoais sem `isAdmin`; em pessoa existente,
+   devolve o documento vigente sem alterar a presença do campo administrativo. Se
+   duas criações concorrerem, a que receber chave duplicada carrega o documento
+   vencedor.
 7. Chama `AuthSessionService.createSession`, que assina JWT contendo somente
    `sub=<personId>`.
 8. Monta o resultado de redirect e cookie.
@@ -102,19 +104,20 @@ tratado sem expor detalhes e o navegador volta à UI com código genérico.
 `TestAuthBypassGuard` valida ambiente, flag e chave. Depois do DTO,
 `TestLoginCommand` prepara a mesma identidade interna que o adapter Google
 produziria, chama `FindOrCreatePersonService` e `AuthSessionService`, e o controller
-grava o cookie.
+grava o cookie. A validação whitelist rejeita `isAdmin` e qualquer campo que não
+pertença à identidade fictícia.
 
 ## Mapa de caminhos possíveis
 
-| Caminho            | Gatilho                            | Sequência resumida                                       | Resultado HTTP                 | Efeito               |
-| ------------------ | ---------------------------------- | -------------------------------------------------------- | ------------------------------ | -------------------- |
-| preparar OAuth     | POST da UI                         | Controller → Command → GoogleOAuthService                | `200` com URL                  | cookies temporários  |
-| início direto      | GET público                        | Controller → Command → GoogleOAuthService                | `302` Google                   | cookies temporários  |
-| callback novo      | claims válidas, pessoa ausente     | Controller → Command → Google → Person → Mongo → Session | `302 /me`                      | cria pessoa e sessão |
-| callback existente | claims válidas, pessoa presente    | mesmo fluxo, branch existente                            | `302 /me`                      | cria sessão          |
-| callback inválido  | erro, state/nonce/claims inválidos | Controller/Command interrompe                            | `302 /?authError=oauth_failed` | limpa temporários    |
-| bypass válido      | local/teste + chave                | Guard → Controller → Command → Person → Session          | `204`                          | pessoa/sessão        |
-| bypass bloqueado   | produção, flag/chave inválida      | Guard interrompe                                         | `404`                          | nenhum               |
+| Caminho            | Gatilho                            | Sequência resumida                                       | Resultado HTTP                 | Efeito                             |
+| ------------------ | ---------------------------------- | -------------------------------------------------------- | ------------------------------ | ---------------------------------- |
+| preparar OAuth     | POST da UI                         | Controller → Command → GoogleOAuthService                | `200` com URL                  | cookies temporários                |
+| início direto      | GET público                        | Controller → Command → GoogleOAuthService                | `302` Google                   | cookies temporários                |
+| callback novo      | claims válidas, pessoa ausente     | Controller → Command → Google → Person → Mongo → Session | `302 /me`                      | cria pessoa sem `isAdmin` e sessão |
+| callback existente | claims válidas, pessoa presente    | mesmo fluxo, branch existente                            | `302 /me`                      | preserva pessoa e cria sessão      |
+| callback inválido  | erro, state/nonce/claims inválidos | Controller/Command interrompe                            | `302 /?authError=oauth_failed` | limpa temporários                  |
+| bypass válido      | local/teste + chave                | Guard → Controller → Command → Person → Session          | `204`                          | pessoa/sessão                      |
+| bypass bloqueado   | produção, flag/chave inválida      | Guard interrompe                                         | `404`                          | nenhum                             |
 
 ## Cenários detalhados
 
@@ -165,7 +168,7 @@ curl --request POST \
 
 - Given: a fixture garante ausência do `sub`
 - When: o bypass recebe identidade válida
-- Then: responde `204`, cria uma pessoa e envia cookie de sessão
+- Then: responde `204`, cria uma pessoa sem `isAdmin` e envia cookie de sessão
 
 ### Cenário 3 — Login fictício de pessoa existente
 
@@ -188,9 +191,34 @@ curl --request POST \
 
 - Given: existe `Person` da fixture
 - When: o bypass é executado novamente
-- Then: responde `204`, reutiliza a pessoa e não sobrescreve nem duplica o cadastro
+- Then: responde `204`, reutiliza a pessoa sem `isAdmin` e não sobrescreve nem
+  duplica o cadastro
 
-### Cenário 4 — Bypass bloqueado
+### Cenário 4 — Login fictício de administrador existente
+
+**Seed**
+
+```bash
+pnpm -C api seed -- auth:person-admin
+```
+
+**cURL**
+
+```bash
+curl --request POST \
+  --url http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' \
+  --header 'x-auth-test-key: local-auth-test-key' \
+  --include \
+  --data '{"googleSubject":"google-admin-001","name":"Ignored Admin","email":"ignored.admin@example.test","photoUrl":null}'
+```
+
+- Given: existe `Person` com `isAdmin: true`
+- When: o bypass é executado novamente
+- Then: responde `204`, preserva `isAdmin: true` e não sobrescreve nem duplica a
+  pessoa
+
+### Cenário 5 — Bypass bloqueado
 
 **Seed:** não se aplica — a proteção interrompe antes do MongoDB.
 
@@ -208,7 +236,7 @@ curl --request POST \
 - When: chama o bypass
 - Then: recebe `404` e nenhum cadastro ou cookie é criado
 
-### Cenário 5 — Callback com state divergente
+### Cenário 6 — Callback com state divergente
 
 **Seed:** não se aplica — o fluxo termina antes da integração e do banco.
 
@@ -233,17 +261,20 @@ adapter e o E2E usa o cenário 2 para persistência e sessão.
 
 ## Regras de negócio cobertas por testes
 
-| Regra                        | Teste unitário                            | Teste E2E                        | Mock ou fixture        |
-| ---------------------------- | ----------------------------------------- | -------------------------------- | ---------------------- |
-| state/nonce e claims válidas | commands e `google-oauth.service.spec.ts` | divergência de state             | adapter Google mockado |
-| primeiro cadastro            | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | MongoDB efêmero        |
-| concorrência/reutilização    | service e repository                      | `auth.e2e-spec.ts`               | índice único           |
-| bypass bloqueado             | guard                                     | `auth.e2e-spec.ts`               | chave fictícia         |
-| sessão emitida               | `auth-session.service.spec.ts`            | cookie usado em endpoint privado | segredo fictício       |
+| Regra                         | Teste unitário                            | Teste E2E                        | Mock ou fixture        |
+| ----------------------------- | ----------------------------------------- | -------------------------------- | ---------------------- |
+| state/nonce e claims válidas  | commands e `google-oauth.service.spec.ts` | divergência de state             | adapter Google mockado |
+| primeiro cadastro             | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | MongoDB efêmero        |
+| concorrência/reutilização     | service e repository                      | `auth.e2e-spec.ts`               | índice único           |
+| condição admin preservada     | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | pessoa com `isAdmin`   |
+| escalação pelo body rejeitada | DTO/ValidationPipe                        | `auth.e2e-spec.ts`               | body fictício          |
+| bypass bloqueado              | guard                                     | `auth.e2e-spec.ts`               | chave fictícia         |
+| sessão emitida                | `auth-session.service.spec.ts`            | cookie usado em endpoint privado | segredo fictício       |
 
 ## Fora do comportamento atual
 
 - refresh token e APIs Google adicionais;
 - atualização dos dados pessoais em logins posteriores;
+- promoção ou revogação administrativa por endpoint;
 - logout e revogação;
 - bypass habilitado em produção.

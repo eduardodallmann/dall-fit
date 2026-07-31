@@ -137,6 +137,7 @@ export class MongoPersonRepository extends PersonRepository {
       name: document.name,
       email: document.email,
       photoUrl: document.photoUrl,
+      ...(document.isAdmin === true ? { isAdmin: true as const } : {}),
       createdAt: document.createdAt.toISOString(),
       updatedAt: document.updatedAt.toISOString(),
     };

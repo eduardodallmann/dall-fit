@@ -44,4 +44,19 @@ describe('FindOrCreatePersonService', () => {
       );
     },
   );
+
+  it('preserves the admin flag returned for an existing person', async () => {
+    const adminPerson = { ...person, isAdmin: true as const };
+    personRepository.findOrCreateByGoogleSubject.mockResolvedValue({
+      created: false,
+      person: adminPerson,
+    });
+
+    const result = await service.execute(identity);
+
+    expect(result).toEqual({ created: false, person: adminPerson });
+    expect(personRepository.findOrCreateByGoogleSubject).toHaveBeenCalledWith(
+      identity,
+    );
+  });
 });

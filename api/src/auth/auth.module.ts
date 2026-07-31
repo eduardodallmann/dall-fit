@@ -7,6 +7,7 @@ import { GetCurrentPersonCommand } from '~/auth/commands/get-current-person.comm
 import { StartGoogleLoginCommand } from '~/auth/commands/start-google-login.command';
 import { TestLoginCommand } from '~/auth/commands/test-login.command';
 import { AuthController } from '~/auth/controllers/auth.controller';
+import { AdminAuthorizationGuard } from '~/auth/guards/admin-authorization.guard';
 import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
 import { AuthSessionService } from '~/auth/services/auth-session.service';
@@ -26,6 +27,7 @@ import { PersonModule } from '~/person/person.module';
   controllers: [AuthController],
   providers: [
     AuthSessionService,
+    AdminAuthorizationGuard,
     CompleteGoogleLoginCommand,
     GetCurrentPersonCommand,
     GoogleOAuthService,
@@ -34,6 +36,6 @@ import { PersonModule } from '~/person/person.module';
     TestAuthBypassGuard,
     TestLoginCommand,
   ],
-  exports: [AuthSessionService, SessionAuthGuard],
+  exports: [AdminAuthorizationGuard, AuthSessionService, SessionAuthGuard],
 })
 export class AuthModule {}

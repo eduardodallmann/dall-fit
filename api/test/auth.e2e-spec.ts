@@ -107,9 +107,89 @@ describe('Authentication (e2e)', () => {
     });
     const meBody = meResponse.body as { data: Record<string, unknown> };
     expect(meBody.data).not.toHaveProperty('googleSubject');
+    expect(meBody.data).not.toHaveProperty('isAdmin');
     expect(rootResponse.status).toBe(200);
     expect(rootResponse.text).toBe('Hello World!');
     await expect(personModel.countDocuments()).resolves.toBe(1);
+    const storedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-new-001',
+    });
+    expect(storedPerson).not.toHaveProperty('isAdmin');
+  });
+
+  it('returns the admin flag for an administrator and preserves it on login', async () => {
+    await personModel.create({
+      googleSubject: 'google-admin-001',
+      name: 'Admin Runner',
+      email: 'admin.runner@example.test',
+      photoUrl: null,
+      isAdmin: true,
+    });
+    const agent = request.agent(app.getHttpServer());
+
+    const loginResponse = await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-admin-001',
+        name: 'Changed Admin',
+        email: 'changed.admin@example.test',
+        photoUrl: 'https://example.test/changed-admin.png',
+      });
+    const meResponse = await agent.get('/auth/me');
+
+    expect(loginResponse.status).toBe(204);
+    expect(meResponse.status).toBe(200);
+    expect(meResponse.body).toMatchObject({
+      data: {
+        name: 'Admin Runner',
+        email: 'admin.runner@example.test',
+        isAdmin: true,
+      },
+    });
+    const storedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-admin-001',
+    });
+    expect(storedPerson).toMatchObject({ isAdmin: true });
+  });
+
+  it('applies promotion and revocation on the next request without replacing the session', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-promoted-001',
+        name: 'Promoted Runner',
+        email: 'promoted.runner@example.test',
+        photoUrl: null,
+      });
+
+    await personModel
+      .updateOne(
+        { googleSubject: 'google-promoted-001' },
+        { $set: { isAdmin: true } },
+      )
+      .exec();
+    const promotedResponse = await agent.get('/auth/me');
+
+    expect(promotedResponse.body).toMatchObject({
+      data: { isAdmin: true },
+    });
+
+    await personModel
+      .updateOne(
+        { googleSubject: 'google-promoted-001' },
+        { $unset: { isAdmin: 1 } },
+      )
+      .exec();
+    const revokedResponse = await agent.get('/auth/me');
+    const revokedBody = revokedResponse.body as {
+      data: Record<string, unknown>;
+    };
+
+    expect(revokedResponse.status).toBe(200);
+    expect(revokedBody.data).not.toHaveProperty('isAdmin');
   });
 
   it('reuses an existing person without overwriting their original profile', async () => {
@@ -172,6 +252,22 @@ describe('Authentication (e2e)', () => {
         googleSubject: '',
         name: '',
         email: 'invalid',
+      });
+
+    expect(response.status).toBe(400);
+    await expect(personModel.countDocuments()).resolves.toBe(0);
+  });
+
+  it('rejects an attempt to grant admin access through the test login body', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-escalation-001',
+        name: 'Escalation Attempt',
+        email: 'escalation@example.test',
+        photoUrl: null,
+        isAdmin: true,
       });
 
     expect(response.status).toBe(400);

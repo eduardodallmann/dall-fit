@@ -15,6 +15,7 @@ import {
   ProtectedRouteError,
   ProtectedRoutePending,
 } from '~/core/components/route-status';
+import { assertAdminAccess } from '~/routes/admin-access';
 import {
   HomeRouteComponent,
   MeRouteComponent,
@@ -75,12 +76,26 @@ const authenticatedRoute = createRoute({
   pendingComponent: ProtectedRoutePending,
 });
 
+export const adminRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  id: '_admin',
+  beforeLoad: ({ context }) => {
+    assertAdminAccess(context.person);
+    const result = {};
+
+    return result;
+  },
+  component: Outlet,
+});
+
 const meRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/me',
   validateSearch: (search: Record<string, unknown>): MeSearch => {
     const mockAuth: MockAuthScenario | undefined =
-      search.mockAuth === 'error' || search.mockAuth === 'unauthenticated'
+      search.mockAuth === 'admin' ||
+      search.mockAuth === 'error' ||
+      search.mockAuth === 'unauthenticated'
         ? search.mockAuth
         : undefined;
     const result = mockAuth === undefined ? {} : { mockAuth };
@@ -104,7 +119,9 @@ export const router = createRouter({
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');
   const result =
-    value === 'error' || value === 'unauthenticated' ? value : 'authenticated';
+    value === 'admin' || value === 'error' || value === 'unauthenticated'
+      ? value
+      : 'authenticated';
 
   return result;
 }

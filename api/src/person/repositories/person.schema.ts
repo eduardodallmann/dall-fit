@@ -7,17 +7,20 @@ import { HydratedDocument } from 'mongoose';
   versionKey: false,
 })
 export class PersonDocument {
-  @Prop({ index: true, required: true, unique: true })
+  @Prop({ index: true, required: true, type: String, unique: true })
   googleSubject!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: String })
   name!: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, type: String })
   email!: string;
 
   @Prop({ default: null, type: String })
   photoUrl!: string | null;
+
+  @Prop({ type: Boolean })
+  isAdmin?: boolean;
 
   createdAt!: Date;
   updatedAt!: Date;
