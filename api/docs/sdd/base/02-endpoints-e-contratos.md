@@ -2,7 +2,11 @@
 
 ## Convenções
 
-- recursos e paths em inglês, minúsculos e com substantivos;
+- recursos e segmentos estáticos dos paths usam substantivos em inglês, letras
+  minúsculas e `kebab-case`, conforme a
+  [convenção transversal de paths públicos](../../../../docs/sdd/base/01-arquitetura-do-monorepo.md#convenção-de-paths-públicos);
+- palavras de um mesmo segmento estático são separadas por hífen; não usar
+  `camelCase`, `PascalCase`, `snake_case` ou espaços em paths de endpoints;
 - JSON como formato padrão;
 - datas e horários em ISO 8601, com timezone explícito;
 - IDs opacos são strings;

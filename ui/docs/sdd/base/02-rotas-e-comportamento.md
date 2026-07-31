@@ -7,6 +7,13 @@ TanStack Router é o roteador oficial. A árvore é declarada manualmente em
 tipagem de paths, parâmetros, links e navegação. Não usar roteamento por arquivos,
 strings de URL espalhadas em componentes nem acesso direto a `window.history`.
 
+Todo segmento estático de um path navegável usa inglês, letras minúsculas e
+`kebab-case`, conforme a
+[convenção transversal de paths públicos](../../../../docs/sdd/base/01-arquitetura-do-monorepo.md#convenção-de-paths-públicos).
+Palavras de um mesmo segmento são separadas por hífen; não usar `camelCase`,
+`PascalCase`, `snake_case` ou espaços. A regra vale para a declaração da rota e
+para todos os links, redirects e navegações que apontam para ela.
+
 ## Documentação viva
 
 Cada arquivo em `routes/` representa o estado atual de uma tela ou rota navegável.

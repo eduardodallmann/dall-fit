@@ -56,6 +56,23 @@ compartilhados do workspace e aos pacotes externos que já possuem namespace, co
 `@nestjs/*` e `@heroui/*`. API e UI não importam caminhos internos de
 `packages/types`; consomem somente suas exportações públicas.
 
+## Convenção de paths públicos
+
+Todos os segmentos estáticos dos paths públicos da API e da UI usam inglês,
+letras minúsculas e `kebab-case`. Palavras dentro do mesmo segmento são separadas
+exclusivamente por hífen; `camelCase`, `PascalCase`, `snake_case` e espaços não são
+permitidos. Segmentos de uma única palavra e o path raiz `/` já satisfazem a regra.
+
+Exemplos válidos incluem `/training-plans` na UI e `/auth/test-login` na API.
+A convenção se aplica ao path, não ao protocolo, host, porta, fragmento, nomes ou
+valores de query params nem aos valores concretos de segmentos dinâmicos. Esses
+elementos seguem os contratos de seus respectivos proprietários.
+
+Os detalhes adicionais de endpoints pertencem a
+[`api/docs/sdd/base/02-endpoints-e-contratos.md`](../../../api/docs/sdd/base/02-endpoints-e-contratos.md),
+e os detalhes de rotas da UI pertencem a
+[`ui/docs/sdd/base/02-rotas-e-comportamento.md`](../../../ui/docs/sdd/base/02-rotas-e-comportamento.md).
+
 ## Inclusão de um projeto
 
 Um novo projeto deve:
