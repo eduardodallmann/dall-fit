@@ -3,41 +3,67 @@ name: Pull request quality
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
-  actions: write
 
 jobs:
   quality:
     runs-on: ubuntu-latest
     env:
-      MONGOMS_DOWNLOAD_DIR: ${{ runner.temp }}/mongodb-binaries
-      REDISMS_DOWNLOAD_DIR: ${{ runner.temp }}/redis-binaries
       VITE_API_URL: http://localhost:4000
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 10
+          version: 11
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
-      - uses: actions/cache@v4
+      - name: Configure memory-server cache directories
+        run: |
+          echo "MONGOMS_DOWNLOAD_DIR=${{ runner.temp }}/mongodb-binaries" >> "$GITHUB_ENV"
+          echo "REDISMS_DOWNLOAD_DIR=${{ runner.temp }}/redis-binaries" >> "$GITHUB_ENV"
+
+      - name: Restore memory-server binaries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ${{ runner.temp }}/mongodb-binaries
             ${{ runner.temp }}/redis-binaries
-          key: ${{ runner.os }}-memory-servers-${{ hashFiles('package.json', 'api/package.json', 'pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-memory-servers-${{ hashFiles('package.json', 'api/package.json', 'pnpm-lock.yaml') }}
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm test:coverage:ci
-      - run: pnpm -C api test:e2e
-      - run: pnpm -C ui test:integration:install:ci
-      - run: pnpm test:integration
-      - run: pnpm build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Run unit tests
+        run: pnpm test
+
+      - name: Run coverage tests
+        run: pnpm test:coverage:ci
+
+      - name: Run API end-to-end tests
+        run: pnpm -C api test:e2e
+
+      - name: Install Chromium
+        run: pnpm -C ui test:integration:install:ci
+
+      - name: Run UI integration tests
+        run: pnpm test:integration
+
+      - name: Build
+        run: pnpm build

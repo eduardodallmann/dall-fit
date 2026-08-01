@@ -2,7 +2,9 @@
 
 ## Gerenciador
 
-O monorepo usa pnpm.
+O monorepo usa pnpm. O workflow de pull requests fixa apenas sua versão major para
+receber automaticamente atualizações compatíveis sem exigir mudanças recorrentes
+no repositório.
 Existe um único `pnpm-lock.yaml`, na raiz. Lockfiles e workspaces internos às
 aplicações não são permitidos.
 
@@ -79,7 +81,9 @@ incorporar mudanças locais feitas depois da instalação.
 O workflow
 [`pull-request-quality.yml`](../../../.github/workflows/pull-request-quality.yml)
 executa em todo `pull_request` e possui apenas permissão de leitura do conteúdo do
-repositório. Ele configura a versão de Node declarada em `.nvmrc`, instala o pnpm
+repositório. Uma nova atualização do mesmo pull request cancela a execução anterior.
+As actions externas são fixadas por commit imutável. O workflow configura a versão
+de Node declarada em `.nvmrc`, instala a major de pnpm declarada no próprio workflow
 e as dependências com `--frozen-lockfile`, e executa, nesta ordem:
 
 ```bash
