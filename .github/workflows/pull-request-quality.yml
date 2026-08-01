@@ -1,0 +1,42 @@
+name: Pull request quality
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      MONGOMS_DOWNLOAD_DIR: ${{ runner.temp }}/mongodb-binaries
+      REDISMS_DOWNLOAD_DIR: ${{ runner.temp }}/redis-binaries
+      VITE_API_URL: http://localhost:4000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/mongodb-binaries
+            ${{ runner.temp }}/redis-binaries
+          key: ${{ runner.os }}-memory-servers-${{ hashFiles('package.json', 'api/package.json', 'pnpm-lock.yaml') }}
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm test:coverage:ci
+      - run: pnpm -C api test:e2e
+      - run: pnpm -C ui test:integration:install:ci
+      - run: pnpm test:integration
+      - run: pnpm build
