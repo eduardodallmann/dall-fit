@@ -8,7 +8,7 @@ export function createAuthCookieOptions(
     httpOnly: true,
     maxAge,
     path: '/',
-    sameSite: 'lax',
+    sameSite: secure ? 'none' : 'lax',
     secure,
   };
 
@@ -19,7 +19,7 @@ export function createClearCookieOptions(secure: boolean): CookieOptions {
   const result: CookieOptions = {
     httpOnly: true,
     path: '/',
-    sameSite: 'lax',
+    sameSite: secure ? 'none' : 'lax',
     secure,
   };
 
