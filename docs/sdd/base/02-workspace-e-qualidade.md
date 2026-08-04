@@ -2,7 +2,9 @@
 
 ## Gerenciador
 
-O monorepo usa pnpm.
+O monorepo usa pnpm. O workflow de pull requests fixa apenas sua versão major para
+receber automaticamente atualizações compatíveis sem exigir mudanças recorrentes
+no repositório.
 Existe um único `pnpm-lock.yaml`, na raiz. Lockfiles e workspaces internos às
 aplicações não são permitidos.
 
@@ -73,6 +75,31 @@ jornada de login e segue
 O pacote `@dall-fit/types` também é compilado em `postinstall`, garantindo suas
 exportações de runtime após um clone novo. Os agregadores repetem o build para
 incorporar mudanças locais feitas depois da instalação.
+
+## Pull requests
+
+O workflow
+[`pull-request-quality.yml`](../../../.github/workflows/pull-request-quality.yml)
+executa em todo `pull_request` e possui apenas permissão de leitura do conteúdo do
+repositório. Uma nova atualização do mesmo pull request cancela a execução anterior.
+As actions externas são fixadas por commit imutável. O workflow configura a versão
+de Node declarada em `.nvmrc`, instala a major de pnpm declarada no próprio workflow
+e as dependências com `--frozen-lockfile`, e executa, nesta ordem:
+
+```bash
+pnpm lint
+pnpm test
+pnpm test:coverage:ci
+pnpm -C api test:e2e
+pnpm -C ui test:integration:install:ci
+pnpm test:integration
+pnpm build
+```
+
+O workflow reutiliza os caches do pnpm e dos binários de MongoDB e Redis usados
+pelos memory servers. Ele define a URL da API usada pelos handlers MSW nos testes
+da UI. A instalação do Chromium e suas dependências antecede a suíte Playwright;
+os E2E da API permanecem seriais conforme sua configuração.
 
 ## ESLint e formatação
 

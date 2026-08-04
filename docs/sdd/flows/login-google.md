@@ -50,6 +50,19 @@ as fronteiras externas sem acessar a API.
    `/dash` permanece vazia.
 9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
 
+## Compatibilidade temporária do deploy
+
+No deploy atual, UI e API ocupam sites `vercel.app` distintos. A API usa cookies
+`SameSite=None; Secure` nesse ambiente para que o navegador preserve `state`,
+`nonce` e sessão durante a jornada cross-site; localmente, sem `Secure`, os cookies
+permanecem `SameSite=Lax`. As requests HTTP da UI usam credenciais e a API aceita
+somente a origem configurada em CORS.
+
+Essa flexibilização deve ser revertida quando frontend e backend compartilharem o
+mesmo site registrável. Nessa topologia futura, todos os cookies voltam a
+`SameSite=Lax`, inclusive sob HTTPS, e a documentação e os testes de autenticação
+devem acompanhar a reversão.
+
 ## Dados compartilhados
 
 | Dado            | Origem              | Consumidores      | Persistência                | Observações                        |

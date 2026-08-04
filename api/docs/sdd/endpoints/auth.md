@@ -59,6 +59,19 @@ local/teste, para automação sem o provedor externo.
 - responde `204`, grava `dall_fit_session` e não chama Google;
 - fora das condições responde `404`, evitando divulgar o recurso.
 
+### Política dos cookies
+
+Todos os cookies de autenticação são `HttpOnly` e usam path `/`. No ambiente local,
+`AUTH_COOKIE_SECURE=false` mantém `SameSite=Lax`. No deploy HTTPS atual,
+`AUTH_COOKIE_SECURE=true` combina obrigatoriamente `SameSite=None` e `Secure` para
+permitir o fluxo entre a UI e a API hospedadas em sites `vercel.app` distintos. As
+requests da UI continuam usando credenciais e a API continua restringindo CORS à
+origem configurada.
+
+A aceitação cross-site é temporária. Quando UI e API compartilharem o mesmo site
+registrável, a política deve voltar a `SameSite=Lax` inclusive no ambiente seguro,
+reduzindo a exposição dos cookies a contextos cross-site.
+
 ## Fluxo completo
 
 ### 1. Início — `AuthController.prepareGoogleLogin` e `startGoogleLogin`
@@ -261,15 +274,16 @@ adapter e o E2E usa o cenário 2 para persistência e sessão.
 
 ## Regras de negócio cobertas por testes
 
-| Regra                         | Teste unitário                            | Teste E2E                        | Mock ou fixture        |
-| ----------------------------- | ----------------------------------------- | -------------------------------- | ---------------------- |
-| state/nonce e claims válidas  | commands e `google-oauth.service.spec.ts` | divergência de state             | adapter Google mockado |
-| primeiro cadastro             | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | MongoDB efêmero        |
-| concorrência/reutilização     | service e repository                      | `auth.e2e-spec.ts`               | índice único           |
-| condição admin preservada     | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | pessoa com `isAdmin`   |
-| escalação pelo body rejeitada | DTO/ValidationPipe                        | `auth.e2e-spec.ts`               | body fictício          |
-| bypass bloqueado              | guard                                     | `auth.e2e-spec.ts`               | chave fictícia         |
-| sessão emitida                | `auth-session.service.spec.ts`            | cookie usado em endpoint privado | segredo fictício       |
+| Regra                            | Teste unitário                            | Teste E2E                        | Mock ou fixture        |
+| -------------------------------- | ----------------------------------------- | -------------------------------- | ---------------------- |
+| state/nonce e claims válidas     | commands e `google-oauth.service.spec.ts` | divergência de state             | adapter Google mockado |
+| primeiro cadastro                | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | MongoDB efêmero        |
+| concorrência/reutilização        | service e repository                      | `auth.e2e-spec.ts`               | índice único           |
+| condição admin preservada        | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | pessoa com `isAdmin`   |
+| escalação pelo body rejeitada    | DTO/ValidationPipe                        | `auth.e2e-spec.ts`               | body fictício          |
+| bypass bloqueado                 | guard                                     | `auth.e2e-spec.ts`               | chave fictícia         |
+| sessão emitida                   | `auth-session.service.spec.ts`            | cookie usado em endpoint privado | segredo fictício       |
+| política `SameSite` por ambiente | `auth-cookie-options.spec.ts`             | cookie local permanece `Lax`     | não se aplica          |
 
 ## Fora do comportamento atual
 

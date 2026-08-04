@@ -219,7 +219,8 @@ Vite da UI.
     base64;
   - `AUTH_SESSION_SECRET`, chave HMAC com pelo menos 32 caracteres;
   - `AUTH_SESSION_TTL_SECONDS`, validade da sessão;
-  - `AUTH_COOKIE_SECURE`, ativação explícita do atributo `Secure`;
+  - `AUTH_COOKIE_SECURE`, ativação explícita do atributo `Secure` e seleção
+    temporária da política `SameSite` compatível com o deploy;
   - `AUTH_TEST_BYPASS_ENABLED` e `AUTH_TEST_BYPASS_KEY`, mecanismo restrito de
     local/teste;
 - o `.env` local não é versionado;
@@ -253,9 +254,19 @@ controller. O token contém apenas o ID técnico, sem nome, e-mail ou foto.
 service novamente. Pessoa autenticada sem a chave recebe
 `403 ADMIN_ACCESS_REQUIRED`. Nenhum endpoint vigente usa essa proteção.
 
-Cookies de sessão usam `HttpOnly`, `SameSite=Lax`, path `/`, expiração configurada
-e `Secure` conforme ambiente. `state` e `nonce` usam cookies temporários com as
-mesmas proteções e são removidos no callback.
+Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. `state` e
+`nonce` usam cookies temporários com as mesmas proteções e são removidos no
+callback. A política vigente seleciona `SameSite=Lax` quando
+`AUTH_COOKIE_SECURE=false`, preservando o fluxo local, e seleciona obrigatoriamente
+`SameSite=None` junto de `Secure` quando `AUTH_COOKIE_SECURE=true`. A flexibilização
+do ambiente seguro permite que a UI e a API implantadas em sites distintos sob
+`vercel.app` criem e enviem os cookies nas requests com credenciais.
+
+Essa política `SameSite=None` é uma compatibilidade temporária do deploy, não o
+estado de segurança desejado em definitivo. Quando frontend e backend compartilharem
+o mesmo site registrável, os helpers de criação e limpeza devem voltar a emitir
+`SameSite=Lax` também com `Secure=true`, e os testes e esta documentação devem ser
+atualizados na mesma mudança.
 
 O bypass de autenticação aceita somente ambiente diferente de produção, flag
 explícita e chave própria. A validação de ambiente rejeita

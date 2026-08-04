@@ -15,7 +15,7 @@ pnpm-debug.log*
 .env.*
 !.env.example
 *.local
-client_secret_*.json
+client_secret*
 
 # Test and quality artifacts
 .scannerwork
