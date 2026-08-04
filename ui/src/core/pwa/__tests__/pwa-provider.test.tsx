@@ -67,6 +67,27 @@ function createInstallPrompt(outcome: 'accepted' | 'dismissed') {
   return { event, prompt };
 }
 
+function createPendingInstallPrompt() {
+  let rejectChoice: (reason?: unknown) => void = () => undefined;
+  let resolveChoice: (value: {
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }) => void = () => undefined;
+  const userChoice = new Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>((resolve, reject) => {
+    rejectChoice = reject;
+    resolveChoice = resolve;
+  });
+  const event = new Event('beforeinstallprompt', { cancelable: true });
+  const prompt = vi.fn().mockResolvedValue(undefined);
+
+  Object.assign(event, { prompt, userChoice });
+
+  return { event, prompt, rejectChoice, resolveChoice, userChoice };
+}
+
 describe('PwaProvider', () => {
   beforeEach(() => {
     pwaMocks.needRefresh = false;
@@ -159,6 +180,141 @@ describe('PwaProvider', () => {
     expect(screen.getByText('manual')).toBeInTheDocument();
   });
 
+  it('keeps the native installation action visible until dismissal resolves', async () => {
+    const user = userEvent.setup();
+    const pending = createPendingInstallPrompt();
+    render(
+      <PwaProvider>
+        <PwaInstallAction />
+      </PwaProvider>,
+    );
+
+    void act(() => {
+      window.dispatchEvent(pending.event);
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    );
+
+    expect(pending.prompt).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.queryByRole('button', { name: 'Como instalar' }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending.resolveChoice({ outcome: 'dismissed', platform: 'web' });
+      await pending.userChoice;
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Como instalar' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps appinstalled authoritative over a late dismissed choice', async () => {
+    const user = userEvent.setup();
+    const pending = createPendingInstallPrompt();
+    render(
+      <PwaProvider>
+        <PwaInstallAction />
+      </PwaProvider>,
+    );
+
+    void act(() => {
+      window.dispatchEvent(pending.event);
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    );
+    void act(() => {
+      window.dispatchEvent(new Event('appinstalled'));
+    });
+
+    expect(
+      screen.queryByRole('region', { name: 'Instalação do aplicativo' }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending.resolveChoice({ outcome: 'dismissed', platform: 'web' });
+      await pending.userChoice;
+    });
+
+    expect(
+      screen.queryByRole('region', { name: 'Instalação do aplicativo' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('falls back after userChoice rejects', async () => {
+    const user = userEvent.setup();
+    const pending = createPendingInstallPrompt();
+    render(
+      <PwaProvider>
+        <PwaInstallAction />
+      </PwaProvider>,
+    );
+
+    void act(() => {
+      window.dispatchEvent(pending.event);
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    );
+
+    await act(async () => {
+      pending.rejectChoice(new Error('choice failure'));
+
+      try {
+        await pending.userChoice;
+      } catch {
+        // The provider converts this browser failure into the manual fallback.
+      }
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Como instalar' }),
+    ).toBeInTheDocument();
+  });
+
+  it('preserves a newer prompt when an earlier choice finishes', async () => {
+    const user = userEvent.setup();
+    const earlier = createPendingInstallPrompt();
+    const newer = createPendingInstallPrompt();
+    render(
+      <PwaProvider>
+        <PwaInstallAction />
+      </PwaProvider>,
+    );
+
+    void act(() => {
+      window.dispatchEvent(earlier.event);
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    );
+    void act(() => {
+      window.dispatchEvent(newer.event);
+    });
+
+    await act(async () => {
+      earlier.resolveChoice({ outcome: 'dismissed', platform: 'web' });
+      await earlier.userChoice;
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Instalar aplicativo' }),
+    );
+    expect(earlier.prompt).toHaveBeenCalledOnce();
+    expect(newer.prompt).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      newer.resolveChoice({ outcome: 'dismissed', platform: 'web' });
+      await newer.userChoice;
+    });
+  });
+
   it('hides installation actions in standalone mode and after appinstalled', () => {
     vi.stubGlobal(
       'matchMedia',
@@ -224,7 +380,7 @@ describe('PwaProvider', () => {
 
   it('shares a single consumed prompt between both mounted menu actions', async () => {
     const user = userEvent.setup();
-    const { event, prompt } = createInstallPrompt('accepted');
+    const pending = createPendingInstallPrompt();
     render(
       <PwaProvider>
         <PwaInstallAction />
@@ -233,7 +389,7 @@ describe('PwaProvider', () => {
     );
 
     void act(() => {
-      window.dispatchEvent(event);
+      window.dispatchEvent(pending.event);
     });
     expect(
       screen.getAllByRole('button', { name: 'Instalar aplicativo' }),
@@ -243,12 +399,25 @@ describe('PwaProvider', () => {
       screen.getAllByRole('button', { name: 'Instalar aplicativo' })[0],
     );
 
+    expect(
+      screen.getAllByRole('button', { name: 'Instalar aplicativo' }),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByRole('button', { name: 'Instalar aplicativo' })[1],
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(pending.prompt).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pending.resolveChoice({ outcome: 'accepted', platform: 'web' });
+      await pending.userChoice;
+    });
+
     await waitFor(() =>
       expect(
         screen.queryByRole('button', { name: 'Instalar aplicativo' }),
       ).not.toBeInTheDocument(),
     );
-    expect(prompt).toHaveBeenCalledOnce();
+    expect(pending.prompt).toHaveBeenCalledOnce();
   });
 
   it('updates only after confirmation and allows dismissing the notice state', async () => {

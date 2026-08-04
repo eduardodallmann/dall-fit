@@ -92,7 +92,6 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
     }
 
     installPromptRef.current = null;
-    setInstallPrompt(null);
     setIsInstalling(true);
 
     try {
@@ -105,6 +104,9 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
     } catch {
       // The application remains usable and falls back to manual instructions.
     } finally {
+      setInstallPrompt((currentPrompt) =>
+        currentPrompt === promptEvent ? null : currentPrompt,
+      );
       setIsInstalling(false);
     }
   }, [isInstalling]);

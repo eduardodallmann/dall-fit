@@ -87,11 +87,14 @@ enquanto o dashboard permanece intencionalmente vazio.
 
 - Condição nativa: o navegador dispara `beforeinstallprompt`.
 - Comportamento: o menu mostra `Instalar aplicativo`; a ativação abre a interface
-  nativa e consome esse prompt uma única vez.
+  nativa e consome esse prompt uma única vez. Enquanto a decisão estiver pendente,
+  mantém a mesma ação em progresso nos menus persistente e móvel e não antecipa
+  `Como instalar`.
 - Condição manual: o prompt não existe, é recusado ou falha.
-- Comportamento: o menu mostra `Como instalar` e expande instruções inline. Em iOS,
-  orienta usar `Compartilhar` e `Adicionar à Tela de Início`; nos demais casos,
-  orienta usar o menu do navegador.
+- Comportamento: somente depois do cancelamento ou da falha, o menu mostra
+  `Como instalar` e expande instruções inline. Em iOS, orienta usar `Compartilhar`
+  e `Adicionar à Tela de Início`; nos demais casos, orienta usar o menu do
+  navegador.
 - Resultado: a recusa não é persistida, não há prompt automático e a ação some em
   modo standalone ou após `appinstalled`.
 
