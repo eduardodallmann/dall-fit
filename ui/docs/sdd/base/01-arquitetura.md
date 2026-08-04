@@ -52,6 +52,23 @@ devem usar lazy loading quando sua separação produzir ganho real. Links,
 redirecionamentos, parâmetros e navegação programática usam APIs tipadas do
 TanStack Router, sem manipulação manual de `history`.
 
+### Deploy da SPA na Vercel
+
+A UI é publicada como uma Single Page Application. O arquivo `ui/vercel.json`
+configura um rewrite de qualquer path não resolvido pela plataforma para
+`/index.html`, preservando a URL solicitada no navegador. Depois que o documento
+principal é entregue, o TanStack Router resolve a rota correspondente na árvore
+manual.
+
+Esse fallback é obrigatório para que URLs navegáveis funcionem em acessos diretos,
+recarregamentos e redirects HTTP externos. Em particular, o callback OAuth da API
+redireciona o navegador diretamente para `/dash`; a Vercel deve entregar a SPA em
+vez de procurar um arquivo físico nesse path e responder `404`.
+
+Arquivos estáticos existentes continuam sendo atendidos normalmente pela Vercel.
+Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras individuais
+de rewrite.
+
 ## Estado e integrações
 
 - estado local fica próximo do componente proprietário;

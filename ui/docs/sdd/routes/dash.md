@@ -12,6 +12,9 @@
 ## Entradas e pré-condições
 
 - Como o usuário chega: callback de login, item `Home` ou URL direta.
+- No deploy da Vercel, callback, URL direta e recarregamento de `/dash` entregam
+  `index.html` pelo fallback da SPA; o TanStack Router resolve a rota sem `404` da
+  plataforma.
 - Path e query params: `/dash`; a query `mockAuth` existe somente com MSW e aceita
   os cenários `admin`, `unauthenticated` e `error`.
 - Contexto e estado persistido: cookie de sessão gerenciado pelo browser, cache
@@ -214,6 +217,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 ## Estrutura técnica relevante
 
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
+- Configuração de deep links na Vercel: `vercel.json`
 - Componentes HeroUI: `Avatar`, `Button`, `Chip`, `Drawer`, `Spinner` e
   `Typography`
 - Componentes core: `authenticated-shell`, `application-menu` e `route-status`

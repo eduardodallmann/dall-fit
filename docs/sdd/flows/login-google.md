@@ -42,6 +42,8 @@ as fronteiras externas sem acessar a API.
    `isAdmin`; se já houver, reutiliza o cadastro sem duplicá-lo nem alterar a
    condição administrativa.
 6. A API emite o cookie de sessão, remove cookies temporários e redireciona a
+   `/dash`. No deploy da UI, o rewrite da Vercel entrega `index.html` para esse
+   acesso direto e o TanStack Router assume a rota, sem exigir um arquivo físico
    `/dash`.
 7. A rota-pai protegida consulta `GET /auth/me`.
 8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
