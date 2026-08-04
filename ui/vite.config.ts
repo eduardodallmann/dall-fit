@@ -2,11 +2,69 @@ import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+
+const applicationBackgroundColor = '#f7f7f7';
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      devOptions: {
+        enabled: false,
+      },
+      includeAssets: [
+        'apple-touch-icon-180x180.png',
+        'favicon.ico',
+        'favicon.svg',
+      ],
+      injectRegister: false,
+      manifest: {
+        background_color: applicationBackgroundColor,
+        description: 'Acesse o Dall Fit pelo seu dispositivo.',
+        display: 'standalone',
+        icons: [
+          {
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+        id: '/',
+        lang: 'pt-BR',
+        name: 'Dall Fit',
+        prefer_related_applications: false,
+        scope: '/',
+        short_name: 'Dall Fit',
+        start_url: '/dash',
+        theme_color: applicationBackgroundColor,
+      },
+      registerType: 'prompt',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        globIgnores: ['**/mockServiceWorker.js'],
+        globPatterns: ['**/*.{js,css,html,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/auth(?:\/|$)/],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '~': fileURLToPath(new URL('./src', import.meta.url)),

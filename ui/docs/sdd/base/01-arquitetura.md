@@ -11,6 +11,7 @@ A fundação de aplicação usa:
 - TanStack Query para estado de servidor;
 - TanStack Form para formulários;
 - Axios como client HTTP;
+- `vite-plugin-pwa` com Workbox para instalação e atualização da PWA;
 - Vitest para testes unitários e de componentes;
 - Playwright para testes integrados no navegador.
 
@@ -42,7 +43,7 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 ## Inicialização e navegação
 
 1. `main.tsx` carrega os estilos globais.
-2. `AppProviders` aplica o `QueryClientProvider`.
+2. `AppProviders` aplica o `QueryClientProvider` e o `PwaProvider`.
 3. `App` aplica o `RouterProvider`.
 4. TanStack Router resolve a URL pela árvore manual de `routes/routes.tsx`.
 
@@ -55,10 +56,9 @@ TanStack Router, sem manipulação manual de `history`.
 ### Deploy da SPA na Vercel
 
 A UI é publicada como uma Single Page Application. O arquivo `ui/vercel.json`
-configura um rewrite de qualquer path não resolvido pela plataforma para
-`/index.html`, preservando a URL solicitada no navegador. Depois que o documento
-principal é entregue, o TanStack Router resolve a rota correspondente na árvore
-manual.
+prioriza arquivos físicos e envia qualquer path restante para `/index.html`,
+preservando a URL solicitada no navegador. Depois que o documento principal é
+entregue, o TanStack Router resolve a rota correspondente na árvore manual.
 
 Esse fallback é obrigatório para que URLs navegáveis funcionem em acessos diretos,
 recarregamentos e redirects HTTP externos. Em particular, o callback OAuth da API
@@ -66,8 +66,7 @@ redireciona o navegador diretamente para `/dash`; a Vercel deve entregar a SPA e
 vez de procurar um arquivo físico nesse path e responder `404`.
 
 Arquivos estáticos existentes continuam sendo atendidos normalmente pela Vercel.
-Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras individuais
-de rewrite.
+Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras individuais.
 
 ## Estado e integrações
 
@@ -110,6 +109,43 @@ vigentes estão definidos em `03-componentes-e-estilizacao.md`.
 MSW está configurado para as fronteiras de autenticação, seguindo
 `05-mocks-de-api.md`. Playwright está configurado para as rotas e a jornada de login,
 seguindo `07-testes-integrados-playwright.md`.
+
+## Progressive Web App
+
+O build de produção usa `vite-plugin-pwa` 1.3 com a estratégia `generateSW`. O
+manifest identifica a aplicação como `Dall Fit`, inicia em `/dash`, possui escopo
+raiz e usa apresentação `standalone`. Os ícones versionados em `public/` incluem
+as variantes `192x192`, `512x512`, `maskable 512x512` e Apple Touch `180x180`; o
+script `pnpm -C ui generate:pwa-assets` os reproduz a partir do `favicon.svg`.
+
+O registro é manual pelo módulo React do plugin e ocorre no `PwaProvider` global.
+Esse provider concentra o único estado de instalação, mesmo que as apresentações
+desktop e móvel do menu coexistam no DOM, e observa:
+
+- `beforeinstallprompt` para disponibilizar a ação nativa uma única vez;
+- `appinstalled`, `display-mode: standalone` e `navigator.standalone` para ocultar
+  ações quando a aplicação já está instalada;
+- ausência, recusa ou falha do prompt para oferecer orientação manual compatível
+  com iOS e demais navegadores;
+- nova versão do service worker para mostrar um aviso global e só ativá-la e
+  recarregar após `Atualizar agora`.
+
+`Agora não` dispensa o aviso apenas no documento corrente. A aplicação não exibe
+mensagem de cache pronto, não solicita instalação automaticamente e continua
+utilizável quando o registro, a instalação ou a atualização falham.
+
+O precache contém somente o app shell, bundles versionados, fontes e ativos locais
+necessários. Requests da API, autenticação, imagens remotas, avatares, respostas
+com dados pessoais e `mockServiceWorker.js` não entram no cache. Não existem push
+notifications, background sync ou empacotamento para lojas neste contrato.
+
+O PWA permanece desabilitado no servidor Vite de desenvolvimento e nos integrados
+Playwright. Ele é emitido no build e exercitado pelo `vite preview`, evitando
+concorrência entre o service worker do Workbox e o service worker do MSW. Em
+produção, `vercel.json` serve primeiro arquivos reais, aplica fallback de SPA só
+depois e mantém `sw.js` e `manifest.webmanifest` revalidáveis com seus MIME types
+explícitos. A origem de produção precisa usar HTTPS, como exigido pela plataforma
+de service workers.
 
 ## Proteção de rotas
 

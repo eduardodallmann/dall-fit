@@ -21,7 +21,9 @@
 - descrição curta de que a conta Google será usada;
 - botão `Entrar com Google`;
 - alerta `Não foi possível entrar. Tente novamente.` após erro de callback ou
-  falha ao preparar o login.
+  falha ao preparar o login;
+- aviso global `Nova versão disponível` quando o service worker encontra uma
+  versão em espera, com ações `Atualizar agora` e `Agora não`.
 
 ## Caminho feliz
 
@@ -39,6 +41,15 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Condição: query `authError=oauth_failed` ou falha no `POST /auth/google`.
 - Comportamento: a tela continua pública e mostra alerta genérico.
 - Resultado: nenhuma informação técnica é exposta e a ação pode ser repetida.
+
+### Alternativa 2 — Nova versão do PWA
+
+- Condição: o service worker encontra uma versão em espera enquanto a rota pública
+  está aberta.
+- Comportamento: o aviso global não bloqueia o login; `Atualizar agora` ativa a
+  versão e recarrega, enquanto `Agora não` o dispensa no documento atual.
+- Resultado: a atualização depende de confirmação e falhas não expõem detalhe
+  técnico nem impedem a autenticação.
 
 ## Validações
 
@@ -80,6 +91,8 @@ Não se aplica — não há formulário nem entrada local.
 - o botão possui nome acessível `Entrar com Google` e foco visível;
 - acionamento por teclado executa a mesma navegação;
 - o alerta usa o componente semântico HeroUI e texto independente de cor.
+- o aviso de atualização usa região viva polida, título e descrição, com ações
+  nomeadas e operáveis por teclado.
 
 ## Referências visuais de layout — opcional
 
@@ -105,7 +118,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 - Arquivo da rota: `src/routes/home/index.tsx`
 - Componentes HeroUI utilizados: `Alert`, `Button` e `Card`
-- Componentes core: não se aplica
+- Componentes core: `pwa-update-notice`, aplicado pelos providers globais
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
 - Hooks e serviços: mutation TanStack Query e `startGoogleLogin`
 - Tipos compartilhados: `StartGoogleLoginResponse`
