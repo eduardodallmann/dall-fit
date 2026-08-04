@@ -63,6 +63,13 @@ antes da interceptação. Builds de produção não importam nem iniciam o worke
 desenvolvimento e Playwright funcionem imediatamente e não deve ser editado
 manualmente.
 
+O service worker do PWA é uma infraestrutura diferente. Ele permanece
+explicitamente desabilitado no Vite de desenvolvimento e no servidor usado pelo
+Playwright, enquanto o MSW é habilitado nesses ambientes. No build de produção o
+inverso se aplica: o Workbox é emitido e o MSW não é importado. O arquivo
+`mockServiceWorker.js` também é excluído do precache do PWA, impedindo que um
+worker intercepte o escopo ou o tráfego pertencente ao outro.
+
 ## Regra obrigatória
 
 Toda request HTTP nova ou alterada inclui handlers e fixtures na mesma mudança.

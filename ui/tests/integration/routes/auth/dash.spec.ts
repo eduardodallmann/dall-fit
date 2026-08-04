@@ -86,6 +86,27 @@ test.describe('Rota /dash', () => {
     await expect(page.getByText('Admin')).toBeVisible();
   });
 
+  test('Cenário 5 — Orientação manual de instalação no menu', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 1024, width: 768 });
+    await page.goto('/dash');
+
+    const applicationMenu = page.getByRole('complementary', {
+      name: 'Menu da aplicação',
+    });
+    await applicationMenu
+      .getByRole('button', { name: 'Como instalar' })
+      .click();
+
+    await expect(
+      applicationMenu.getByText('Abra o menu do navegador.'),
+    ).toBeVisible();
+    await expect(
+      applicationMenu.getByText(/pode não oferecer essa forma/),
+    ).toBeVisible();
+  });
+
   test('Cenário 9 — Rota privada sem sessão', async ({ page }) => {
     await page.goto('/dash?mockAuth=unauthenticated');
 

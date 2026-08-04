@@ -37,6 +37,8 @@ Depois da proteção, o layout autenticado apresenta:
   `Person.isAdmin === true`;
 - navegação principal com o link `Home`, ícone Lucide `House` e destino `/dash`;
 - `Home` marcado visualmente e com `aria-current="page"`;
+- seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
+  prompt ou orientação manual expansível quando ele não está disponível;
 - região `main` sem conteúdo próprio, título, placeholder, card ou mensagem.
 
 A rota pública `/` não recebe nenhum desses elementos.
@@ -78,6 +80,27 @@ enquanto o dashboard permanece intencionalmente vazio.
 - Resultado: identidade e navegação permanecem iguais às da pessoa comum, com o
   indicador adicional.
 
+### Alternativa 4 — Instalação do PWA
+
+- Condição nativa: o navegador dispara `beforeinstallprompt`.
+- Comportamento: o menu mostra `Instalar aplicativo`; a ativação abre a interface
+  nativa e consome esse prompt uma única vez.
+- Condição manual: o prompt não existe, é recusado ou falha.
+- Comportamento: o menu mostra `Como instalar` e expande instruções inline. Em iOS,
+  orienta usar `Compartilhar` e `Adicionar à Tela de Início`; nos demais casos,
+  orienta usar o menu do navegador.
+- Resultado: a recusa não é persistida, não há prompt automático e a ação some em
+  modo standalone ou após `appinstalled`.
+
+### Alternativa 5 — Nova versão do PWA
+
+- Condição: o service worker encontra uma versão em espera.
+- Comportamento: um aviso global mostra `Nova versão disponível`, as ações
+  `Atualizar agora` e `Agora não` e não interrompe o uso da rota.
+- Resultado: somente `Atualizar agora` ativa a versão e recarrega; `Agora não`
+  dispensa o aviso no documento atual. Falhas permanecem não bloqueantes e sem
+  detalhe técnico.
+
 ## Validações
 
 Não se aplica — a rota e o menu não possuem formulário nem entrada editável.
@@ -91,7 +114,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro recuperável: mensagem `Não foi possível carregar sua conta` e orientação de
   recarga, sem shell.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: não se aplica.
+- Ações desabilitadas: controles de instalação e atualização indicam o progresso e
+  evitam ativações concorrentes.
 
 ## Integrações
 
@@ -150,6 +174,10 @@ móvel não o reabre.
 - o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu`, contenção e
   restauração de foco e fechamento por `Escape`;
 - `Home` tem label visível, foco visível e `aria-current="page"` quando ativo;
+- a instalação manual usa `Disclosure` com trigger nomeado, conteúdo inline e
+  texto de compatibilidade; não abre modal dentro do `Drawer`;
+- o aviso de versão possui título, descrição textual, região viva polida e duas
+  ações explícitas, sem depender apenas de cor;
 - o avatar é exposto como imagem com o nome completo da pessoa; foto e iniciais são
   apresentações alternativas da mesma identidade;
 - nome e e-mail usam `Typography` HeroUI; cada um ocupa sua própria linha com
@@ -195,7 +223,15 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: o shell renderiza
 - Then: exibe foto, nome, e-mail, `Chip` `Admin` e `Home`
 
-### Cenário 5 — Sessão ausente
+### Cenário 5 — Orientação manual de instalação
+
+- Link para testar: `http://localhost:3000/dash` com MSW habilitado
+- Given: o Vite de desenvolvimento não registra PWA e não existe prompt nativo
+- When: a pessoa aciona `Como instalar` no menu
+- Then: expande instruções do navegador e a nota de compatibilidade sem abrir outro
+  overlay
+
+### Cenário 6 — Sessão ausente
 
 - Link para testar:
   `http://localhost:3000/dash?mockAuth=unauthenticated` com MSW habilitado
@@ -203,7 +239,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: a proteção executa
 - Then: redireciona para `/` sem mostrar shell ou dados pessoais
 
-### Cenário 6 — Erro de integração
+### Cenário 7 — Erro de integração
 
 - Link para testar:
   `http://localhost:3000/dash?mockAuth=error` com MSW habilitado
@@ -214,9 +250,10 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 ## Estrutura técnica relevante
 
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
-- Componentes HeroUI: `Avatar`, `Button`, `Chip`, `Drawer`, `Spinner` e
-  `Typography`
-- Componentes core: `authenticated-shell`, `application-menu` e `route-status`
+- Componentes HeroUI: `Alert`, `Avatar`, `Button`, `Chip`, `Disclosure`, `Drawer`,
+  `Spinner` e `Typography`
+- Componentes core: `authenticated-shell`, `application-menu`,
+  `pwa-install-action`, `pwa-update-notice` e `route-status`
 - Componentes exclusivos da rota: não se aplica; `/dash` não possui conteúdo
 - Hooks e serviços: `useOverlayState`, `currentPersonQueryOptions` e
   `getCurrentPerson`
@@ -225,14 +262,16 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 
 ## Cobertura automatizada
 
-| Regra ou cenário                    | Vitest             | Playwright   |
-| ----------------------------------- | ------------------ | ------------ |
-| identidade, iniciais e `Admin`      | `application-menu` | rota `/dash` |
-| link `Home` e estado atual          | `application-menu` | rota e flow  |
-| menu persistente e breakpoint       | estilos/typecheck  | rota `/dash` |
-| backdrop, teclado e foco móvel      | componentes HeroUI | rota `/dash` |
-| redirect em `401`                   | router/app         | rota `/dash` |
-| erro técnico sem identidade parcial | router/app         | rota `/dash` |
+| Regra ou cenário                     | Vitest              | Playwright    |
+| ------------------------------------ | ------------------- | ------------- |
+| identidade, iniciais e `Admin`       | `application-menu`  | rota `/dash`  |
+| link `Home` e estado atual           | `application-menu`  | rota e flow   |
+| menu persistente e breakpoint        | estilos/typecheck   | rota `/dash`  |
+| backdrop, teclado e foco móvel       | componentes HeroUI  | rota `/dash`  |
+| prompt e orientação de instalação    | provider/componente | rota `/dash`  |
+| atualização confirmada ou dispensada | provider/componente | não se aplica |
+| redirect em `401`                    | router/app          | rota `/dash`  |
+| erro técnico sem identidade parcial  | router/app          | rota `/dash`  |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts` e
   `src/mocks/fixtures/person.ts`.

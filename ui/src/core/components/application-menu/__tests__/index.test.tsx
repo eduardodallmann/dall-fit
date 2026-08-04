@@ -12,7 +12,18 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Person } from '@dall-fit/types';
 
 import { ApplicationMenu } from '~/core/components/application-menu';
+import { PwaContext } from '~/core/pwa/pwa-context';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
+
+const pwaContextValue = {
+  dismissUpdate: vi.fn(),
+  install: vi.fn().mockResolvedValue(undefined),
+  installationMode: 'manual' as const,
+  isInstalling: false,
+  isUpdating: false,
+  needRefresh: false,
+  update: vi.fn().mockResolvedValue(undefined),
+};
 
 describe('ApplicationMenu', () => {
   it('shows the authenticated identity and active Home navigation', async () => {
@@ -88,5 +99,9 @@ async function renderApplicationMenu(
   });
 
   await testRouter.load();
-  render(<RouterProvider router={testRouter} />);
+  render(
+    <PwaContext value={pwaContextValue}>
+      <RouterProvider router={testRouter} />
+    </PwaContext>,
+  );
 }

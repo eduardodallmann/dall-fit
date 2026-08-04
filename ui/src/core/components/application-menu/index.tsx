@@ -6,6 +6,7 @@ import type { Person } from '@dall-fit/types';
 
 import { getPersonInitials } from '~/core/components/application-menu/get-person-initials';
 import { applicationMenuStyles } from '~/core/components/application-menu/styles';
+import { PwaInstallAction } from '~/core/components/pwa-install-action';
 
 const styles = applicationMenuStyles();
 
@@ -73,6 +74,7 @@ export function ApplicationMenu({
           <span>Home</span>
         </Link>
       </nav>
+      <PwaInstallAction />
     </div>
   );
 }
