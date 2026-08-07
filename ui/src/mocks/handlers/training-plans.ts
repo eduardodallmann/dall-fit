@@ -20,6 +20,10 @@ interface ScenarioState {
 
 const scenarioStates = new Map<string, ScenarioState>();
 
+export function resetTrainingPlanScenarioStates(): void {
+  scenarioStates.clear();
+}
+
 function getScenario(request: Request): string {
   const result =
     request.headers.get('x-dall-fit-mock-training-plans') ?? 'success';

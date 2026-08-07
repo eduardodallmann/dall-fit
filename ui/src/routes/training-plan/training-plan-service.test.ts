@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import { mockServer } from '~/mocks/server';
 import {
   createGlobalTrainingPlan,
@@ -47,6 +48,21 @@ describe('training plan service', () => {
       name: 'Novo plano',
     });
     expect(updated).toMatchObject({ id: planId, name: 'Plano atualizado' });
+  });
+
+  it('restores stateful scenarios to their initial fixtures', async () => {
+    await createGlobalTrainingPlan(
+      { name: 'Plano temporário', description: 'Descrição temporária' },
+      'create-success',
+    );
+    const changed = await listGlobalTrainingPlans(1, 'create-success');
+
+    expect(changed.total).toBe(22);
+    resetTrainingPlanScenarioStates();
+
+    const restored = await listGlobalTrainingPlans(1, 'create-success');
+
+    expect(restored.total).toBe(21);
   });
 
   it('creates and deletes a workout through its real returned id', async () => {
