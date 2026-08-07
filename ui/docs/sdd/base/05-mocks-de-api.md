@@ -104,7 +104,8 @@ O handler de proteção sempre fica por último.
 1. iniciar `mockServer` antes da suíte;
 2. usar `onUnhandledRequest: 'error'`;
 3. restaurar handlers sobrescritos após cada teste;
-4. encerrar o servidor após a suíte.
+4. limpar estados mutáveis mantidos pelos handlers após cada teste;
+5. encerrar o servidor após a suíte.
 
 Testes reutilizam os handlers padrão. Para um cenário específico:
 
@@ -153,3 +154,13 @@ representando que o provedor e callback concluíram. `GET /auth/me` devolve a
 fixture autenticada sem `isAdmin` por padrão, a fixture com `isAdmin: true` no
 seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
 `error`.
+
+Planos globais usam fixtures tipadas e handlers para as sete operações em arquivos
+`training-plans.ts`. A query exclusiva `mockTrainingPlans` vira o header
+`x-dall-fit-mock-training-plans` somente com mocks ativos; nenhum dos dois pertence
+ao contrato real. Cenários de mutation mantêm estado separado por valor do seletor,
+evitando interferência entre jornadas Playwright paralelas. No Vitest, o setup
+global limpa esse estado depois de cada teste, pois `resetHandlers()` restaura os
+handlers do MSW, mas não dados mutáveis mantidos pelos módulos. Há sucesso, vazio,
+not-found, loading prolongado para validar skeletons e falhas relevantes com
+latência; a proteção sentinela continua por último.

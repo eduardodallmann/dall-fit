@@ -1,4 +1,4 @@
-import { Card, Spinner } from '@heroui/react';
+import { Card, Skeleton } from '@heroui/react';
 
 import { routeStatusStyles } from '~/core/components/route-status/styles';
 
@@ -7,9 +7,22 @@ const styles = routeStatusStyles();
 export function ProtectedRoutePending() {
   return (
     <main className={styles.page()}>
-      <div className={styles.pageContent()}>
-        <Spinner aria-label="Carregando sua conta" size="lg" />
-        <p className={styles.description()}>Carregando sua conta</p>
+      <div
+        aria-label="Carregando sua conta"
+        className={styles.pageContent()}
+        role="status"
+      >
+        <span className={styles.srOnly()}>Carregando sua conta</span>
+        <div className={styles.skeletonIdentity()}>
+          <Skeleton className={styles.skeletonAvatar()} />
+          <div className={styles.skeletonText()}>
+            <Skeleton className={styles.skeletonName()} />
+            <Skeleton className={styles.skeletonEmail()} />
+          </div>
+        </div>
+        <Skeleton className={styles.skeletonNavigation()} />
+        <Skeleton className={styles.skeletonNavigation()} />
+        <Skeleton className={styles.skeletonContent()} />
       </div>
     </main>
   );

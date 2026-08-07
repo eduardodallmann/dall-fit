@@ -50,6 +50,17 @@ import { SortDirection, type ApiResponse, type Entity } from '@dall-fit/types';
   detalhes exclusivos da API e não pertencem ao pacote.
 - `photoUrl` é anulável porque o claim de foto do provedor não é garantido.
 
+## Contratos vigentes de planos de treino
+
+- `TrainingPlanSummary` expõe ID, nome, descrição e timestamps, sem ownership ou
+  workouts.
+- `TrainingPlanDetails` acrescenta resumos de workouts com ID, nome e
+  `exerciseCount`, sem o array de exercícios.
+- requests de criação exigem nome/descrição; requests de edição são parciais.
+- a coleção global usa `CollectionResponse<TrainingPlanSummary>` e as respostas de
+  item usam `ApiResponse`.
+- `ownerPersonId`, documentos Mongoose e exercícios embutidos são internos da API.
+
 O pacote é compilado por `pnpm install` e novamente antes dos comandos agregadores
 da raiz. Durante desenvolvimento, execute `pnpm -C packages/types build` após mudar
 uma exportação pública caso o consumidor esteja sendo iniciado isoladamente.

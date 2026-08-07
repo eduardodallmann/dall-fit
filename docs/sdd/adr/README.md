@@ -13,3 +13,5 @@ substituída permanece no histórico e aponta para a sucessora.
   mocks e bancos de teste.
 - [`ADR-0002`](ADR-0002-autenticacao-google-e-sessao.md): autenticação Google,
   sessão e bypass restrito de testes.
+- [`ADR-0003`](ADR-0003-modelagem-dos-planos-de-treino.md): coleção única de
+  planos por owner e árvore embutida.

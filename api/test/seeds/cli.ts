@@ -1,11 +1,26 @@
 import 'dotenv/config';
 
-import { connect, disconnect, model } from 'mongoose';
+import { connect, disconnect, model, Types } from 'mongoose';
 
 import {
   PersonDocument,
   PersonSchema,
 } from '~/person/repositories/person.schema';
+import {
+  TrainingPlanDocument,
+  TrainingPlanSchema,
+} from '~/training-plan/repositories/training-plan.schema';
+
+const trainingPlanScenarios = [
+  'training-plans:create',
+  'training-plans:create-workout',
+  'training-plans:delete',
+  'training-plans:delete-workout',
+  'training-plans:detail',
+  'training-plans:list',
+  'training-plans:not-found',
+  'training-plans:update',
+] as const;
 
 async function main(): Promise<void> {
   const scenario = process.argv.slice(2).find((argument) => argument !== '--');
@@ -22,13 +37,19 @@ async function main(): Promise<void> {
     throw new Error('Seeds require an explicitly local MongoDB host.');
   }
 
+  const authScenarios = [
+    'auth:person-admin',
+    'auth:person-existing',
+    'auth:person-new',
+  ];
   if (
-    !['auth:person-admin', 'auth:person-existing', 'auth:person-new'].includes(
-      scenario ?? '',
+    !authScenarios.includes(scenario ?? '') &&
+    !trainingPlanScenarios.includes(
+      (scenario ?? '') as (typeof trainingPlanScenarios)[number],
     )
   ) {
     throw new Error(
-      'Unknown seed. Use auth:person-admin, auth:person-new or auth:person-existing.',
+      `Unknown seed. Use ${[...authScenarios, ...trainingPlanScenarios].join(', ')}.`,
     );
   }
 
@@ -36,6 +57,10 @@ async function main(): Promise<void> {
 
   try {
     const personModel = model(PersonDocument.name, PersonSchema);
+    const trainingPlanModel = model(
+      TrainingPlanDocument.name,
+      TrainingPlanSchema,
+    );
 
     if (scenario === 'auth:person-new') {
       await personModel.deleteMany({ googleSubject: 'google-new-001' }).exec();
@@ -54,7 +79,7 @@ async function main(): Promise<void> {
           { new: true, setDefaultsOnInsert: true, upsert: true },
         )
         .exec();
-    } else {
+    } else if (scenario === 'auth:person-existing') {
       await personModel
         .findOneAndUpdate(
           { googleSubject: 'google-existing-001' },
@@ -69,6 +94,51 @@ async function main(): Promise<void> {
           { new: true, setDefaultsOnInsert: true, upsert: true },
         )
         .exec();
+    } else {
+      await personModel
+        .findOneAndUpdate(
+          { googleSubject: 'google-admin-001' },
+          {
+            $set: {
+              email: 'admin.runner@example.test',
+              isAdmin: true,
+              name: 'Admin Runner',
+              photoUrl: 'https://example.test/admin-avatar.png',
+            },
+          },
+          { new: true, setDefaultsOnInsert: true, upsert: true },
+        )
+        .exec();
+
+      const planId = new Types.ObjectId('64b000000000000000000001');
+      const personalPlanId = new Types.ObjectId('64b000000000000000000002');
+      const workoutId = new Types.ObjectId('64b000000000000000000101');
+      await trainingPlanModel
+        .deleteMany({ _id: { $in: [planId, personalPlanId] } })
+        .exec();
+      await trainingPlanModel.create([
+        {
+          _id: planId,
+          ownerPersonId: null,
+          name: 'Plano global de exemplo',
+          description:
+            'Plano estável para reproduzir cenários administrativos.',
+          workouts: [
+            {
+              _id: workoutId,
+              name: 'Treino A',
+              exercises: [{ name: 'Exercício fictício' }],
+            },
+          ],
+        },
+        {
+          _id: personalPlanId,
+          ownerPersonId: new Types.ObjectId('64b000000000000000000003'),
+          name: 'Plano pessoal fora do escopo',
+          description: 'Não aparece nas operações globais.',
+          workouts: [],
+        },
+      ]);
     }
 
     process.stdout.write(`Seed ${scenario} prepared.\n`);

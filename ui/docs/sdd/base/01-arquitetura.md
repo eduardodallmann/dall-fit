@@ -43,8 +43,10 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 ## Inicialização e navegação
 
 1. `main.tsx` carrega os estilos globais.
-2. `AppProviders` aplica o `QueryClientProvider` e o `PwaProvider`.
-3. `App` aplica o `RouterProvider`.
+2. `AppProviders` aplica `QueryClientProvider`, `PwaProvider` e o único
+   `Toast.Provider` global.
+3. `App` aplica o `RouterProvider` do TanStack Router. Breadcrumbs de domínio usam
+   `Link` tipado diretamente para navegar sem recarregar o documento.
 4. TanStack Router resolve a URL pela árvore manual de `routes/routes.tsx`.
 
 Não usar roteamento baseado em arquivos nem adicionar o plugin gerador do TanStack
@@ -106,8 +108,8 @@ Introduzir internacionalização ou alterar essas escolhas exige atualizar esta 
 e registrar ADR quando houver trade-off transversal. O design system e suas regras
 vigentes estão definidos em `03-componentes-e-estilizacao.md`.
 
-MSW está configurado para as fronteiras de autenticação, seguindo
-`05-mocks-de-api.md`. Playwright está configurado para as rotas e a jornada de login,
+MSW está configurado para autenticação e planos globais, seguindo
+`05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
 
 ## Progressive Web App
@@ -177,13 +179,18 @@ Os componentes reutilizáveis do shell e do menu vivem em
 Router. Ao entrar no breakpoint persistente, qualquer `Drawer` aberto é fechado e
 não conserva estado para uma futura volta ao viewport móvel.
 
-O ponto de extensão `adminRoute` declara um layout sem path cujo pai é o layout
-autenticado. Seu `beforeLoad` reutiliza `Person` do contexto: `isAdmin: true` permite
-o filho futuro e a ausência da chave redireciona com substituição de histórico para
-`/dash`. Enquanto não possui rota navegável filha, ele não é agregado à `routeTree`,
-pois uma branch sem path e vazia competiria com `/`. A primeira rota administrativa
-deve ser adicionada como filha desse layout e agregá-lo à árvore; seu endpoint
-também deve aplicar a autorização da API.
+`adminRoute` declara um layout sem path cujo pai é o layout autenticado. Seu
+`beforeLoad` reutiliza `Person` do contexto: `isAdmin: true` permite as rotas de
+planos e a ausência da chave redireciona com substituição de histórico para
+`/dash`. Lista, detalhe e workout são filhos desse layout, cuja branch faz parte da
+`routeTree`. A proteção visual não substitui `AdminOnly` na API.
+
+O módulo `src/routes/training-plan/` possui services Axios, query keys, queries e
+mutations. Criação/edição/exclusão de plano e exclusão de workout usam snapshot,
+atualização otimista e rollback; overlays de edição/exclusão fecham ao disparar a
+mutation e não reabrem no rollback. Criar workout espera o ID real. Toda mutation
+usa `toast.promise` e invalida o cache proprietário ao terminar. Falha de refetch
+preserva dado válido e é comunicada sem apagar conteúdo.
 
 ## Ambiente local
 

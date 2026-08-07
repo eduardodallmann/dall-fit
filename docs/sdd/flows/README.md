@@ -7,6 +7,8 @@ Cada arquivo descreve uma jornada funcional que atravessa API e UI. Use
 
 - [`Login com Google`](login-google.md): entrada pública, autenticação, cadastro e
   acesso à rota privada.
+- [`Gestão de planos de treino globais`](gestao-planos-treino-globais.md): CRUD
+  administrativo de planos e manutenção de workouts.
 
 Fluxos registram sequência, decisões e dados compartilhados, mas referenciam a
 documentação detalhada de endpoints e rotas sem duplicá-la.

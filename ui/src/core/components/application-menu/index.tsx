@@ -1,6 +1,6 @@
 import { Avatar, Chip, Typography } from '@heroui/react';
-import { Link } from '@tanstack/react-router';
-import { House } from 'lucide-react';
+import { Link, useLocation } from '@tanstack/react-router';
+import { Dumbbell, House } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
@@ -20,6 +20,10 @@ export function ApplicationMenu({
   person,
 }: Readonly<ApplicationMenuProps>) {
   const initials = getPersonInitials(person.name);
+  const location = useLocation();
+  const mockAuth = new URLSearchParams(location.searchStr).get('mockAuth');
+  const adminSearch =
+    mockAuth === 'admin' ? { mockAuth: 'admin' as const } : {};
 
   return (
     <div className={styles.content()}>
@@ -73,6 +77,22 @@ export function ApplicationMenu({
           />
           <span>Home</span>
         </Link>
+        {person.isAdmin === true ? (
+          <Link
+            activeOptions={{ includeSearch: false }}
+            className={styles.navigationLink()}
+            onClick={onNavigate}
+            search={adminSearch}
+            to="/global/training-plan"
+          >
+            <Dumbbell
+              aria-hidden="true"
+              className={styles.navigationIcon()}
+              focusable="false"
+            />
+            <span>Planos de treino</span>
+          </Link>
+        ) : null}
       </nav>
       <PwaInstallAction />
     </div>

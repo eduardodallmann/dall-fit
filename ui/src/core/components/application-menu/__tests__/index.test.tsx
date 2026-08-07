@@ -68,6 +68,9 @@ describe('ApplicationMenu', () => {
     expect(screen.getByText(person.name)).toBeInTheDocument();
     expect(screen.getByText(person.email)).toBeInTheDocument();
     expect(screen.getByText('Admin')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Planos de treino' }),
+    ).toBeInTheDocument();
   });
 
   it('notifies the mobile shell when Home is activated', async () => {

@@ -7,6 +7,7 @@ import { AuthModule } from '~/auth/auth.module';
 import { GetRootCommand } from '~/commands/get-root.command';
 import { validateEnvironment } from '~/config/environment';
 import { PersonModule } from '~/person/person.module';
+import { TrainingPlanModule } from '~/training-plan/training-plan.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PersonModule } from '~/person/person.module';
     }),
     PersonModule,
     AuthModule,
+    TrainingPlanModule,
   ],
   controllers: [AppController],
   providers: [GetRootCommand],
