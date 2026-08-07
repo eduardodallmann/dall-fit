@@ -211,5 +211,6 @@ junto dos testes Playwright e não substituem as imagens curadas do SDD.
 
 ## Estado de adoção
 
-Playwright foi adotado com a jornada de login. Configuração, scripts, Chromium,
-MSW Browser, specs de rota/flow e ignores seguem o contrato desta página.
+Playwright cobre a jornada de login e a gestão administrativa de planos globais.
+Configuração, scripts, Chromium, MSW Browser, specs de rota/flow e ignores seguem
+o contrato desta página.

@@ -21,6 +21,10 @@ import {
   DashRouteComponent,
   HomeRouteComponent,
 } from '~/routes/route-components';
+import { TrainingPlanDetailPage } from '~/routes/training-plan/detail-page';
+import { TrainingPlanListPage } from '~/routes/training-plan/list-page';
+import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import { TrainingPlanWorkoutPage } from '~/routes/training-plan/workout-page';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -32,6 +36,14 @@ interface HomeSearch {
 
 interface DashSearch {
   mockAuth?: MockAuthScenario;
+}
+
+interface TrainingPlanSearch extends DashSearch {
+  mockTrainingPlans?: MockTrainingPlansScenario;
+}
+
+interface TrainingPlanListSearch extends TrainingPlanSearch {
+  page?: number;
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -107,9 +119,47 @@ const dashRoute = createRoute({
   component: DashRouteComponent,
 });
 
+const trainingPlanListRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/global/training-plan',
+  validateSearch: (search: Record<string, unknown>): TrainingPlanListSearch => {
+    const common = parseTrainingPlanSearch(search);
+    const numericPage = Number(search.page);
+    const page =
+      Number.isInteger(numericPage) && numericPage > 1
+        ? numericPage
+        : undefined;
+    const result = page === undefined ? common : { ...common, page };
+
+    return result;
+  },
+  component: TrainingPlanListRouteComponent,
+});
+
+const trainingPlanDetailRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/global/training-plan/$trainingPlanId',
+  validateSearch: parseTrainingPlanSearch,
+  component: TrainingPlanDetailRouteComponent,
+});
+
+const trainingPlanWorkoutRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/global/training-plan/$trainingPlanId/workout/$workoutId',
+  validateSearch: parseTrainingPlanSearch,
+  component: TrainingPlanWorkoutRouteComponent,
+});
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
-  authenticatedRoute.addChildren([dashRoute]),
+  authenticatedRoute.addChildren([
+    dashRoute,
+    adminRoute.addChildren([
+      trainingPlanListRoute,
+      trainingPlanDetailRoute,
+      trainingPlanWorkoutRoute,
+    ]),
+  ]),
 ]);
 
 export const router = createRouter({
@@ -124,6 +174,88 @@ function parseMockAuthScenario(search: string): MockAuthScenario {
     value === 'admin' || value === 'error' || value === 'unauthenticated'
       ? value
       : 'authenticated';
+
+  return result;
+}
+
+function parseTrainingPlanSearch(
+  search: Record<string, unknown>,
+): TrainingPlanSearch {
+  const mockAuth: MockAuthScenario | undefined =
+    search.mockAuth === 'admin' ||
+    search.mockAuth === 'error' ||
+    search.mockAuth === 'unauthenticated'
+      ? search.mockAuth
+      : undefined;
+  const scenarios: readonly MockTrainingPlansScenario[] = [
+    'create-error',
+    'create-success',
+    'create-workout-error',
+    'delete-error',
+    'delete-success',
+    'delete-workout-error',
+    'delete-workout-success',
+    'detail-error',
+    'empty',
+    'list-error',
+    'loading',
+    'not-found',
+    'success',
+    'update-error',
+    'update-success',
+  ];
+  const mockTrainingPlans = scenarios.find(
+    (scenario) => scenario === search.mockTrainingPlans,
+  );
+  const result = {
+    ...(mockAuth === undefined ? {} : { mockAuth }),
+    ...(mockTrainingPlans === undefined ? {} : { mockTrainingPlans }),
+  };
+
+  return result;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingPlanListRouteComponent() {
+  const search = trainingPlanListRoute.useSearch();
+  const result = (
+    <TrainingPlanListPage
+      mockAuth={search.mockAuth}
+      mockTrainingPlans={search.mockTrainingPlans ?? 'success'}
+      page={search.page ?? 1}
+    />
+  );
+
+  return result;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingPlanDetailRouteComponent() {
+  const params = trainingPlanDetailRoute.useParams();
+  const search = trainingPlanDetailRoute.useSearch();
+  const result = (
+    <TrainingPlanDetailPage
+      mockAuth={search.mockAuth}
+      mockTrainingPlans={search.mockTrainingPlans ?? 'success'}
+      trainingPlanId={params.trainingPlanId}
+    />
+  );
+
+  return result;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingPlanWorkoutRouteComponent() {
+  const params = trainingPlanWorkoutRoute.useParams();
+  const search = trainingPlanWorkoutRoute.useSearch();
+  const result = (
+    <TrainingPlanWorkoutPage
+      mockAuth={search.mockAuth}
+      mockTrainingPlans={search.mockTrainingPlans ?? 'success'}
+      trainingPlanId={params.trainingPlanId}
+      workoutId={params.workoutId}
+    />
+  );
 
   return result;
 }

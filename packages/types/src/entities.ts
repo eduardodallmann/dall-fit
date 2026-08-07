@@ -13,3 +13,18 @@ export interface Person extends Entity {
   photoUrl: string | null;
   isAdmin?: true;
 }
+
+export interface TrainingPlanSummary extends Entity {
+  name: string;
+  description: string;
+}
+
+export interface TrainingPlanWorkoutSummary {
+  id: EntityId;
+  name: string;
+  exerciseCount: number;
+}
+
+export interface TrainingPlanDetails extends TrainingPlanSummary {
+  workouts: readonly TrainingPlanWorkoutSummary[];
+}

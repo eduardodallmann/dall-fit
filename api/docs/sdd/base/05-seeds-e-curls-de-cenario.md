@@ -61,26 +61,23 @@ seed.
 
 ## Convenção do comando
 
-Quando surgir o primeiro endpoint dependente de estado, a API deve disponibilizar:
+A API disponibiliza:
 
 ```bash
 pnpm -C api seed -- <endpoint-slug>:<scenario-slug>
 ```
 
-Exemplos de identificadores:
+Identificadores vigentes incluem:
 
-- `users:create-success`;
-- `users:create-conflict`;
-- `sessions:get-expired`;
-- `profile:update-external-error`.
+- `auth:person-new`, `auth:person-existing` e `auth:person-admin`;
+- `training-plans:list`, `training-plans:create`, `training-plans:detail`,
+  `training-plans:update`, `training-plans:delete`,
+  `training-plans:create-workout`, `training-plans:delete-workout` e
+  `training-plans:not-found`.
 
 O identificador é estável, usa `kebab-case` em cada segmento e pertence ao cenário
 documentado. Renomear ou remover um cenário atualiza atomicamente seed, documento e
 testes.
-
-Enquanto nenhum cenário depender de MongoDB, Redis ou outra infraestrutura local,
-o script não precisa existir. A primeira demanda que documentar um comando de seed
-deve implementar e validar esse comando na mesma mudança.
 
 ## Responsabilidades do seed
 
@@ -99,24 +96,17 @@ Um seed:
 Seeds podem reutilizar factories usadas pelos E2E, mas não reutilizam dumps inteiros
 de ambientes.
 
-## Organização futura
+## Organização
 
-Quando o primeiro seed for implementado, adotar:
+O entrypoint vigente é:
 
 ```text
-test/
-├── factories/
-├── seeds/
-│   ├── cli.ts
-│   └── scenarios/
-│       └── <endpoint>/
-│           └── <scenario>.ts
-└── setup/
+test/seeds/cli.ts
 ```
 
-O script `seed` do `api/package.json` chama `test/seeds/cli.ts`. A tecnologia de
-execução TypeScript será definida junto da implementação, sem duplicar lógica de
-negócio da aplicação.
+O script `seed` do `api/package.json` executa esse arquivo com `tsx`. Quando o
+volume justificar, cenários podem migrar para módulos sob `test/seeds/scenarios/`
+sem alterar os identificadores públicos. Seeds não duplicam regra de negócio.
 
 ## Regras do cURL
 

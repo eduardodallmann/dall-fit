@@ -1,4 +1,9 @@
-import type { Person } from './entities.js';
+import type {
+  Person,
+  TrainingPlanDetails,
+  TrainingPlanSummary,
+  TrainingPlanWorkoutSummary,
+} from './entities.js';
 
 export interface ApiError {
   code: string;
@@ -22,6 +27,25 @@ export type CurrentPersonResponse = ApiResponse<Person>;
 export type StartGoogleLoginResponse = ApiResponse<{
   authorizationUrl: string;
 }>;
+
+export interface CreateTrainingPlanRequest {
+  name: string;
+  description: string;
+}
+
+export interface UpdateTrainingPlanRequest {
+  name?: string;
+  description?: string;
+}
+
+export type GlobalTrainingPlanCollectionResponse =
+  CollectionResponse<TrainingPlanSummary>;
+
+export type CreateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
+export type UpdateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
+export type TrainingPlanDetailsResponse = ApiResponse<TrainingPlanDetails>;
+export type CreateTrainingPlanWorkoutResponse =
+  ApiResponse<TrainingPlanWorkoutSummary>;
 
 export interface RequestContract<
   TBody = never,

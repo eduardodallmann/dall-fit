@@ -26,6 +26,11 @@ Formato base de erro:
 
 Mensagens não são contrato para lógica do cliente; consumidores usam `code`.
 
+O `ValidationPipe` global transforma entradas, mantém somente propriedades dos
+DTOs e rejeita campos adicionais. Toda falha de query, param ou body validado por
+esse pipe responde `400` com `code: VALIDATION_ERROR`, `details: {}` e mensagem
+genérica. A API não expõe a lista interna de constraints ou valores rejeitados.
+
 ## Compatibilidade
 
 Adicionar campo opcional costuma ser compatível. Remover, renomear, tornar

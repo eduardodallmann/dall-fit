@@ -40,6 +40,8 @@ Depois da proteção, o layout autenticado apresenta:
   `Person.isAdmin === true`;
 - navegação principal com o link `Home`, ícone Lucide `House` e destino `/dash`;
 - `Home` marcado visualmente e com `aria-current="page"`;
+- somente para `Person.isAdmin === true`, link `Planos de treino` com ícone
+  `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
 - seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
   prompt ou orientação manual expansível quando ele não está disponível;
 - região `main` sem conteúdo próprio, título, placeholder, card ou mensagem.
@@ -79,9 +81,10 @@ enquanto o dashboard permanece intencionalmente vazio.
 ### Alternativa 3 — Pessoa administradora
 
 - Condição: `Person.isAdmin === true`.
-- Comportamento: o mesmo menu recebe o `Chip` textual `Admin`.
-- Resultado: identidade e navegação permanecem iguais às da pessoa comum, com o
-  indicador adicional.
+- Comportamento: o mesmo menu recebe o `Chip` textual `Admin` e o link
+  `Planos de treino`.
+- Resultado: a pessoa ganha entrada visível para a branch protegida; pessoa comum
+  não reserva espaço para o item.
 
 ### Alternativa 4 — Instalação do PWA
 
@@ -113,7 +116,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 
 ## Estados
 
-- Loading: spinner e texto `Carregando sua conta` durante a proteção, sem shell.
+- Loading: skeletons estruturais com nome acessível `Carregando sua conta` durante
+  a proteção, sem shell.
 - Vazio: região principal intencionalmente vazia depois do sucesso.
 - Sucesso comum: shell com identidade e `Home`, sem `Admin`.
 - Sucesso administrativo: mesmo shell acrescido do `Chip` `Admin`.
@@ -161,7 +165,8 @@ móvel não o reabre.
 ## Navegação
 
 - Entrada: callback, URL direta ou item `Home`.
-- Avanço: `Home` usa `Link` tipado do TanStack Router para `/dash`, sem reload.
+- Avanço: `Home` e, para administradora, `Planos de treino` usam `Link` tipado do
+  TanStack Router, sem reload.
 - Rota atual: ativar `Home` em `/dash` mantém a rota; no `Drawer`, também fecha o
   menu.
 - Retorno: browser volta à página anterior conforme seu histórico.
@@ -179,7 +184,8 @@ móvel não o reabre.
   decorativos e não duplicam labels;
 - o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu`, contenção e
   restauração de foco e fechamento por `Escape`;
-- `Home` tem label visível, foco visível e `aria-current="page"` quando ativo;
+- links do menu têm label visível, foco visível e `aria-current="page"` quando
+  ativos;
 - a instalação manual usa `Disclosure` com trigger nomeado, conteúdo inline e
   texto de compatibilidade; não abre modal dentro do `Drawer`;
 - o aviso de versão possui título, descrição textual, região viva polida e duas
@@ -189,7 +195,7 @@ móvel não o reabre.
 - nome e e-mail usam `Typography` HeroUI; cada um ocupa sua própria linha com
   truncamento por CSS, sem alterar a string;
 - `Admin` possui texto explícito, não depende de cor e não entra na ordem de foco;
-- loading e erro possuem texto além do indicador visual.
+- loading possui nome acessível além dos skeletons; erro possui texto explícito.
 
 ## Referências visuais de layout — opcional
 
@@ -227,7 +233,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   `http://localhost:3000/dash?mockAuth=admin` com MSW habilitado
 - Given: o handler devolve pessoa fictícia com `isAdmin: true`
 - When: o shell renderiza
-- Then: exibe foto, nome, e-mail, `Chip` `Admin` e `Home`
+- Then: exibe foto, nome, e-mail, `Chip` `Admin`, `Home` e `Planos de treino`
 
 ### Cenário 5 — Orientação manual de instalação
 
@@ -258,7 +264,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
 - Configuração de deep links na Vercel: `vercel.json`
 - Componentes HeroUI: `Alert`, `Avatar`, `Button`, `Chip`, `Disclosure`, `Drawer`,
-  `Spinner` e `Typography`
+  `Skeleton` e `Typography`
 - Componentes core: `authenticated-shell`, `application-menu`,
   `pwa-install-action`, `pwa-update-notice` e `route-status`
 - Componentes exclusivos da rota: não se aplica; `/dash` não possui conteúdo
@@ -269,16 +275,16 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 
 ## Cobertura automatizada
 
-| Regra ou cenário                     | Vitest              | Playwright    |
-| ------------------------------------ | ------------------- | ------------- |
-| identidade, iniciais e `Admin`       | `application-menu`  | rota `/dash`  |
-| link `Home` e estado atual           | `application-menu`  | rota e flow   |
-| menu persistente e breakpoint        | estilos/typecheck   | rota `/dash`  |
-| backdrop, teclado e foco móvel       | componentes HeroUI  | rota `/dash`  |
-| prompt e orientação de instalação    | provider/componente | rota `/dash`  |
-| atualização confirmada ou dispensada | provider/componente | não se aplica |
-| redirect em `401`                    | router/app          | rota `/dash`  |
-| erro técnico sem identidade parcial  | router/app          | rota `/dash`  |
+| Regra ou cenário                          | Vitest              | Playwright       |
+| ----------------------------------------- | ------------------- | ---------------- |
+| identidade, `Admin` e link administrativo | `application-menu`  | `/dash` e planos |
+| link `Home` e estado atual                | `application-menu`  | rota e flow      |
+| menu persistente e breakpoint             | estilos/typecheck   | rota `/dash`     |
+| backdrop, teclado e foco móvel            | componentes HeroUI  | rota `/dash`     |
+| prompt e orientação de instalação         | provider/componente | rota `/dash`     |
+| atualização confirmada ou dispensada      | provider/componente | não se aplica    |
+| redirect em `401`                         | router/app          | rota `/dash`     |
+| erro técnico sem identidade parcial       | router/app          | rota `/dash`     |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts` e
   `src/mocks/fixtures/person.ts`.

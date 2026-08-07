@@ -178,6 +178,14 @@ antes de devolvê-los. Uma pessoa administradora possui `isAdmin: true`; pessoas
 comuns omitem o campo. Não existe default `false`, coleção separada nem consulta
 adicional para descobrir essa condição.
 
+O domínio `training-plan` usa a coleção `training_plans` e o fluxo completo
+controller → command → `TrainingPlanService` → `TrainingPlanRepository`. Planos
+globais possuem `ownerPersonId: null`; workouts e exercícios ficam embutidos. O
+adapter mantém o índice `{ ownerPersonId: 1, createdAt: -1 }`, projeta somente
+resumos públicos e executa `$push`/`$pull` atômicos. Redis não participa. A decisão
+está em
+`../../../../docs/sdd/adr/ADR-0003-modelagem-dos-planos-de-treino.md`.
+
 ## Infraestrutura de desenvolvimento local
 
 O comando abaixo inicia MongoDB e Redis reais em processos locais efêmeros, sem
@@ -252,7 +260,8 @@ controller. O token contém apenas o ID técnico, sem nome, e-mail ou foto.
 `SessionAuthGuard` e depois `AdminAuthorizationGuard`; o segundo guard reutiliza a
 `Person` anexada ao request e permite somente `isAdmin: true`, sem acessar banco ou
 service novamente. Pessoa autenticada sem a chave recebe
-`403 ADMIN_ACCESS_REQUIRED`. Nenhum endpoint vigente usa essa proteção.
+`403 ADMIN_ACCESS_REQUIRED`. As sete operações de planos globais aplicam essa
+proteção no controller proprietário.
 
 Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. `state` e
 `nonce` usam cookies temporários com as mesmas proteções e são removidos no
