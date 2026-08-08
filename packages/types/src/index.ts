@@ -10,6 +10,8 @@ export type {
   RequestContract,
   StartGoogleLoginResponse,
   TrainingPlanDetailsResponse,
+  UpdateCurrentPersonConfigsRequest,
+  UpdateCurrentPersonConfigsResponse,
   UpdateTrainingPlanRequest,
   UpdateTrainingPlanResponse,
 } from './contracts.js';
@@ -17,6 +19,8 @@ export type {
   Entity,
   EntityId,
   Person,
+  PersonConfigs,
+  Theme,
   Timestamp,
   TrainingPlanDetails,
   TrainingPlanSummary,

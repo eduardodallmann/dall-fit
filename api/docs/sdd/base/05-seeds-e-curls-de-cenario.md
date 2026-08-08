@@ -70,6 +70,8 @@ pnpm -C api seed -- <endpoint-slug>:<scenario-slug>
 Identificadores vigentes incluem:
 
 - `auth:person-new`, `auth:person-existing` e `auth:person-admin`;
+- `auth:person-legacy`, `auth:person-theme-light` e
+  `auth:person-theme-dark`;
 - `training-plans:list`, `training-plans:create`, `training-plans:detail`,
   `training-plans:update`, `training-plans:delete`,
   `training-plans:create-workout`, `training-plans:delete-workout` e

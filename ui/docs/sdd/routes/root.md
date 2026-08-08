@@ -11,7 +11,8 @@
 
 - Como o usuário chega: URL direta ou redirecionamento após sessão/callback inválido.
 - Path e query params: `/`; query opcional `authError=oauth_failed`.
-- Contexto e estado persistido: não exige sessão.
+- Contexto e estado persistido: não exige sessão; pode usar somente a preferência
+  local `dall-fit:theme` com valor `light | dark`.
 - Permissões: pública.
 
 ## Elementos e conteúdo
@@ -25,6 +26,11 @@
 - aviso global `Nova versão disponível` quando o service worker encontra uma
   versão em espera, com ações `Atualizar agora` e `Agora não`; em viewports
   estreitos, as ações ficam abaixo da mensagem e permanecem contidas no aviso.
+
+Antes da primeira pintura útil, a rota usa o tema local válido ou, quando ele não
+existe, é inválido ou está inacessível, `prefers-color-scheme`. O resultado fica em
+`data-theme` no elemento raiz. Enquanto o sistema for a fonte, mudanças da
+preferência atualizam a rota sem escrever no armazenamento.
 
 ## Caminho feliz
 
@@ -55,6 +61,15 @@ Resultado esperado: a API inicia o fluxo OAuth.
   técnico nem impedem a autenticação. O aviso não corta conteúdo nem cria rolagem
   horizontal.
 
+### Alternativa 3 — Preferência de tema inválida ou indisponível
+
+- Condição: `dall-fit:theme` não contém `light | dark` ou o navegador bloqueia o
+  armazenamento.
+- Comportamento: o valor inválido é descartado e o sistema operacional define
+  `light` ou `dark`.
+- Resultado: login e navegação continuam disponíveis; nenhum valor inferido do
+  sistema é persistido.
+
 ## Validações
 
 Não se aplica — não há formulário nem entrada local.
@@ -68,6 +83,8 @@ Não se aplica — não há formulário nem entrada local.
 - Erro não recuperável: não se aplica.
 - Ações desabilitadas: durante a ativação da nova versão, `Atualizar agora` indica
   progresso e `Agora não` fica indisponível para impedir ações concorrentes.
+- Tema: local válido prevalece sobre o sistema; sem valor local válido, acompanha
+  o sistema.
 
 ## Integrações
 
@@ -99,6 +116,8 @@ Não se aplica — não há formulário nem entrada local.
 - o aviso de atualização usa região viva polida, título e descrição, com ações
   nomeadas e operáveis por teclado; a mensagem precede `Atualizar agora` e
   `Agora não` na ordem de leitura e de foco em qualquer largura.
+- a mudança de tema preserva os tokens de contraste e foco e não depende de texto
+  adicional na rota.
 
 ## Responsividade do aviso de atualização
 
@@ -147,11 +166,29 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
   ficam abaixo da mensagem e, a partir desse breakpoint, ficam ao lado dela
 - And: não há corte, sobreposição ou rolagem horizontal
 
+### Cenário 4 — Tema público acompanha o sistema
+
+- Link para testar: `http://localhost:3000/` sem `dall-fit:theme`
+- Given: o sistema prefere `light`
+- When: a rota abre e a preferência muda para `dark`
+- Then: `data-theme` muda de `light` para `dark`
+- And: `dall-fit:theme` continua ausente
+
+### Cenário 5 — Preferência local inicia o tema
+
+- Link para testar: `http://localhost:3000/` com `dall-fit:theme=dark` preparado
+  antes da navegação
+- Given: o sistema prefere `light`
+- When: o documento inicia
+- Then: `data-theme="dark"` é aplicado antes da primeira pintura útil e mudanças
+  do sistema não substituem a escolha local
+
 ## Estrutura técnica relevante
 
 - Arquivo da rota: `src/routes/home/index.tsx`
 - Componentes HeroUI utilizados: `Alert`, `Button` e `Card`
 - Componentes core: `pwa-update-notice`, aplicado pelos providers globais
+- Infraestrutura core: `ThemeProvider` e `theme-storage`
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
 - Hooks e serviços: mutation TanStack Query e `startGoogleLogin`
 - Tipos compartilhados: `StartGoogleLoginResponse`
@@ -164,6 +201,8 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 | alerta de callback          | componente home | rota root     |
 | avanço até `/dash` mockado  | não se aplica   | flow login    |
 | aviso de atualização        | componente PWA  | não se aplica |
+| bootstrap local/sistema     | theme storage   | rota root     |
+| mudança do sistema          | theme provider  | rota root     |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.

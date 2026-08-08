@@ -40,7 +40,10 @@ async function main(): Promise<void> {
   const authScenarios = [
     'auth:person-admin',
     'auth:person-existing',
+    'auth:person-legacy',
     'auth:person-new',
+    'auth:person-theme-dark',
+    'auth:person-theme-light',
   ];
   if (
     !authScenarios.includes(scenario ?? '') &&
@@ -89,7 +92,46 @@ async function main(): Promise<void> {
               name: 'Taylor Fit',
               photoUrl: 'https://example.test/avatar.png',
             },
+            $unset: { configs: 1, isAdmin: 1 },
+          },
+          { new: true, setDefaultsOnInsert: true, upsert: true },
+        )
+        .exec();
+    } else if (
+      scenario === 'auth:person-theme-dark' ||
+      scenario === 'auth:person-theme-light'
+    ) {
+      const isDark = scenario === 'auth:person-theme-dark';
+      await personModel
+        .findOneAndUpdate(
+          {
+            googleSubject: isDark
+              ? 'google-theme-dark-001'
+              : 'google-theme-light-001',
+          },
+          {
+            $set: {
+              configs: { theme: isDark ? 'dark' : 'light' },
+              email: 'theme.runner@example.test',
+              name: 'Theme Runner',
+              photoUrl: null,
+            },
             $unset: { isAdmin: 1 },
+          },
+          { new: true, setDefaultsOnInsert: true, upsert: true },
+        )
+        .exec();
+    } else if (scenario === 'auth:person-legacy') {
+      await personModel
+        .findOneAndUpdate(
+          { googleSubject: 'google-legacy-001' },
+          {
+            $set: {
+              email: 'legacy.runner@example.test',
+              name: 'Legacy Runner',
+              photoUrl: null,
+            },
+            $unset: { configs: 1, isAdmin: 1 },
           },
           { new: true, setDefaultsOnInsert: true, upsert: true },
         )

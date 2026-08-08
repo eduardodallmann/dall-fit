@@ -176,7 +176,12 @@ O domínio `Person` expõe ports de repository aos services. O adapter MongoDB m
 índice único para o identificador `sub` do Google e mapeia documentos para entidades
 antes de devolvê-los. Uma pessoa administradora possui `isAdmin: true`; pessoas
 comuns omitem o campo. Não existe default `false`, coleção separada nem consulta
-adicional para descobrir essa condição.
+adicional para descobrir essa condição. A preferência opcional de tema fica em
+`configs.theme`, aceita somente `light | dark` e não possui default. Documentos
+novos ou históricos sem a configuração continuam sem o campo persistido, enquanto
+a representação pública garante `configs: {}`. A atualização da própria pessoa usa
+o fluxo controller → command → `UpdatePersonThemeService` → repository e altera
+atomicamente somente `configs.theme` e `updatedAt`.
 
 O domínio `training-plan` usa a coleção `training_plans` e o fluxo completo
 controller → command → `TrainingPlanService` → `TrainingPlanRepository`. Planos

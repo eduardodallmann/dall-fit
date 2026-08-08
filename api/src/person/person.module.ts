@@ -9,6 +9,7 @@ import {
 } from '~/person/repositories/person.schema';
 import { FindOrCreatePersonService } from '~/person/services/find-or-create-person.service';
 import { FindPersonByIdService } from '~/person/services/find-person-by-id.service';
+import { UpdatePersonThemeService } from '~/person/services/update-person-theme.service';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { FindPersonByIdService } from '~/person/services/find-person-by-id.servi
   providers: [
     FindOrCreatePersonService,
     FindPersonByIdService,
+    UpdatePersonThemeService,
     MongoPersonRepository,
     {
       provide: PersonRepository,
@@ -28,6 +30,7 @@ import { FindPersonByIdService } from '~/person/services/find-person-by-id.servi
   exports: [
     FindOrCreatePersonService,
     FindPersonByIdService,
+    UpdatePersonThemeService,
     MongooseModule,
     PersonRepository,
   ],

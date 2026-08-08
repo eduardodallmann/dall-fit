@@ -2,6 +2,7 @@ import { tv } from '@heroui/styles';
 
 export const applicationMenuStyles = tv({
   slots: {
+    appearance: 'flex items-center',
     avatar: 'shrink-0',
     content:
       'flex h-full min-w-0 flex-col gap-8 bg-surface p-6 text-foreground',

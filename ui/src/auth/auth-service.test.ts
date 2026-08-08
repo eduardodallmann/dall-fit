@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCurrentPerson, startGoogleLogin } from '~/auth/auth-service';
+import {
+  getCurrentPerson,
+  startGoogleLogin,
+  updateCurrentPersonConfigs,
+} from '~/auth/auth-service';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
 
 describe('authService', () => {
@@ -14,5 +18,11 @@ describe('authService', () => {
     await expect(startGoogleLogin()).resolves.toBe(
       'http://localhost:4000/dash',
     );
+  });
+
+  it('updates the current person theme through the API client and MSW', async () => {
+    const result = await updateCurrentPersonConfigs('light');
+
+    expect(result.configs).toEqual({ theme: 'light' });
   });
 });

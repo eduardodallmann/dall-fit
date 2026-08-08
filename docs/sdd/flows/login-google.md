@@ -47,9 +47,12 @@ as fronteiras externas sem acessar a API.
    `/dash`.
 7. A rota-pai protegida consulta `GET /auth/me`.
 8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
-   público. O layout autenticado mostra avatar, nome, e-mail, navegação `Home` e,
-   quando recebe `isAdmin: true`, o indicador `Admin`; a região própria de
-   `/dash` permanece vazia.
+   público. Antes de pintar o shell, a UI aplica `configs.theme` e o sincroniza no
+   navegador; quando ele não existe, remove uma escolha local potencialmente
+   pertencente a outra conta e usa `prefers-color-scheme` sem persistir um default.
+   O layout autenticado mostra avatar, nome, e-mail, toggle de tema, navegação
+   `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
+   de `/dash` permanece vazia.
 9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
 
 ## Compatibilidade temporária do deploy
@@ -67,16 +70,17 @@ devem acompanhar a reversão.
 
 ## Dados compartilhados
 
-| Dado            | Origem              | Consumidores      | Persistência                | Observações                        |
-| --------------- | ------------------- | ----------------- | --------------------------- | ---------------------------------- |
-| `sub` Google    | ID token            | API               | MongoDB                     | chave externa estável, nunca na UI |
-| nome            | ID token            | API e UI          | MongoDB                     | dado pessoal, nunca em logs        |
-| e-mail          | ID token verificado | API e UI          | MongoDB                     | dado pessoal, não é chave          |
-| URL da foto     | ID token            | API e UI          | MongoDB                     | pode ser ausente                   |
-| ID de `Person`  | MongoDB             | sessão e API      | MongoDB e JWT               | único dado da pessoa no JWT        |
-| `isAdmin`       | operação autorizada | API e UI          | MongoDB                     | somente `true`; ausência é `false` |
-| sessão          | API                 | browser e API     | cookie `HttpOnly` stateless | não acessível ao JavaScript        |
-| `state`/`nonce` | API                 | Google e callback | cookies temporários         | removidos ao terminar              |
+| Dado            | Origem              | Consumidores      | Persistência                          | Observações                        |
+| --------------- | ------------------- | ----------------- | ------------------------------------- | ---------------------------------- |
+| `sub` Google    | ID token            | API               | MongoDB                               | chave externa estável, nunca na UI |
+| nome            | ID token            | API e UI          | MongoDB                               | dado pessoal, nunca em logs        |
+| e-mail          | ID token verificado | API e UI          | MongoDB                               | dado pessoal, não é chave          |
+| URL da foto     | ID token            | API e UI          | MongoDB                               | pode ser ausente                   |
+| ID de `Person`  | MongoDB             | sessão e API      | MongoDB e JWT                         | único dado da pessoa no JWT        |
+| `isAdmin`       | operação autorizada | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
+| tema            | pessoa ou sistema   | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
+| sessão          | API                 | browser e API     | cookie `HttpOnly` stateless           | não acessível ao JavaScript        |
+| `state`/`nonce` | API                 | Google e callback | cookies temporários                   | removidos ao terminar              |
 
 ## Estados e exceções
 
@@ -86,6 +90,9 @@ devem acompanhar a reversão.
   sem sessão; um novo acionamento reinicia o fluxo.
 - Erro recuperável: sessão ausente/expirada redireciona à entrada pública; falha
   transitória de `/auth/me` exibe o erro da rota para nova tentativa por recarga.
+- Reconciliação: tema explícito do perfil substitui o bootstrap local; perfil sem
+  tema remove a chave local e acompanha o sistema. Falha de `/auth/me` mantém o
+  tema do bootstrap sem inferir dado parcial.
 - Erro não recuperável: claims obrigatórias inválidas impedem cadastro e sessão.
 - Indisponibilidade: erro do Google ou MongoDB não cria sessão nem expõe detalhes
   técnicos.
@@ -117,12 +124,31 @@ devem acompanhar a reversão.
 - When: a rota-pai protegida valida a sessão
 - Then: a UI redireciona para `/` sem renderizar dados privados
 
+### Cenário 4 — Perfil assume a fonte do tema após o login
+
+- Link para testar:
+  `http://127.0.0.1:3100/dash?mockAuth=theme-light` com
+  `dall-fit:theme=dark` preparado antes da navegação
+- Given: a entrada pública iniciou em `dark`, mas a pessoa possui tema `light`
+- When: `GET /auth/me` conclui
+- Then: o shell autenticado inicia em `light` e sincroniza a chave local
+
+### Cenário 5 — Conta sem tema não herda escolha local
+
+- Link para testar:
+  `http://127.0.0.1:3100/dash?mockAuth=theme-unset` com sistema em `light` e
+  `dall-fit:theme=dark`
+- Given: a pessoa autenticada não possui `configs.theme`
+- When: o perfil é reconciliado
+- Then: a UI remove a chave anterior e usa `light` pelo sistema
+
 ## Cobertura automatizada
 
 - Regras e caminhos de negócio protegidos: primeiro cadastro, reutilização,
   validação de `state`/`nonce`, sessão válida/expirada e pessoa removida.
 - Unitários e componentes da UI: home, consulta de pessoa, autorização
-  administrativa, iniciais e apresentação comum/administrativa do menu.
+  administrativa, bootstrap/reconciliação do tema, rollback, iniciais e
+  apresentação comum/administrativa do menu.
 - Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
 - E2E dos endpoints da API e fixtures MongoDB/Redis:
   `api/test/auth.e2e-spec.ts` com MongoDB efêmero; Redis não participa.

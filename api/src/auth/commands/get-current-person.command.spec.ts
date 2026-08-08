@@ -7,6 +7,7 @@ describe('GetCurrentPersonCommand', () => {
     const command = new GetCurrentPersonCommand();
 
     const result = command.execute({
+      configs: {},
       id: 'person-001',
       googleSubject: 'google-secret-subject',
       name: 'Alex Runner',
@@ -17,6 +18,7 @@ describe('GetCurrentPersonCommand', () => {
     });
 
     expect(result.data).toEqual({
+      configs: {},
       id: 'person-001',
       name: 'Alex Runner',
       email: 'alex.runner@example.test',
@@ -32,6 +34,7 @@ describe('GetCurrentPersonCommand', () => {
     const command = new GetCurrentPersonCommand();
 
     const result = command.execute({
+      configs: { theme: 'dark' },
       id: 'person-admin-001',
       googleSubject: 'google-admin-subject',
       name: 'Admin Runner',
@@ -43,6 +46,7 @@ describe('GetCurrentPersonCommand', () => {
     });
 
     expect(result.data).toMatchObject({
+      configs: { theme: 'dark' },
       id: 'person-admin-001',
       isAdmin: true,
     });

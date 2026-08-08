@@ -14,6 +14,7 @@ export class GetCurrentPersonCommand {
     });
 
     const publicPerson: Person = {
+      configs: person.configs,
       id: person.id,
       name: person.name,
       email: person.email,

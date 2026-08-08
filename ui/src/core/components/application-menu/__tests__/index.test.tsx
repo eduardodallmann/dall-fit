@@ -13,6 +13,7 @@ import type { Person } from '@dall-fit/types';
 
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { PwaContext } from '~/core/pwa/pwa-context';
+import { ThemeContext } from '~/core/theme/theme-context';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
 
 const pwaContextValue = {
@@ -25,6 +26,15 @@ const pwaContextValue = {
   update: vi.fn().mockResolvedValue(undefined),
 };
 
+const toggleTheme = vi.fn();
+const themeContextValue = {
+  isSaving: false,
+  reconcileAuthenticated: vi.fn(),
+  reconcilePublic: vi.fn(),
+  theme: 'dark' as const,
+  toggleTheme,
+};
+
 describe('ApplicationMenu', () => {
   it('shows the authenticated identity and active Home navigation', async () => {
     await renderApplicationMenu(authenticatedPersonFixture);
@@ -35,6 +45,9 @@ describe('ApplicationMenu', () => {
     expect(screen.getByText('Alex Runner')).toBeInTheDocument();
     expect(screen.getByText('alex.runner@example.test')).toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ativar tema claro' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: 'Navegação principal' }),
     ).toBeInTheDocument();
@@ -103,8 +116,10 @@ async function renderApplicationMenu(
 
   await testRouter.load();
   render(
-    <PwaContext value={pwaContextValue}>
-      <RouterProvider router={testRouter} />
-    </PwaContext>,
+    <ThemeContext value={themeContextValue}>
+      <PwaContext value={pwaContextValue}>
+        <RouterProvider router={testRouter} />
+      </PwaContext>
+    </ThemeContext>,
   );
 }

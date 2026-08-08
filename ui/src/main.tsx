@@ -5,8 +5,11 @@ import '~/index.css';
 
 import App from '~/app';
 import { AppProviders } from '~/context/providers';
+import { bootstrapTheme } from '~/core/theme/theme-storage';
 
 async function bootstrap() {
+  const initialTheme = bootstrapTheme();
+
   if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true') {
     const { mockWorker } = await import('~/mocks/browser');
     await mockWorker.start({ onUnhandledRequest: 'bypass' });
@@ -19,7 +22,7 @@ async function bootstrap() {
 
   createRoot(rootElement).render(
     <StrictMode>
-      <AppProviders>
+      <AppProviders initialTheme={initialTheme}>
         <App />
       </AppProviders>
     </StrictMode>,

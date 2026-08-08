@@ -65,6 +65,9 @@ describe('Authentication (e2e)', () => {
   it('rejects protected endpoints without a session', async () => {
     const rootResponse = await request(app.getHttpServer()).get('/');
     const meResponse = await request(app.getHttpServer()).get('/auth/me');
+    const configsResponse = await request(app.getHttpServer())
+      .patch('/auth/me/configs')
+      .send({ theme: 'dark' });
 
     expect(rootResponse.status).toBe(401);
     expect(rootResponse.body).toMatchObject({
@@ -72,6 +75,10 @@ describe('Authentication (e2e)', () => {
     });
     expect(meResponse.status).toBe(401);
     expect(meResponse.body).toMatchObject({
+      code: 'AUTHENTICATION_REQUIRED',
+    });
+    expect(configsResponse.status).toBe(401);
+    expect(configsResponse.body).toMatchObject({
       code: 'AUTHENTICATION_REQUIRED',
     });
   });
@@ -100,6 +107,7 @@ describe('Authentication (e2e)', () => {
     expect(meResponse.status).toBe(200);
     expect(meResponse.body).toMatchObject({
       data: {
+        configs: {},
         name: 'Alex Runner',
         email: 'alex.runner@example.test',
         photoUrl: 'https://example.test/alex.png',
@@ -115,6 +123,98 @@ describe('Authentication (e2e)', () => {
       googleSubject: 'google-new-001',
     });
     expect(storedPerson).not.toHaveProperty('isAdmin');
+    expect(storedPerson).not.toHaveProperty('configs');
+  });
+
+  it('maps a legacy person without configs to an empty public object', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-legacy-001',
+        name: 'Legacy Runner',
+        email: 'legacy.runner@example.test',
+        photoUrl: null,
+      });
+    await personModel.collection.updateOne(
+      { googleSubject: 'google-legacy-001' },
+      { $unset: { configs: 1 } },
+    );
+
+    const response = await agent.get('/auth/me');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ data: { configs: {} } });
+    const storedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-legacy-001',
+    });
+    expect(storedPerson).not.toHaveProperty('configs');
+  });
+
+  it('updates the current person theme and returns the public person', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-theme-001',
+        name: 'Theme Runner',
+        email: 'theme.runner@example.test',
+        photoUrl: null,
+      });
+
+    const firstResponse = await agent
+      .patch('/auth/me/configs')
+      .send({ theme: 'dark' });
+    const secondResponse = await agent
+      .patch('/auth/me/configs')
+      .send({ theme: 'dark' });
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.body).toMatchObject({
+      data: { configs: { theme: 'dark' }, name: 'Theme Runner' },
+    });
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toMatchObject({
+      data: { configs: { theme: 'dark' } },
+    });
+    const storedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-theme-001',
+    });
+    expect(storedPerson).toMatchObject({ configs: { theme: 'dark' } });
+    await expect(
+      personModel.countDocuments({ googleSubject: 'google-theme-001' }),
+    ).resolves.toBe(1);
+  });
+
+  it('rejects invalid theme config bodies without changing the person', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', 'local-auth-test-key')
+      .send({
+        googleSubject: 'google-invalid-theme-001',
+        name: 'Invalid Theme Runner',
+        email: 'invalid.theme@example.test',
+        photoUrl: null,
+      });
+
+    for (const body of [
+      {},
+      { theme: 'system' },
+      { additional: true, theme: 'light' },
+    ]) {
+      const response = await agent.patch('/auth/me/configs').send(body);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+    }
+
+    const storedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-invalid-theme-001',
+    });
+    expect(storedPerson).not.toHaveProperty('configs');
   });
 
   it('returns the admin flag for an administrator and preserves it on login', async () => {

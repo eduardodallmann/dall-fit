@@ -89,11 +89,14 @@ variáveis semânticas públicas do HeroUI:
 - `--radius` e `--field-radius`;
 - `--font-sans`.
 
-O modo claro é o padrão de `:root` e também responde a `.light`, `.default`,
+O modo claro é o fallback de `:root` e também responde a `.light`, `.default`,
 `data-theme="light"` e `data-theme="default"`. Os tokens escuros respondem a
-`.dark` ou `data-theme="dark"`. Enquanto não existir uma preferência de tema na
-aplicação, não inferir o modo pela preferência do sistema nem introduzir um
-provider apenas para alterná-lo.
+`.dark` ou `data-theme="dark"`. A aplicação controla exclusivamente
+`data-theme="light" | "dark"` em `<html>` pelo `ThemeProvider` documentado em
+`01-arquitetura.md`; não manter classe de tema paralela nem duplicar esse estado em
+componentes. A escolha inicial usa a preferência local válida ou o sistema e a
+reconciliação autenticada usa `Person.configs.theme` ou o sistema quando ela não
+existe.
 
 A fonte Inter Variable é fornecida localmente por `@fontsource-variable/inter`.
 `src/index.css` carrega seus arquivos e define `--font-inter`, usado por

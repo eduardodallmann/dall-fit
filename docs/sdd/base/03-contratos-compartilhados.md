@@ -40,9 +40,15 @@ import { SortDirection, type ApiResponse, type Entity } from '@dall-fit/types';
 ## Contratos vigentes de autenticação
 
 - `Person` é a representação pública compartilhada da pessoa autenticada. Contém
-  `id`, `name`, `email`, `photoUrl`, `createdAt`, `updatedAt` e pode conter
+  `id`, `name`, `email`, `photoUrl`, `createdAt`, `updatedAt`, o objeto obrigatório
+  `configs` e pode conter
   `isAdmin: true`. A ausência de `isAdmin` representa uma pessoa não
   administradora; o contrato não materializa `false`.
+- `Theme` aceita somente `light | dark`. `PersonConfigs.theme` é opcional e sua
+  ausência representa uma pessoa sem preferência explícita; a API nunca inventa
+  um valor a partir do sistema operacional.
+- `UpdateCurrentPersonConfigsRequest` aceita somente `theme`, e
+  `UpdateCurrentPersonConfigsResponse` devolve a `Person` pública atualizada.
 - `CurrentPersonResponse` envolve `Person` em `ApiResponse`.
 - `StartGoogleLoginResponse` envolve a `authorizationUrl` temporária em
   `ApiResponse`.
