@@ -7,6 +7,7 @@ import type { Person } from '@dall-fit/types';
 import { getPersonInitials } from '~/core/components/application-menu/get-person-initials';
 import { applicationMenuStyles } from '~/core/components/application-menu/styles';
 import { PwaInstallAction } from '~/core/components/pwa-install-action';
+import { ThemeToggle } from '~/core/components/theme-toggle';
 
 const styles = applicationMenuStyles();
 
@@ -62,6 +63,9 @@ export function ApplicationMenu({
             <Chip.Label>Admin</Chip.Label>
           </Chip>
         ) : null}
+      </section>
+      <section aria-label="Aparência" className={styles.appearance()}>
+        <ThemeToggle />
       </section>
       <nav aria-label="Navegação principal" className={styles.navigation()}>
         <Link

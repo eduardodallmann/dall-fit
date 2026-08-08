@@ -153,7 +153,12 @@ O handler de `POST /auth/google` devolve `/dash` como URL de autorização,
 representando que o provedor e callback concluíram. `GET /auth/me` devolve a
 fixture autenticada sem `isAdmin` por padrão, a fixture com `isAdmin: true` no
 seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
-`error`.
+`error`. Os seletores `theme-light`, `theme-dark` e `theme-unset` controlam a
+reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercitam os
+dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o body e
+devolve a `Person` atualizada ou a falha selecionada. O estado de autenticação é
+reiniciado depois de cada teste Vitest e permanece isolado entre contextos
+Playwright.
 
 Planos globais usam fixtures tipadas e handlers para as sete operações em arquivos
 `training-plans.ts`. A query exclusiva `mockTrainingPlans` vira o header

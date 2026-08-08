@@ -19,6 +19,7 @@ describe('AdminAuthorizationGuard', () => {
 
   it('allows the person already loaded by the session guard when they are admin', () => {
     request.currentPerson = {
+      configs: {},
       id: 'person-admin-001',
       googleSubject: 'google-admin-001',
       name: 'Admin Fixture',
@@ -34,6 +35,7 @@ describe('AdminAuthorizationGuard', () => {
 
   it('rejects an authenticated person without the admin flag', () => {
     request.currentPerson = {
+      configs: {},
       id: 'person-common-001',
       googleSubject: 'google-common-001',
       name: 'Common Fixture',

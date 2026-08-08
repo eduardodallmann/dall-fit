@@ -43,8 +43,8 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 ## Inicialização e navegação
 
 1. `main.tsx` carrega os estilos globais.
-2. `AppProviders` aplica `QueryClientProvider`, `PwaProvider` e o único
-   `Toast.Provider` global.
+2. `AppProviders` aplica `QueryClientProvider`, `ThemeProvider`, `PwaProvider` e o
+   único `Toast.Provider` global.
 3. `App` aplica o `RouterProvider` do TanStack Router. Breadcrumbs de domínio usam
    `Link` tipado diretamente para navegar sem recarregar o documento.
 4. TanStack Router resolve a URL pela árvore manual de `routes/routes.tsx`.
@@ -112,6 +112,28 @@ MSW está configurado para autenticação e planos globais, seguindo
 `05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
 
+### Tema da aplicação
+
+Antes de aguardar o MSW ou renderizar React, `main.tsx` lê sincronamente a chave
+`dall-fit:theme`. Somente `light` e `dark` são válidos; na ausência, em valor
+inválido ou em falha do armazenamento, o bootstrap usa
+`prefers-color-scheme`. O resultado é aplicado como `data-theme` em `<html>` antes
+da primeira pintura útil.
+
+`ThemeProvider` fica dentro do `QueryClientProvider`, envolve rotas públicas e
+privadas e é o único controlador do tema. Enquanto a fonte for o sistema, observa
+mudanças do media query sem gravar localmente. Depois que o layout autenticado
+recebe `Person`, `configs.theme` explícito prevalece e é sincronizado no
+`localStorage`; se estiver ausente, a chave local é removida e o sistema passa a
+ser a fonte. Assim uma escolha deixada por outra conta não é herdada.
+
+O toggle do menu aplica o valor oposto e a chave local de forma otimista, chama
+`PATCH /auth/me/configs` por uma mutation TanStack Query única e atualiza todas as
+queries de pessoa com a response. Os menus persistente e móvel compartilham
+loading e bloqueio de concorrência. Em falha, o provider restaura o tema confirmado
+do perfil ou, quando ele não existia, remove a chave e volta a acompanhar o sistema;
+o erro é anunciado pelo toast global.
+
 ## Progressive Web App
 
 O build de produção usa `vite-plugin-pwa` 1.3 com a estratégia `generateSW`. O
@@ -170,6 +192,8 @@ API novamente, e apresenta:
 - um `aside` persistente a partir do breakpoint `md` de `768px`;
 - um botão icon-only e um `Drawer` HeroUI dispensável abaixo de `768px`;
 - o mesmo conteúdo de identidade e navegação nas duas apresentações;
+- a mesma ação icon-only de tema e o mesmo estado de gravação nas duas
+  apresentações;
 - a região `main` reservada ao conteúdo da rota filha.
 
 Os componentes reutilizáveis do shell e do menu vivem em

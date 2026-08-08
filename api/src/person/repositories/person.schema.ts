@@ -1,12 +1,25 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
+import type { Theme } from '@dall-fit/types';
+
+@Schema({ _id: false })
+export class PersonConfigsDocument {
+  @Prop({ enum: ['light', 'dark'], type: String })
+  theme?: Theme;
+}
+
+const PersonConfigsSchema = SchemaFactory.createForClass(PersonConfigsDocument);
+
 @Schema({
   collection: 'people',
   timestamps: true,
   versionKey: false,
 })
 export class PersonDocument {
+  @Prop({ type: PersonConfigsSchema })
+  configs?: PersonConfigsDocument;
+
   @Prop({ index: true, required: true, type: String, unique: true })
   googleSubject!: string;
 

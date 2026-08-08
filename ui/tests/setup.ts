@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 
+import { toast } from '@heroui/react';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
+import { resetAuthScenarioStates } from '~/mocks/handlers/auth';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import { mockServer } from '~/mocks/server';
 
@@ -12,8 +14,11 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  toast.clear();
   mockServer.resetHandlers();
+  resetAuthScenarioStates();
   resetTrainingPlanScenarioStates();
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -38,5 +43,19 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     removeListener: vi.fn(),
   })),
+  writable: true,
+});
+
+class MockResizeObserver implements ResizeObserver {
+  disconnect(): void {}
+
+  observe(): void {}
+
+  unobserve(): void {}
+}
+
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  configurable: true,
+  value: MockResizeObserver,
   writable: true,
 });

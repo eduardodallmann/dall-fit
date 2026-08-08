@@ -7,7 +7,14 @@ export interface Entity {
   updatedAt: Timestamp;
 }
 
+export type Theme = 'dark' | 'light';
+
+export interface PersonConfigs {
+  theme?: Theme;
+}
+
 export interface Person extends Entity {
+  configs: PersonConfigs;
   name: string;
   email: string;
   photoUrl: string | null;

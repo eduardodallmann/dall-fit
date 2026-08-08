@@ -1,5 +1,6 @@
 import type {
   Person,
+  Theme,
   TrainingPlanDetails,
   TrainingPlanSummary,
   TrainingPlanWorkoutSummary,
@@ -23,6 +24,12 @@ export interface CollectionResponse<TData> {
 }
 
 export type CurrentPersonResponse = ApiResponse<Person>;
+
+export interface UpdateCurrentPersonConfigsRequest {
+  theme: Theme;
+}
+
+export type UpdateCurrentPersonConfigsResponse = ApiResponse<Person>;
 
 export type StartGoogleLoginResponse = ApiResponse<{
   authorizationUrl: string;

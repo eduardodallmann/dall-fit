@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
+import type { Theme } from '@dall-fit/types';
+
 import type { NewPerson, PersonEntity } from '~/person/domain/person.entity';
 import {
   PersonRepository,
@@ -126,12 +128,45 @@ export class MongoPersonRepository extends PersonRepository {
     }
   }
 
+  async updateTheme(
+    personId: string,
+    theme: Theme,
+  ): Promise<PersonEntity | null> {
+    this.logger.log('MongoPersonRepository -> updateTheme -> params:', {
+      params: { fields: ['configs.theme'], personId },
+    });
+
+    const document = await this.personModel
+      .findByIdAndUpdate(
+        personId,
+        { $set: { 'configs.theme': theme } },
+        { returnDocument: 'after', runValidators: true },
+      )
+      .exec();
+    const data = { found: document !== null, personId };
+    this.logger.log(
+      'MongoPersonRepository -> updateTheme -> mongoose return:',
+      { data },
+    );
+
+    const result = document === null ? null : this.mapDocument(document);
+    this.logger.log('MongoPersonRepository -> updateTheme -> return:', {
+      data,
+    });
+
+    return result;
+  }
+
   private mapDocument(document: PersonHydratedDocument): PersonEntity {
     this.logger.log('MongoPersonRepository -> mapDocument -> params:', {
       params: { personId: document.id },
     });
 
     const result = {
+      configs:
+        document.configs?.theme === undefined
+          ? {}
+          : { theme: document.configs.theme },
       id: document.id,
       googleSubject: document.googleSubject,
       name: document.name,

@@ -74,7 +74,7 @@ const authenticatedRoute = createRoute({
       const person = await context.queryClient.ensureQueryData(
         currentPersonQueryOptions(mockAuth),
       );
-      const result = { person };
+      const result = { mockAuth, person };
 
       return result;
     } catch (error: unknown) {
@@ -106,12 +106,11 @@ const dashRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   path: '/dash',
   validateSearch: (search: Record<string, unknown>): DashSearch => {
-    const mockAuth: MockAuthScenario | undefined =
-      search.mockAuth === 'admin' ||
-      search.mockAuth === 'error' ||
-      search.mockAuth === 'unauthenticated'
-        ? search.mockAuth
-        : undefined;
+    const mockAuth: MockAuthScenario | undefined = isMockAuthScenario(
+      search.mockAuth,
+    )
+      ? search.mockAuth
+      : undefined;
     const result = mockAuth === undefined ? {} : { mockAuth };
 
     return result;
@@ -170,10 +169,22 @@ export const router = createRouter({
 
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');
+  const result = isMockAuthScenario(value) ? value : 'authenticated';
+
+  return result;
+}
+
+function isMockAuthScenario(value: unknown): value is MockAuthScenario {
   const result =
-    value === 'admin' || value === 'error' || value === 'unauthenticated'
-      ? value
-      : 'authenticated';
+    value === 'admin' ||
+    value === 'authenticated' ||
+    value === 'error' ||
+    value === 'theme-dark' ||
+    value === 'theme-light' ||
+    value === 'theme-save-error' ||
+    value === 'theme-save-error-unset' ||
+    value === 'theme-unset' ||
+    value === 'unauthenticated';
 
   return result;
 }
@@ -181,12 +192,11 @@ function parseMockAuthScenario(search: string): MockAuthScenario {
 function parseTrainingPlanSearch(
   search: Record<string, unknown>,
 ): TrainingPlanSearch {
-  const mockAuth: MockAuthScenario | undefined =
-    search.mockAuth === 'admin' ||
-    search.mockAuth === 'error' ||
-    search.mockAuth === 'unauthenticated'
-      ? search.mockAuth
-      : undefined;
+  const mockAuth: MockAuthScenario | undefined = isMockAuthScenario(
+    search.mockAuth,
+  )
+    ? search.mockAuth
+    : undefined;
   const scenarios: readonly MockTrainingPlansScenario[] = [
     'create-error',
     'create-success',

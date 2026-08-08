@@ -16,9 +16,11 @@
   `index.html` pelo fallback da SPA; o TanStack Router resolve a rota sem `404` da
   plataforma.
 - Path e query params: `/dash`; a query `mockAuth` existe somente com MSW e aceita
-  os cenários `admin`, `unauthenticated` e `error`.
+  os cenários `admin`, `unauthenticated`, `error`, `theme-light`, `theme-dark`,
+  `theme-unset`, `theme-save-error` e `theme-save-error-unset`.
 - Contexto e estado persistido: cookie de sessão gerenciado pelo browser, cache
-  TanStack Query e estado local temporário do `Drawer` móvel.
+  TanStack Query, preferência opcional `dall-fit:theme` e estado local temporário
+  do `Drawer` móvel.
 - Permissões: sessão válida e pessoa existente. A rota é comum e não pertence ao
   layout administrativo.
 
@@ -39,6 +41,8 @@ Depois da proteção, o layout autenticado apresenta:
 - `Chip` HeroUI não interativo com texto `Admin`, somente quando
   `Person.isAdmin === true`;
 - navegação principal com o link `Home`, ícone Lucide `House` e destino `/dash`;
+- botão HeroUI icon-only que mostra `Sun` no escuro com nome `Ativar tema claro`
+  ou `Moon` no claro com nome `Ativar tema escuro`;
 - `Home` marcado visualmente e com `aria-current="page"`;
 - somente para `Person.isAdmin === true`, link `Planos de treino` com ícone
   `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
@@ -52,12 +56,15 @@ A rota pública `/` não recebe nenhum desses elementos.
 
 1. O layout autenticado executa `GET /auth/me` antes de renderizar o shell.
 2. A API responde com `CurrentPersonResponse`.
-3. O layout entrega a mesma `Person` ao shell e ao contexto dos filhos, sem segunda
+3. Antes da pintura do shell, o layout reconcilia o provider: tema explícito do
+   perfil prevalece e é sincronizado localmente; sem tema, remove a chave local e
+   usa o sistema.
+4. O layout entrega a mesma `Person` ao shell e ao contexto dos filhos, sem segunda
    request.
-4. A largura do viewport seleciona a apresentação persistente ou móvel.
-5. O menu exibe avatar, nome, e-mail, indicador administrativo condicional e
-   `Home` ativo.
-6. A rota filha `/dash` não acrescenta conteúdo à região principal.
+5. A largura do viewport seleciona a apresentação persistente ou móvel.
+6. O menu exibe avatar, nome, e-mail, indicador administrativo condicional,
+   toggle de tema e `Home` ativo.
+7. A rota filha `/dash` não acrescenta conteúdo à região principal.
 
 Resultado esperado: a pessoa reconhece sua sessão e possui navegação disponível,
 enquanto o dashboard permanece intencionalmente vazio.
@@ -110,6 +117,24 @@ enquanto o dashboard permanece intencionalmente vazio.
   dispensa o aviso no documento atual. Falhas permanecem não bloqueantes e sem
   detalhe técnico.
 
+### Alternativa 6 — Perfil sem preferência de tema
+
+- Condição: `GET /auth/me` devolve `configs: {}`.
+- Comportamento: a UI ignora e remove um valor local anterior, aplica o valor atual
+  de `prefers-color-scheme` e passa a acompanhar suas mudanças sem persistir um
+  default.
+- Resultado: a conta não herda a escolha explícita de outra pessoa neste browser.
+
+### Alternativa 7 — Falha ao salvar o tema
+
+- Condição: `PATCH /auth/me/configs` falha por validação, autenticação, rede ou
+  servidor.
+- Comportamento: se o perfil possuía tema, restaura documento, provider e chave
+  local; se não possuía, remove a chave, restaura o sistema atual e volta a
+  acompanhá-lo. O cache de pessoa anterior é preservado.
+- Resultado: mostra o toast acessível
+  `Não foi possível salvar o tema. Tente novamente.` e permite tentar de novo.
+
 ## Validações
 
 Não se aplica — a rota e o menu não possuem formulário nem entrada editável.
@@ -124,8 +149,9 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro recuperável: mensagem `Não foi possível carregar sua conta` e orientação de
   recarga, sem shell.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: controles de instalação e atualização indicam o progresso e
-  evitam ativações concorrentes.
+- Ações desabilitadas: controles de tema, instalação e atualização indicam o
+  progresso e evitam ativações concorrentes. Os dois toggles de tema compartilham
+  exatamente o mesmo pending.
 
 ## Integrações
 
@@ -134,12 +160,25 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Momento: `beforeLoad` do layout autenticado.
 - Endpoint documentado: `api/docs/sdd/endpoints/current-person.md`.
 - Dados enviados: cookie automaticamente por `withCredentials`.
-- Resposta utilizada: `data.name`, `data.email`, `data.photoUrl` e o opcional
-  `data.isAdmin`.
+- Resposta utilizada: `data.name`, `data.email`, `data.photoUrl`, `data.configs`
+  e o opcional `data.isAdmin`.
 - Sucesso: pessoa entregue ao shell e ao contexto; a presença de `isAdmin: true`
   mostra o indicador e a ausência representa pessoa comum.
 - Erros: `401` redireciona; demais erros acionam o error component.
 - Retry, timeout e idempotência: política global de uma tentativa e cache por 30s.
+
+### Atualizar tema da pessoa atual
+
+- Momento: ativação de `Ativar tema claro` ou `Ativar tema escuro`.
+- Endpoint documentado: `api/docs/sdd/endpoints/current-person.md`.
+- Dados enviados: exatamente `{ theme: "light" | "dark" }` e cookie automático.
+- Antes da resposta: aplica `data-theme`, estado global e chave local de forma
+  otimista; bloqueia ambos os toggles.
+- Sucesso: mantém a escolha, atualiza todas as queries de pessoa com a response e
+  registra a preferência confirmada sem novo `GET /auth/me`.
+- Erro: executa o rollback descrito na alternativa 7 e anuncia a falha.
+- Retry, timeout e idempotência: sem retry adicional da mutation; nova ativação é
+  possível depois do término e repetir o mesmo tema é idempotente na API.
 
 ## Responsividade e interações do menu
 
@@ -182,6 +221,8 @@ móvel não o reabre.
 - `aside`, `nav`, `main` e `dialog` preservam seus landmarks e nomes acessíveis;
 - o botão icon-only possui nome `Abrir menu`; ícones `Menu` e `House` são
   decorativos e não duplicam labels;
+- o toggle icon-only possui nome dinâmico que descreve a ação; `Sun` e `Moon` são
+  decorativos, e pending impede concorrência sem remover o controle;
 - o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu`, contenção e
   restauração de foco e fechamento por `Escape`;
 - links do menu têm label visível, foco visível e `aria-current="page"` quando
@@ -259,6 +300,66 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: a proteção executa
 - Then: exibe o estado de erro recuperável sem shell ou identidade parcial
 
+### Cenário 8 — Perfil substitui tema local
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=theme-light` com MSW e
+  `dall-fit:theme=dark` preparado antes da navegação
+- Given: o bootstrap aplicou `dark` e o perfil devolve `configs.theme=light`
+- When: a proteção termina
+- Then: o shell usa `light` e a chave local passa a conter `light`
+
+### Cenário 9 — Perfil sem tema usa o sistema
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=theme-unset` com MSW,
+  sistema em `light` e `dall-fit:theme=dark`
+- Given: o perfil devolve `configs: {}`
+- When: o shell autenticado reconcilia o tema
+- Then: remove a chave local, aplica `light` e acompanha futuras mudanças do
+  sistema
+
+### Cenário 10 — Alternar e persistir com estado compartilhado
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=theme-dark` com MSW
+- Given: o perfil confirmado e a UI estão em `dark`
+- When: ativa `Ativar tema claro` no menu persistente ou móvel
+- Then: aplica e grava `light` imediatamente, envia
+  `PATCH /auth/me/configs` e mantém os dois toggles em pending compartilhado
+- And: a response atualiza o cache sem segundo `GET /auth/me`
+
+### Cenário 11 — Falha restaura tema confirmado
+
+- Link para testar:
+  `http://localhost:3000/dash?mockAuth=theme-save-error` com MSW
+- Given: o perfil confirmado usa `dark`
+- When: a tentativa otimista de ativar `light` falha
+- Then: restaura `dark` no documento, provider e chave local e anuncia a falha
+
+### Cenário 12 — Falha sem tema retorna ao sistema
+
+- Link para testar:
+  `http://localhost:3000/dash?mockAuth=theme-save-error-unset` com MSW e sistema
+  em `light`
+- Given: o perfil não possui tema confirmado
+- When: a tentativa otimista de ativar `dark` falha
+- Then: remove a chave local, restaura `light`, volta a observar o sistema e
+  anuncia a falha
+
+### Cenário 13 — Sessão ausente preserva precedência pública
+
+- Link para testar:
+  `http://localhost:3000/dash?mockAuth=unauthenticated` com MSW
+- Given: o bootstrap já escolheu o tema local ou do sistema
+- When: `GET /auth/me` responde `401`
+- Then: redireciona a `/`, mantém a precedência pública e não renderiza o toggle
+  autenticado
+
+### Cenário 14 — Erro técnico mantém o tema do bootstrap
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=error` com MSW
+- Given: o bootstrap escolheu o tema antes da request
+- When: `GET /auth/me` responde erro diferente de `401`
+- Then: o estado de erro usa esse tema sem inferir configuração parcial de perfil
+
 ## Estrutura técnica relevante
 
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
@@ -266,12 +367,13 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Componentes HeroUI: `Alert`, `Avatar`, `Button`, `Chip`, `Disclosure`, `Drawer`,
   `Skeleton` e `Typography`
 - Componentes core: `authenticated-shell`, `application-menu`,
-  `pwa-install-action`, `pwa-update-notice` e `route-status`
+  `theme-toggle`, `pwa-install-action`, `pwa-update-notice` e `route-status`
 - Componentes exclusivos da rota: não se aplica; `/dash` não possui conteúdo
-- Hooks e serviços: `useOverlayState`, `currentPersonQueryOptions` e
-  `getCurrentPerson`
-- Tipos compartilhados: `Person`, `CurrentPersonResponse`
-- Ícones: imports individuais `Menu` e `House` de `lucide-react`
+- Hooks e serviços: `useOverlayState`, `currentPersonQueryOptions`,
+  `getCurrentPerson`, `ThemeProvider` e `updateCurrentPersonConfigs`
+- Tipos compartilhados: `Theme`, `PersonConfigs`, `Person`,
+  `CurrentPersonResponse` e `UpdateCurrentPersonConfigsResponse`
+- Ícones: imports individuais `Menu`, `House`, `Sun` e `Moon` de `lucide-react`
 
 ## Cobertura automatizada
 
@@ -285,6 +387,9 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 | atualização confirmada ou dispensada      | provider/componente | não se aplica    |
 | redirect em `401`                         | router/app          | rota `/dash`     |
 | erro técnico sem identidade parcial       | router/app          | rota `/dash`     |
+| precedência perfil/local/sistema          | theme provider      | rota `/dash`     |
+| toggle, cache e pending compartilhado     | provider/menu       | rota `/dash`     |
+| rollback para perfil ou sistema           | theme provider      | rota `/dash`     |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts` e
   `src/mocks/fixtures/person.ts`.

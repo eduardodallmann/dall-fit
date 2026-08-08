@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Logger,
+  Patch,
   Post,
   Query,
   Req,
@@ -16,6 +17,7 @@ import type { Request, Response } from 'express';
 import type {
   CurrentPersonResponse,
   StartGoogleLoginResponse,
+  UpdateCurrentPersonConfigsResponse,
 } from '@dall-fit/types';
 
 import {
@@ -32,10 +34,12 @@ import { CompleteGoogleLoginCommand } from '~/auth/commands/complete-google-logi
 import { GetCurrentPersonCommand } from '~/auth/commands/get-current-person.command';
 import { StartGoogleLoginCommand } from '~/auth/commands/start-google-login.command';
 import { TestLoginCommand } from '~/auth/commands/test-login.command';
+import { UpdateCurrentPersonConfigsCommand } from '~/auth/commands/update-current-person-configs.command';
 import { Authenticated } from '~/auth/decorators/authenticated';
 import { CurrentPerson } from '~/auth/decorators/current-person';
 import { GoogleCallbackQueryDto } from '~/auth/dto/google-callback-query.dto';
 import { TestLoginDto } from '~/auth/dto/test-login.dto';
+import { UpdateCurrentPersonConfigsDto } from '~/auth/dto/update-current-person-configs.dto';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
 import type { PersonEntity } from '~/person/domain/person.entity';
 
@@ -50,6 +54,7 @@ export class AuthController {
     private readonly completeGoogleLoginCommand: CompleteGoogleLoginCommand,
     private readonly testLoginCommand: TestLoginCommand,
     private readonly getCurrentPersonCommand: GetCurrentPersonCommand,
+    private readonly updateCurrentPersonConfigsCommand: UpdateCurrentPersonConfigsCommand,
   ) {
     this.secureCookies =
       configService.getOrThrow<boolean>('AUTH_COOKIE_SECURE');
@@ -266,6 +271,41 @@ export class AuthController {
 
     const result = commandResult;
     this.logger.log('AuthController -> getCurrentPerson -> return:', {
+      data: {
+        fields: Object.keys(result.data),
+        personId: result.data.id,
+      },
+    });
+
+    return result;
+  }
+
+  @Patch('auth/me/configs')
+  @Authenticated()
+  async updateCurrentPersonConfigs(
+    @CurrentPerson() person: PersonEntity,
+    @Body() configs: UpdateCurrentPersonConfigsDto,
+  ): Promise<UpdateCurrentPersonConfigsResponse> {
+    this.logger.log('AuthController -> updateCurrentPersonConfigs -> params:', {
+      params: { fields: Object.keys(configs), personId: person.id },
+    });
+
+    const commandResult = await this.updateCurrentPersonConfigsCommand.execute(
+      person,
+      configs,
+    );
+    this.logger.log(
+      'AuthController -> updateCurrentPersonConfigs -> updateCurrentPersonConfigsCommand return:',
+      {
+        data: {
+          fields: Object.keys(commandResult.data),
+          personId: commandResult.data.id,
+        },
+      },
+    );
+
+    const result = commandResult;
+    this.logger.log('AuthController -> updateCurrentPersonConfigs -> return:', {
       data: {
         fields: Object.keys(result.data),
         personId: result.data.id,

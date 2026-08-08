@@ -1,3 +1,5 @@
+import type { Theme } from '@dall-fit/types';
+
 import type { NewPerson, PersonEntity } from '~/person/domain/person.entity';
 
 export interface FindOrCreatePersonResult {
@@ -11,4 +13,9 @@ export abstract class PersonRepository {
   abstract findOrCreateByGoogleSubject(
     person: NewPerson,
   ): Promise<FindOrCreatePersonResult>;
+
+  abstract updateTheme(
+    personId: string,
+    theme: Theme,
+  ): Promise<PersonEntity | null>;
 }

@@ -1,6 +1,96 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Rota /dash', () => {
+  test('Cenário 8 — Perfil autenticado substitui o tema local', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('dall-fit:theme', 'dark');
+    });
+    await page.goto('/dash?mockAuth=theme-light');
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(
+      page.getByRole('button', { name: 'Ativar tema escuro' }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('dall-fit:theme')))
+      .toBe('light');
+  });
+
+  test('Cenário 9 — Perfil sem tema usa o sistema e remove o valor local', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.addInitScript(() => {
+      window.localStorage.setItem('dall-fit:theme', 'dark');
+    });
+    await page.goto('/dash?mockAuth=theme-unset');
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('dall-fit:theme')))
+      .toBeNull();
+  });
+
+  test('Cenário 10 — Alterna e persiste o tema com estado compartilhado', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.goto('/dash?mockAuth=theme-dark');
+    await page.getByRole('button', { name: 'Abrir menu' }).click();
+    const themeButtons = page.locator('button[aria-label="Ativar tema claro"]');
+    await expect(themeButtons).toHaveCount(2);
+
+    await page
+      .getByRole('dialog', { name: 'Menu da aplicação' })
+      .getByRole('button', { name: 'Ativar tema claro' })
+      .click();
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('dall-fit:theme')))
+      .toBe('light');
+    await expect(
+      page
+        .getByRole('dialog', { name: 'Menu da aplicação' })
+        .getByRole('button', { name: 'Ativar tema escuro' }),
+    ).toBeEnabled();
+  });
+
+  test('Cenário 11 — Falha de gravação restaura o tema confirmado', async ({
+    page,
+  }) => {
+    await page.goto('/dash?mockAuth=theme-save-error');
+
+    await page.getByRole('button', { name: 'Ativar tema claro' }).click();
+
+    await expect(
+      page.getByText('Não foi possível salvar o tema. Tente novamente.'),
+    ).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('dall-fit:theme')))
+      .toBe('dark');
+  });
+
+  test('Cenário 12 — Falha sem tema confirmado retorna ao sistema', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.goto('/dash?mockAuth=theme-save-error-unset');
+
+    await page.getByRole('button', { name: 'Ativar tema escuro' }).click();
+
+    await expect(
+      page.getByText('Não foi possível salvar o tema. Tente novamente.'),
+    ).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('dall-fit:theme')))
+      .toBeNull();
+  });
+
   test('Cenário 1 — Menu persistente em tablet e desktop', async ({ page }) => {
     await page.setViewportSize({ height: 1024, width: 768 });
     await page.goto('/dash');
@@ -107,7 +197,7 @@ test.describe('Rota /dash', () => {
     ).toBeVisible();
   });
 
-  test('Cenário 9 — Rota privada sem sessão', async ({ page }) => {
+  test('Cenário 13 — Rota privada sem sessão', async ({ page }) => {
     await page.goto('/dash?mockAuth=unauthenticated');
 
     await expect(page).toHaveURL('/');
@@ -120,7 +210,7 @@ test.describe('Rota /dash', () => {
     ).not.toBeVisible();
   });
 
-  test('Cenário 10 — Falha técnica ao proteger o dashboard', async ({
+  test('Cenário 14 — Falha técnica ao proteger o dashboard', async ({
     page,
   }) => {
     await page.goto('/dash?mockAuth=error');
