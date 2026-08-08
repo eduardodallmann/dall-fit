@@ -7,8 +7,8 @@ exclusivos de backend ou frontend ficam no SDD do projeto proprietário.
 
 ## Estrutura
 
-- `base/`: documentação viva da arquitetura, workspace, qualidade e contratos
-  transversais vigentes.
+- `base/`: documentação viva da arquitetura, workspace, qualidade, contratos e
+  fontes oficiais das tecnologias transversais vigentes.
 - `adr/`: histórico de decisões arquiteturais, alternativas e consequências.
 - `features/`: specs autocontidas das demandas e registro histórico das entregas.
 - `flows/`: documentação funcional viva das jornadas ponta a ponta vigentes.
@@ -113,6 +113,11 @@ descrevem somente o comportamento atual. Eles não acumulam histórico de ticket
 Todo cenário funcional deve informar pré-condições, entrada, ação e resultado
 esperado. Rotas de UI incluem um `Link para testar:` reproduzível. Endpoints
 incluem método, caminho, autenticação, exemplos sanitizados e respostas por status.
+
+Planejamento e implementação de APIs ou configurações de dependências seguem
+[`base/05-documentacao-oficial-das-tecnologias.md`](base/05-documentacao-oficial-das-tecnologias.md).
+O catálogo prioriza formatos oficiais consumíveis por IA quando existirem, exige
+confirmação da versão instalada e preserva o SDD como autoridade do projeto.
 
 ## Validação
 

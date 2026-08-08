@@ -50,4 +50,35 @@ describe('PwaUpdateNotice', () => {
     expect(context.update).toHaveBeenCalledOnce();
     expect(context.dismissUpdate).toHaveBeenCalledOnce();
   });
+
+  it('keeps the message before its actions in the live region', () => {
+    renderNotice();
+
+    const notice = screen.getByRole('status');
+    const actions = screen.getAllByRole('button');
+
+    expect(notice).toHaveAttribute('aria-live', 'polite');
+    expect(actions.map((action) => action.textContent)).toEqual([
+      'Atualizar agora',
+      'Agora não',
+    ]);
+  });
+
+  it('blocks both update actions while activation is pending', async () => {
+    const user = userEvent.setup();
+    const context = renderNotice({ isUpdating: true });
+    const updateAction = screen.getByRole('button', {
+      name: 'Atualizar agora',
+    });
+    const dismissAction = screen.getByRole('button', { name: 'Agora não' });
+
+    expect(updateAction).toHaveAttribute('aria-disabled', 'true');
+    expect(dismissAction).toBeDisabled();
+
+    await user.click(updateAction);
+    await user.click(dismissAction);
+
+    expect(context.update).not.toHaveBeenCalled();
+    expect(context.dismissUpdate).not.toHaveBeenCalled();
+  });
 });

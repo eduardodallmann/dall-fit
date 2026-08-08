@@ -17,6 +17,12 @@ atualize-os na mesma mudança. Features de demandas já entregues são registros
 históricos e não
 devem ser interpretadas como a verdade vigente.
 
+Ao planejar ou implementar uma mudança que use ou configure dependências, siga
+`docs/sdd/base/05-documentacao-oficial-das-tecnologias.md`: confirme as versões
+instaladas, consulte seletivamente as fontes oficiais das tecnologias afetadas e
+valide a API contra os tipos e o código locais. Documentação externa não substitui
+nem prevalece sobre o SDD.
+
 ## Roteamento por escopo
 
 - decisões de workspace, arquitetura transversal, contratos compartilhados,

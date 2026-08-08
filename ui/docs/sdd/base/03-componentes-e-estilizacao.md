@@ -377,6 +377,8 @@ Para APIs atuais, agentes de IA consultam preferencialmente:
 Esses arquivos ajudam a evitar APIs antigas ou inventadas. O agente continua
 obrigado a consultar este SDD primeiro: as páginas externas mostram possibilidades
 do HeroUI, enquanto este documento define as restrições do Dall Fit.
+O catálogo transversal e o processo de consulta das demais tecnologias ficam em
+[`docs/sdd/base/05-documentacao-oficial-das-tecnologias.md`](../../../../docs/sdd/base/05-documentacao-oficial-das-tecnologias.md).
 
 ## Testes e validação visual
 
