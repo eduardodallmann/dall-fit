@@ -149,6 +149,12 @@ depois e mantém `sw.js` e `manifest.webmanifest` revalidáveis com seus MIME ty
 explícitos. A origem de produção precisa usar HTTPS, como exigido pela plataforma
 de service workers.
 
+O documento compartilhado `index.html` declara a viewport com escala inicial e
+máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual
+por pinça em todas as rotas web e na PWA `standalone`, sem listeners JavaScript ou
+CSS que interfiram em rolagem, foco, teclado ou controles. Navegadores que preservem
+zoom por políticas de acessibilidade mantêm sua própria decisão.
+
 ## Proteção de rotas
 
 A árvore manual possui um layout sem path para rotas autenticadas. Seu
