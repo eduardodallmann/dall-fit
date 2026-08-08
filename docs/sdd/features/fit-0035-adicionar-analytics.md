@@ -137,6 +137,7 @@ completa, identificador, texto visível arbitrário ou valor de campo.
 | `ui_field_focused` | Campo recebe foco pela primeira vez em cada abertura de formulário/edição | `form`, `field` |
 | `ui_field_completed` | Campo perde foco após alteração | `form`, `field`, `state` (`empty`, `valid`, `invalid`) |
 | `ui_form_submitted` | Formulário válido é submetido | `form`, `mode` (`create`, `edit`, `inline_edit`) |
+| `ui_operation_started` | Ação assíncrona de login, tema, PWA ou mutation é aceita pela UI | `operation` |
 | `ui_operation_completed` | Login, tema, PWA ou mutation iniciada pelo usuário termina | `operation`, `outcome` (`success`, `error`, `dismissed`, `unavailable`) |
 | `ui_retry_requested` | Uma ação Tentar novamente é ativada | `resource` (`training_plans`, `training_plan`, `workout`) |
 | `ui_disclosure_toggled` | Instruções de instalação são abertas ou fechadas | `disclosure`, `state` (`open`, `closed`) |
@@ -169,7 +170,8 @@ pending, exceções técnicas e payloads não são registrados.
 - **Futuras superfícies:** todo novo botão, link acionável, input, textarea, select,
   checkbox, radio, slider, paginação, menu, disclosure, modal, drawer, alert dialog,
   toast com ação ou fluxo assíncrono deve mapear-se a um evento existente ou justificar
-  e especificar um novo evento nesta feature antes da implementação.
+  e especificar um novo evento em sua própria feature e no catálogo vivo antes da
+  implementação.
 
 ## Requisitos não funcionais
 
@@ -179,11 +181,11 @@ pending, exceções técnicas e payloads não são registrados.
   introduzir polling, chamadas Axios, listeners globais de clique ou captura de cada
   tecla. Campos não emitem por `change`/tecla e a fronteira descarta emissão repetida
   no mesmo ciclo de interação.
-- Segurança e privacidade: não configurar eventos customizados nem transmitir dados
-  pessoais, credenciais, tokens, payloads HTTP, conteúdo de treinos, identificadores
-  de pessoa/plano/treino, valores/erros de formulários, URL completa, query ou hash.
-  Variáveis `VITE_*` novas não são necessárias e nenhum segredo pode ser incorporado
-  ao bundle.
+- Segurança e privacidade: configurar somente os eventos customizados e propriedades
+  enumerados nesta feature; nunca transmitir dados pessoais, credenciais, tokens,
+  payloads HTTP, conteúdo de treinos, identificadores de pessoa/plano/treino,
+  valores/erros de formulários, URL completa, query ou hash. Variáveis `VITE_*` novas
+  não são necessárias e nenhum segredo pode ser incorporado ao bundle.
 - Observabilidade: Vercel Analytics é a única observabilidade introduzida. Não usar
   `console.*`, logs locais, data attributes usados como coleta paralela ou uma segunda
   SDK de telemetria.
