@@ -122,6 +122,11 @@ Ferramentas de IA entram no projeto pelos arquivos:
 ou UI. Os arquivos específicos de ferramenta apenas apontam para essa instrução
 central, evitando políticas divergentes.
 
+Antes de planejar ou implementar APIs e configurações de dependências, agentes
+seguem `05-documentacao-oficial-das-tecnologias.md`. Os índices oficiais otimizados
+para IA ajudam a localizar a documentação atual, mas continuam subordinados às
+versões instaladas e às decisões do SDD.
+
 O SDD continua sendo a fonte de verdade. Arquivos de agente resumem a política e
 não devem introduzir arquitetura, comportamento ou quality gates que não estejam
 documentados aqui. Toda mudança na organização do SDD atualiza os pontos de entrada
