@@ -54,6 +54,30 @@ essa necessidade existir e estiver documentada.
 Seus componentes são importados de `@heroui/react`; nenhum código do catálogo é
 copiado ou gerado dentro do projeto.
 
+## Política global de seleção de texto
+
+`src/index.css` bloqueia declarativamente a seleção de texto em todos os elementos
+do documento. A fronteira global inclui a árvore React e overlays montados por
+portal diretamente no `body`, portanto componentes e rotas não repetem classes ou
+listeners para aplicar essa política.
+
+As únicas superfícies liberadas são controles nos quais o usuário realmente edita
+texto e campos textuais `readonly` cujo valor pode ser consultado e copiado:
+
+- `:read-write` cobre inputs textuais mutáveis, `textarea` e elementos
+  `contenteditable`, inclusive `contenteditable="plaintext-only"` e seus
+  descendentes efetivamente editáveis;
+- `input` textual e `textarea` com `readonly` recebem a mesma liberação;
+- checkbox, radio, range, color, file e controles de ação implementados com
+  `input` não recebem a exceção textual;
+- controles `disabled` preservam sua interação nativa.
+
+A regra usa `user-select` e seu alias de compatibilidade
+`-webkit-user-select`. Não usar listeners de `selectstart`, ponteiro, toque,
+teclado, clipboard ou menu de contexto para reforçá-la. O bloqueio não altera
+foco, navegação, cursor ou semântica e não é proteção contra leitura, inspeção ou
+cópia programática do conteúdo.
+
 ## Tema global
 
 O tema vigente foi gerado no Theme Builder do HeroUI e fica declarado em

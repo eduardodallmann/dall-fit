@@ -2,6 +2,31 @@
 @import '@heroui/styles';
 @import '@fontsource-variable/inter';
 
+* {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:where(
+  :read-write,
+  textarea[readonly],
+  input[readonly]:not(
+      [type='button'],
+      [type='checkbox'],
+      [type='color'],
+      [type='file'],
+      [type='hidden'],
+      [type='image'],
+      [type='radio'],
+      [type='range'],
+      [type='reset'],
+      [type='submit']
+    )
+) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 :root,
 .light,
 .default,
