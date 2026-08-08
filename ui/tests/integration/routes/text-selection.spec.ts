@@ -31,8 +31,7 @@ test.describe('FIT-0010 — Bloqueio global da seleção de textos', () => {
     );
 
     await heading.click();
-    await page.keyboard.press('Control+A');
-
+    await page.keyboard.press('ControlOrMeta+A');
     expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
       '',
     );
