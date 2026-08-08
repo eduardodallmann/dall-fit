@@ -112,10 +112,12 @@ enquanto o dashboard permanece intencionalmente vazio.
 
 - Condição: o service worker encontra uma versão em espera.
 - Comportamento: um aviso global mostra `Nova versão disponível`, as ações
-  `Atualizar agora` e `Agora não` e não interrompe o uso da rota.
+  `Atualizar agora` e `Agora não` e não interrompe o uso da rota. Abaixo de
+  `640px`, as ações ficam abaixo da mensagem; a partir de `640px`, mensagem e ações
+  usam a mesma linha quando houver espaço.
 - Resultado: somente `Atualizar agora` ativa a versão e recarrega; `Agora não`
   dispensa o aviso no documento atual. Falhas permanecem não bloqueantes e sem
-  detalhe técnico.
+  detalhe técnico. O aviso não corta conteúdo nem cria rolagem horizontal.
 
 ### Alternativa 6 — Perfil sem preferência de tema
 
@@ -230,13 +232,32 @@ móvel não o reabre.
 - a instalação manual usa `Disclosure` com trigger nomeado, conteúdo inline e
   texto de compatibilidade; não abre modal dentro do `Drawer`;
 - o aviso de versão possui título, descrição textual, região viva polida e duas
-  ações explícitas, sem depender apenas de cor;
+  ações explícitas, sem depender apenas de cor; mensagem e ações mantêm a mesma
+  ordem de leitura e de foco em todas as larguras;
 - o avatar é exposto como imagem com o nome completo da pessoa; foto e iniciais são
   apresentações alternativas da mesma identidade;
 - nome e e-mail usam `Typography` HeroUI; cada um ocupa sua própria linha com
   truncamento por CSS, sem alterar a string;
 - `Admin` possui texto explícito, não depende de cor e não entra na ordem de foco;
 - loading possui nome acessível além dos skeletons; erro possui texto explícito.
+
+## Responsividade do aviso de atualização
+
+### Viewport menor que `640px`
+
+- o aviso preserva `16px` de distância das laterais e da borda inferior;
+- indicador, título e descrição formam a primeira região de conteúdo;
+- as ações aparecem abaixo da mensagem, usam a largura disponível e podem quebrar
+  entre linhas sem cortar seus textos;
+- o aviso permanece sobre o shell sem ampliar a largura do documento nem bloquear
+  o menu ou a região principal.
+
+### Viewport igual ou maior que `640px`
+
+- o aviso preserva `24px` de distância das laterais e largura máxima de `768px`;
+- mensagem e ações ficam lado a lado, com as ações em sua ordem original;
+- redimensionar o viewport altera somente a disposição visual e não confirma nem
+  dispensa a atualização.
 
 ## Referências visuais de layout — opcional
 
@@ -300,7 +321,17 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: a proteção executa
 - Then: exibe o estado de erro recuperável sem shell ou identidade parcial
 
-### Cenário 8 — Perfil substitui tema local
+### Cenário 8 — Aviso responsivo de nova versão
+
+- Link para testar: não se aplica — o estado depende de uma nova versão do Service
+  Worker instalada em espera no preview do build
+- Given: uma nova versão está em espera enquanto a rota autenticada está aberta
+- When: o aviso é conferido em `320x568`, `360x800`, `390x844` e `768x1024`
+- Then: todo o conteúdo permanece dentro do viewport; abaixo de `640px`, as ações
+  ficam abaixo da mensagem e, a partir desse breakpoint, ficam ao lado dela
+- And: não há corte, sobreposição ou rolagem horizontal e o shell continua operável
+
+### Cenário 9 — Perfil substitui tema local
 
 - Link para testar: `http://localhost:3000/dash?mockAuth=theme-light` com MSW e
   `dall-fit:theme=dark` preparado antes da navegação
@@ -308,7 +339,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: a proteção termina
 - Then: o shell usa `light` e a chave local passa a conter `light`
 
-### Cenário 9 — Perfil sem tema usa o sistema
+### Cenário 10 — Perfil sem tema usa o sistema
 
 - Link para testar: `http://localhost:3000/dash?mockAuth=theme-unset` com MSW,
   sistema em `light` e `dall-fit:theme=dark`
@@ -317,7 +348,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Then: remove a chave local, aplica `light` e acompanha futuras mudanças do
   sistema
 
-### Cenário 10 — Alternar e persistir com estado compartilhado
+### Cenário 11 — Alternar e persistir com estado compartilhado
 
 - Link para testar: `http://localhost:3000/dash?mockAuth=theme-dark` com MSW
 - Given: o perfil confirmado e a UI estão em `dark`
@@ -326,7 +357,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   `PATCH /auth/me/configs` e mantém os dois toggles em pending compartilhado
 - And: a response atualiza o cache sem segundo `GET /auth/me`
 
-### Cenário 11 — Falha restaura tema confirmado
+### Cenário 12 — Falha restaura tema confirmado
 
 - Link para testar:
   `http://localhost:3000/dash?mockAuth=theme-save-error` com MSW
@@ -334,7 +365,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: a tentativa otimista de ativar `light` falha
 - Then: restaura `dark` no documento, provider e chave local e anuncia a falha
 
-### Cenário 12 — Falha sem tema retorna ao sistema
+### Cenário 13 — Falha sem tema retorna ao sistema
 
 - Link para testar:
   `http://localhost:3000/dash?mockAuth=theme-save-error-unset` com MSW e sistema
@@ -344,7 +375,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Then: remove a chave local, restaura `light`, volta a observar o sistema e
   anuncia a falha
 
-### Cenário 13 — Sessão ausente preserva precedência pública
+### Cenário 14 — Sessão ausente preserva precedência pública
 
 - Link para testar:
   `http://localhost:3000/dash?mockAuth=unauthenticated` com MSW
@@ -353,7 +384,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Then: redireciona a `/`, mantém a precedência pública e não renderiza o toggle
   autenticado
 
-### Cenário 14 — Erro técnico mantém o tema do bootstrap
+### Cenário 15 — Erro técnico mantém o tema do bootstrap
 
 - Link para testar: `http://localhost:3000/dash?mockAuth=error` com MSW
 - Given: o bootstrap escolheu o tema antes da request
@@ -385,6 +416,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 | backdrop, teclado e foco móvel            | componentes HeroUI  | rota `/dash`     |
 | prompt e orientação de instalação         | provider/componente | rota `/dash`     |
 | atualização confirmada ou dispensada      | provider/componente | não se aplica    |
+| responsividade do aviso de atualização    | componente/estilos  | não se aplica    |
 | redirect em `401`                         | router/app          | rota `/dash`     |
 | erro técnico sem identidade parcial       | router/app          | rota `/dash`     |
 | precedência perfil/local/sistema          | theme provider      | rota `/dash`     |
@@ -397,4 +429,6 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   `tests/integration/flows/login-google.spec.ts`.
 - Cenários manuais e justificativa: truncamento visual com valores longos é
   conferido no browser sem referência de screenshot; o valor integral e a regra de
-  iniciais possuem cobertura unitária.
+  iniciais possuem cobertura unitária. O layout do aviso é conferido no preview de
+  duas versões do build, porque o Playwright usa MSW Browser e mantém o Service
+  Worker da PWA desabilitado.

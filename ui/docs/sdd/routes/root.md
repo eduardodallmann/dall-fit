@@ -24,7 +24,8 @@
 - alerta `Não foi possível entrar. Tente novamente.` após erro de callback ou
   falha ao preparar o login;
 - aviso global `Nova versão disponível` quando o service worker encontra uma
-  versão em espera, com ações `Atualizar agora` e `Agora não`.
+  versão em espera, com ações `Atualizar agora` e `Agora não`; em viewports
+  estreitos, as ações ficam abaixo da mensagem e permanecem contidas no aviso.
 
 Antes da primeira pintura útil, a rota usa o tema local válido ou, quando ele não
 existe, é inválido ou está inacessível, `prefers-color-scheme`. O resultado fica em
@@ -53,9 +54,12 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Condição: o service worker encontra uma versão em espera enquanto a rota pública
   está aberta.
 - Comportamento: o aviso global não bloqueia o login; `Atualizar agora` ativa a
-  versão e recarrega, enquanto `Agora não` o dispensa no documento atual.
+  versão e recarrega, enquanto `Agora não` o dispensa no documento atual. Abaixo
+  de `640px`, as ações são apresentadas depois do texto; a partir de `640px`, texto
+  e ações usam a mesma linha quando houver espaço.
 - Resultado: a atualização depende de confirmação e falhas não expõem detalhe
-  técnico nem impedem a autenticação.
+  técnico nem impedem a autenticação. O aviso não corta conteúdo nem cria rolagem
+  horizontal.
 
 ### Alternativa 3 — Preferência de tema inválida ou indisponível
 
@@ -77,7 +81,8 @@ Não se aplica — não há formulário nem entrada local.
 - Sucesso: card de entrada e ação visíveis.
 - Erro recuperável: alerta após callback falho ou falha na preparação.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: não se aplica.
+- Ações desabilitadas: durante a ativação da nova versão, `Atualizar agora` indica
+  progresso e `Agora não` fica indisponível para impedir ações concorrentes.
 - Tema: local válido prevalece sobre o sistema; sem valor local válido, acompanha
   o sistema.
 
@@ -109,9 +114,27 @@ Não se aplica — não há formulário nem entrada local.
 - acionamento por teclado executa a mesma navegação;
 - o alerta usa o componente semântico HeroUI e texto independente de cor.
 - o aviso de atualização usa região viva polida, título e descrição, com ações
-  nomeadas e operáveis por teclado.
+  nomeadas e operáveis por teclado; a mensagem precede `Atualizar agora` e
+  `Agora não` na ordem de leitura e de foco em qualquer largura.
 - a mudança de tema preserva os tokens de contraste e foco e não depende de texto
   adicional na rota.
+
+## Responsividade do aviso de atualização
+
+### Viewport menor que `640px`
+
+- o aviso preserva `16px` de distância das laterais e da borda inferior;
+- indicador, título e descrição formam a primeira região de conteúdo;
+- as ações aparecem abaixo da mensagem, usam a largura disponível e podem quebrar
+  entre linhas sem cortar seus textos;
+- o aviso e o documento não apresentam overflow horizontal.
+
+### Viewport igual ou maior que `640px`
+
+- o aviso preserva `24px` de distância das laterais e largura máxima de `768px`;
+- mensagem e ações ficam lado a lado, com as ações em sua ordem original;
+- redimensionar o viewport altera somente a disposição visual e não confirma nem
+  dispensa a atualização.
 
 ## Referências visuais de layout — opcional
 
@@ -133,7 +156,17 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - When: a rota renderiza
 - Then: mostra o alerta e mantém a ação de login disponível
 
-### Cenário 3 — Tema público acompanha o sistema
+### Cenário 3 — Aviso responsivo de nova versão
+
+- Link para testar: não se aplica — o estado depende de uma nova versão do Service
+  Worker instalada em espera no preview do build
+- Given: uma nova versão está em espera enquanto a rota pública está aberta
+- When: o aviso é conferido em `320x568`, `360x800`, `390x844` e `768x1024`
+- Then: todo o conteúdo permanece dentro do viewport; abaixo de `640px`, as ações
+  ficam abaixo da mensagem e, a partir desse breakpoint, ficam ao lado dela
+- And: não há corte, sobreposição ou rolagem horizontal
+
+### Cenário 4 — Tema público acompanha o sistema
 
 - Link para testar: `http://localhost:3000/` sem `dall-fit:theme`
 - Given: o sistema prefere `light`
@@ -141,7 +174,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Then: `data-theme` muda de `light` para `dark`
 - And: `dall-fit:theme` continua ausente
 
-### Cenário 4 — Preferência local inicia o tema
+### Cenário 5 — Preferência local inicia o tema
 
 - Link para testar: `http://localhost:3000/` com `dall-fit:theme=dark` preparado
   antes da navegação
@@ -162,15 +195,17 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ## Cobertura automatizada
 
-| Regra ou cenário de negócio | Vitest          | Playwright |
-| --------------------------- | --------------- | ---------- |
-| conteúdo e destino do login | componente home | rota root  |
-| alerta de callback          | componente home | rota root  |
-| avanço até `/dash` mockado  | não se aplica   | flow login |
-| bootstrap local/sistema     | theme storage   | rota root  |
-| mudança do sistema          | theme provider  | rota root  |
+| Regra ou cenário de negócio | Vitest          | Playwright    |
+| --------------------------- | --------------- | ------------- |
+| conteúdo e destino do login | componente home | rota root     |
+| alerta de callback          | componente home | rota root     |
+| avanço até `/dash` mockado  | não se aplica   | flow login    |
+| aviso de atualização        | componente PWA  | não se aplica |
+| bootstrap local/sistema     | theme storage   | rota root     |
+| mudança do sistema          | theme provider  | rota root     |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.
 - Cenários manuais e justificativa: consentimento Google real exige serviço e conta
-  externos.
+  externos. O layout do aviso é conferido no preview de duas versões do build,
+  porque o Playwright usa MSW Browser e mantém o Service Worker da PWA desabilitado.

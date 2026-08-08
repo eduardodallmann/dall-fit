@@ -20,28 +20,30 @@ export function PwaUpdateNotice() {
       status="accent"
     >
       <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Nova versão disponível</Alert.Title>
-        <Alert.Description>
-          Atualize para usar a versão mais recente.
-        </Alert.Description>
+      <Alert.Content className={styles.content()}>
+        <div className={styles.message()}>
+          <Alert.Title>Nova versão disponível</Alert.Title>
+          <Alert.Description>
+            Atualize para usar a versão mais recente.
+          </Alert.Description>
+        </div>
+        <div className={styles.actions()}>
+          <Button
+            isPending={isUpdating}
+            onPress={() => void update()}
+            variant="primary"
+          >
+            Atualizar agora
+          </Button>
+          <Button
+            isDisabled={isUpdating}
+            onPress={dismissUpdate}
+            variant="tertiary"
+          >
+            Agora não
+          </Button>
+        </div>
       </Alert.Content>
-      <div className={styles.actions()}>
-        <Button
-          isPending={isUpdating}
-          onPress={() => void update()}
-          variant="primary"
-        >
-          Atualizar agora
-        </Button>
-        <Button
-          isDisabled={isUpdating}
-          onPress={dismissUpdate}
-          variant="tertiary"
-        >
-          Agora não
-        </Button>
-      </div>
     </Alert>
   );
 }
