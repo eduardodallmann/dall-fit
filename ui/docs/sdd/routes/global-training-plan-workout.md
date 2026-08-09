@@ -41,6 +41,13 @@ alerta não depende de cor. Voltar retorna ao detalhe com seu cache.
 Textos visíveis e nomes acessíveis usam `treino`; `workout` permanece somente nos
 identificadores técnicos da rota e do contrato.
 
+## Analytics
+
+Breadcrumbs emitem somente destinos enumerados e a rota comum normaliza os dois
+segmentos dinâmicos. Quando a falha sem cache oferece `Tentar novamente`, a ação
+emite `ui_retry_requested` para `workout`. IDs, nomes, query e conteúdo do plano ou
+treino não são enviados.
+
 ## Referências visuais de layout
 
 Não se aplica — não existem imagens em

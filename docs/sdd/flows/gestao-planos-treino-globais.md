@@ -18,13 +18,13 @@ navegação por `adminRoute`; a API reaplica autenticação e autorização por
 
 ## Rotas e endpoints participantes
 
-| Ordem | Etapa                 | Rota de UI                                                 | Endpoint da API                                        |
-| ----: | --------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-|     1 | Abrir lista           | `/global/training-plan`                                    | `GET /global/training-plans`                           |
-|     2 | Criar/editar/excluir  | lista ou detalhe                                           | `POST`, `PATCH` ou `DELETE /global/training-plans/...` |
-|     3 | Abrir detalhe         | `/global/training-plan/:trainingPlanId`                    | `GET /global/training-plans/:trainingPlanId`           |
-|     4 | Criar/excluir treino  | detalhe                                                    | `POST` ou `DELETE .../workouts/...`                    |
-|     5 | Abrir editor futuro   | `/global/training-plan/:trainingPlanId/workout/:workoutId` | reutiliza o detalhe                                    |
+| Ordem | Etapa                | Rota de UI                                                 | Endpoint da API                                        |
+| ----: | -------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+|     1 | Abrir lista          | `/global/training-plan`                                    | `GET /global/training-plans`                           |
+|     2 | Criar/editar/excluir | lista ou detalhe                                           | `POST`, `PATCH` ou `DELETE /global/training-plans/...` |
+|     3 | Abrir detalhe        | `/global/training-plan/:trainingPlanId`                    | `GET /global/training-plans/:trainingPlanId`           |
+|     4 | Criar/excluir treino | detalhe                                                    | `POST` ou `DELETE .../workouts/...`                    |
+|     5 | Abrir editor futuro  | `/global/training-plan/:trainingPlanId/workout/:workoutId` | reutiliza o detalhe                                    |
 
 ## Sequência e decisões
 
@@ -40,6 +40,13 @@ navegação por `adminRoute`; a API reaplica autenticação e autorização por
 6. Excluir treino fecha a confirmação e remove o resumo otimisticamente; falha
    restaura o snapshot sem reabrir o dialog.
 7. Toda mutation usa `toast.promise` e invalida as queries relacionadas ao terminar.
+
+Cada intenção navegável, menu, overlay, campo, submissão, retry e mutation desse
+fluxo passa pela fronteira única de Analytics da UI. Mutations emitem início depois
+que a UI aceita a ação e exatamente um resultado `success|error`; overlays registram
+abertura e fechamento com a razão efetiva. A instrumentação não muda a ordem acima,
+não cria request da API e não recebe nomes, descrições, IDs, página, query, erros de
+campo ou conteúdo de treino.
 
 ## Dados compartilhados
 
@@ -106,6 +113,9 @@ navegação por `adminRoute`; a API reaplica autenticação e autorização por
 - Unitários e componentes da UI: serviços, menu e typecheck das composições HeroUI.
 - Playwright da jornada UI:
   `ui/tests/integration/flows/gestao-planos-treino.spec.ts`.
+- Analytics: testes da fronteira e dos componentes validam schema, privacidade,
+  campos, menus e overlays; a jornada Playwright preserva navegação e mutations sem
+  implementação paralela de coleta.
 - E2E dos endpoints: `api/test/training-plan.e2e-spec.ts`, com MongoDB efêmero e
   sem Redis.
 - Handlers e fixtures MSW: `training-plans.ts`, com estado isolado por seletor.

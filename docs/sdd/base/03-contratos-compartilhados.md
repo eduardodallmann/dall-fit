@@ -34,8 +34,12 @@ divergência em estruturas conhecidas pela API e pela UI.
 ## Consumo
 
 ```ts
-import { SortDirection, type ApiResponse, type Entity } from '@dall-fit/types';
+import type { ApiResponse, Entity } from '@dall-fit/types';
 ```
+
+O barrel público contém somente contratos, entidades e valores com consumidores
+vigentes no monorepo. Tipos auxiliares ou enums sem consumidor não são mantidos
+como pontos de extensão hipotéticos.
 
 ## Contratos vigentes de autenticação
 

@@ -11,6 +11,7 @@ import type {
 } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { trackUiEvent } from '~/core/analytics';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
@@ -65,6 +66,12 @@ export function TrainingPlanListPage({
     if (formPlan === undefined) {
       const previousPage = page;
       await navigateToPage(1);
+      trackUiEvent({
+        control: 'submit',
+        eventName: 'ui_operation_started',
+        operation: 'training_plan_create',
+        surface: 'training_plan_form',
+      });
       const promise = createMutation.mutateAsync(input);
       toast.promise(promise, {
         error: 'Não foi possível criar o plano.',
@@ -73,14 +80,34 @@ export function TrainingPlanListPage({
       });
       try {
         await promise;
+        trackUiEvent({
+          control: 'submit',
+          eventName: 'ui_operation_completed',
+          operation: 'training_plan_create',
+          outcome: 'success',
+          surface: 'training_plan_form',
+        });
         setFormPlan(null);
       } catch {
+        trackUiEvent({
+          control: 'submit',
+          eventName: 'ui_operation_completed',
+          operation: 'training_plan_create',
+          outcome: 'error',
+          surface: 'training_plan_form',
+        });
         await navigateToPage(previousPage);
       }
 
       return;
     }
 
+    trackUiEvent({
+      control: 'submit',
+      eventName: 'ui_operation_started',
+      operation: 'training_plan_update',
+      surface: 'training_plan_form',
+    });
     const promise = updateMutation.mutateAsync({
       changes: input,
       trainingPlanId: formPlan.id,
@@ -92,12 +119,32 @@ export function TrainingPlanListPage({
     });
     try {
       await promise;
+      trackUiEvent({
+        control: 'submit',
+        eventName: 'ui_operation_completed',
+        operation: 'training_plan_update',
+        outcome: 'success',
+        surface: 'training_plan_form',
+      });
     } catch {
+      trackUiEvent({
+        control: 'submit',
+        eventName: 'ui_operation_completed',
+        operation: 'training_plan_update',
+        outcome: 'error',
+        surface: 'training_plan_form',
+      });
       return;
     }
   };
   const confirmDelete = async () => {
     if (deletePlan === undefined) return;
+    trackUiEvent({
+      control: 'delete_confirmation',
+      eventName: 'ui_operation_started',
+      operation: 'training_plan_delete',
+      surface: 'training_plan_list',
+    });
     const previousPage = page;
     const shouldReturnPage = rows.length === 1 && page > 1;
     if (shouldReturnPage) await navigateToPage(page - 1);
@@ -109,7 +156,21 @@ export function TrainingPlanListPage({
     });
     try {
       await promise;
+      trackUiEvent({
+        control: 'delete_confirmation',
+        eventName: 'ui_operation_completed',
+        operation: 'training_plan_delete',
+        outcome: 'success',
+        surface: 'training_plan_list',
+      });
     } catch {
+      trackUiEvent({
+        control: 'delete_confirmation',
+        eventName: 'ui_operation_completed',
+        operation: 'training_plan_delete',
+        outcome: 'error',
+        surface: 'training_plan_list',
+      });
       if (shouldReturnPage) await navigateToPage(previousPage);
     }
   };
@@ -129,7 +190,15 @@ export function TrainingPlanListPage({
       <TrainingPlanTableState
         description="A consulta falhou. Você pode tentar novamente sem sair desta página."
         kind="error"
-        onRetry={() => void query.refetch()}
+        onRetry={() => {
+          trackUiEvent({
+            control: 'retry',
+            eventName: 'ui_retry_requested',
+            resource: 'training_plans',
+            surface: 'training_plan_list',
+          });
+          void query.refetch();
+        }}
         title="Não foi possível carregar os planos"
       />
     );
@@ -140,6 +209,7 @@ export function TrainingPlanListPage({
       <TrainingPlanBreadcrumbs
         mockAuth={mockAuth}
         mockTrainingPlans={mockTrainingPlans}
+        surface="training_plan_list"
       />
       <header className={styles.pageHeader()}>
         <div className={styles.titleGroup()}>
@@ -148,7 +218,18 @@ export function TrainingPlanListPage({
             Crie e mantenha os modelos globais disponíveis para administração.
           </p>
         </div>
-        <Button onPress={() => setFormPlan(undefined)}>
+        <Button
+          onPress={() => {
+            trackUiEvent({
+              control: 'new_plan',
+              eventName: 'ui_overlay_opened',
+              mode: 'create',
+              overlay: 'plan_form',
+              surface: 'training_plan_list',
+            });
+            setFormPlan(undefined);
+          }}
+        >
           <Plus aria-hidden="true" className={styles.icon()} />
           Novo plano
         </Button>
@@ -162,7 +243,18 @@ export function TrainingPlanListPage({
               Os dados exibidos são a última versão disponível.
             </Alert.Description>
           </Alert.Content>
-          <Button onPress={() => void query.refetch()} variant="ghost">
+          <Button
+            onPress={() => {
+              trackUiEvent({
+                control: 'retry',
+                eventName: 'ui_retry_requested',
+                resource: 'training_plans',
+                surface: 'training_plan_list',
+              });
+              void query.refetch();
+            }}
+            variant="ghost"
+          >
             Tentar novamente
           </Button>
         </Alert>
@@ -183,6 +275,15 @@ export function TrainingPlanListPage({
                     <Table.Cell>
                       <Link
                         className={styles.planLink()}
+                        onClick={() => {
+                          trackUiEvent({
+                            control: 'plan_link',
+                            destination: 'training_plan_detail',
+                            eventName: 'ui_navigation_selected',
+                            navigationKind: 'row_link',
+                            surface: 'training_plan_list',
+                          });
+                        }}
                         params={{ trainingPlanId: plan.id }}
                         search={{ mockAuth, mockTrainingPlans }}
                         title={plan.name}
@@ -207,8 +308,26 @@ export function TrainingPlanListPage({
                     <Table.Cell>
                       <ActionsMenu
                         ariaLabel={`Ações de ${plan.name}`}
-                        onDelete={() => setDeletePlan(plan)}
-                        onEdit={() => setFormPlan(plan)}
+                        onDelete={() => {
+                          trackUiEvent({
+                            control: 'delete_confirmation',
+                            eventName: 'ui_overlay_opened',
+                            overlay: 'delete_confirmation',
+                            surface: 'training_plan_list',
+                          });
+                          setDeletePlan(plan);
+                        }}
+                        onEdit={() => {
+                          trackUiEvent({
+                            control: 'plan_form',
+                            eventName: 'ui_overlay_opened',
+                            mode: 'edit',
+                            overlay: 'plan_form',
+                            surface: 'training_plan_list',
+                          });
+                          setFormPlan(plan);
+                        }}
+                        surface="training_plan_list"
                       />
                     </Table.Cell>
                   </Table.Row>
@@ -226,7 +345,16 @@ export function TrainingPlanListPage({
               <Pagination.Item>
                 <Pagination.Previous
                   isDisabled={page === 1}
-                  onPress={() => void navigateToPage(page - 1)}
+                  onPress={() => {
+                    trackUiEvent({
+                      control: 'pagination_previous',
+                      destination: 'training_plan_list',
+                      eventName: 'ui_navigation_selected',
+                      navigationKind: 'pagination',
+                      surface: 'training_plan_list',
+                    });
+                    void navigateToPage(page - 1);
+                  }}
                 >
                   Anterior
                 </Pagination.Previous>
@@ -236,7 +364,16 @@ export function TrainingPlanListPage({
                   <Pagination.Item key={pageNumber}>
                     <Pagination.Link
                       isActive={pageNumber === page}
-                      onPress={() => void navigateToPage(pageNumber)}
+                      onPress={() => {
+                        trackUiEvent({
+                          control: 'pagination_page',
+                          destination: 'training_plan_list',
+                          eventName: 'ui_navigation_selected',
+                          navigationKind: 'pagination',
+                          surface: 'training_plan_list',
+                        });
+                        void navigateToPage(pageNumber);
+                      }}
                     >
                       {pageNumber}
                     </Pagination.Link>
@@ -246,7 +383,16 @@ export function TrainingPlanListPage({
               <Pagination.Item>
                 <Pagination.Next
                   isDisabled={page >= pageCount}
-                  onPress={() => void navigateToPage(page + 1)}
+                  onPress={() => {
+                    trackUiEvent({
+                      control: 'pagination_next',
+                      destination: 'training_plan_list',
+                      eventName: 'ui_navigation_selected',
+                      navigationKind: 'pagination',
+                      surface: 'training_plan_list',
+                    });
+                    void navigateToPage(page + 1);
+                  }}
                 >
                   Próxima
                 </Pagination.Next>
@@ -277,6 +423,7 @@ export function TrainingPlanListPage({
           if (!open) setDeletePlan(undefined);
         }}
         open={deletePlan !== undefined}
+        surface="training_plan_list"
         title="Excluir plano de treino?"
       />
     </div>

@@ -259,6 +259,22 @@ móvel não o reabre.
 - redimensionar o viewport altera somente a disposição visual e não confirma nem
   dispensa a atualização.
 
+## Analytics
+
+- abrir o drawer móvel emite `ui_menu_opened` para `application`; seu fechamento
+  emite `ui_overlay_closed` com `close_trigger`, `backdrop`, `escape`, `navigation`
+  ou `breakpoint`, conforme a interação que efetivamente o fechou;
+- `Home` e `Planos de treino` emitem `ui_navigation_selected` com navegação `menu`
+  e destino enumerado, sem query ou reload do documento;
+- o toggle emite início e resultado `success|error` de `theme_update`, sem enviar o
+  tema anterior, o tema escolhido ou dados da pessoa;
+- a instalação nativa emite início e resultado
+  `success|dismissed|error` de `pwa_install`; `Como instalar` emite somente
+  `ui_disclosure_toggled` com `open|closed`;
+- a atualização da PWA segue os eventos documentados na rota `/`;
+- nome, e-mail, foto, `isAdmin`, preferência e seletores `mockAuth` nunca entram nas
+  emissões.
+
 ## Referências visuais de layout — opcional
 
 Não se aplica — não existem imagens em `routes/assets/dash/`.

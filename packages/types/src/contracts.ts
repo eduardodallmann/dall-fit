@@ -53,13 +53,3 @@ export type UpdateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
 export type TrainingPlanDetailsResponse = ApiResponse<TrainingPlanDetails>;
 export type CreateTrainingPlanWorkoutResponse =
   ApiResponse<TrainingPlanWorkoutSummary>;
-
-export interface RequestContract<
-  TBody = never,
-  TParams = never,
-  TQuery = never,
-> {
-  body: TBody;
-  params: TParams;
-  query: TQuery;
-}
