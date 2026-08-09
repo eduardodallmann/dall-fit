@@ -61,6 +61,20 @@ exclusão e exigem ação explícita. O browser voltar preserva o cache enquanto
 válido. A interface usa somente `treino`/`treinos`; `workout` permanece restrito a
 identificadores técnicos, paths e contratos.
 
+## Analytics
+
+- breadcrumbs e nomes de treino emitem `ui_navigation_selected` com destino
+  normalizado, sem nomes nem IDs;
+- o lápis e o cancelamento da edição inline emitem `ui_button_pressed`; o formulário
+  inline emite foco, término de edição e submissão com as mesmas regras de
+  privacidade da lista;
+- salvar o plano, criar treino e excluir treino emitem um início e um único
+  resultado terminal `success|error`; criação e exclusão nunca enviam ID ou nome do
+  treino;
+- abrir o dropdown e escolher Excluir emite os eventos de menu; abrir e fechar a
+  confirmação emite os eventos de overlay com razão `cancel|confirm`;
+- a falha inicial oferece retry e emite `ui_retry_requested` para `training_plan`.
+
 ## Referências visuais de layout
 
 Não se aplica — não existem imagens em

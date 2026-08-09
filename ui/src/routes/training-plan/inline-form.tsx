@@ -13,7 +13,9 @@ import { Check, X } from 'lucide-react';
 
 import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
+import { trackUiEvent } from '~/core/analytics';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
+import { useTrainingPlanFieldAnalytics } from '~/routes/training-plan/training-plan-analytics';
 import {
   validateTrainingPlanDescription,
   validateTrainingPlanName,
@@ -32,9 +34,18 @@ export function TrainingPlanInlineForm({
   onCancel,
   onSubmit,
 }: Readonly<InlineFormProps>) {
+  const { trackFieldCompletion, trackFieldFocus } =
+    useTrainingPlanFieldAnalytics(defaultValues);
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      trackUiEvent({
+        control: 'submit',
+        eventName: 'ui_form_submitted',
+        form: 'training_plan',
+        mode: 'inline_edit',
+        surface: 'training_plan_form',
+      });
       await onSubmit({
         description: value.description.trim(),
         name: value.name.trim(),
@@ -68,8 +79,12 @@ export function TrainingPlanInlineForm({
               <Input
                 autoFocus
                 maxLength={120}
-                onBlur={field.handleBlur}
+                onBlur={(event) => {
+                  field.handleBlur();
+                  trackFieldCompletion('name', event.target.value);
+                }}
                 onChange={(event) => field.handleChange(event.target.value)}
+                onFocus={() => trackFieldFocus('name')}
                 value={field.state.value}
               />
               <FieldError className={styles.fieldError()}>
@@ -85,7 +100,15 @@ export function TrainingPlanInlineForm({
                     aria-label="Cancelar edição"
                     isDisabled={isSubmitting}
                     isIconOnly
-                    onPress={onCancel}
+                    onPress={() => {
+                      trackUiEvent({
+                        action: 'cancel_inline_edit',
+                        control: 'cancel',
+                        eventName: 'ui_button_pressed',
+                        surface: 'training_plan_detail',
+                      });
+                      onCancel();
+                    }}
                     size="sm"
                     type="button"
                     variant="ghost"
@@ -125,8 +148,12 @@ export function TrainingPlanInlineForm({
             <Label className={styles.srOnly()}>Descrição</Label>
             <TextArea
               maxLength={1000}
-              onBlur={field.handleBlur}
+              onBlur={(event) => {
+                field.handleBlur();
+                trackFieldCompletion('description', event.target.value);
+              }}
               onChange={(event) => field.handleChange(event.target.value)}
+              onFocus={() => trackFieldFocus('description')}
               rows={3}
               value={field.state.value}
             />

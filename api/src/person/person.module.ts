@@ -31,8 +31,6 @@ import { UpdatePersonThemeService } from '~/person/services/update-person-theme.
     FindOrCreatePersonService,
     FindPersonByIdService,
     UpdatePersonThemeService,
-    MongooseModule,
-    PersonRepository,
   ],
 })
 export class PersonModule {}

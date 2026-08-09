@@ -2,6 +2,7 @@ import { Alert, Button, Card } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { trackUiEvent } from '~/core/analytics';
 import { TrainingPlanBreadcrumbs } from '~/routes/training-plan/components';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
@@ -35,6 +36,7 @@ export function TrainingPlanWorkoutPage({
         mockAuth={mockAuth}
         mockTrainingPlans={mockTrainingPlans}
         plan={plan}
+        surface="workout"
         workout={workout}
       />
       {query.isLoading ? (
@@ -49,7 +51,18 @@ export function TrainingPlanWorkoutPage({
               Os nomes do plano e do treino foram omitidos do breadcrumb.
             </Alert.Description>
           </Alert.Content>
-          <Button onPress={() => void query.refetch()} variant="secondary">
+          <Button
+            onPress={() => {
+              trackUiEvent({
+                control: 'retry',
+                eventName: 'ui_retry_requested',
+                resource: 'workout',
+                surface: 'workout',
+              });
+              void query.refetch();
+            }}
+            variant="secondary"
+          >
             Tentar novamente
           </Button>
         </Alert>

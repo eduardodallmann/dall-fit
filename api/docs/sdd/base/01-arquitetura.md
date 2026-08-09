@@ -124,6 +124,15 @@ Módulos não acessam internals de outro domínio. Services não dependem de obj
 HTTP do Express, e infraestrutura implementa as abstrações definidas pela aplicação
 ou domínio.
 
+O array `exports` de cada módulo Nest representa sua interface pública efetivamente
+consumida. `PersonModule` exporta somente `FindOrCreatePersonService`,
+`FindPersonByIdService` e `UpdatePersonThemeService`; `MongooseModule`, o model, o
+adapter MongoDB e a port `PersonRepository` permanecem internos. `AuthModule`
+reexporta `PersonModule` porque seus guards públicos dependem de
+`FindPersonByIdService` quando são aplicados em controllers de módulos consumidores.
+Assim, `TrainingPlanModule` importa somente `AuthModule` para essa dependência e
+resolve o grafo de autenticação sem depender diretamente do módulo de pessoa.
+
 A estrutura cresce com necessidade real; não criar camadas vazias.
 
 ## Logging e retornos

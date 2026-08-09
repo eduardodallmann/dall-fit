@@ -10,6 +10,11 @@
 - V8 para cobertura;
 - ESLint type-aware com React Hooks e Fast Refresh configurados na raiz.
 
+As duas unidades referenciadas pelo build da UI compilam com `strict: true`:
+`tsconfig.app.json` cobre aplicação e testes, enquanto `tsconfig.node.json` cobre
+as configurações de Vite e Playwright. Nenhuma delas desabilita individualmente
+uma verificação da família estrita.
+
 ## Unitários e componentes
 
 Testes usam `*.test.ts` ou `*.test.tsx` próximos ao código. O setup comum fica em
@@ -24,6 +29,17 @@ mesmo handler disponível no desenvolvimento. Não mockar `fetch`, o cliente HTT
 o módulo de service diretamente em testes de rota. Overrides locais com
 `mockServer.use(...)` são permitidos para erros e casos específicos e devem ser
 restaurados após cada teste.
+
+Vercel Analytics é isolado nos testes: a composição global substitui o componente
+oficial para confirmar uma única montagem sem carregar coleta externa; testes da
+fronteira substituem apenas `track` e validam schema, normalização, deduplicação,
+privacidade e no-op em falha. Componentes e providers substituem a fronteira
+interna para verificar os eventos produzidos por interações acessíveis. Valores de
+campos, IDs, query e mensagens de erro não podem aparecer nos asserts de emissão.
+
+Playwright mantém a integração real entre componentes e navegação, mas não cria
+handler MSW, `page.route` ou implementação paralela para Analytics. Recebimento de
+pageviews no dashboard da Vercel é uma verificação manual de implantação.
 
 ## Testes integrados
 

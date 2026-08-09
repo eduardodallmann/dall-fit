@@ -9,6 +9,7 @@ import {
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
+import { trackUiEvent } from '~/core/analytics';
 import {
   PwaContext,
   type PwaContextValue,
@@ -91,6 +92,12 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       return;
     }
 
+    trackUiEvent({
+      control: 'pwa_install',
+      eventName: 'ui_operation_started',
+      operation: 'pwa_install',
+      surface: 'pwa_install',
+    });
     installPromptRef.current = null;
     setIsInstalling(true);
 
@@ -101,8 +108,22 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       if (choice.outcome === 'accepted') {
         setInstalled(true);
       }
+      trackUiEvent({
+        control: 'pwa_install',
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_install',
+        outcome: choice.outcome === 'accepted' ? 'success' : 'dismissed',
+        surface: 'pwa_install',
+      });
     } catch {
       // The application remains usable and falls back to manual instructions.
+      trackUiEvent({
+        control: 'pwa_install',
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_install',
+        outcome: 'error',
+        surface: 'pwa_install',
+      });
     } finally {
       setInstallPrompt((currentPrompt) =>
         currentPrompt === promptEvent ? null : currentPrompt,
@@ -116,17 +137,50 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       return;
     }
 
+    trackUiEvent({
+      control: 'pwa_update',
+      eventName: 'ui_operation_started',
+      operation: 'pwa_update',
+      surface: 'pwa_update',
+    });
     setIsUpdating(true);
 
     try {
       await updateServiceWorker(true);
+      trackUiEvent({
+        control: 'pwa_update',
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_update',
+        outcome: 'success',
+        surface: 'pwa_update',
+      });
     } catch {
       setIsUpdating(false);
+      trackUiEvent({
+        control: 'pwa_update',
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_update',
+        outcome: 'error',
+        surface: 'pwa_update',
+      });
     }
   }, [isUpdating, updateServiceWorker]);
 
   const dismissUpdate = useCallback(() => {
+    trackUiEvent({
+      control: 'pwa_update_dismiss',
+      eventName: 'ui_operation_started',
+      operation: 'pwa_update',
+      surface: 'pwa_update',
+    });
     setNeedRefresh(false);
+    trackUiEvent({
+      control: 'pwa_update_dismiss',
+      eventName: 'ui_operation_completed',
+      operation: 'pwa_update',
+      outcome: 'dismissed',
+      surface: 'pwa_update',
+    });
   }, [setNeedRefresh]);
 
   let installationMode: PwaInstallationMode = 'prompt';
