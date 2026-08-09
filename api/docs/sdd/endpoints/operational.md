@@ -13,7 +13,7 @@ autenticação, consumir rate limit ou revelar detalhes internos.
 | Command    | [`GetLivenessCommand`](../../../src/operational/commands/get-liveness.command.ts)         | monta a resposta estática de liveness              |
 | Command    | [`GetReadinessCommand`](../../../src/operational/commands/get-readiness.command.ts)       | orquestra a consulta de readiness                  |
 | Service    | [`ReadinessService`](../../../src/operational/services/readiness.service.ts)              | executa os indicadores pelo Terminus               |
-| Indicador  | `MongooseHealthIndicator` do Terminus                                                     | pinga a conexão Mongoose vigente com timeout       |
+| Indicador  | [`MongoHealthIndicator`](../../../src/operational/indicators/mongo-health.indicator.ts)   | executa ping real pela conexão Mongoose vigente    |
 | Indicador  | [`RedisHealthIndicator`](../../../src/operational/indicators/redis-health.indicator.ts)   | traduz o PING do singleton Redis em up/down        |
 | Adapter    | [`RedisClientService`](../../../src/redis/redis-client.service.ts)                        | usa a conexão ioredis compartilhada                |
 
@@ -51,9 +51,10 @@ devolve essa resposta.
 
 `OperationalController.getReadiness` chama `GetReadinessCommand.execute`, que
 delega a `ReadinessService.check`. O service entrega duas funções ao
-`HealthCheckService`: uma usa `MongooseHealthIndicator.pingCheck` sobre a conexão
-já injetada e outra chama `RedisHealthIndicator.check`. Os dois indicadores
-limitam a espera do probe a um segundo. O indicador Redis usa
+`HealthCheckService`: uma chama `MongoHealthIndicator.check`, que executa o comando
+`ping` pela conexão Mongoose já injetada, e outra chama
+`RedisHealthIndicator.check`. Os dois indicadores limitam a espera do probe a um
+segundo. O indicador Redis usa
 `RedisClientService.ping`, portanto não cria conexão, pool ou client paralelo; o
 timeout próprio da readiness ainda preserva os limites internos do ioredis.
 
@@ -125,7 +126,7 @@ curl --include --request GET --url http://localhost:4000/
 
 ## Cobertura automatizada
 
-- unitários dos commands, controller, service e indicador Redis em
+- unitários dos commands, controller, service e indicadores MongoDB/Redis em
   `api/src/operational/operational.spec.ts`;
 - contrato transversal, logger, correlação e filtro em
   `api/src/observability/*.spec.ts`;

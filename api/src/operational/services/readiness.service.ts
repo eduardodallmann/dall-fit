@@ -1,13 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  HealthCheckService,
-  MongooseHealthIndicator,
-  type HealthCheckResult,
-} from '@nestjs/terminus';
+import { HealthCheckService, type HealthCheckResult } from '@nestjs/terminus';
 
+import { MongoHealthIndicator } from '~/operational/indicators/mongo-health.indicator';
 import { RedisHealthIndicator } from '~/operational/indicators/redis-health.indicator';
-
-const MONGODB_HEALTH_TIMEOUT_MS = 1_000;
 
 @Injectable()
 export class ReadinessService {
@@ -15,19 +10,16 @@ export class ReadinessService {
 
   constructor(
     private readonly healthCheckService: HealthCheckService,
-    private readonly mongooseHealthIndicator: MongooseHealthIndicator,
+    private readonly mongoHealthIndicator: MongoHealthIndicator,
     private readonly redisHealthIndicator: RedisHealthIndicator,
   ) {}
 
   async check(): Promise<HealthCheckResult> {
     this.logger.log('ReadinessService -> check -> params:', {
-      params: { mongodbTimeoutMs: MONGODB_HEALTH_TIMEOUT_MS },
+      params: { indicatorNames: ['mongodb', 'redis'] },
     });
     const healthResult = await this.healthCheckService.check([
-      () =>
-        this.mongooseHealthIndicator.pingCheck('mongodb', {
-          timeout: MONGODB_HEALTH_TIMEOUT_MS,
-        }),
+      () => this.mongoHealthIndicator.check(),
       () => this.redisHealthIndicator.check(),
     ]);
     this.logger.log('ReadinessService -> check -> healthCheckService return:', {

@@ -63,6 +63,9 @@ export class RedisClientService implements OnModuleDestroy, OnModuleInit {
       this.logger.log('RedisClientService -> onModuleInit -> ping return:', {
         data: { ready: pong === 'PONG' },
       });
+      if (pong !== 'PONG') {
+        throw new RedisUnavailableError();
+      }
     } catch (error: unknown) {
       this.logger.error('RedisClientService -> onModuleInit -> failed:', {
         data: {
@@ -112,6 +115,12 @@ export class RedisClientService implements OnModuleDestroy, OnModuleInit {
     this.logger.log('RedisClientService -> ping -> execute return:', {
       data: { ready: pong === 'PONG' },
     });
+    if (pong !== 'PONG') {
+      this.logger.warn('RedisClientService -> ping -> unexpected response:', {
+        data: { ready: false },
+      });
+      throw new RedisUnavailableError();
+    }
     this.logger.log('RedisClientService -> ping -> completed:', {
       data: { ready: true },
     });

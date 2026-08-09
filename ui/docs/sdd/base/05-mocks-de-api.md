@@ -113,13 +113,8 @@ Testes reutilizam os handlers padrão. Para um cenário específico:
 mockServer.use(
   http.get('/resource', () =>
     HttpResponse.json(
-      {
-        code: 'RESOURCE_UNAVAILABLE',
-        details: {},
-        message: 'Resource unavailable.',
-        requestId: 'mock-request-id',
-      },
-      { headers: { 'x-request-id': 'mock-request-id' }, status: 503 },
+      createMockApiError('RESOURCE_UNAVAILABLE', 'Resource unavailable.'),
+      createMockResponseInit({ status: 503 }),
     ),
   ),
 );

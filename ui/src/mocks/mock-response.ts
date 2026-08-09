@@ -1,6 +1,8 @@
 import type { ApiError } from '@dall-fit/types';
 
-export const MOCK_REQUEST_ID = 'mock-request-id';
+import { MOCK_REQUEST_ID } from '~/mocks/mock-constants';
+
+export { MOCK_REQUEST_ID } from '~/mocks/mock-constants';
 
 export function createMockResponseInit(init: ResponseInit = {}): ResponseInit {
   const headers = new Headers(init.headers);
