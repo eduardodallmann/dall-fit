@@ -82,12 +82,15 @@ dos testes.
 
 1. Iniciar MongoDB e Redis antes de compor o módulo Nest.
 2. Configurar as URLs temporárias no módulo de configuração de teste.
-3. Inicializar a aplicação e garantir a criação dos índices.
-4. Antes de cada cenário, limpar documentos e executar `flushDb` no Redis dedicado.
-5. Inserir fixtures mínimas para o cenário.
-6. Executar requests com Supertest.
-7. Validar resposta e efeitos persistidos.
-8. Ao final, fechar aplicação, clients, MongoDB e Redis, mesmo se um teste falhar.
+3. Marcar explicitamente o runtime E2E antes do import dinâmico de `AppModule`;
+   esse marcador só autoriza o bypass com `NODE_ENV=test`, flag própria e chave
+   forte, inclusive quando o executor define `CI=true`.
+4. Inicializar a aplicação e garantir a criação dos índices.
+5. Antes de cada cenário, limpar documentos e executar `flushDb` no Redis dedicado.
+6. Inserir fixtures mínimas para o cenário.
+7. Executar requests com Supertest.
+8. Validar resposta e efeitos persistidos.
+9. Ao final, fechar aplicação, clients, MongoDB e Redis, mesmo se um teste falhar.
 
 Os E2E não substituem repositories, models nem clients de infraestrutura. Apenas as
 URLs e credenciais apontam para instâncias efêmeras.
@@ -137,6 +140,5 @@ aplicação.
 - Unitários nunca iniciam bancos.
 - E2E sempre usam adapters reais quando MongoDB ou Redis participarem do fluxo.
 - E2E nunca executam em paralelo.
-- `mongodb-memory-server` e `redis-memory-server` estão instalados. O setup MongoDB
-  vigente atende os E2E de autenticação e `Person`; versão e lifecycle do Redis
-  efêmero entram somente no primeiro E2E que consumir Redis.
+- `mongodb-memory-server` e `redis-memory-server` estão instalados e atendem os E2E
+  de autenticação, `Person` e planos globais com versões e lifecycle fixados.

@@ -52,6 +52,7 @@ describe('Global training plans (e2e)', () => {
     process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
     process.env.AUTH_COOKIE_SECURE = 'false';
     process.env.AUTH_TEST_BYPASS_ENABLED = 'true';
+    process.env.AUTH_TEST_BYPASS_E2E_ENABLED = 'true';
     process.env.AUTH_TEST_BYPASS_KEY = testBypassKey;
     process.env.UI_URL = 'http://localhost:3000';
 

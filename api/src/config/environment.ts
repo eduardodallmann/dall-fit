@@ -20,6 +20,7 @@ const environmentSchema = z.looseObject({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  CI: optionalNonEmptyString,
   VERCEL: optionalNonEmptyString,
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   VERCEL_URL: optionalNonEmptyString,
@@ -114,6 +115,7 @@ const environmentSchema = z.looseObject({
     .default(604_800),
   AUTH_COOKIE_SECURE: booleanString.default(false),
   AUTH_TEST_BYPASS_ENABLED: booleanString.default(false),
+  AUTH_TEST_BYPASS_E2E_ENABLED: booleanString.default(false),
   AUTH_TEST_BYPASS_KEY: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.string().min(43).optional(),
@@ -310,14 +312,23 @@ function validateSecurityCombinations(
   }
 
   if (
+    config.AUTH_TEST_BYPASS_E2E_ENABLED &&
+    (runtimeEnvironment !== 'test' || !config.AUTH_TEST_BYPASS_ENABLED)
+  ) {
+    throw new Error(
+      'Invalid environment variables: AUTH_TEST_BYPASS_E2E_ENABLED: allowed only with the bypass enabled in the test runtime',
+    );
+  }
+
+  if (
     config.AUTH_TEST_BYPASS_ENABLED &&
     (runtimeEnvironment === 'production' ||
       runtimeEnvironment === 'preview' ||
       config.VERCEL !== undefined ||
-      process.env.CI !== undefined)
+      (config.CI !== undefined && !config.AUTH_TEST_BYPASS_E2E_ENABLED))
   ) {
     throw new Error(
-      'Invalid environment variables: AUTH_TEST_BYPASS_ENABLED: allowed only in local or test runtimes outside Vercel and CI',
+      'Invalid environment variables: AUTH_TEST_BYPASS_ENABLED: allowed only in local or test runtimes outside Vercel and non-E2E CI',
     );
   }
 

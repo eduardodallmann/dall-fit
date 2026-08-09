@@ -15,9 +15,9 @@ O `tsconfig.json` da API compila produção, testes, seeds e scripts com
 adicional `noFallthroughCasesInSwitch` permanece ativa explicitamente, e o ESLint
 rejeita `any` explícito pela configuração type-aware transversal.
 
-`mongodb-memory-server` é usado pelos E2E do domínio `Person`. O ciclo de vida do
-Redis efêmero continua sem setup enquanto nenhum adapter Redis participar de um
-fluxo.
+`mongodb-memory-server` e `redis-memory-server` são usados pelos E2E de
+autenticação, pessoa e planos globais. As suítes exercitam os adapters reais e
+controlam integralmente o lifecycle dos dois processos efêmeros.
 
 ## Princípio de teste
 

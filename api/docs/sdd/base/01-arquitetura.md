@@ -268,6 +268,10 @@ Vite da UI.
     temporária da política `SameSite` compatível com o deploy;
   - `AUTH_TEST_BYPASS_ENABLED` e `AUTH_TEST_BYPASS_KEY`, mecanismo restrito de
     local/teste;
+- `AUTH_TEST_BYPASS_E2E_ENABLED` não pertence ao `.env` de aplicação: é um
+  marcador interno definido pelas suítes E2E antes da composição Nest. Em CI, o
+  bypass só é aceito quando esse marcador, `NODE_ENV=test`, a flag e a chave forte
+  estão presentes; Vercel, preview e produção permanecem recusados;
 - o `.env` local não é versionado;
 - local/teste usam por padrão `redis://127.0.0.1:6379`; produção/preview não
   possuem fallback e exigem Redis TLS e namespace próprios;

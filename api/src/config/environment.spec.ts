@@ -34,6 +34,7 @@ describe('validateEnvironment', () => {
       RATE_LIMIT_SESSION_WINDOW_MS: 60_000,
       AUTH_COOKIE_SECURE: false,
       AUTH_TEST_BYPASS_ENABLED: false,
+      AUTH_TEST_BYPASS_E2E_ENABLED: false,
       GOOGLE_OAUTH_CREDENTIALS: {
         clientId: credentialDocument.web.client_id,
         clientSecret: credentialDocument.web.client_secret,
@@ -107,6 +108,42 @@ describe('validateEnvironment', () => {
         TRUST_PROXY_HOPS: '1',
       }),
     ).toThrow('AUTH_COOKIE_SECURE: must be true in production');
+  });
+
+  it('allows the bypass in CI only for an explicitly marked E2E runtime', () => {
+    const ciTestEnvironment = {
+      ...validEnvironment,
+      AUTH_TEST_BYPASS_ENABLED: 'true',
+      AUTH_TEST_BYPASS_KEY: 'a'.repeat(43),
+      CI: 'true',
+      NODE_ENV: 'test',
+    };
+
+    expect(() => validateEnvironment(ciTestEnvironment)).toThrow(
+      'AUTH_TEST_BYPASS_ENABLED: allowed only in local or test runtimes outside Vercel and non-E2E CI',
+    );
+
+    expect(
+      validateEnvironment({
+        ...ciTestEnvironment,
+        AUTH_TEST_BYPASS_E2E_ENABLED: 'true',
+      }),
+    ).toMatchObject({
+      AUTH_TEST_BYPASS_E2E_ENABLED: true,
+      AUTH_TEST_BYPASS_ENABLED: true,
+      RUNTIME_ENVIRONMENT: 'test',
+    });
+  });
+
+  it('rejects the E2E marker outside an enabled test bypass', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        AUTH_TEST_BYPASS_E2E_ENABLED: 'true',
+      }),
+    ).toThrow(
+      'AUTH_TEST_BYPASS_E2E_ENABLED: allowed only with the bypass enabled in the test runtime',
+    );
   });
 
   it('requires TLS, namespace and explicit proxy trust in production', () => {
