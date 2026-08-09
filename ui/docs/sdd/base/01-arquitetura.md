@@ -12,6 +12,7 @@ A fundação de aplicação usa:
 - TanStack Form para formulários;
 - Axios como client HTTP;
 - `vite-plugin-pwa` com Workbox para instalação e atualização da PWA;
+- `@vercel/analytics` para pageviews e eventos customizados sem conteúdo;
 - Vitest para testes unitários e de componentes;
 - Playwright para testes integrados no navegador.
 
@@ -45,8 +46,9 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 1. `main.tsx` carrega os estilos globais.
 2. `AppProviders` aplica `QueryClientProvider`, `ThemeProvider`, `PwaProvider` e o
    único `Toast.Provider` global.
-3. `App` aplica o `RouterProvider` do TanStack Router. Breadcrumbs de domínio usam
-   `Link` tipado diretamente para navegar sem recarregar o documento.
+3. `App` aplica o `RouterProvider` do TanStack Router e monta uma única instância
+   de `Analytics` de `@vercel/analytics/react`. Breadcrumbs de domínio usam `Link`
+   tipado diretamente para navegar sem recarregar o documento.
 4. TanStack Router resolve a URL pela árvore manual de `routes/routes.tsx`.
 
 Não usar roteamento baseado em arquivos nem adicionar o plugin gerador do TanStack
@@ -111,6 +113,55 @@ vigentes estão definidos em `03-componentes-e-estilizacao.md`.
 MSW está configurado para autenticação e planos globais, seguindo
 `05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
+
+### Analytics e privacidade
+
+`src/core/analytics/index.ts` é a única fronteira de eventos customizados. Ela usa
+`track` do pacote oficial, converte somente enums tipados em propriedades planas,
+omite propriedades ausentes, normaliza os paths dinâmicos e absorve falhas da
+coleta. Eventos idênticos repetidos no mesmo ciclo de interação são descartados.
+Não existe provider, event bus, client paralelo, listener global de cliques ou
+captura de teclas.
+
+`App` mantém uma única instância do componente oficial. O script acompanha o
+carregamento inicial e as transições client-side produzidas pelo router sem mudar a
+árvore de providers ou provocar reload do documento. Desenvolvimento usa o modo do
+pacote sem envio de produção e os testes isolam componente e transporte.
+
+O contexto comum de eventos aceita somente `route`, `surface` e `control`. `route`
+é omitida quando o path não é conhecido; nos paths vigentes, aceita somente `/`,
+`/dash`, `/global/training-plan`,
+`/global/training-plan/:trainingPlanId` e
+`/global/training-plan/:trainingPlanId/workout/:workoutId`. Query, hash, URL
+completa e valores concretos dos segmentos nunca são propriedades.
+
+| Evento                    | Propriedades adicionais vigentes                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ui_navigation_selected`  | `destination`, `navigation_kind` (`menu`, `breadcrumb`, `row_link`, `pagination`)                                      |
+| `ui_button_pressed`       | `action` enumerada pela fronteira                                                                                      |
+| `ui_menu_opened`          | `menu` (`application`, `row_actions`)                                                                                  |
+| `ui_menu_action_selected` | `menu`, `action` (`edit`, `delete`)                                                                                    |
+| `ui_overlay_opened`       | `overlay`, `mode` opcional (`create`, `edit`)                                                                          |
+| `ui_overlay_closed`       | `overlay`, `reason` (`cancel`, `close_trigger`, `backdrop`, `escape`, `submit`, `confirm`, `navigation`, `breakpoint`) |
+| `ui_field_focused`        | `form`, `field`                                                                                                        |
+| `ui_field_completed`      | `form`, `field`, `state` (`empty`, `valid`, `invalid`)                                                                 |
+| `ui_form_submitted`       | `form`, `mode` (`create`, `edit`, `inline_edit`)                                                                       |
+| `ui_operation_started`    | `operation`                                                                                                            |
+| `ui_operation_completed`  | `operation`, `outcome` (`success`, `error`, `dismissed`, `unavailable`)                                                |
+| `ui_retry_requested`      | `resource` (`training_plans`, `training_plan`, `workout`)                                                              |
+| `ui_disclosure_toggled`   | `disclosure`, `state` (`open`, `closed`)                                                                               |
+
+Eventos nunca recebem nome, e-mail, foto, token, payload HTTP, texto de plano ou
+treino, ID de domínio, valor/tamanho/erro de campo, texto visível arbitrário ou
+seletor `mock*`. Campos emitem o primeiro foco de cada montagem e um término apenas
+quando o valor mudou desde o término anterior, sempre como estado enumerado.
+
+Todo novo botão, link acionável, campo, seleção, paginação, menu, disclosure,
+overlay, toast com ação ou fluxo assíncrono deve mapear a interação a um evento do
+catálogo na mesma mudança. Uma necessidade nova exige atualizar primeiro a feature
+da demanda e este catálogo vivo. `ui_button_pressed` não acompanha outra emissão
+mais específica da mesma ação, e operações assíncronas emitem um único início e um
+único resultado terminal.
 
 ### Tema da aplicação
 

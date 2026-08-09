@@ -2,6 +2,7 @@ import { Alert, Button, Card } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 
 import { startGoogleLogin } from '~/auth/auth-service';
+import { trackUiEvent } from '~/core/analytics';
 import { homeStyles } from '~/routes/home/styles';
 
 const styles = homeStyles();
@@ -14,7 +15,23 @@ export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
   const loginMutation = useMutation({
     mutationFn: startGoogleLogin,
     onSuccess: (authorizationUrl) => {
+      trackUiEvent({
+        control: 'google_login',
+        eventName: 'ui_operation_completed',
+        operation: 'google_login',
+        outcome: 'success',
+        surface: 'home',
+      });
       window.location.assign(authorizationUrl);
+    },
+    onError: () => {
+      trackUiEvent({
+        control: 'google_login',
+        eventName: 'ui_operation_completed',
+        operation: 'google_login',
+        outcome: 'error',
+        surface: 'home',
+      });
     },
   });
   const showAuthError = hasAuthError || loginMutation.isError;
@@ -42,7 +59,15 @@ export function HomePage({ hasAuthError = false }: Readonly<HomePageProps>) {
           <Card.Footer>
             <Button
               isPending={loginMutation.isPending}
-              onPress={() => loginMutation.mutate()}
+              onPress={() => {
+                trackUiEvent({
+                  control: 'google_login',
+                  eventName: 'ui_operation_started',
+                  operation: 'google_login',
+                  surface: 'home',
+                });
+                loginMutation.mutate();
+              }}
             >
               {loginMutation.isPending
                 ? 'Iniciando login'

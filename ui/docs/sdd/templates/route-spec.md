@@ -86,6 +86,30 @@ Para estados inexistentes, declarar “não se aplica”.
 - Labels e anúncios:
 - Foco após erro ou navegação interna:
 
+## Analytics
+
+> Seguir o catálogo e a política de privacidade vigentes em
+> `../base/01-arquitetura.md`. Esta seção documenta somente o mapeamento próprio da
+> rota; não duplicar o catálogo transversal nem introduzir nomes ou propriedades
+> fora da fronteira tipada.
+
+| Interação ou resultado observável | Evento do catálogo | Propriedades enumeradas | Momento da emissão |
+| --------------------------------- | ------------------ | ----------------------- | ------------------ |
+|                                   |                    |                         |                    |
+
+- Path normalizado usado como `route`:
+- Botões, links, campos, seleções, paginações, menus, disclosures, overlays, ações
+  de toast e operações assíncronas cobertos:
+- Ações sem evento customizado e justificativa:
+- Regras de deduplicação ou coordenação entre eventos da mesma interação:
+- Dados da rota explicitamente proibidos nas emissões:
+- Comportamento da tela quando a coleta falha ou é bloqueada:
+
+Mesmo quando a rota não possuir evento customizado, documentar o pageview global e
+declarar “não se aplica” para as linhas restantes com justificativa. Nunca enviar
+query, hash, URL completa, IDs concretos, texto visível arbitrário, conteúdo ou erro
+de campo, payload HTTP, dado pessoal, credencial, seletor de mock ou estado interno.
+
 ## Referências visuais de layout — opcional
 
 > Preencher somente quando existirem imagens em
@@ -137,6 +161,7 @@ Para estados inexistentes, declarar “não se aplica”.
 
 - Handlers e fixtures MSW:
 - Spec Playwright da rota:
+- Testes de Analytics e privacidade:
 - Cenários manuais e justificativa:
 
 O título do teste integrado mantém o identificador e o nome do cenário deste

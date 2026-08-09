@@ -1,6 +1,7 @@
 import { Button, Disclosure } from '@heroui/react';
 import { Download } from 'lucide-react';
 
+import { trackUiEvent } from '~/core/analytics';
 import { pwaInstallActionStyles } from '~/core/components/pwa-install-action/styles';
 import { usePwa } from '~/core/pwa/pwa-context';
 
@@ -34,7 +35,17 @@ export function PwaInstallAction() {
           Instalar aplicativo
         </Button>
       ) : (
-        <Disclosure>
+        <Disclosure
+          onExpandedChange={(isExpanded) => {
+            trackUiEvent({
+              control: 'pwa_install_instructions',
+              disclosure: 'pwa_install_instructions',
+              eventName: 'ui_disclosure_toggled',
+              state: isExpanded ? 'open' : 'closed',
+              surface: 'pwa_install',
+            });
+          }}
+        >
           <Disclosure.Heading>
             <Button fullWidth slot="trigger" variant="secondary">
               Como instalar
