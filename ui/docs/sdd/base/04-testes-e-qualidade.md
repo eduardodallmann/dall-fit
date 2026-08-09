@@ -10,6 +10,11 @@
 - V8 para cobertura;
 - ESLint type-aware com React Hooks e Fast Refresh configurados na raiz.
 
+As duas unidades referenciadas pelo build da UI compilam com `strict: true`:
+`tsconfig.app.json` cobre aplicação e testes, enquanto `tsconfig.node.json` cobre
+as configurações de Vite e Playwright. Nenhuma delas desabilita individualmente
+uma verificação da família estrita.
+
 ## Unitários e componentes
 
 Testes usam `*.test.ts` ou `*.test.tsx` próximos ao código. O setup comum fica em

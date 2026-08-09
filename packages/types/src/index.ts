@@ -7,7 +7,6 @@ export type {
   CreateTrainingPlanWorkoutResponse,
   CurrentPersonResponse,
   GlobalTrainingPlanCollectionResponse,
-  RequestContract,
   StartGoogleLoginResponse,
   TrainingPlanDetailsResponse,
   UpdateCurrentPersonConfigsRequest,
@@ -26,5 +25,3 @@ export type {
   TrainingPlanSummary,
   TrainingPlanWorkoutSummary,
 } from './entities.js';
-export { SortDirection } from './enums.js';
-export type { SortDirectionValue } from './enums.js';

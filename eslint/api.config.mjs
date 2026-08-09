@@ -9,7 +9,6 @@ export function apiConfig() {
         sourceType: 'commonjs',
       },
       rules: {
-        '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-floating-promises': 'error',
         '@typescript-eslint/no-unsafe-argument': 'error',
       },
