@@ -174,11 +174,25 @@ export const router = createRouter({
   routeTree,
 });
 
-window.addEventListener(AUTHENTICATION_REQUIRED_EVENT, () => {
+function handleAuthenticationRequired(): void {
   clearCsrfToken();
   queryClient.clear();
   void router.navigate({ replace: true, to: '/' });
-});
+}
+
+window.addEventListener(
+  AUTHENTICATION_REQUIRED_EVENT,
+  handleAuthenticationRequired,
+);
+
+if (import.meta.hot !== undefined) {
+  import.meta.hot.dispose(() => {
+    window.removeEventListener(
+      AUTHENTICATION_REQUIRED_EVENT,
+      handleAuthenticationRequired,
+    );
+  });
+}
 
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');

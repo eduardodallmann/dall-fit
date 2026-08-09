@@ -14,7 +14,7 @@ const styles = applicationMenuStyles();
 
 export interface ApplicationMenuProps {
   isLogoutPending?: boolean;
-  onLogout?: () => void;
+  onLogout: () => void;
   onNavigate?: () => void;
   person: Person;
 }

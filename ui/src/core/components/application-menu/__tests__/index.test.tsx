@@ -115,16 +115,35 @@ describe('ApplicationMenu', () => {
       surface: 'application_menu',
     });
   });
+
+  it('requests logout when Sair is activated', async () => {
+    const user = userEvent.setup();
+    const onLogout = vi.fn();
+    await renderApplicationMenu(
+      authenticatedPersonFixture,
+      undefined,
+      onLogout,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Sair' }));
+
+    expect(onLogout).toHaveBeenCalledOnce();
+  });
 });
 
 async function renderApplicationMenu(
   person: Person,
   onNavigate?: () => void,
+  onLogout: () => void = vi.fn(),
 ): Promise<void> {
   const rootRoute = createRootRoute();
   const dashRoute = createRoute({
     component: () => (
-      <ApplicationMenu onNavigate={onNavigate} person={person} />
+      <ApplicationMenu
+        onLogout={onLogout}
+        onNavigate={onNavigate}
+        person={person}
+      />
     ),
     getParentRoute: () => rootRoute,
     path: '/dash',
