@@ -10,6 +10,11 @@
 - V8 para cobertura;
 - ESLint type-aware com regras Node definidas na raiz.
 
+O `tsconfig.json` da API compila produção, testes, seeds e scripts com
+`strict: true`, sem desabilitar verificações da família estrita. A verificação
+adicional `noFallthroughCasesInSwitch` permanece ativa explicitamente, e o ESLint
+rejeita `any` explícito pela configuração type-aware transversal.
+
 `mongodb-memory-server` é usado pelos E2E do domínio `Person`. O ciclo de vida do
 Redis efêmero continua sem setup enquanto nenhum adapter Redis participar de um
 fluxo.

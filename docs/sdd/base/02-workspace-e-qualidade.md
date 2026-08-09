@@ -115,6 +115,20 @@ override possível, entrar no arquivo de escopo correto e ter justificativa.
 Prettier é configurado uma vez na raiz. Imports de tipos usam `import type`;
 identificadores e arquivos usam inglês, salvo texto de produto.
 
+## TypeScript estrito
+
+Todas as unidades TypeScript da API, da aplicação UI e do tooling UI compilam com
+`strict: true`. Nenhum projeto desabilita individualmente uma opção da família
+`strict`; diagnósticos novos são resolvidos por tipos concretos, generics ou
+`unknown` com narrowing, sem relaxar o compilador. A API mantém também
+`noFallthroughCasesInSwitch: true`, pois essa verificação não pertence à família
+estrita.
+
+O preset type-aware comum aplica `@typescript-eslint/no-explicit-any` também à API.
+Uma integração que realmente não possa ser representada por tipo seguro pode usar
+somente uma exceção local, adjacente ao uso e acompanhada de justificativa
+verificável; overrides amplos por projeto não são permitidos.
+
 ## Revisão final de código sem uso
 
 Ao final de toda implementação, antes da entrega, revisar tanto `api/` quanto

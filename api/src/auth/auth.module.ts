@@ -38,6 +38,11 @@ import { PersonModule } from '~/person/person.module';
     TestLoginCommand,
     UpdateCurrentPersonConfigsCommand,
   ],
-  exports: [AdminAuthorizationGuard, AuthSessionService, SessionAuthGuard],
+  exports: [
+    AdminAuthorizationGuard,
+    AuthSessionService,
+    PersonModule,
+    SessionAuthGuard,
+  ],
 })
 export class AuthModule {}
