@@ -26,8 +26,15 @@ describe('validateEnvironment', () => {
       UI_URL: 'http://localhost:3000',
       MONGODB_URI: 'mongodb://127.0.0.1:27017/dall-fit',
       REDIS_URL: 'redis://127.0.0.1:6379',
+      REDIS_NAMESPACE: 'dall-fit:local',
+      RUNTIME_ENVIRONMENT: 'local',
+      RATE_LIMIT_GOOGLE_START_LIMIT: 10,
+      RATE_LIMIT_GOOGLE_START_WINDOW_MS: 600_000,
+      RATE_LIMIT_SESSION_LIMIT: 30,
+      RATE_LIMIT_SESSION_WINDOW_MS: 60_000,
       AUTH_COOKIE_SECURE: false,
       AUTH_TEST_BYPASS_ENABLED: false,
+      AUTH_TEST_BYPASS_E2E_ENABLED: false,
       GOOGLE_OAUTH_CREDENTIALS: {
         clientId: credentialDocument.web.client_id,
         clientSecret: credentialDocument.web.client_secret,
@@ -88,16 +95,90 @@ describe('validateEnvironment', () => {
       validateEnvironment({
         ...validEnvironment,
         NODE_ENV: 'production',
+        TRUST_PROXY_HOPS: '1',
         AUTH_TEST_BYPASS_ENABLED: 'true',
-        AUTH_TEST_BYPASS_KEY: 'local-auth-test-key',
+        AUTH_TEST_BYPASS_KEY: 'a'.repeat(43),
       }),
-    ).toThrow('AUTH_TEST_BYPASS_ENABLED: cannot be true in production');
+    ).toThrow('AUTH_TEST_BYPASS_ENABLED: allowed only in local or test');
 
     expect(() =>
       validateEnvironment({
         ...validEnvironment,
         NODE_ENV: 'production',
+        TRUST_PROXY_HOPS: '1',
       }),
     ).toThrow('AUTH_COOKIE_SECURE: must be true in production');
+  });
+
+  it('allows the bypass in CI only for an explicitly marked E2E runtime', () => {
+    const ciTestEnvironment = {
+      ...validEnvironment,
+      AUTH_TEST_BYPASS_ENABLED: 'true',
+      AUTH_TEST_BYPASS_KEY: 'a'.repeat(43),
+      CI: 'true',
+      NODE_ENV: 'test',
+    };
+
+    expect(() => validateEnvironment(ciTestEnvironment)).toThrow(
+      'AUTH_TEST_BYPASS_ENABLED: allowed only in local or test runtimes outside Vercel and non-E2E CI',
+    );
+
+    expect(
+      validateEnvironment({
+        ...ciTestEnvironment,
+        AUTH_TEST_BYPASS_E2E_ENABLED: 'true',
+      }),
+    ).toMatchObject({
+      AUTH_TEST_BYPASS_E2E_ENABLED: true,
+      AUTH_TEST_BYPASS_ENABLED: true,
+      RUNTIME_ENVIRONMENT: 'test',
+    });
+  });
+
+  it('rejects the E2E marker outside an enabled test bypass', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        AUTH_TEST_BYPASS_E2E_ENABLED: 'true',
+      }),
+    ).toThrow(
+      'AUTH_TEST_BYPASS_E2E_ENABLED: allowed only with the bypass enabled in the test runtime',
+    );
+  });
+
+  it('requires TLS, namespace and explicit proxy trust in production', () => {
+    const productionEnvironment = {
+      ...validEnvironment,
+      AUTH_COOKIE_SECURE: 'true',
+      NODE_ENV: 'production',
+      TRUST_PROXY_HOPS: '1',
+    };
+
+    expect(() => validateEnvironment(productionEnvironment)).toThrow(
+      'REDIS_URL: required in production',
+    );
+    expect(() =>
+      validateEnvironment({
+        ...productionEnvironment,
+        REDIS_NAMESPACE: 'dall-fit',
+        REDIS_URL: 'redis://redis.example.test:6379',
+      }),
+    ).toThrow('REDIS_URL: must use TLS');
+    expect(() =>
+      validateEnvironment({
+        ...productionEnvironment,
+        REDIS_URL: 'rediss://redis.example.test:6379',
+      }),
+    ).toThrow('REDIS_NAMESPACE: required in production');
+  });
+
+  it('rejects disabled or unbounded rate limit settings', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        RATE_LIMIT_GOOGLE_START_LIMIT: '0',
+        RATE_LIMIT_SESSION_WINDOW_MS: '999',
+      }),
+    ).toThrow('RATE_LIMIT_GOOGLE_START_LIMIT');
   });
 });

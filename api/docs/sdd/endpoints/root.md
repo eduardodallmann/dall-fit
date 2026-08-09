@@ -71,7 +71,7 @@ pnpm -C api seed -- auth:person-existing
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-cookie.txt \
   --data '{"googleSubject":"google-existing-001","name":"Taylor Fit","email":"taylor.fit@example.test","photoUrl":"https://example.test/avatar.png"}' \
 && curl --request GET \

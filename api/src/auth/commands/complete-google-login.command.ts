@@ -12,6 +12,7 @@ import { FindOrCreatePersonService } from '~/person/services/find-or-create-pers
 
 export interface CompleteGoogleLoginInput {
   callback: GoogleCallbackQueryDto;
+  codeVerifierCookie?: string;
   nonceCookie?: string;
   stateCookie?: string;
 }
@@ -38,6 +39,7 @@ export class CompleteGoogleLoginCommand {
       params: {
         authorizationCodePresent: typeof input.callback.code === 'string',
         callbackErrorPresent: typeof input.callback.error === 'string',
+        codeVerifierCookiePresent: typeof input.codeVerifierCookie === 'string',
         nonceCookiePresent: typeof input.nonceCookie === 'string',
         stateCookiePresent: typeof input.stateCookie === 'string',
         stateQueryPresent: typeof input.callback.state === 'string',
@@ -54,6 +56,7 @@ export class CompleteGoogleLoginCommand {
       const identity = await this.googleOAuthService.exchangeCode(
         input.callback.code!,
         input.nonceCookie!,
+        input.codeVerifierCookie!,
       );
       this.logger.log(
         'CompleteGoogleLoginCommand -> execute -> googleOAuthService return:',
@@ -133,6 +136,8 @@ export class CompleteGoogleLoginCommand {
         params: {
           authorizationCodePresent: typeof input.callback.code === 'string',
           callbackErrorPresent: typeof input.callback.error === 'string',
+          codeVerifierCookiePresent:
+            typeof input.codeVerifierCookie === 'string',
           nonceCookiePresent: typeof input.nonceCookie === 'string',
           stateCookiePresent: typeof input.stateCookie === 'string',
           stateQueryPresent: typeof input.callback.state === 'string',
@@ -146,6 +151,7 @@ export class CompleteGoogleLoginCommand {
       typeof input.callback.state !== 'string' ||
       typeof input.stateCookie !== 'string' ||
       typeof input.nonceCookie !== 'string' ||
+      typeof input.codeVerifierCookie !== 'string' ||
       !this.valuesMatch(input.callback.state, input.stateCookie)
     ) {
       this.logger.warn(

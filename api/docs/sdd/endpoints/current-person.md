@@ -24,13 +24,15 @@ o próprio tema sem expor um CRUD geral de pessoas.
 ## Contrato HTTP resumido
 
 - Método e path: `GET /auth/me`
-- Autenticação: cookie `dall_fit_session` obrigatório
+- Autenticação: cookie de sessão vigente, JWT validado, registro Redis ativo e
+  pessoa ainda existente
 - Autorização: pessoa da sessão ainda existente; o endpoint não exige
   administrador
 - Entrada: não se aplica
 - Saída comum: `{ data: Person }`, sem `isAdmin`
 - Saída administrativa: `{ data: Person }`, com `isAdmin: true`
-- Status: `200`, `401 AUTHENTICATION_REQUIRED`
+- Status: `200`, `401 AUTHENTICATION_REQUIRED`, `503` técnico sanitizado quando a
+  proteção distribuída está indisponível
 - Dados sensíveis: nome, e-mail e foto aparecem somente na resposta autorizada
 - Idempotência: GET seguro e idempotente
 
@@ -45,9 +47,13 @@ devolve `configs: {}` sem gravar ou inferir um default; quando existe, devolve
 ### `PATCH /auth/me/configs`
 
 - Autenticação: cookie `dall_fit_session` obrigatório; nenhum ID é aceito
+- Proteção de mutação: `Origin` exatamente igual a `UI_URL`, header
+  `X-CSRF-Token` da sessão e limite de 60/minuto por pessoa+IP
 - Entrada: exatamente `{ "theme": "light" | "dark" }`
 - Saída: `{ data: Person }` atualizada
-- Status: `200`, `400 VALIDATION_ERROR`, `401 AUTHENTICATION_REQUIRED`
+- Status: `200`, `400 VALIDATION_ERROR`, `401 AUTHENTICATION_REQUIRED`,
+  `403 CSRF_VALIDATION_FAILED`, `429 RATE_LIMIT_EXCEEDED` e falha técnica
+  sanitizada
 - Persistência: altera atomicamente somente `configs.theme` e `updatedAt`
 - Idempotência: repetir o tema já salvo mantém o mesmo estado e não cria recurso
 
@@ -55,8 +61,9 @@ devolve `configs: {}` sem gravar ou inferir um default; quando existe, devolve
 
 ### 1. Proteção — `SessionAuthGuard.canActivate`
 
-O guard lê o cookie, chama `AuthSessionService` para validar o JWT e recebe o ID
-técnico da pessoa. Depois chama `FindPersonByIdService`, que acessa
+O guard lê o cookie vigente, chama `AuthSessionService` para validar claims,
+assinatura/chave e o registro ativo no Redis e recebe a sessão técnica. Depois
+chama `FindPersonByIdService`, que acessa
 `MongoPersonRepository.findById`.
 
 O repository mapeia os campos persistidos para `PersonEntity`. Ele inclui
@@ -82,7 +89,9 @@ adicional para determinar autorização.
 
 ### 1. Proteção e validação
 
-`SessionAuthGuard` valida a sessão e carrega a pessoa como no GET. O
+`SessionAuthGuard` valida a sessão e carrega a pessoa como no GET.
+`RateLimitGuard` consome atomicamente a quota Redis e `CsrfGuard` compara token em
+tempo constante e origem exata. Só então o
 `ValidationPipe` aplica `UpdateCurrentPersonConfigsDto`: body vazio, valor fora de
 `light | dark` ou propriedade adicional termina com `400 VALIDATION_ERROR` antes
 do command.
@@ -115,6 +124,10 @@ service preserva a falha de pessoa removida como `401`, e o command monta a
 | body inválido           | vazio, valor inválido ou campo extra | `400 VALIDATION_ERROR`               | nenhum                 |
 | cookie ausente          | sem sessão                           | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
 | token inválido/expirado | falha JWT                            | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
+| registro Redis ausente  | sessão revogada/resetada             | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
+| CSRF ou Origin inválido | mutação sem proteção exata           | `403 CSRF_VALIDATION_FAILED`         | nenhum                 |
+| quota excedida          | mais de 60 mutações/min/pessoa+IP    | `429` e `Retry-After`                | contador Redis         |
+| Redis indisponível      | proteção não pode ser confirmada     | erro técnico sanitizado              | nenhum                 |
 | pessoa removida         | repository devolve vazio             | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
 | MongoDB indisponível    | falha técnica ao carregar `Person`   | `500` genérico                       | nenhum                 |
 
@@ -138,7 +151,7 @@ pnpm -C api seed -- auth:person-existing
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-cookie.txt \
   --data '{"googleSubject":"google-existing-001","name":"Taylor Fit","email":"taylor.fit@example.test","photoUrl":"https://example.test/avatar.png"}' \
 && curl --request GET \
@@ -166,7 +179,7 @@ pnpm -C api seed -- auth:person-admin
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-admin-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":"https://example.test/admin-avatar.png"}' \
 && curl --request GET \
@@ -208,7 +221,7 @@ pnpm -C api seed -- auth:person-theme-light
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-theme-cookie.txt \
   --data '{"googleSubject":"google-theme-light-001","name":"Theme Runner","email":"theme.runner@example.test","photoUrl":null}' \
 && curl --request GET \
@@ -235,7 +248,7 @@ pnpm -C api seed -- auth:person-legacy
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-legacy-cookie.txt \
   --data '{"googleSubject":"google-legacy-001","name":"Legacy Runner","email":"legacy.runner@example.test","photoUrl":null}' \
 && curl --request GET \
@@ -262,12 +275,15 @@ pnpm -C api seed -- auth:person-theme-dark
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-theme-update-cookie.txt \
   --data '{"googleSubject":"google-theme-dark-001","name":"Theme Runner","email":"theme.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-theme-update-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request PATCH \
   --url http://localhost:4000/auth/me/configs \
   --header 'content-type: application/json' \
+  --header 'origin: http://localhost:3000' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-theme-update-cookie.txt \
   --data '{"theme":"light"}'
 ```
@@ -292,12 +308,15 @@ pnpm -C api seed -- auth:person-theme-dark
 curl --request POST \
   --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-theme-invalid-cookie.txt \
   --data '{"googleSubject":"google-theme-dark-001","name":"Theme Runner","email":"theme.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-theme-invalid-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request PATCH \
   --url http://localhost:4000/auth/me/configs \
   --header 'content-type: application/json' \
+  --header 'origin: http://localhost:3000' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-theme-invalid-cookie.txt \
   --data '{"theme":"system"}'
 ```

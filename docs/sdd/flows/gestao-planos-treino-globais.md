@@ -11,35 +11,41 @@
 
 ## Entrada e pré-condições
 
-A sessão precisa ser válida e a pessoa precisa ser administradora. A UI protege a
-navegação por `adminRoute`; a API reaplica autenticação e autorização por
-`AdminOnly`. Em desenvolvimento integrado, `mockAuth=admin` e
+A sessão precisa ser válida e a pessoa precisa ser administradora. Antes de
+disponibilizar o layout, a UI confirma a pessoa por `GET /auth/me` e mantém em
+memória o token de `GET /auth/csrf`. A UI protege a navegação por `adminRoute`; a
+API reaplica autenticação e autorização por `AdminOnly`, rate limit e validação de
+origem/CSRF em toda mutação. Em desenvolvimento integrado, `mockAuth=admin` e
 `mockTrainingPlans` selecionam fixtures MSW sem alterar o contrato de produção.
 
 ## Rotas e endpoints participantes
 
 | Ordem | Etapa                | Rota de UI                                                 | Endpoint da API                                        |
 | ----: | -------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-|     1 | Abrir lista          | `/global/training-plan`                                    | `GET /global/training-plans`                           |
-|     2 | Criar/editar/excluir | lista ou detalhe                                           | `POST`, `PATCH` ou `DELETE /global/training-plans/...` |
-|     3 | Abrir detalhe        | `/global/training-plan/:trainingPlanId`                    | `GET /global/training-plans/:trainingPlanId`           |
-|     4 | Criar/excluir treino | detalhe                                                    | `POST` ou `DELETE .../workouts/...`                    |
-|     5 | Abrir editor futuro  | `/global/training-plan/:trainingPlanId/workout/:workoutId` | reutiliza o detalhe                                    |
+|     1 | Proteger layout      | layout autenticado                                         | `GET /auth/me` e `GET /auth/csrf`                      |
+|     2 | Abrir lista          | `/global/training-plan`                                    | `GET /global/training-plans`                           |
+|     3 | Criar/editar/excluir | lista ou detalhe                                           | `POST`, `PATCH` ou `DELETE /global/training-plans/...` |
+|     4 | Abrir detalhe        | `/global/training-plan/:trainingPlanId`                    | `GET /global/training-plans/:trainingPlanId`           |
+|     5 | Criar/excluir treino | detalhe                                                    | `POST` ou `DELETE .../workouts/...`                    |
+|     6 | Abrir editor futuro  | `/global/training-plan/:trainingPlanId/workout/:workoutId` | reutiliza o detalhe                                    |
 
 ## Sequência e decisões
 
-1. O menu exibe `Planos de treino` somente à pessoa administradora.
-2. A lista consulta a página da URL, limitada a 20 itens e ordenada pela criação.
-3. Criar, editar e excluir plano atualizam o cache otimisticamente; os modais de
+1. O layout confirma sessão/pessoa e obtém uma vez o CSRF da sessão; falha técnica
+   desse bootstrap apresenta erro recuperável e não libera mutações.
+2. O menu exibe `Planos de treino` somente à pessoa administradora.
+3. A lista consulta a página da URL, limitada a 20 itens e ordenada pela criação.
+4. Criar, editar e excluir plano enviam `Origin` e `X-CSRF-Token` pelo client Axios
+   único e atualizam o cache otimisticamente; os modais de
    criação/edição e a confirmação de exclusão fecham assim que a mutation é
    disparada, e falha restaura snapshot, página e conteúdo anterior sem reabrir o
    overlay.
-4. O detalhe consulta o plano e recebe apenas nome, descrição e resumos de treino.
-5. Criar treino aguarda a API devolver o ID real, atualiza o cache e só então
+5. O detalhe consulta o plano e recebe apenas nome, descrição e resumos de treino.
+6. Criar treino aguarda a API devolver o ID real, atualiza o cache e só então
    navega ao stub do editor.
-6. Excluir treino fecha a confirmação e remove o resumo otimisticamente; falha
+7. Excluir treino fecha a confirmação e remove o resumo otimisticamente; falha
    restaura o snapshot sem reabrir o dialog.
-7. Toda mutation usa `toast.promise` e invalida as queries relacionadas ao terminar.
+8. Toda mutation usa `toast.promise` e invalida as queries relacionadas ao terminar.
 
 Cada intenção navegável, menu, overlay, campo, submissão, retry e mutation desse
 fluxo passa pela fronteira única de Analytics da UI. Mutations emitem início depois
@@ -68,7 +74,9 @@ campo ou conteúdo de treino.
   rota inteira ainda não possui dado válido; loading de tabela usa skeletons de
   linhas e não se apresenta como estado vazio.
 - Erro não recuperável: plano ou treino inexistente apresenta o estado da rota.
-- Indisponibilidade: rollback conserva o último snapshot e toast comunica a falha.
+- Indisponibilidade: rollback conserva o último snapshot e toast comunica a falha;
+  `401` limpa token CSRF e caches privados e volta à raiz, enquanto rejeição CSRF
+  não repete automaticamente a mutação.
 - Breadcrumb: falha sem cache omite nomes dinâmicos; plano carregado com treino
   ausente conserva somente o nome do plano; ancestrais navegáveis usam o router da
   SPA e não recarregam o documento.
@@ -116,8 +124,8 @@ campo ou conteúdo de treino.
 - Analytics: testes da fronteira e dos componentes validam schema, privacidade,
   campos, menus e overlays; a jornada Playwright preserva navegação e mutations sem
   implementação paralela de coleta.
-- E2E dos endpoints: `api/test/training-plan.e2e-spec.ts`, com MongoDB efêmero e
-  sem Redis.
+- E2E dos endpoints: `api/test/training-plan.e2e-spec.ts`, com MongoDB e Redis
+  efêmeros, execução serial, sessão real, CSRF, origem e rate limit.
 - Handlers e fixtures MSW: `training-plans.ts`, com estado isolado por seletor.
 - Cenários não automatizados: regressão visual não se aplica, pois não há imagens
   de referência nas novas rotas.

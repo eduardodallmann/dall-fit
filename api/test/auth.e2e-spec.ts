@@ -1,14 +1,17 @@
 import type { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
+import Redis from 'ioredis';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { Model } from 'mongoose';
+import { RedisMemoryServer } from 'redis-memory-server';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   AUTH_SESSION_COOKIE,
+  OAUTH_CODE_VERIFIER_COOKIE,
   OAUTH_NONCE_COOKIE,
   OAUTH_STATE_COOKIE,
 } from '~/auth/auth.constants';
@@ -24,23 +27,31 @@ const googleCredential = Buffer.from(
     },
   }),
 ).toString('base64');
+const testBypassKey = 'e2e-auth-test-key-with-at-least-32-random-bytes';
 
 describe('Authentication (e2e)', () => {
   let app: INestApplication<App>;
   let mongoServer: MongoMemoryServer;
   let personModel: Model<PersonDocument>;
+  let redisClient: Redis;
+  let redisServer: RedisMemoryServer;
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create({
       binary: { version: '8.0.12' },
     });
+    redisServer = new RedisMemoryServer({ binary: { version: '8.8.1' } });
+    await redisServer.start();
     process.env.NODE_ENV = 'test';
     process.env.MONGODB_URI = mongoServer.getUri('dall-fit-e2e');
+    process.env.REDIS_URL = `redis://${await redisServer.getHost()}:${await redisServer.getPort()}`;
+    process.env.REDIS_NAMESPACE = 'dall-fit-auth-e2e';
     process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64 = googleCredential;
     process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
     process.env.AUTH_COOKIE_SECURE = 'false';
     process.env.AUTH_TEST_BYPASS_ENABLED = 'true';
-    process.env.AUTH_TEST_BYPASS_KEY = 'local-auth-test-key';
+    process.env.AUTH_TEST_BYPASS_E2E_ENABLED = 'true';
+    process.env.AUTH_TEST_BYPASS_KEY = testBypassKey;
     process.env.UI_URL = 'http://localhost:3000';
 
     const { AppModule } = await import('~/app.module.js');
@@ -50,17 +61,36 @@ describe('Authentication (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
+    app.enableCors({
+      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      origin: 'http://localhost:3000',
+    });
     await app.init();
 
     personModel = app.get<Model<PersonDocument>>(
       getModelToken(PersonDocument.name),
     );
     await personModel.syncIndexes();
+    redisClient = new Redis(process.env.REDIS_URL);
   });
 
   beforeEach(async () => {
-    await personModel.deleteMany({}).exec();
+    await Promise.all([
+      personModel.deleteMany({}).exec(),
+      redisClient.flushdb(),
+    ]);
   });
+
+  async function getCsrfToken(
+    agent: ReturnType<typeof request.agent>,
+  ): Promise<string> {
+    const response = await agent.get('/auth/csrf').expect(200);
+    const body = response.body as { data: { token: string } };
+
+    return body.data.token;
+  }
 
   it('rejects protected endpoints without a session', async () => {
     const rootResponse = await request(app.getHttpServer()).get('/');
@@ -88,7 +118,7 @@ describe('Authentication (e2e)', () => {
 
     const loginResponse = await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-new-001',
         name: 'Alex Runner',
@@ -130,7 +160,7 @@ describe('Authentication (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-legacy-001',
         name: 'Legacy Runner',
@@ -156,19 +186,24 @@ describe('Authentication (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-theme-001',
         name: 'Theme Runner',
         email: 'theme.runner@example.test',
         photoUrl: null,
       });
+    const csrfToken = await getCsrfToken(agent);
 
     const firstResponse = await agent
       .patch('/auth/me/configs')
+      .set('Origin', 'http://localhost:3000')
+      .set('x-csrf-token', csrfToken)
       .send({ theme: 'dark' });
     const secondResponse = await agent
       .patch('/auth/me/configs')
+      .set('Origin', 'http://localhost:3000')
+      .set('x-csrf-token', csrfToken)
       .send({ theme: 'dark' });
 
     expect(firstResponse.status).toBe(200);
@@ -192,20 +227,25 @@ describe('Authentication (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-invalid-theme-001',
         name: 'Invalid Theme Runner',
         email: 'invalid.theme@example.test',
         photoUrl: null,
       });
+    const csrfToken = await getCsrfToken(agent);
 
     for (const body of [
       {},
       { theme: 'system' },
       { additional: true, theme: 'light' },
     ]) {
-      const response = await agent.patch('/auth/me/configs').send(body);
+      const response = await agent
+        .patch('/auth/me/configs')
+        .set('Origin', 'http://localhost:3000')
+        .set('x-csrf-token', csrfToken)
+        .send(body);
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
@@ -229,7 +269,7 @@ describe('Authentication (e2e)', () => {
 
     const loginResponse = await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-admin-001',
         name: 'Changed Admin',
@@ -242,8 +282,8 @@ describe('Authentication (e2e)', () => {
     expect(meResponse.status).toBe(200);
     expect(meResponse.body).toMatchObject({
       data: {
-        name: 'Admin Runner',
-        email: 'admin.runner@example.test',
+        name: 'Changed Admin',
+        email: 'changed.admin@example.test',
         isAdmin: true,
       },
     });
@@ -257,7 +297,7 @@ describe('Authentication (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-promoted-001',
         name: 'Promoted Runner',
@@ -292,13 +332,13 @@ describe('Authentication (e2e)', () => {
     expect(revokedBody.data).not.toHaveProperty('isAdmin');
   });
 
-  it('reuses an existing person without overwriting their original profile', async () => {
+  it('synchronizes an existing provider profile without creating another person', async () => {
     const firstAgent = request.agent(app.getHttpServer());
     const secondAgent = request.agent(app.getHttpServer());
 
     await firstAgent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-existing-001',
         name: 'Taylor Fit',
@@ -307,7 +347,19 @@ describe('Authentication (e2e)', () => {
       });
     await secondAgent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
+      .send({
+        googleSubject: 'google-existing-001',
+        name: 'Changed Name',
+        email: 'changed@example.test',
+        photoUrl: null,
+      });
+    const synchronizedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-existing-001',
+    });
+    await secondAgent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-existing-001',
         name: 'Changed Name',
@@ -315,17 +367,21 @@ describe('Authentication (e2e)', () => {
         photoUrl: null,
       });
     const meResponse = await secondAgent.get('/auth/me');
+    const unchangedPerson = await personModel.collection.findOne({
+      googleSubject: 'google-existing-001',
+    });
 
     expect(meResponse.body).toMatchObject({
       data: {
-        name: 'Taylor Fit',
-        email: 'taylor.fit@example.test',
-        photoUrl: 'https://example.test/taylor.png',
+        name: 'Changed Name',
+        email: 'changed@example.test',
+        photoUrl: null,
       },
     });
     await expect(
       personModel.countDocuments({ googleSubject: 'google-existing-001' }),
     ).resolves.toBe(1);
+    expect(unchangedPerson?.updatedAt).toEqual(synchronizedPerson?.updatedAt);
   });
 
   it('hides the test login when the key is invalid', async () => {
@@ -347,7 +403,7 @@ describe('Authentication (e2e)', () => {
   it('rejects malformed test identities before persistence', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: '',
         name: '',
@@ -361,7 +417,7 @@ describe('Authentication (e2e)', () => {
   it('rejects an attempt to grant admin access through the test login body', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-escalation-001',
         name: 'Escalation Attempt',
@@ -380,19 +436,17 @@ describe('Authentication (e2e)', () => {
     );
     const response = await request(app.getHttpServer()).get('/auth/google');
 
-    expect(prepareResponse.status).toBe(200);
-    const prepareBody = prepareResponse.body as {
-      data: { authorizationUrl: string };
-    };
-    expect(prepareBody.data.authorizationUrl).toContain('accounts.google.com');
-    expect(prepareResponse.headers['set-cookie']).toHaveLength(2);
+    expect(prepareResponse.status).toBe(404);
     expect(response.status).toBe(302);
     expect(response.headers.location).toContain('accounts.google.com');
     expect(response.headers.location).toContain('scope=openid');
+    expect(response.headers.location).toContain('code_challenge_method=S256');
+    expect(response.headers['set-cookie']).toHaveLength(3);
     expect(response.headers['set-cookie']).toEqual(
       expect.arrayContaining([
         expect.stringContaining(`${OAUTH_STATE_COOKIE}=`),
         expect.stringContaining(`${OAUTH_NONCE_COOKIE}=`),
+        expect.stringContaining(`${OAUTH_CODE_VERIFIER_COOKIE}=`),
       ]),
     );
     for (const cookie of response.headers['set-cookie'] ?? []) {
@@ -408,7 +462,7 @@ describe('Authentication (e2e)', () => {
       )
       .set(
         'Cookie',
-        `${OAUTH_STATE_COOKIE}=expected-state; ${OAUTH_NONCE_COOKIE}=fake-nonce`,
+        `${OAUTH_STATE_COOKIE}=expected-state; ${OAUTH_NONCE_COOKIE}=fake-nonce; ${OAUTH_CODE_VERIFIER_COOKIE}=fake-verifier`,
       );
 
     expect(response.status).toBe(302);
@@ -419,6 +473,7 @@ describe('Authentication (e2e)', () => {
       expect.arrayContaining([
         expect.stringContaining(`${OAUTH_STATE_COOKIE}=;`),
         expect.stringContaining(`${OAUTH_NONCE_COOKIE}=;`),
+        expect.stringContaining(`${OAUTH_CODE_VERIFIER_COOKIE}=;`),
       ]),
     );
     await expect(personModel.countDocuments()).resolves.toBe(0);
@@ -428,7 +483,7 @@ describe('Authentication (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject: 'google-removed-001',
         name: 'Removed Person',
@@ -447,6 +502,130 @@ describe('Authentication (e2e)', () => {
     });
   });
 
+  it('requires the exact origin and CSRF token on authenticated mutations', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
+      .send({
+        googleSubject: 'google-csrf-001',
+        name: 'CSRF Runner',
+        email: 'csrf.runner@example.test',
+        photoUrl: null,
+      })
+      .expect(204);
+    const csrfResponse = await agent.get('/auth/csrf').expect(200);
+    const csrfBody = csrfResponse.body as { data: { token: string } };
+    expect(csrfResponse.headers['cache-control']).toBe('no-store');
+
+    const missingProtection = await agent
+      .patch('/auth/me/configs')
+      .send({ theme: 'dark' });
+    const wrongOrigin = await agent
+      .patch('/auth/me/configs')
+      .set('Origin', 'http://malicious.example')
+      .set('x-csrf-token', csrfBody.data.token)
+      .send({ theme: 'dark' });
+    const valid = await agent
+      .patch('/auth/me/configs')
+      .set('Origin', 'http://localhost:3000')
+      .set('x-csrf-token', csrfBody.data.token)
+      .send({ theme: 'dark' });
+
+    expect(missingProtection.status).toBe(403);
+    expect(missingProtection.body).toMatchObject({
+      code: 'CSRF_VALIDATION_FAILED',
+    });
+    expect(wrongOrigin.status).toBe(403);
+    expect(valid.status).toBe(200);
+  });
+
+  it('revokes the current session and keeps logout idempotent without one', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
+      .send({
+        googleSubject: 'google-logout-001',
+        name: 'Logout Runner',
+        email: 'logout.runner@example.test',
+        photoUrl: null,
+      })
+      .expect(204);
+    const csrfToken = await getCsrfToken(agent);
+
+    const logoutResponse = await agent
+      .post('/auth/logout')
+      .set('Origin', 'http://localhost:3000')
+      .set('x-csrf-token', csrfToken);
+    const revokedResponse = await agent.get('/auth/me');
+    const anonymousLogout = await request(app.getHttpServer()).post(
+      '/auth/logout',
+    );
+
+    expect(logoutResponse.status).toBe(204);
+    expect(logoutResponse.headers['set-cookie']).toHaveLength(2);
+    expect(revokedResponse.status).toBe(401);
+    expect(anonymousLogout.status).toBe(204);
+  });
+
+  it('fails an old session closed after an isolated Redis dataset reset', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const identity = {
+      googleSubject: 'google-reset-001',
+      name: 'Reset Runner',
+      email: 'reset.runner@example.test',
+      photoUrl: null,
+    };
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
+      .send(identity)
+      .expect(204);
+    await redisClient.flushdb();
+
+    await agent.get('/auth/me').expect(401);
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
+      .send(identity)
+      .expect(204);
+    await agent.get('/auth/me').expect(200);
+  });
+
+  it('applies the distributed Google start limit and emits Retry-After', async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await request(app.getHttpServer()).get('/auth/google').expect(302);
+    }
+
+    const limitedResponse = await request(app.getHttpServer()).get(
+      '/auth/google',
+    );
+    expect(limitedResponse.status).toBe(429);
+    expect(limitedResponse.headers['retry-after']).toBeDefined();
+    expect(limitedResponse.body).toMatchObject({ code: 'RATE_LIMIT_EXCEEDED' });
+  });
+
+  it('uses exact credentialed CORS and does not charge preflight requests', async () => {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await request(app.getHttpServer())
+        .options('/auth/google')
+        .set('Origin', 'http://localhost:3000')
+        .set('Access-Control-Request-Method', 'GET')
+        .expect(204);
+    }
+    const response = await request(app.getHttpServer())
+      .get('/auth/google')
+      .set('Origin', 'http://localhost:3000');
+
+    expect(response.status).toBe(302);
+    expect(response.headers['access-control-allow-origin']).toBe(
+      'http://localhost:3000',
+    );
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+    expect(response.headers.vary).toContain('Origin');
+  });
+
   afterAll(async () => {
     if (app !== undefined) {
       await app.close();
@@ -454,5 +633,7 @@ describe('Authentication (e2e)', () => {
     if (mongoServer !== undefined) {
       await mongoServer.stop();
     }
+    await redisClient?.quit();
+    await redisServer?.stop();
   });
 });

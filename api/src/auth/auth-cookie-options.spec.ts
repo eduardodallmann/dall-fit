@@ -1,28 +1,43 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  createAuthCookieOptions,
-  createClearCookieOptions,
+  createClearOAuthCookieOptions,
+  createClearSessionCookieOptions,
+  createOAuthCookieOptions,
+  createSessionCookieOptions,
 } from '~/auth/auth-cookie-options';
 
 describe('auth cookie options', () => {
   it.each([
-    { expectedSameSite: 'lax', secure: false },
-    { expectedSameSite: 'none', secure: true },
+    { expectedSessionSameSite: 'lax', secure: false },
+    { expectedSessionSameSite: 'none', secure: true },
   ] as const)(
-    'uses SameSite=$expectedSameSite when secure is $secure',
-    ({ expectedSameSite, secure }) => {
-      expect(createAuthCookieOptions(secure, 60_000)).toEqual({
+    'configures session and OAuth cookies when secure is $secure',
+    ({ expectedSessionSameSite, secure }) => {
+      expect(createSessionCookieOptions(secure, 60_000)).toEqual({
         httpOnly: true,
         maxAge: 60_000,
         path: '/',
-        sameSite: expectedSameSite,
+        sameSite: expectedSessionSameSite,
         secure,
       });
-      expect(createClearCookieOptions(secure)).toEqual({
+      expect(createClearSessionCookieOptions(secure)).toEqual({
         httpOnly: true,
         path: '/',
-        sameSite: expectedSameSite,
+        sameSite: expectedSessionSameSite,
+        secure,
+      });
+      expect(createOAuthCookieOptions(secure, 60_000)).toEqual({
+        httpOnly: true,
+        maxAge: 60_000,
+        path: '/',
+        sameSite: 'lax',
+        secure,
+      });
+      expect(createClearOAuthCookieOptions(secure)).toEqual({
+        httpOnly: true,
+        path: '/',
+        sameSite: 'lax',
         secure,
       });
     },

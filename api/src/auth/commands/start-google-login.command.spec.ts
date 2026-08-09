@@ -24,9 +24,11 @@ describe('StartGoogleLoginCommand', () => {
     expect(result.state).not.toBe(result.nonce);
     expect(result.state.length).toBeGreaterThan(20);
     expect(result.nonce.length).toBeGreaterThan(20);
+    expect(result.codeVerifier.length).toBeGreaterThan(43);
     expect(googleOAuthService.createAuthorizationUrl).toHaveBeenCalledWith(
       result.state,
       result.nonce,
+      expect.any(String),
     );
   });
 });

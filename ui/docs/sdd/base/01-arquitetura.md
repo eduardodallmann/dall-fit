@@ -72,6 +72,12 @@ vez de procurar um arquivo físico nesse path e responder `404`.
 Arquivos estáticos existentes continuam sendo atendidos normalmente pela Vercel.
 Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras individuais.
 
+`ui/vercel.json` também aplica CSP e headers defensivos a todas as respostas. A
+CSP permite scripts e endpoints do Vercel Analytics v2 pela própria origem,
+conexão somente com a própria origem e a origem exata da API vigente, imagem local,
+data URI e avatar Google, e bloqueia objetos, frames e ancestrais. A política não
+usa wildcard de `vercel.app`.
+
 ## Estado e integrações
 
 - estado local fica próximo do componente proprietário;
@@ -92,6 +98,12 @@ como `baseURL` e `withCredentials=true` para enviar a sessão `HttpOnly` à API.
 criar instâncias paralelas nem usar Axios diretamente em componentes. Services HTTP
 pertencem ao domínio ou à rota proprietária; hooks TanStack Query consomem esses
 services.
+
+O mesmo client injeta `X-CSRF-Token` em POST, PUT, PATCH e DELETE a partir de um
+store exclusivamente em memória. O token é obtido por `GET /auth/csrf` depois de
+`GET /auth/me`; nunca entra em localStorage, sessionStorage, cookie legível ou
+cache persistido. Resposta `401` limpa imediatamente o token. Mutations não fazem
+retry automático de `403`.
 
 Formulários usam TanStack Form. A composição tipada permanece próxima da rota;
 helpers migram para `src/core/form/` somente quando houver reutilização real.
@@ -163,6 +175,10 @@ da demanda e este catálogo vivo. `ui_button_pressed` não acompanha outra emiss
 mais específica da mesma ação, e operações assíncronas emitem um único início e um
 único resultado terminal.
 
+O login emite apenas `ui_operation_started/google_login` antes da navegação
+top-level; não existe conclusão antecipada. Logout emite início e exatamente um
+terminal `success|error`, sem token, pessoa ou detalhe técnico.
+
 ### Tema da aplicação
 
 Antes de aguardar o MSW ou renderizar React, `main.tsx` lê sincronamente a chave
@@ -232,9 +248,11 @@ zoom por políticas de acessibilidade mantêm sua própria decisão.
 
 A árvore manual possui um layout sem path para rotas autenticadas. Seu
 `beforeLoad` usa o `QueryClient` recebido pelo router context para garantir
-`GET /auth/me` antes de carregar qualquer filho.
+`GET /auth/me` e depois `GET /auth/csrf` antes de carregar qualquer filho.
 
-- `401` lança redirect tipado para `/`;
+- `401` limpa CSRF/cache privado e lança redirect tipado para `/`;
+- falha exclusiva do bootstrap CSRF permanece recuperável e não transforma uma
+  pessoa autenticada em anônima;
 - outros erros permanecem erros da rota e são apresentados pelo componente de erro;
 - o contexto autenticado entrega `Person` aos filhos sem uma segunda request;
 - a proteção da UI é navegação e privacidade visual, nunca substitui o guard da API.
@@ -251,6 +269,9 @@ API novamente, e apresenta:
 - o mesmo conteúdo de identidade e navegação nas duas apresentações;
 - a mesma ação icon-only de tema e o mesmo estado de gravação nas duas
   apresentações;
+- uma única mutation compartilhada de logout nas duas apresentações, com botão
+  pending; sucesso revoga, limpa CSRF/cache e navega com replace para `/`, enquanto
+  falha mantém o shell e anuncia toast acessível;
 - a região `main` reservada ao conteúdo da rota filha.
 
 Os componentes reutilizáveis do shell e do menu vivem em

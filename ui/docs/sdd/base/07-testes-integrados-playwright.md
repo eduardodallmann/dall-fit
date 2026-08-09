@@ -36,6 +36,12 @@ O bootstrap da UI deve aguardar o Service Worker do MSW antes do primeiro render
 O cliente HTTP, services, hooks e componentes usados em produção permanecem reais;
 somente a resposta da fronteira de rede é interceptada.
 
+A única exceção técnica é a navegação top-level de
+`GET /api/auth/google`: service workers não interceptam essa navegação como uma
+request Axios. O Vite, já controlado pelo `webServer` do Playwright e somente com
+mocks habilitados, responde `302 /dash`. Não há `page.route`, acesso à API real ou
+atalho no componente; a UI percorre a mesma URL top-level de produção.
+
 Quando a UI possuir uma variável para a URL da API, a configuração Playwright
 define um valor local e fictício compatível com os handlers. Tokens, API keys e
 credenciais usados nos testes são exclusivamente locais e reconhecíveis como

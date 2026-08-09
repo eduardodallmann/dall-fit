@@ -51,6 +51,7 @@ describe('CompleteGoogleLoginCommand', () => {
 
       const result = await command.execute({
         callback: { code: 'one-time-code', state: 'matching-state' },
+        codeVerifierCookie: 'code-verifier',
         nonceCookie: 'matching-nonce',
         stateCookie: 'matching-state',
       });
@@ -63,6 +64,7 @@ describe('CompleteGoogleLoginCommand', () => {
       expect(googleOAuthService.exchangeCode).toHaveBeenCalledWith(
         'one-time-code',
         'matching-nonce',
+        'code-verifier',
       );
       expect(findOrCreatePersonService.execute).toHaveBeenCalledWith(identity);
       expect(authSessionService.createSession).toHaveBeenCalledWith(
@@ -74,16 +76,19 @@ describe('CompleteGoogleLoginCommand', () => {
   it.each([
     {
       callback: { code: 'code', state: 'wrong' },
+      codeVerifierCookie: 'code-verifier',
       nonceCookie: 'nonce',
       stateCookie: 'expected',
     },
     {
       callback: { error: 'access_denied' },
+      codeVerifierCookie: 'code-verifier',
       nonceCookie: 'nonce',
       stateCookie: 'expected',
     },
     {
       callback: {},
+      codeVerifierCookie: undefined,
       nonceCookie: undefined,
       stateCookie: undefined,
     },
@@ -105,6 +110,7 @@ describe('CompleteGoogleLoginCommand', () => {
 
     const result = await command.execute({
       callback: { code: 'one-time-code', state: 'matching-state' },
+      codeVerifierCookie: 'code-verifier',
       nonceCookie: 'matching-nonce',
       stateCookie: 'matching-state',
     });

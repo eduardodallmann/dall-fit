@@ -4,11 +4,16 @@ import { JwtModule } from '@nestjs/jwt';
 
 import { CompleteGoogleLoginCommand } from '~/auth/commands/complete-google-login.command';
 import { GetCurrentPersonCommand } from '~/auth/commands/get-current-person.command';
+import { LogoutCommand } from '~/auth/commands/logout.command';
 import { StartGoogleLoginCommand } from '~/auth/commands/start-google-login.command';
 import { TestLoginCommand } from '~/auth/commands/test-login.command';
 import { UpdateCurrentPersonConfigsCommand } from '~/auth/commands/update-current-person-configs.command';
 import { AuthController } from '~/auth/controllers/auth.controller';
 import { AdminAuthorizationGuard } from '~/auth/guards/admin-authorization.guard';
+import { CsrfGuard } from '~/auth/guards/csrf.guard';
+import { LogoutCsrfGuard } from '~/auth/guards/logout-csrf.guard';
+import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
+import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
 import { AuthSessionService } from '~/auth/services/auth-session.service';
@@ -29,9 +34,14 @@ import { PersonModule } from '~/person/person.module';
   providers: [
     AuthSessionService,
     AdminAuthorizationGuard,
+    CsrfGuard,
     CompleteGoogleLoginCommand,
     GetCurrentPersonCommand,
     GoogleOAuthService,
+    LogoutCommand,
+    LogoutCsrfGuard,
+    OptionalSessionGuard,
+    RateLimitGuard,
     SessionAuthGuard,
     StartGoogleLoginCommand,
     TestAuthBypassGuard,

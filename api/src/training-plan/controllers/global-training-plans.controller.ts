@@ -20,6 +20,7 @@ import type {
 } from '@dall-fit/types';
 
 import { AdminOnly } from '~/auth/decorators/admin-only';
+import { AdminMutation } from '~/auth/decorators/authenticated-mutation';
 import { CreateGlobalTrainingPlanCommand } from '~/training-plan/commands/create-global-training-plan.command';
 import { CreateTrainingPlanWorkoutCommand } from '~/training-plan/commands/create-training-plan-workout.command';
 import { DeleteGlobalTrainingPlanCommand } from '~/training-plan/commands/delete-global-training-plan.command';
@@ -82,6 +83,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Post()
+  @AdminMutation()
   async create(
     @Body() input: CreateTrainingPlanDto,
   ): Promise<CreateTrainingPlanResponse> {
@@ -137,6 +139,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Patch(':trainingPlanId')
+  @AdminMutation()
   async update(
     @Param() params: TrainingPlanParamsDto,
     @Body() changes: UpdateTrainingPlanDto,
@@ -166,6 +169,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Delete(':trainingPlanId')
+  @AdminMutation()
   @HttpCode(204)
   async delete(@Param() params: TrainingPlanParamsDto): Promise<void> {
     this.logger.log('GlobalTrainingPlansController -> delete -> params:', {
@@ -183,6 +187,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Post(':trainingPlanId/workouts')
+  @AdminMutation()
   async createWorkout(
     @Param() params: TrainingPlanParamsDto,
     @Body() body: EmptyTrainingPlanRequestDto,
@@ -225,6 +230,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Delete(':trainingPlanId/workouts/:workoutId')
+  @AdminMutation()
   @HttpCode(204)
   async deleteWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,

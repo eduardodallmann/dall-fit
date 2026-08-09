@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OAuth2Client } from 'google-auth-library';
+import { CodeChallengeMethod, OAuth2Client } from 'google-auth-library';
 
 import type { ExternalIdentity } from '~/auth/domain/auth.types';
 import { OAuthCallbackError } from '~/auth/errors/oauth-callback.error';
@@ -25,16 +25,23 @@ export class GoogleOAuthService {
     });
   }
 
-  createAuthorizationUrl(state: string, nonce: string): string {
+  createAuthorizationUrl(
+    state: string,
+    nonce: string,
+    codeChallenge: string,
+  ): string {
     this.logger.log('GoogleOAuthService -> createAuthorizationUrl -> params:', {
       params: {
         noncePresent: nonce.length > 0,
+        codeChallengePresent: codeChallenge.length > 0,
         statePresent: state.length > 0,
       },
     });
 
     const authorizationUrl = this.client.generateAuthUrl({
       access_type: 'online',
+      code_challenge: codeChallenge,
+      code_challenge_method: CodeChallengeMethod.S256,
       include_granted_scopes: true,
       nonce,
       prompt: 'select_account',
@@ -55,15 +62,20 @@ export class GoogleOAuthService {
     return result;
   }
 
-  async exchangeCode(code: string, nonce: string): Promise<ExternalIdentity> {
+  async exchangeCode(
+    code: string,
+    nonce: string,
+    codeVerifier: string,
+  ): Promise<ExternalIdentity> {
     this.logger.log('GoogleOAuthService -> exchangeCode -> params:', {
       params: {
         authorizationCodePresent: code.length > 0,
+        codeVerifierPresent: codeVerifier.length > 0,
         noncePresent: nonce.length > 0,
       },
     });
 
-    const tokenResponse = await this.client.getToken(code);
+    const tokenResponse = await this.client.getToken({ code, codeVerifier });
     this.logger.log(
       'GoogleOAuthService -> exchangeCode -> oauthClient return:',
       {
@@ -100,6 +112,9 @@ export class GoogleOAuthService {
 
     if (
       payload === undefined ||
+      !['accounts.google.com', 'https://accounts.google.com'].includes(
+        payload.iss ?? '',
+      ) ||
       payload.nonce !== nonce ||
       payload.email_verified !== true ||
       typeof payload.sub !== 'string' ||

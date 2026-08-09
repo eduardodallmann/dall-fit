@@ -178,8 +178,19 @@ E2E, os adapters reais usam processos efêmeros iniciados por
 `04-mocks-e-bancos-de-teste.md`.
 
 `MongooseModule` é inicializado pela aplicação porque o domínio `Person` persiste
-cadastros e valida a existência da pessoa em toda sessão autenticada. O client Redis
-continua ausente do wiring porque nenhum fluxo vigente o consome.
+cadastros e valida a existência da pessoa em toda sessão autenticada. `RedisModule`
+mantém uma única instância compartilhada de ioredis por runtime aquecido. Ela usa
+TLS obrigatório em produção/preview, namespace por ambiente e deployment de
+preview, fila offline desabilitada, tentativas e timeouts limitados e encerramento
+no lifecycle do Nest. Na Vercel, a mesma conexão é anexada ao lifecycle oficial de
+Fluid Compute; não existe conexão, pool ou fallback por request.
+
+`SessionStoreService` cria, lê e remove sessões revogáveis. `RateLimitService` usa
+um script Lua atômico que executa incremento, TTL e leitura da janela em um único
+comando Redis. Somente `RedisKeyService` compõe as chaves injetando o namespace;
+nenhum adapter executa `KEYS`, `FLUSH*` ou limpeza por prefixo em runtime publicado.
+Falha, timeout, saturação, reset do dataset ou rejeição por `noeviction` nunca
+desabilitam autenticação, CSRF ou rate limit: o caminho protegido falha fechado.
 
 O domínio `Person` expõe ports de repository aos services. O adapter MongoDB mantém
 índice único para o identificador `sub` do Google e mapeia documentos para entidades
@@ -232,22 +243,38 @@ Vite da UI.
   expor seus valores e preserva variáveis predefinidas não pertencentes ao schema;
 - `api/.env.example` declara:
   - `PORT`, porta HTTP, com padrão local `4000`;
+  - `TRUST_PROXY_HOPS`, quantidade explícita de proxies confiáveis para cálculo do
+    IP usado em rate limit;
   - `CORS_ORIGIN`, origem permitida, com padrão local
     `http://localhost:3000`;
   - `MONGODB_URI`, URI do MongoDB principal;
-  - `REDIS_URL`, URI do Redis;
+  - `REDIS_URL`, URI do Redis, obrigatória e `rediss://` em produção/preview;
+  - `REDIS_NAMESPACE`, base do namespace; preview acrescenta hash do deployment;
+  - `REDIS_CONNECT_TIMEOUT_MS` e `REDIS_COMMAND_TIMEOUT_MS`, limites de espera;
+  - pares `RATE_LIMIT_*_LIMIT` e `RATE_LIMIT_*_WINDOW_MS` para início/callback
+    Google, bypass local, sessão, mutações autenticadas e administrativas; aceitam
+    somente inteiros positivos e as janelas têm mínimo de um segundo;
   - `UI_URL`, destino dos redirecionamentos após autenticação;
   - `GOOGLE_OAUTH_CREDENTIALS_BASE64`, JSON de cliente OAuth Web codificado em
     base64;
   - `AUTH_SESSION_SECRET`, chave HMAC com pelo menos 32 caracteres;
+  - `AUTH_SESSION_ACTIVE_KEY_ID`, `AUTH_SESSION_ISSUER` e
+    `AUTH_SESSION_AUDIENCE`, identidade criptográfica da chave e do token;
+  - trio opcional `AUTH_SESSION_PREVIOUS_SECRET`,
+    `AUTH_SESSION_PREVIOUS_KEY_ID` e `AUTH_SESSION_PREVIOUS_VALID_UNTIL`, aceito
+    somente durante no máximo uma validade absoluta de sessão;
   - `AUTH_SESSION_TTL_SECONDS`, validade da sessão;
   - `AUTH_COOKIE_SECURE`, ativação explícita do atributo `Secure` e seleção
     temporária da política `SameSite` compatível com o deploy;
   - `AUTH_TEST_BYPASS_ENABLED` e `AUTH_TEST_BYPASS_KEY`, mecanismo restrito de
     local/teste;
+- `AUTH_TEST_BYPASS_E2E_ENABLED` não pertence ao `.env` de aplicação: é um
+  marcador interno definido pelas suítes E2E antes da composição Nest. Em CI, o
+  bypass só é aceito quando esse marcador, `NODE_ENV=test`, a flag e a chave forte
+  estão presentes; Vercel, preview e produção permanecem recusados;
 - o `.env` local não é versionado;
-- valores padrão existem para desenvolvimento, mas ambientes implantados devem
-  declarar explicitamente seus próprios endereços e credenciais;
+- local/teste usam por padrão `redis://127.0.0.1:6379`; produção/preview não
+  possuem fallback e exigem Redis TLS e namespace próprios;
 - segredos e dados pessoais não aparecem em logs, fixtures ou documentação;
 - todo log segue a sanitização e a redaction definidas em
   `06-logging-e-rastreabilidade.md`;
@@ -260,15 +287,21 @@ documento e ADR quando houver decisão transversal relevante.
 
 ## Autenticação vigente
 
-O módulo `AuthModule` implementa OAuth 2.0 Authorization Code e OpenID Connect no
-backend. A credencial Google nunca chega à UI. `GoogleOAuthService` gera a URL,
-troca o código e valida o ID token; `AuthSessionService` emite e valida o JWT da
-aplicação.
+O módulo `AuthModule` implementa OAuth 2.0 Authorization Code, OpenID Connect e
+PKCE S256 no backend. A credencial Google nunca chega à UI. `GET /auth/google`
+cria `state`, `nonce` e verifier aleatórios em cookies temporários, e
+`GoogleOAuthService` envia somente o challenge, troca o código com o verifier e
+valida assinatura, issuer, audience, nonce, `sub`, e-mail verificado, nome e
+e-mail. `POST /auth/google` não existe.
 
-`SessionAuthGuard` é a fronteira reutilizável de endpoints privados. Ele lê o cookie
-`dall_fit_session`, valida assinatura e expiração e consulta `Person` no MongoDB.
+`SessionAuthGuard` é a fronteira reutilizável de endpoints privados. Ele lê
+`dall_fit_session` em local/teste ou `__Host-dall_fit_session` em ambiente seguro,
+valida `alg`, `kid`, assinatura, `sub`, `jti`, `iss`, `aud`, `iat` e `exp`, exige o
+registro ativo correspondente no Redis e então consulta `Person` no MongoDB.
 `Authenticated` aplica o guard e `CurrentPerson` entrega a entidade já validada ao
-controller. O token contém apenas o ID técnico, sem nome, e-mail ou foto.
+controller. O token contém somente claims técnicos; o JWT bruto nunca é persistido
+no Redis. Cada sessão dura no máximo sete dias, sem renovação deslizante, e o TTL
+do registro nunca ultrapassa `exp`.
 
 `AdminOnly` é o ponto de extensão para endpoints administrativos. Ele aplica
 `SessionAuthGuard` e depois `AdminAuthorizationGuard`; o segundo guard reutiliza a
@@ -277,13 +310,24 @@ service novamente. Pessoa autenticada sem a chave recebe
 `403 ADMIN_ACCESS_REQUIRED`. As sete operações de planos globais aplicam essa
 proteção no controller proprietário.
 
-Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. `state` e
-`nonce` usam cookies temporários com as mesmas proteções e são removidos no
-callback. A política vigente seleciona `SameSite=Lax` quando
-`AUTH_COOKIE_SECURE=false`, preservando o fluxo local, e seleciona obrigatoriamente
-`SameSite=None` junto de `Secure` quando `AUTH_COOKIE_SECURE=true`. A flexibilização
-do ambiente seguro permite que a UI e a API implantadas em sites distintos sob
-`vercel.app` criem e enviem os cookies nas requests com credenciais.
+Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. Em local/teste
+usam nome sem prefixo, `SameSite=Lax` e sem `Secure`; em produção/preview usam
+prefixo `__Host-`, `Secure`, host-only e `SameSite=None`. Os cookies temporários de
+`state`, `nonce` e verifier duram no máximo dez minutos, usam sempre
+`SameSite=Lax` e são removidos no callback, inclusive em erro.
+
+`GET /auth/csrf` devolve o segredo da sessão com `Cache-Control: no-store`.
+Mutações autenticadas exigem simultaneamente cookie, `X-CSRF-Token` comparado em
+tempo constante e `Origin` exatamente igual a `UI_URL`. `POST /auth/logout` é
+idempotente quando não há sessão válida; quando há, aplica a proteção, remove o
+registro Redis e limpa nomes atual e legado do cookie.
+
+Rate limits distribuídos usam sessão/pessoa e IP conforme o endpoint. Início
+Google aceita 10/10min/IP; callback 30/10min/IP; bypass 5/min/IP; CSRF e logout
+30/min/sessão+IP; mutações autenticadas comuns 60/min/pessoa+IP; administrativas
+30/min/admin+IP. Preflight não consome quota. Excesso responde `429` estruturado e
+`Retry-After`. A API usa Helmet antes dos demais middlewares, CORS credenciado com
+origem, métodos e headers exatos e `trust proxy` explícito.
 
 Essa política `SameSite=None` é uma compatibilidade temporária do deploy, não o
 estado de segurança desejado em definitivo. Quando frontend e backend compartilharem
@@ -291,6 +335,7 @@ o mesmo site registrável, os helpers de criação e limpeza devem voltar a emit
 `SameSite=Lax` também com `Secure=true`, e os testes e esta documentação devem ser
 atualizados na mesma mudança.
 
-O bypass de autenticação aceita somente ambiente diferente de produção, flag
-explícita e chave própria. A validação de ambiente rejeita
-`AUTH_TEST_BYPASS_ENABLED=true` em produção.
+O bypass de autenticação aceita somente runtime local/teste fora da Vercel e CI,
+flag explícita e chave aleatória de pelo menos 32 bytes comparada em tempo
+constante. Fora desse contexto o endpoint se comporta como inexistente. O script
+de configuração OAuth não habilita bypass nem grava chave conhecida.

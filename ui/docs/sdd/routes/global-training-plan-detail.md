@@ -50,6 +50,10 @@ Nome e descrição seguem trim e limites 1–120/1–1000. Integrações:
 - `POST /global/training-plans/:trainingPlanId/workouts`;
 - `DELETE /global/training-plans/:trainingPlanId/workouts/:workoutId`.
 
+POST, PATCH e DELETE dependem do bootstrap CSRF do layout autenticado. O client
+Axios único injeta o header em memória; falha `403` não dispara retry automático e
+usa o mesmo rollback/feedback documentado para a operação.
+
 Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 
 ## Navegação e acessibilidade

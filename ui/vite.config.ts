@@ -2,15 +2,36 @@ import { fileURLToPath } from 'node:url';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
 const applicationBackgroundColor = '#f7f7f7';
 
+const mockOAuthNavigationPlugin: Plugin = {
+  name: 'dall-fit-mock-oauth-navigation',
+  configureServer(server) {
+    server.middlewares.use('/api/auth/google', (request, response, next) => {
+      if (
+        process.env.VITE_ENABLE_API_MOCKS !== 'true' ||
+        request.method !== 'GET'
+      ) {
+        next();
+        return;
+      }
+
+      response.statusCode = 302;
+      response.setHeader('Location', '/dash');
+      response.end();
+    });
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    mockOAuthNavigationPlugin,
     tailwindcss(),
     VitePWA({
       devOptions: {

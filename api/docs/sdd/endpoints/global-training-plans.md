@@ -29,10 +29,14 @@
 
 ## Contrato HTTP resumido
 
-Todas as operações exigem o cookie `dall_fit_session` e `isAdmin: true`. Sessão
+Todas as operações exigem o cookie de sessão vigente, registro ativo no Redis e
+`isAdmin: true`. Sessão
 ausente/inválida responde `401 AUTHENTICATION_REQUIRED`; pessoa comum responde
 `403 ADMIN_ACCESS_REQUIRED` antes do controller. Propriedades adicionais, IDs,
 query e bodies inválidos respondem `400 VALIDATION_ERROR` com detalhes vazios.
+POST, PATCH e DELETE também exigem `Origin` exato, `X-CSRF-Token` da sessão e
+quota distribuída de 30/minuto por administradora+IP; falhas respondem `403`,
+`429` com `Retry-After` ou erro técnico sanitizado sem executar o command.
 
 | Método e path                                                       | Entrada                       | Sucesso | Saída                           |
 | ------------------------------------------------------------------- | ----------------------------- | ------- | ------------------------------- |
@@ -58,7 +62,9 @@ sentido de resposta, pois repetir depois da exclusão produz not-found.
 
 ### 1. Entrada e proteção — `GlobalTrainingPlansController`
 
-`AdminOnly` executa `SessionAuthGuard` e `AdminAuthorizationGuard` nessa ordem. O
+`AdminOnly` executa `SessionAuthGuard` e `AdminAuthorizationGuard` nessa ordem.
+Nas mutações, `RateLimitGuard` e `CsrfGuard` completam a proteção antes do
+controller. O
 pipe global transforma query, aplica whitelist e rejeita propriedades extras com o
 erro estável. O controller registra somente IDs e nomes de campos, chama exatamente
 um command e devolve o resultado sem acessar repository.
@@ -97,8 +103,9 @@ da exclusão de workout nos erros funcionais estáveis.
 - exclusão usa `$pull` por plano e workout; se nada for removido, consulta a
   existência do plano para distinguir os dois not-found.
 
-MongoDB é a única dependência. Redis, mensageria, serviço externo e transação não
-participam.
+MongoDB é a única dependência do domínio de planos. Redis participa somente na
+fronteira transversal de sessão, rate limit e CSRF; mensageria, serviço externo e
+transação não participam.
 
 ### 4. Saída e falhas
 
@@ -143,7 +150,7 @@ pnpm -C api seed -- training-plans:list
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":"https://example.test/admin-avatar.png"}' \
 && curl --request GET \
@@ -165,11 +172,12 @@ pnpm -C api seed -- training-plans:create
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request POST --url http://localhost:4000/global/training-plans \
-  --header 'content-type: application/json' --cookie /tmp/dall-fit-training-plan-cookie.txt \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"name":"  Plano corrida  ","description":"  Preparação global.  "}'
 ```
 
@@ -187,7 +195,7 @@ pnpm -C api seed -- training-plans:detail
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
 && curl --request GET \
@@ -209,12 +217,13 @@ pnpm -C api seed -- training-plans:update
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request PATCH \
   --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --header 'content-type: application/json' --cookie /tmp/dall-fit-training-plan-cookie.txt \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"name":"Plano global atualizado"}'
 ```
 
@@ -232,12 +241,13 @@ pnpm -C api seed -- training-plans:create-workout
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request POST \
   --url http://localhost:4000/global/training-plans/64b000000000000000000001/workouts \
-  --header 'content-type: application/json' --cookie /tmp/dall-fit-training-plan-cookie.txt \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
   --data '{}'
 ```
 
@@ -255,12 +265,13 @@ pnpm -C api seed -- training-plans:delete-workout
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request DELETE \
   --url http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 \
-  --cookie /tmp/dall-fit-training-plan-cookie.txt
+  --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt
 ```
 
 - Then: `204`; remove apenas o workout indicado.
@@ -277,12 +288,13 @@ pnpm -C api seed -- training-plans:delete
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request DELETE \
   --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --cookie /tmp/dall-fit-training-plan-cookie.txt
+  --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt
 ```
 
 - Then: `204`; documento e árvore embutida deixam de existir.
@@ -299,7 +311,7 @@ pnpm -C api seed -- training-plans:not-found
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
 && curl --request GET \
@@ -321,12 +333,13 @@ pnpm -C api seed -- training-plans:update
 
 ```bash
 curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: local-auth-test-key' \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
   --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
 && curl --request PATCH \
   --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --header 'content-type: application/json' --cookie /tmp/dall-fit-training-plan-cookie.txt \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
   --data '{}'
 ```
 
