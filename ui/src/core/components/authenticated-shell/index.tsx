@@ -1,10 +1,11 @@
-import { useCallback, useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 
 import { Button, Drawer, useOverlayState } from '@heroui/react';
 import { Menu } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
+import { trackUiEvent } from '~/core/analytics';
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { authenticatedShellStyles } from '~/core/components/authenticated-shell/styles';
 
@@ -20,16 +21,73 @@ export function AuthenticatedShell({
   children,
   person,
 }: Readonly<AuthenticatedShellProps>) {
-  const drawerState = useOverlayState();
-  const closeDrawer = useCallback(() => {
-    drawerState.close();
-  }, [drawerState]);
+  const drawerOpenRef = useRef(false);
+  const closeReasonRef = useRef<
+    'backdrop' | 'breakpoint' | 'close_trigger' | 'escape' | 'navigation'
+  >('backdrop');
+  const handleDrawerOpenChange = useCallback((isOpen: boolean) => {
+    if (isOpen) {
+      if (!drawerOpenRef.current) {
+        trackUiEvent({
+          control: 'mobile_menu',
+          eventName: 'ui_menu_opened',
+          menu: 'application',
+          surface: 'authenticated_shell',
+        });
+      }
+      drawerOpenRef.current = true;
+
+      return;
+    }
+
+    if (!drawerOpenRef.current) {
+      return;
+    }
+
+    trackUiEvent({
+      control: 'mobile_menu',
+      eventName: 'ui_overlay_closed',
+      overlay: 'application_menu',
+      reason: closeReasonRef.current,
+      surface: 'authenticated_shell',
+    });
+    drawerOpenRef.current = false;
+    closeReasonRef.current = 'backdrop';
+  }, []);
+  const drawerState = useOverlayState({
+    onOpenChange: handleDrawerOpenChange,
+  });
+  const closeDrawer = useCallback(
+    (reason: typeof closeReasonRef.current) => {
+      closeReasonRef.current = reason;
+      drawerState.close();
+    },
+    [drawerState],
+  );
+
+  useEffect(() => {
+    if (!drawerState.isOpen) {
+      return;
+    }
+
+    const markEscapeClose = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeReasonRef.current = 'escape';
+      }
+    };
+
+    document.addEventListener('keydown', markEscapeClose, true);
+
+    return () => {
+      document.removeEventListener('keydown', markEscapeClose, true);
+    };
+  }, [drawerState.isOpen]);
 
   useEffect(() => {
     const desktopMediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
     const closeDrawerOnDesktop = (event: MediaQueryListEvent) => {
       if (event.matches) {
-        closeDrawer();
+        closeDrawer('breakpoint');
       }
     };
 
@@ -54,15 +112,30 @@ export function AuthenticatedShell({
               focusable="false"
             />
           </Button>
-          <Drawer.Backdrop isDismissable>
+          <Drawer.Backdrop
+            isDismissable
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeReasonRef.current = 'backdrop';
+              }
+            }}
+          >
             <Drawer.Content placement="left">
               <Drawer.Dialog
                 aria-label="Menu da aplicação"
                 className={styles.drawerDialog()}
               >
-                <Drawer.CloseTrigger aria-label="Fechar menu" />
+                <Drawer.CloseTrigger
+                  aria-label="Fechar menu"
+                  onPressStart={() => {
+                    closeReasonRef.current = 'close_trigger';
+                  }}
+                />
                 <Drawer.Body className={styles.drawerBody()}>
-                  <ApplicationMenu onNavigate={closeDrawer} person={person} />
+                  <ApplicationMenu
+                    onNavigate={() => closeDrawer('navigation')}
+                    person={person}
+                  />
                 </Drawer.Body>
               </Drawer.Dialog>
             </Drawer.Content>

@@ -25,6 +25,17 @@ o módulo de service diretamente em testes de rota. Overrides locais com
 `mockServer.use(...)` são permitidos para erros e casos específicos e devem ser
 restaurados após cada teste.
 
+Vercel Analytics é isolado nos testes: a composição global substitui o componente
+oficial para confirmar uma única montagem sem carregar coleta externa; testes da
+fronteira substituem apenas `track` e validam schema, normalização, deduplicação,
+privacidade e no-op em falha. Componentes e providers substituem a fronteira
+interna para verificar os eventos produzidos por interações acessíveis. Valores de
+campos, IDs, query e mensagens de erro não podem aparecer nos asserts de emissão.
+
+Playwright mantém a integração real entre componentes e navegação, mas não cria
+handler MSW, `page.route` ou implementação paralela para Analytics. Recebimento de
+pageviews no dashboard da Vercel é uma verificação manual de implantação.
+
 ## Testes integrados
 
 Playwright sobe a UI real com Vite, habilita o MSW no navegador e cobre:

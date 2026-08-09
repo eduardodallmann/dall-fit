@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Person } from '@dall-fit/types';
 
@@ -15,6 +15,14 @@ import { ApplicationMenu } from '~/core/components/application-menu';
 import { PwaContext } from '~/core/pwa/pwa-context';
 import { ThemeContext } from '~/core/theme/theme-context';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
+
+const { trackUiEventMock } = vi.hoisted(() => ({
+  trackUiEventMock: vi.fn(),
+}));
+
+vi.mock('~/core/analytics', () => ({
+  trackUiEvent: trackUiEventMock,
+}));
 
 const pwaContextValue = {
   dismissUpdate: vi.fn(),
@@ -36,6 +44,10 @@ const themeContextValue = {
 };
 
 describe('ApplicationMenu', () => {
+  beforeEach(() => {
+    trackUiEventMock.mockClear();
+  });
+
   it('shows the authenticated identity and active Home navigation', async () => {
     await renderApplicationMenu(authenticatedPersonFixture);
 
@@ -94,6 +106,13 @@ describe('ApplicationMenu', () => {
     await user.click(screen.getByRole('link', { name: 'Home' }));
 
     expect(onNavigate).toHaveBeenCalledOnce();
+    expect(trackUiEventMock).toHaveBeenCalledWith({
+      control: 'home_link',
+      destination: 'dash',
+      eventName: 'ui_navigation_selected',
+      navigationKind: 'menu',
+      surface: 'application_menu',
+    });
   });
 });
 

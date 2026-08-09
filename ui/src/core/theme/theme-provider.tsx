@@ -16,6 +16,7 @@ import {
   updateCurrentPersonConfigs,
   type MockAuthScenario,
 } from '~/auth/auth-service';
+import { trackUiEvent } from '~/core/analytics';
 import {
   ThemeContext,
   type ThemeContextValue,
@@ -79,6 +80,13 @@ export function ThemeProvider({
       }
 
       toast.danger('Não foi possível salvar o tema. Tente novamente.');
+      trackUiEvent({
+        control: 'theme_toggle',
+        eventName: 'ui_operation_completed',
+        operation: 'theme_update',
+        outcome: 'error',
+        surface: 'application_menu',
+      });
     },
     onSuccess: (person) => {
       const confirmedTheme = person.configs.theme;
@@ -93,6 +101,13 @@ export function ThemeProvider({
         { queryKey: ['auth', 'current-person'] },
         person,
       );
+      trackUiEvent({
+        control: 'theme_toggle',
+        eventName: 'ui_operation_completed',
+        operation: 'theme_update',
+        outcome: 'success',
+        surface: 'application_menu',
+      });
     },
     onSettled: () => {
       mutationPendingRef.current = false;
@@ -135,6 +150,12 @@ export function ThemeProvider({
     }
 
     mutationPendingRef.current = true;
+    trackUiEvent({
+      control: 'theme_toggle',
+      eventName: 'ui_operation_started',
+      operation: 'theme_update',
+      surface: 'application_menu',
+    });
     const nextTheme = themeState.theme === 'dark' ? 'light' : 'dark';
     const rollback = confirmedThemeRef.current;
     writeStoredTheme(nextTheme);

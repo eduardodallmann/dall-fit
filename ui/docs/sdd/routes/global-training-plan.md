@@ -99,6 +99,24 @@ dialogs, campos e botões possuem nomes textuais; menu de reticências recebe `A
 de <nome>`. O nome do plano mantém affordance visual de link por cor e sublinhado.
 Truncamento visual preserva o texto integral e `title`.
 
+## Analytics
+
+- breadcrumb, nome de plano e paginação emitem `ui_navigation_selected` com destino
+  e tipo enumerados; página, ID, nome e query não são propriedades;
+- abrir o dropdown emite `ui_menu_opened`; escolher Editar ou Excluir emite
+  `ui_menu_action_selected`, e a abertura subsequente do modal ou confirmação emite
+  `ui_overlay_opened`;
+- abrir `Novo plano` emite a abertura do formulário no modo `create`; editar usa
+  `edit`. Cancelar, submeter ou confirmar emite um único `ui_overlay_closed` com a
+  razão correspondente;
+- Nome e Descrição emitem o primeiro `ui_field_focused` de cada abertura e
+  `ui_field_completed` somente depois de mudança, com `empty|valid|invalid`. Valor,
+  tamanho, erro e texto visível nunca são enviados;
+- submissões válidas emitem `ui_form_submitted`, e criar, editar ou excluir emitem
+  um início e um resultado terminal `success|error` da operação correspondente;
+- retries emitem `ui_retry_requested` para `training_plans`, tanto na falha inicial
+  quanto na atualização em background.
+
 ## Referências visuais de layout
 
 Não se aplica — não existem imagens em `routes/assets/global-training-plan/`.

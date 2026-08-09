@@ -21,8 +21,17 @@ import {
 } from '~/mocks/fixtures/person';
 import { mockServer } from '~/mocks/server';
 
+const { trackUiEventMock } = vi.hoisted(() => ({
+  trackUiEventMock: vi.fn(),
+}));
+
+vi.mock('~/core/analytics', () => ({
+  trackUiEvent: trackUiEventMock,
+}));
+
 describe('ThemeProvider', () => {
   beforeEach(() => {
+    trackUiEventMock.mockClear();
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
   });
@@ -131,6 +140,19 @@ describe('ThemeProvider', () => {
       ).toEqual({ theme: 'light' });
     });
     expect(requestCount).toBe(1);
+    expect(trackUiEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_started',
+        operation: 'theme_update',
+      }),
+    );
+    expect(trackUiEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'theme_update',
+        outcome: 'success',
+      }),
+    );
   });
 
   it('rolls back to the confirmed profile theme and announces a save failure', async () => {
@@ -159,6 +181,13 @@ describe('ThemeProvider', () => {
     ).toBeInTheDocument();
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    expect(trackUiEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'theme_update',
+        outcome: 'error',
+      }),
+    );
   });
 
   it('rolls back a profile without theme to the current system preference', async () => {

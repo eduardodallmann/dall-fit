@@ -4,6 +4,7 @@ import { Dumbbell, House } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
+import { trackUiEvent } from '~/core/analytics';
 import { getPersonInitials } from '~/core/components/application-menu/get-person-initials';
 import { applicationMenuStyles } from '~/core/components/application-menu/styles';
 import { PwaInstallAction } from '~/core/components/pwa-install-action';
@@ -71,7 +72,16 @@ export function ApplicationMenu({
         <Link
           activeOptions={{ exact: true }}
           className={styles.navigationLink()}
-          onClick={onNavigate}
+          onClick={() => {
+            trackUiEvent({
+              control: 'home_link',
+              destination: 'dash',
+              eventName: 'ui_navigation_selected',
+              navigationKind: 'menu',
+              surface: 'application_menu',
+            });
+            onNavigate?.();
+          }}
           to="/dash"
         >
           <House
@@ -85,7 +95,16 @@ export function ApplicationMenu({
           <Link
             activeOptions={{ includeSearch: false }}
             className={styles.navigationLink()}
-            onClick={onNavigate}
+            onClick={() => {
+              trackUiEvent({
+                control: 'training_plans_link',
+                destination: 'training_plan_list',
+                eventName: 'ui_navigation_selected',
+                navigationKind: 'menu',
+                surface: 'application_menu',
+              });
+              onNavigate?.();
+            }}
             search={adminSearch}
             to="/global/training-plan"
           >
