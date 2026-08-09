@@ -23,8 +23,10 @@
     `SortDirectionValue` sem consumidores vigentes;
   - `PersonModule` exporta `MongooseModule` e `PersonRepository`, ampliando a API
     pública do domínio além dos services permitidos pela arquitetura;
-  - `TrainingPlanModule` importa `PersonModule` sem consumir nenhum provider
-    exportado por ele.
+  - `TrainingPlanModule` importa `PersonModule` para que os guards aplicados por
+    `AdminOnly` resolvam `FindPersonByIdService`: embora `AuthModule` importe
+    `PersonModule`, ele não o reexporta, e o Nest instancia os guards no contexto
+    do módulo proprietário do controller.
 - Resultado: API, UI e seus testes/tooling compilam sob TypeScript estrito, a API
   não possui permissão global para `any`, e as superfícies públicas do pacote de
   tipos e dos módulos Nest expõem somente dependências com consumidores
@@ -42,6 +44,9 @@
   - `packages/types/src/index.ts`, `packages/types/src/contracts.ts` e
     `packages/types/src/enums.ts`;
   - `api/src/person/person.module.ts`;
+  - `api/src/auth/auth.module.ts`;
+  - `api/src/auth/guards/session-auth.guard.ts`;
+  - `api/src/auth/decorators/admin-only.ts`;
   - `api/src/training-plan/training-plan.module.ts`.
 - Referências oficiais:
   - [TypeScript — `strict`](https://www.typescriptlang.org/tsconfig/strict.html);
@@ -83,8 +88,12 @@
 - preservar como API pública de `PersonModule` somente os services que possuem
   consumidores válidos: `FindOrCreatePersonService`, `FindPersonByIdService` e
   `UpdatePersonThemeService`;
-- remover `PersonModule` dos imports de `TrainingPlanModule` e confirmar que o
-  módulo de planos continua resolvendo todo o seu grafo de dependências;
+- reexportar `PersonModule` por `AuthModule`, porque os guards públicos de
+  autenticação dependem de `FindPersonByIdService` quando são aplicados em
+  controllers pertencentes a módulos consumidores;
+- remover o import direto de `PersonModule` de `TrainingPlanModule`, deixando a
+  dependência transitiva explícita pela fronteira pública de `AuthModule`, e
+  confirmar que o módulo de planos continua resolvendo todo o grafo;
 - atualizar os SDDs vivos afetados durante a futura implementação para registrar a
   política estrita, a superfície pública efetiva de `@dall-fit/types` e o
   encapsulamento dos módulos da API.
@@ -107,15 +116,15 @@
   a um consumidor hipotético;
 - realizar refactors de estilo, renomeações ou reorganizações não necessários para
   resolver os diagnósticos estritos e estreitar as fronteiras descritas;
-- alterar `AppModule` ou `AuthModule`, salvo se a validação do grafo provar uma
-  inconsistência diretamente causada pelo escopo e a feature for refinada antes da
-  implementação.
+- alterar `AppModule` ou alterar `AuthModule` além da reexportação explícita de
+  `PersonModule` necessária ao grafo dos guards.
 
 ## Projetos e documentação afetados
 
 - API e endpoints:
   - `api/tsconfig.json`, arquivos TypeScript alcançados por ele,
-    `eslint/api.config.mjs`, `PersonModule` e `TrainingPlanModule` são afetados;
+    `eslint/api.config.mjs`, `PersonModule`, `AuthModule` e `TrainingPlanModule`
+    são afetados;
   - `api/docs/sdd/base/01-arquitetura.md` deve registrar a fronteira pública dos
     módulos, e `api/docs/sdd/base/03-testes-e-qualidade.md` deve registrar o
     typecheck estrito;
@@ -168,13 +177,16 @@
    API pública e do código-fonte do pacote somente depois de uma busca sem
    consumidores válidos. Nenhum consumidor deve trocar esses símbolos por cópia
    local especulativa.
-8. Um módulo que importe `PersonModule` deve enxergar somente os três services
-   públicos. `MongooseModule`, models, adapters e a port `PersonRepository`
-   permanecem encapsulados no domínio `person`.
-9. `TrainingPlanModule` deve inicializar e executar sem importar `PersonModule`.
-10. Requests, responses, dados persistidos, logs, status HTTP, telas e interações
+8. Um módulo que importe ou receba `PersonModule` por reexportação deve enxergar
+   somente os três services públicos. `MongooseModule`, models, adapters e a port
+   `PersonRepository` permanecem encapsulados no domínio `person`.
+9. `AuthModule` deve reexportar `PersonModule` para disponibilizar a dependência
+   legítima de `SessionAuthGuard` aos módulos que consomem os guards públicos.
+10. `TrainingPlanModule` deve inicializar e executar importando somente
+    `AuthModule`, sem importar `PersonModule` diretamente.
+11. Requests, responses, dados persistidos, logs, status HTTP, telas e interações
     observáveis devem permanecer equivalentes ao estado anterior à refatoração.
-11. Se a busca descobrir consumidor válido, uso indireto por decorator/injeção,
+12. Se a busca descobrir outro consumidor válido, uso indireto por decorator/injeção,
     carregamento dinâmico ou API pública externa para qualquer símbolo ou módulo a
     remover, a implementação deve parar e esta feature deve ser refinada antes de
     prosseguir.
@@ -246,7 +258,9 @@
 - When: o Nest inicializa o grafo e os E2E vigentes exercitam autenticação e planos.
 - Then: não ocorre erro de resolução de dependência.
 - And: `PersonModule` não exporta `MongooseModule` nem `PersonRepository`.
-- And: `TrainingPlanModule` não importa `PersonModule`.
+- And: `AuthModule` reexporta `PersonModule` para sustentar as dependências dos
+  guards que ele torna públicos.
+- And: `TrainingPlanModule` não importa `PersonModule` diretamente.
 - And: os services públicos de pessoa continuam disponíveis aos consumidores
   válidos e o repository continua acessível somente dentro do domínio por services.
 
@@ -273,9 +287,9 @@
 5. Pesquisar os símbolos públicos candidatos em todo o monorepo e no resultado de
    build do pacote; remover declaração, barrel, arquivos vazios e referências
    documentais em uma mudança atômica.
-6. Estreitar `PersonModule`, remover o import sem consumidor de
-   `TrainingPlanModule` e validar bootstrap e E2E antes de qualquer limpeza
-   adicional de módulos.
+6. Estreitar `PersonModule`, reexportá-lo por `AuthModule`, remover seu import
+   direto de `TrainingPlanModule` e validar bootstrap e E2E antes de qualquer
+   limpeza adicional de módulos.
 7. Atualizar somente os SDDs vivos de arquitetura, qualidade e contratos listados
    nesta feature, preservando endpoints, rotas e flows sem mudança observável.
 8. Revisar API e UI por imports, exports, helpers e arquivos tornados sem uso e
@@ -314,8 +328,11 @@
   risco que a migração pretende revelar. Elas não são solução padrão e exigem uma
   garantia verificável quando inevitáveis.
 - Decorators, injeção do Nest, metadados Mongoose e valores exportados em runtime
-  podem possuir uso indireto que uma busca textual simples não detecta. A remoção
-  exige combinar busca, inspeção do grafo e execução dos E2E.
+  podem possuir uso indireto que uma busca textual simples não detecta. A validação
+  do grafo confirmou que `AdminOnly` faz `SessionAuthGuard` depender de
+  `FindPersonByIdService` no contexto de `TrainingPlanModule`; por isso
+  `AuthModule` reexporta `PersonModule`, conforme o mecanismo oficial de
+  reexportação de módulos do Nest.
 - Remover um provider do array `exports` não remove seu registro local. A decisão é
   manter repository e adapter disponíveis dentro de `PersonModule`, expondo apenas
   services aos módulos consumidores.
@@ -335,7 +352,8 @@
 - `RequestContract`, `SortDirection` e `SortDirectionValue` removidos após busca de
   consumidores
 - `PersonModule` exporta apenas services válidos e mantém infraestrutura interna
-- `TrainingPlanModule` não depende de `PersonModule`
+- `AuthModule` reexporta `PersonModule` para os guards públicos
+- `TrainingPlanModule` não importa `PersonModule` diretamente
 - Comportamento, contratos HTTP, rotas, dados, logs e integrações preservados
 - SDDs vivos de qualidade, contratos e arquitetura atualizados na implementação
 - MSW, mocks e fixtures sem mudança de cenário ou payload
