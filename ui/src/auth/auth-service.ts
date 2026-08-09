@@ -1,17 +1,20 @@
 import type {
+  CsrfTokenResponse,
   CurrentPersonResponse,
   Person,
-  StartGoogleLoginResponse,
   Theme,
   UpdateCurrentPersonConfigsResponse,
 } from '@dall-fit/types';
 
+import { getCsrfToken, setCsrfToken } from '~/auth/csrf-token';
 import { apiClient } from '~/core/http/api-client';
 
 export type MockAuthScenario =
   | 'admin'
   | 'authenticated'
+  | 'csrf-error'
   | 'error'
+  | 'logout-error'
   | 'theme-dark'
   | 'theme-light'
   | 'theme-save-error'
@@ -28,10 +31,9 @@ function getMockHeaders(mockScenario: MockAuthScenario) {
   return result;
 }
 
-export async function startGoogleLogin(): Promise<string> {
-  const response =
-    await apiClient.post<StartGoogleLoginResponse>('/auth/google');
-  const result = response.data.data.authorizationUrl;
+export function getGoogleLoginUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  const result = `${apiUrl}/auth/google`;
 
   return result;
 }
@@ -45,6 +47,31 @@ export async function getCurrentPerson(
   const result = response.data.data;
 
   return result;
+}
+
+export async function ensureCsrfToken(
+  mockScenario: MockAuthScenario = 'authenticated',
+): Promise<string> {
+  const currentToken = getCsrfToken();
+  if (currentToken !== undefined) {
+    return currentToken;
+  }
+
+  const response = await apiClient.get<CsrfTokenResponse>('/auth/csrf', {
+    headers: getMockHeaders(mockScenario),
+  });
+  const result = response.data.data.token;
+  setCsrfToken(result);
+
+  return result;
+}
+
+export async function logout(
+  mockScenario: MockAuthScenario = 'authenticated',
+): Promise<void> {
+  await apiClient.post('/auth/logout', undefined, {
+    headers: getMockHeaders(mockScenario),
+  });
 }
 
 export async function updateCurrentPersonConfigs(

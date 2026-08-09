@@ -8,7 +8,11 @@ import {
 } from '@tanstack/react-router';
 import axios from 'axios';
 
-import type { MockAuthScenario } from '~/auth/auth-service';
+import { ensureCsrfToken, type MockAuthScenario } from '~/auth/auth-service';
+import {
+  AUTHENTICATION_REQUIRED_EVENT,
+  clearCsrfToken,
+} from '~/auth/csrf-token';
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
 import { queryClient } from '~/context/query-client';
 import {
@@ -74,11 +78,14 @@ const authenticatedRoute = createRoute({
       const person = await context.queryClient.ensureQueryData(
         currentPersonQueryOptions(mockAuth),
       );
+      await ensureCsrfToken(mockAuth);
       const result = { mockAuth, person };
 
       return result;
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
+        clearCsrfToken();
+        context.queryClient.clear();
         redirect({ replace: true, throw: true, to: '/' });
       }
 
@@ -167,6 +174,12 @@ export const router = createRouter({
   routeTree,
 });
 
+window.addEventListener(AUTHENTICATION_REQUIRED_EVENT, () => {
+  clearCsrfToken();
+  queryClient.clear();
+  void router.navigate({ replace: true, to: '/' });
+});
+
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');
   const result = isMockAuthScenario(value) ? value : 'authenticated';
@@ -178,7 +191,9 @@ function isMockAuthScenario(value: unknown): value is MockAuthScenario {
   const result =
     value === 'admin' ||
     value === 'authenticated' ||
+    value === 'csrf-error' ||
     value === 'error' ||
+    value === 'logout-error' ||
     value === 'theme-dark' ||
     value === 'theme-light' ||
     value === 'theme-save-error' ||

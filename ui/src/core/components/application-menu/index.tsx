@@ -1,6 +1,6 @@
-import { Avatar, Chip, Typography } from '@heroui/react';
+import { Avatar, Button, Chip, Typography } from '@heroui/react';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Dumbbell, House } from 'lucide-react';
+import { Dumbbell, House, LogOut } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
@@ -13,12 +13,16 @@ import { ThemeToggle } from '~/core/components/theme-toggle';
 const styles = applicationMenuStyles();
 
 export interface ApplicationMenuProps {
+  isLogoutPending?: boolean;
+  onLogout?: () => void;
   onNavigate?: () => void;
   person: Person;
 }
 
 export function ApplicationMenu({
+  isLogoutPending = false,
   onNavigate,
+  onLogout,
   person,
 }: Readonly<ApplicationMenuProps>) {
   const initials = getPersonInitials(person.name);
@@ -118,6 +122,15 @@ export function ApplicationMenu({
         ) : null}
       </nav>
       <PwaInstallAction />
+      <Button
+        className={styles.logout()}
+        isPending={isLogoutPending}
+        onPress={onLogout}
+        variant="secondary"
+      >
+        <LogOut aria-hidden="true" focusable="false" />
+        {isLogoutPending ? 'Saindo' : 'Sair'}
+      </Button>
     </div>
   );
 }

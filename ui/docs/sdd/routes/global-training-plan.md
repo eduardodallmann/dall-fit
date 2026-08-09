@@ -88,6 +88,11 @@ informa a falha.
 - Criar: `POST /global/training-plans` com nome/descrição.
 - Editar: `PATCH /global/training-plans/:id`.
 - Excluir: `DELETE /global/training-plans/:id`.
+
+Todas as mutações só ficam disponíveis depois do bootstrap autenticado de CSRF.
+O Axios compartilhado injeta `X-CSRF-Token` em memória e envia o cookie; `403` não
+é repetido automaticamente e segue o rollback/feedback da mutation proprietária.
+
 - Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 - Retry: política TanStack Query; mutations não são repetidas automaticamente.
 

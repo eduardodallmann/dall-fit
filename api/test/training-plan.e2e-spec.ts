@@ -1,9 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
+import Redis from 'ioredis';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Types, type Model } from 'mongoose';
-import request from 'supertest';
+import { RedisMemoryServer } from 'redis-memory-server';
+import request, { type Test as SupertestTest } from 'supertest';
 import type { App } from 'supertest/types';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -25,24 +27,32 @@ const googleCredential = Buffer.from(
     },
   }),
 ).toString('base64');
+const testBypassKey = 'e2e-training-test-key-with-at-least-32-random-bytes';
 
 describe('Global training plans (e2e)', () => {
   let app: INestApplication<App>;
   let mongoServer: MongoMemoryServer;
   let personModel: Model<PersonDocument>;
+  let redisClient: Redis;
+  let redisServer: RedisMemoryServer;
   let trainingPlanModel: Model<TrainingPlanDocument>;
+  const csrfTokens = new WeakMap<ReturnType<typeof request.agent>, string>();
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create({
       binary: { version: '8.0.12' },
     });
+    redisServer = new RedisMemoryServer({ binary: { version: '8.8.1' } });
+    await redisServer.start();
     process.env.NODE_ENV = 'test';
     process.env.MONGODB_URI = mongoServer.getUri('dall-fit-training-plan-e2e');
+    process.env.REDIS_URL = `redis://${await redisServer.getHost()}:${await redisServer.getPort()}`;
+    process.env.REDIS_NAMESPACE = 'dall-fit-training-e2e';
     process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64 = googleCredential;
     process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
     process.env.AUTH_COOKIE_SECURE = 'false';
     process.env.AUTH_TEST_BYPASS_ENABLED = 'true';
-    process.env.AUTH_TEST_BYPASS_KEY = 'local-auth-test-key';
+    process.env.AUTH_TEST_BYPASS_KEY = testBypassKey;
     process.env.UI_URL = 'http://localhost:3000';
 
     const { AppModule } = await import('~/app.module.js');
@@ -52,6 +62,12 @@ describe('Global training plans (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
+    app.enableCors({
+      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      origin: 'http://localhost:3000',
+    });
     await app.init();
 
     personModel = app.get<Model<PersonDocument>>(
@@ -64,17 +80,21 @@ describe('Global training plans (e2e)', () => {
       personModel.syncIndexes(),
       trainingPlanModel.syncIndexes(),
     ]);
+    redisClient = new Redis(process.env.REDIS_URL);
   });
 
   beforeEach(async () => {
     await Promise.all([
       personModel.deleteMany({}).exec(),
       trainingPlanModel.deleteMany({}).exec(),
+      redisClient.flushdb(),
     ]);
   });
 
   afterAll(async () => {
     await app?.close();
+    await redisClient?.quit();
+    await redisServer?.stop();
     await mongoServer?.stop();
   });
 
@@ -94,7 +114,7 @@ describe('Global training plans (e2e)', () => {
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')
-      .set('x-auth-test-key', 'local-auth-test-key')
+      .set('x-auth-test-key', testBypassKey)
       .send({
         googleSubject,
         name: 'Ignored profile',
@@ -102,8 +122,26 @@ describe('Global training plans (e2e)', () => {
         photoUrl: null,
       })
       .expect(204);
+    const csrfResponse = await agent.get('/auth/csrf').expect(200);
+    const csrfBody = csrfResponse.body as { data: { token: string } };
+    csrfTokens.set(agent, csrfBody.data.token);
 
     return agent;
+  }
+
+  function authenticatedMutation(
+    agent: ReturnType<typeof request.agent>,
+    test: SupertestTest,
+  ): SupertestTest {
+    const csrfToken = csrfTokens.get(agent);
+    if (csrfToken === undefined) {
+      throw new Error('Authenticated agent is missing its CSRF token.');
+    }
+    const result = test
+      .set('Origin', 'http://localhost:3000')
+      .set('x-csrf-token', csrfToken);
+
+    return result;
   }
 
   async function createGlobalPlan(
@@ -153,7 +191,10 @@ describe('Global training plans (e2e)', () => {
 
   it('creates, normalizes, updates and deletes a global plan as one persisted document', async () => {
     const agent = await login(true);
-    const createResponse = await agent.post('/global/training-plans').send({
+    const createResponse = await authenticatedMutation(
+      agent,
+      agent.post('/global/training-plans'),
+    ).send({
       name: '  Plano hipertrofia  ',
       description: '  Um plano global completo.  ',
     });
@@ -174,9 +215,10 @@ describe('Global training plans (e2e)', () => {
       workouts: [],
     });
 
-    const updateResponse = await agent
-      .patch(`/global/training-plans/${planId}`)
-      .send({ name: '  Plano atualizado  ' });
+    const updateResponse = await authenticatedMutation(
+      agent,
+      agent.patch(`/global/training-plans/${planId}`),
+    ).send({ name: '  Plano atualizado  ' });
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body).toMatchObject({
       data: {
@@ -186,7 +228,10 @@ describe('Global training plans (e2e)', () => {
       },
     });
 
-    await agent.delete(`/global/training-plans/${planId}`).expect(204);
+    await authenticatedMutation(
+      agent,
+      agent.delete(`/global/training-plans/${planId}`),
+    ).expect(204);
     await expect(trainingPlanModel.findById(planId).exec()).resolves.toBeNull();
   });
 
@@ -249,7 +294,10 @@ describe('Global training plans (e2e)', () => {
     });
     expect(detailBody.data.workouts[0]).not.toHaveProperty('exercises');
 
-    await agent.delete(`/global/training-plans/${plan.id}`).expect(204);
+    await authenticatedMutation(
+      agent,
+      agent.delete(`/global/training-plans/${plan.id}`),
+    ).expect(204);
     await expect(
       trainingPlanModel.findById(plan.id).exec(),
     ).resolves.toBeNull();
@@ -268,9 +316,10 @@ describe('Global training plans (e2e)', () => {
       ],
     });
 
-    const createResponse = await agent
-      .post(`/global/training-plans/${plan.id}/workouts`)
-      .send({});
+    const createResponse = await authenticatedMutation(
+      agent,
+      agent.post(`/global/training-plans/${plan.id}/workouts`),
+    ).send({});
     expect(createResponse.status).toBe(201);
     expect(createResponse.body).toMatchObject({
       data: { name: 'Novo treino', exerciseCount: 0 },
@@ -286,9 +335,10 @@ describe('Global training plans (e2e)', () => {
       exercises: [],
     });
 
-    await agent
-      .delete(`/global/training-plans/${plan.id}/workouts/${workoutId}`)
-      .expect(204);
+    await authenticatedMutation(
+      agent,
+      agent.delete(`/global/training-plans/${plan.id}/workouts/${workoutId}`),
+    ).expect(204);
     const afterDelete = await trainingPlanModel.findById(plan.id).lean().exec();
     expect(afterDelete?.workouts).toHaveLength(1);
     expect(afterDelete?.workouts[0]?._id.toString()).toBe(
@@ -307,15 +357,18 @@ describe('Global training plans (e2e)', () => {
 
     for (const planId of [personalPlan.id, missingPlanId]) {
       const getResponse = await agent.get(`/global/training-plans/${planId}`);
-      const patchResponse = await agent
-        .patch(`/global/training-plans/${planId}`)
-        .send({ name: 'Não atualiza' });
-      const deleteResponse = await agent.delete(
-        `/global/training-plans/${planId}`,
+      const patchResponse = await authenticatedMutation(
+        agent,
+        agent.patch(`/global/training-plans/${planId}`),
+      ).send({ name: 'Não atualiza' });
+      const deleteResponse = await authenticatedMutation(
+        agent,
+        agent.delete(`/global/training-plans/${planId}`),
       );
-      const workoutResponse = await agent
-        .post(`/global/training-plans/${planId}/workouts`)
-        .send({});
+      const workoutResponse = await authenticatedMutation(
+        agent,
+        agent.post(`/global/training-plans/${planId}/workouts`),
+      ).send({});
 
       for (const response of [
         getResponse,
@@ -330,11 +383,17 @@ describe('Global training plans (e2e)', () => {
       }
     }
 
-    const missingWorkoutResponse = await agent.delete(
-      `/global/training-plans/${globalPlan.id}/workouts/${missingWorkoutId}`,
+    const missingWorkoutResponse = await authenticatedMutation(
+      agent,
+      agent.delete(
+        `/global/training-plans/${globalPlan.id}/workouts/${missingWorkoutId}`,
+      ),
     );
-    const missingPlanWorkoutResponse = await agent.delete(
-      `/global/training-plans/${missingPlanId}/workouts/${missingWorkoutId}`,
+    const missingPlanWorkoutResponse = await authenticatedMutation(
+      agent,
+      agent.delete(
+        `/global/training-plans/${missingPlanId}/workouts/${missingWorkoutId}`,
+      ),
     );
     expect(missingWorkoutResponse.status).toBe(404);
     expect(missingWorkoutResponse.body).toMatchObject({
@@ -354,20 +413,27 @@ describe('Global training plans (e2e)', () => {
       () => agent.get('/global/training-plans?page=1.5'),
       () => agent.get('/global/training-plans/not-an-id'),
       () =>
-        agent
-          .post('/global/training-plans')
-          .send({ name: ' ', description: 'x' }),
+        authenticatedMutation(agent, agent.post('/global/training-plans')).send(
+          { name: ' ', description: 'x' },
+        ),
       () =>
-        agent.post('/global/training-plans').send({
-          name: 'Plano',
-          description: 'Descrição',
-          unexpected: true,
-        }),
-      () => agent.patch(`/global/training-plans/${plan.id}`).send({}),
+        authenticatedMutation(agent, agent.post('/global/training-plans')).send(
+          {
+            name: 'Plano',
+            description: 'Descrição',
+            unexpected: true,
+          },
+        ),
       () =>
-        agent
-          .post(`/global/training-plans/${plan.id}/workouts`)
-          .send({ unexpected: true }),
+        authenticatedMutation(
+          agent,
+          agent.patch(`/global/training-plans/${plan.id}`),
+        ).send({}),
+      () =>
+        authenticatedMutation(
+          agent,
+          agent.post(`/global/training-plans/${plan.id}/workouts`),
+        ).send({ unexpected: true }),
     ];
 
     for (const makeRequest of invalidRequests) {

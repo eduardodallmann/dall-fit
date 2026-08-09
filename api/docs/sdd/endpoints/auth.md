@@ -2,188 +2,166 @@
 
 ## Objetivo funcional
 
-Iniciar e concluir o login Google e oferecer uma entrada equivalente, restrita a
-local/teste, para automação sem o provedor externo.
+Iniciar e concluir OAuth Google com PKCE, criar sessões revogáveis, entregar o
+segredo anti-CSRF e encerrar a sessão sem expor credenciais ou depender de estado
+somente no processo da API.
 
 ## Referências técnicas
 
-| Papel      | Símbolo                                                                                      | Responsabilidade neste fluxo              |
-| ---------- | -------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Controller | [`AuthController`](../../../src/auth/controllers/auth.controller.ts)                         | cookies, redirects e entrada HTTP         |
-| DTO        | [`GoogleCallbackQueryDto`](../../../src/auth/dto/google-callback-query.dto.ts)               | valida código, state e erros do callback  |
-| DTO        | [`TestLoginDto`](../../../src/auth/dto/test-login.dto.ts)                                    | valida identidade exclusivamente fictícia |
-| Command    | [`StartGoogleLoginCommand`](../../../src/auth/commands/start-google-login.command.ts)        | prepara início OAuth                      |
-| Command    | [`CompleteGoogleLoginCommand`](../../../src/auth/commands/complete-google-login.command.ts)  | valida retorno, cadastra e cria sessão    |
-| Command    | [`TestLoginCommand`](../../../src/auth/commands/test-login.command.ts)                       | substitui somente a identidade externa    |
-| Integração | [`GoogleOAuthService`](../../../src/auth/services/google-oauth.service.ts)                   | SDK Google e validação OpenID Connect     |
-| Sessão     | [`AuthSessionService`](../../../src/auth/services/auth-session.service.ts)                   | emite e valida JWT próprio                |
-| Domínio    | [`FindOrCreatePersonService`](../../../src/person/services/find-or-create-person.service.ts) | criação idempotente da pessoa             |
-| Repository | [`MongoPersonRepository`](../../../src/person/repositories/mongo-person.repository.ts)       | criação protegida por índice único        |
+| Papel      | Símbolo                                                                                     | Responsabilidade                                   |
+| ---------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Controller | [`AuthController`](../../../src/auth/controllers/auth.controller.ts)                        | cookies, redirects, status e chamadas dos commands |
+| Command    | [`StartGoogleLoginCommand`](../../../src/auth/commands/start-google-login.command.ts)       | cria state, nonce, verifier e challenge            |
+| Command    | [`CompleteGoogleLoginCommand`](../../../src/auth/commands/complete-google-login.command.ts) | valida callback, sincroniza pessoa e cria sessão   |
+| Command    | [`LogoutCommand`](../../../src/auth/commands/logout.command.ts)                             | revoga a sessão ativa                              |
+| Service    | [`GoogleOAuthService`](../../../src/auth/services/google-oauth.service.ts)                  | URL Google, troca do código e validação OIDC       |
+| Service    | [`AuthSessionService`](../../../src/auth/services/auth-session.service.ts)                  | JWT técnico, rotação e vínculo ao registro Redis   |
+| Adapter    | [`SessionStoreService`](../../../src/redis/session-store.service.ts)                        | sessão revogável com TTL absoluto                  |
+| Proteção   | [`RateLimitGuard`](../../../src/auth/guards/rate-limit.guard.ts)                            | quota distribuída e `Retry-After`                  |
+| Proteção   | [`CsrfGuard`](../../../src/auth/guards/csrf.guard.ts)                                       | token e Origin exatos                              |
 
 ## Contrato HTTP resumido
 
-### `POST /auth/google`
-
-- público, sem entrada;
-- grava cookies temporários `dall_fit_oauth_state` e
-  `dall_fit_oauth_nonce`, com dez minutos;
-- responde `200` com `{ data: { authorizationUrl } }`;
-- a UI navega para a URL recebida;
-- não idempotente quanto aos valores aleatórios gerados.
-
 ### `GET /auth/google`
 
-- público, sem entrada;
-- responde `302` para o Google;
-- grava cookies temporários `dall_fit_oauth_state` e
-  `dall_fit_oauth_nonce`, com dez minutos;
-- seguro e não idempotente quanto aos valores aleatórios gerados.
+- público, top-level navigation e único início OAuth suportado;
+- cria três cookies `HttpOnly` de no máximo dez minutos: state, nonce e PKCE
+  verifier, todos `SameSite=Lax`;
+- responde `302` para Google com PKCE S256;
+- limite: 10 chamadas por 10 minutos e IP.
+
+`POST /auth/google` não existe e responde `404`. Não há response compartilhada de
+preparação da URL.
 
 ### `GET /callback`
 
-- público, recebe `code` e `state`, ou `error`;
-- metadados adicionais devolvidos pelo Google são descartados antes da validação;
-- compara o state do query ao cookie e valida o nonce no ID token;
-- em sucesso grava `dall_fit_session`, limpa cookies temporários e responde `302`
-  para `${UI_URL}/dash`;
-- em falha limpa cookies temporários e responde `302` para
-  `${UI_URL}/?authError=oauth_failed`, sem sessão.
+- recebe os parâmetros Google, compara state em tempo constante, exige os três
+  cookies temporários e valida o ID token;
+- sincroniza nome, e-mail e foto somente quando mudaram, preservando
+  `googleSubject`, `isAdmin`, configs e `createdAt`;
+- cria sessão Redis antes de entregar cookie e redireciona a `/dash`; qualquer
+  falha redireciona a `/?authError=oauth_failed` sem cookie de sessão;
+- sempre limpa os três cookies temporários;
+- limite: 30 chamadas por 10 minutos e IP.
 
 ### `POST /auth/test-login`
 
-- disponível somente quando `AUTH_TEST_BYPASS_ENABLED=true`, ambiente não é
-  produção e `x-auth-test-key` corresponde à configuração;
-- recebe identidade fictícia completa e executa o mesmo cadastro e emissão de
-  sessão;
-- rejeita campos adicionais, inclusive tentativas de enviar `isAdmin`;
-- responde `204`, grava `dall_fit_session` e não chama Google;
-- fora das condições responde `404`, evitando divulgar o recurso.
+- existe somente com flag explícita em local/teste fora de Vercel e CI;
+- exige `x-auth-test-key` aleatória com pelo menos 32 bytes e body validado;
+- cria a mesma sessão real usada pelo OAuth e responde `204`;
+- limite: 5 chamadas por minuto e IP; fora do contexto responde `404`.
 
-### Política dos cookies
+### `GET /auth/csrf`
 
-Todos os cookies de autenticação são `HttpOnly` e usam path `/`. No ambiente local,
-`AUTH_COOKIE_SECURE=false` mantém `SameSite=Lax`. No deploy HTTPS atual,
-`AUTH_COOKIE_SECURE=true` combina obrigatoriamente `SameSite=None` e `Secure` para
-permitir o fluxo entre a UI e a API hospedadas em sites `vercel.app` distintos. As
-requests da UI continuam usando credenciais e a API continua restringindo CORS à
-origem configurada.
+- exige sessão ativa e pessoa ainda existente;
+- responde `200 { "data": { "token": "..." } }` e
+  `Cache-Control: no-store`;
+- limite: 30 chamadas por minuto e sessão+IP.
 
-A aceitação cross-site é temporária. Quando UI e API compartilharem o mesmo site
-registrável, a política deve voltar a `SameSite=Lax` inclusive no ambiente seguro,
-reduzindo a exposição dos cookies a contextos cross-site.
+### `POST /auth/logout`
+
+- sem sessão ou com cookie JWT inválido responde `204` e limpa cookies, de forma
+  idempotente;
+- com sessão Redis ativa exige `Origin` igual a `UI_URL` e `X-CSRF-Token` válido,
+  revoga o `jti`, limpa os nomes atual e legado e responde `204`;
+- limite: 30 chamadas por minuto e sessão+IP; sem sessão usa bucket anônimo por IP.
+
+## Sessão e cookies
+
+O JWT usa HS256 e exige `sub`, `jti`, `iss`, `aud`, `iat`, `exp` e `kid`. O `kid`
+seleciona somente a chave ativa ou a anterior dentro da janela configurada; chave
+desconhecida, algoritmo diferente ou claim inválida recebe `401`. A validade
+absoluta máxima é sete dias e não há renovação deslizante. Redis guarda apenas
+personId, CSRF e expiração sob o `jti`; o JWT bruto nunca é persistido.
+
+Local/teste usa `dall_fit_session`, `HttpOnly`, path `/`, `SameSite=Lax` e sem
+`Secure`. Produção/preview usa `__Host-dall_fit_session`, `HttpOnly`, `Secure`,
+host-only, path `/` e `SameSite=None` para o deploy cross-site vigente. Dataset
+Redis perdido torna JWTs anteriores inativos; a aplicação não reconstrói sessão a
+partir do token.
 
 ## Fluxo completo
 
-### 1. Início — `AuthController.prepareGoogleLogin` e `startGoogleLogin`
+1. `AuthController.startGoogleLogin` aplica `RateLimitGuard`, chama
+   `StartGoogleLoginCommand`, grava os cookies temporários e redireciona.
+2. O command gera valores criptograficamente aleatórios e chama
+   `GoogleOAuthService.createAuthorizationUrl` com challenge S256, sem expor o
+   verifier ao provedor.
+3. No callback, o controller entrega query e cookies ao
+   `CompleteGoogleLoginCommand`. O command valida state, chama
+   `GoogleOAuthService.exchangeCode`, `FindOrCreatePersonService` e
+   `AuthSessionService.createSession` nessa ordem.
+4. O service Google troca o código com verifier e valida assinatura, issuer Google,
+   audience, nonce, e-mail verificado e claims obrigatórias.
+5. O repository da pessoa atualiza atomicamente apenas dados de perfil realmente
+   alterados. A condição administrativa e configurações nunca vêm do provedor.
+6. `AuthSessionService` assina com a chave ativa e chama `SessionStoreService`; se
+   o Redis rejeitar a gravação por timeout, memória ou indisponibilidade, nenhum
+   cookie é entregue.
+7. Endpoints privados usam `SessionAuthGuard`: JWT, registro Redis e pessoa MongoDB
+   precisam existir. Indisponibilidade Redis produz erro técnico sanitizado; token
+   ou registro ausente produz `401 AUTHENTICATION_REQUIRED`.
+8. Mutações executam sessão, rate limit e CSRF antes do controller. Preflight
+   CORS é atendido antes dos guards e não consome quota.
 
-Os dois métodos chamam `StartGoogleLoginCommand.execute`. O command gera `state` e
-`nonce` e chama `GoogleOAuthService.createAuthorizationUrl`.
-O service usa os scopes `openid email profile`, `response_type=code`,
-`access_type=online`, `state`, `nonce` e `prompt=select_account`.
+## Uso operacional do Redis
 
-Ambos os métodos gravam cookies temporários. O POST devolve a URL em JSON à UI; o
-GET redireciona diretamente.
+Uma instância aquecida usa uma conexão ioredis compartilhada. Fila offline fica
+desabilitada; connect/command timeout, retry e backoff são limitados. A conexão é
+fechada no shutdown e anexada ao lifecycle oficial da Vercel quando aplicável.
+Todas as chaves recebem namespace de local, teste, produção ou deployment de
+preview. Produção/preview exigem `rediss://` e não usam fallback local.
 
-### 2. Callback — `AuthController.completeGoogleLogin`
+Máximo de comandos Redis por request no caminho atual:
 
-O DTO garante strings não vazias. Se o Google retornar `error`, ou se parâmetros
-obrigatórios/cookies estiverem ausentes, o command escolhe o branch de falha.
+| Caminho                          |                     Comandos |
+| -------------------------------- | ---------------------------: |
+| início Google                    |                     1 `EVAL` |
+| callback/test-login bem-sucedido |           1 `EVAL` + 1 `SET` |
+| leitura autenticada              |                      1 `GET` |
+| CSRF                             |           1 `GET` + 1 `EVAL` |
+| mutação autenticada/admin        |           1 `GET` + 1 `EVAL` |
+| logout com sessão                | 1 `GET` + 1 `EVAL` + 1 `DEL` |
 
-No caminho principal:
-
-1. `CompleteGoogleLoginCommand` compara `state` por igualdade constante.
-2. Chama `GoogleOAuthService.exchangeCode`, que troca o código e valida o ID token
-   para client ID, issuer, expiração e nonce.
-3. O service exige `sub`, nome, e-mail verificado e aceita foto anulável. Retorna
-   apenas o contrato de identidade necessário.
-4. O command prepara a entrada de `FindOrCreatePersonService`.
-5. O service prepara o objeto de persistência e chama
-   `PersonRepository.findOrCreateByGoogleSubject`.
-6. O adapter consulta pelo `sub` e cria sob proteção de índice único. Em pessoa
-   nova, persiste os três dados pessoais sem `isAdmin`; em pessoa existente,
-   devolve o documento vigente sem alterar a presença do campo administrativo. Se
-   duas criações concorrerem, a que receber chave duplicada carrega o documento
-   vencedor.
-7. Chama `AuthSessionService.createSession`, que assina JWT contendo somente
-   `sub=<personId>`.
-8. Monta o resultado de redirect e cookie.
-9. O controller grava a sessão, limpa cookies OAuth e redireciona.
-
-Falhas de integração ou persistência não criam cookie de sessão. O erro técnico é
-tratado sem expor detalhes e o navegador volta à UI com código genérico.
-
-### 3. Bypass — `AuthController.testLogin`
-
-`TestAuthBypassGuard` valida ambiente, flag e chave. Depois do DTO,
-`TestLoginCommand` prepara a mesma identidade interna que o adapter Google
-produziria, chama `FindOrCreatePersonService` e `AuthSessionService`, e o controller
-grava o cookie. A validação whitelist rejeita `isAdmin` e qualquer campo que não
-pertença à identidade fictícia.
+Os limites por usuário protegem abuso, mas não representam a quota global do
+provedor. Com teto atual de 100 ops/s, o acompanhamento deve considerar a soma de
+todos os requests e manter margem abaixo desse valor e das 30 conexões. Sessões e
+contadores são pequenos, possuem TTL e respeitam o dataset de 30 MB. O Redis deve
+usar `noeviction`: erro de escrita por memória falha fechado e nunca remove sessão
+ou contador silenciosamente.
 
 ## Mapa de caminhos possíveis
 
-| Caminho            | Gatilho                            | Sequência resumida                                       | Resultado HTTP                 | Efeito                             |
-| ------------------ | ---------------------------------- | -------------------------------------------------------- | ------------------------------ | ---------------------------------- |
-| preparar OAuth     | POST da UI                         | Controller → Command → GoogleOAuthService                | `200` com URL                  | cookies temporários                |
-| início direto      | GET público                        | Controller → Command → GoogleOAuthService                | `302` Google                   | cookies temporários                |
-| callback novo      | claims válidas, pessoa ausente     | Controller → Command → Google → Person → Mongo → Session | `302 /dash`                    | cria pessoa sem `isAdmin` e sessão |
-| callback existente | claims válidas, pessoa presente    | mesmo fluxo, branch existente                            | `302 /dash`                    | preserva pessoa e cria sessão      |
-| callback inválido  | erro, state/nonce/claims inválidos | Controller/Command interrompe                            | `302 /?authError=oauth_failed` | limpa temporários                  |
-| bypass válido      | local/teste + chave                | Guard → Controller → Command → Person → Session          | `204`                          | pessoa/sessão                      |
-| bypass bloqueado   | produção, flag/chave inválida      | Guard interrompe                                         | `404`                          | nenhum                             |
+| Gatilho                            | Resultado                                 | Efeito                                            |
+| ---------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| OAuth válido                       | `302 /dash`                               | perfil criado/sincronizado, sessão Redis e cookie |
+| callback inválido                  | `302 /?authError=oauth_failed`            | cookies temporários limpos                        |
+| sessão ativa                       | endpoint privado continua                 | Redis lido e pessoa relida no MongoDB             |
+| JWT válido sem registro após reset | `401`                                     | nenhum estado reconstruído                        |
+| mutação sem CSRF/Origin exato      | `403 CSRF_VALIDATION_FAILED`              | nenhum efeito de domínio                          |
+| quota excedida                     | `429 RATE_LIMIT_EXCEEDED` + `Retry-After` | contador preservado                               |
+| Redis indisponível/saturado        | erro técnico sanitizado                   | proteção permanece ativa, sem fallback            |
+| logout válido                      | `204`                                     | sessão removida e cookies limpos                  |
+| logout sem sessão                  | `204`                                     | cookies limpos                                    |
 
 ## Cenários detalhados
 
-### Cenário 1 — Preparar login Google
+### Cenário 1 — Iniciar OAuth com PKCE
 
-**Seed:** não se aplica — a operação gera estado temporário e não consulta banco.
-
-**cURL**
+**Seed:** não se aplica — a etapa cria somente valores temporários.
 
 ```bash
-curl --request GET \
+curl --include --request GET \
   --url http://localhost:4000/auth/google \
-  --include
+  --cookie-jar /tmp/dall-fit-oauth-cookie.txt
 ```
 
-- Given: API configurada com credencial válida
-- When: chama `GET /auth/google`
-- Then: recebe `302`, Location do Google e dois cookies temporários protegidos
+- Given: Redis local disponível
+- When: inicia o login
+- Then: recebe `302`, três cookies `SameSite=Lax` e URL com
+  `code_challenge_method=S256`
 
-O fluxo usado pela UI chama a variante JSON:
-
-```bash
-curl --request POST \
-  --url http://localhost:4000/auth/google \
-  --include
-```
-
-Ela responde `200` com `authorizationUrl` e os mesmos cookies.
-
-### Cenário 2 — Primeiro login fictício local
-
-**Seed**
-
-```bash
-pnpm -C api seed -- auth:person-new
-```
-
-**cURL**
-
-```bash
-curl --request POST \
-  --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
-  --include \
-  --data '{"googleSubject":"google-new-001","name":"Alex Runner","email":"alex.runner@example.test","photoUrl":"https://example.test/alex.png"}'
-```
-
-- Given: a fixture garante ausência do `sub`
-- When: o bypass recebe identidade válida
-- Then: responde `204`, cria uma pessoa sem `isAdmin` e envia cookie de sessão
-
-### Cenário 3 — Login fictício de pessoa existente
+### Cenário 2 — Login local, CSRF e logout
 
 **Seed**
 
@@ -191,104 +169,70 @@ curl --request POST \
 pnpm -C api seed -- auth:person-existing
 ```
 
-**cURL**
-
 ```bash
-curl --request POST \
-  --url http://localhost:4000/auth/test-login \
+curl --request POST --url http://localhost:4000/auth/test-login \
   --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
-  --include \
-  --data '{"googleSubject":"google-existing-001","name":"Ignored Name","email":"ignored@example.test","photoUrl":null}'
+  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
+  --cookie-jar /tmp/dall-fit-session.txt \
+  --data '{"googleSubject":"google-existing-001","name":"Taylor Fit","email":"taylor.fit@example.test","photoUrl":null}' \
+&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-session.txt | jq --raw-output '.data.token')" \
+&& curl --include --request POST --url http://localhost:4000/auth/logout \
+  --header 'origin: http://localhost:3000' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-session.txt
 ```
 
-- Given: existe `Person` da fixture
-- When: o bypass é executado novamente
-- Then: responde `204`, reutiliza a pessoa sem `isAdmin` e não sobrescreve nem
-  duplica o cadastro
+- Given: bypass local explicit e sessão criada no Redis
+- When: obtém CSRF e encerra a sessão
+- Then: recebe `204`, o `jti` é removido e os cookies são limpos
 
-### Cenário 4 — Login fictício de administrador existente
+### Cenário 3 — Callback com state divergente
 
-**Seed**
+**Seed:** não se aplica — a validação termina antes do MongoDB.
 
 ```bash
-pnpm -C api seed -- auth:person-admin
+curl --include --request GET \
+  --url 'http://localhost:4000/callback?code=fake-code&state=wrong-state' \
+  --header 'cookie: dall_fit_oauth_state=expected-state; dall_fit_oauth_nonce=fake-nonce; dall_fit_oauth_code_verifier=fake-verifier'
 ```
 
-**cURL**
+- Given: state da query difere do cookie
+- When: chama o callback
+- Then: redireciona com erro genérico, limpa os três cookies e não cria sessão
+
+### Cenário 4 — Rate limit distribuído
+
+**Seed:** não se aplica — apenas o contador Redis é usado.
 
 ```bash
-curl --request POST \
-  --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' \
-  --header 'x-auth-test-key: local-auth-test-key' \
-  --include \
-  --data '{"googleSubject":"google-admin-001","name":"Ignored Admin","email":"ignored.admin@example.test","photoUrl":null}'
+for attempt in $(seq 1 11); do
+  curl --include --request GET --url http://localhost:4000/auth/google
+done
 ```
 
-- Given: existe `Person` com `isAdmin: true`
-- When: o bypass é executado novamente
-- Then: responde `204`, preserva `isAdmin: true` e não sobrescreve nem duplica a
-  pessoa
+- Given: as chamadas partem do mesmo IP dentro de dez minutos
+- When: a décima primeira chamada é feita
+- Then: recebe `429 RATE_LIMIT_EXCEEDED` e `Retry-After`
 
-### Cenário 5 — Bypass bloqueado
+### Cenário 5 — Reset do dataset
 
-**Seed:** não se aplica — a proteção interrompe antes do MongoDB.
-
-**cURL**
-
-```bash
-curl --request POST \
-  --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' \
-  --header 'x-auth-test-key: invalid-key' \
-  --data '{"googleSubject":"google-new-001","name":"Alex Runner","email":"alex.runner@example.test","photoUrl":null}'
-```
-
-- Given: a chave não corresponde
-- When: chama o bypass
-- Then: recebe `404` e nenhum cadastro ou cookie é criado
-
-### Cenário 6 — Callback com state divergente
-
-**Seed:** não se aplica — o fluxo termina antes da integração e do banco.
-
-**cURL**
+**Seed:** não se aplica — exige ambiente efêmero isolado de teste; nunca execute
+limpeza global no Redis publicado.
 
 ```bash
 curl --request GET \
-  --url 'http://localhost:4000/callback?code=fake-code&state=wrong-state&iss=https%3A%2F%2Faccounts.google.com&scope=email+profile+openid&authuser=0&prompt=consent' \
-  --cookie 'dall_fit_oauth_state=expected-state; dall_fit_oauth_nonce=fake-nonce' \
-  --include
+  --url http://localhost:4000/auth/me \
+  --cookie /tmp/dall-fit-session-anterior-ao-reset.txt
 ```
 
-- Given: query e cookie possuem states diferentes, e a query contém os metadados
-  adicionais enviados pelo Google
-- When: chama o callback
-- Then: ignora os metadados adicionais, limpa cookies temporários e redireciona com
-  erro genérico, sem chamar Google
+- Given: o dataset efêmero foi reiniciado depois da emissão do cookie
+- When: o cookie antigo acessa endpoint privado
+- Then: recebe `401`; um novo login só funciona após novo `SET` bem-sucedido
 
-O callback feliz real não possui cURL estático porque o código Google é de uso
-único. Ele é validado manualmente pelo início do cenário 1; unitários substituem o
-adapter e o E2E usa o cenário 2 para persistência e sessão.
+## Cobertura automatizada
 
-## Regras de negócio cobertas por testes
-
-| Regra                            | Teste unitário                            | Teste E2E                        | Mock ou fixture        |
-| -------------------------------- | ----------------------------------------- | -------------------------------- | ---------------------- |
-| state/nonce e claims válidas     | commands e `google-oauth.service.spec.ts` | divergência de state             | adapter Google mockado |
-| primeiro cadastro                | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | MongoDB efêmero        |
-| concorrência/reutilização        | service e repository                      | `auth.e2e-spec.ts`               | índice único           |
-| condição admin preservada        | `find-or-create-person.service.spec.ts`   | `auth.e2e-spec.ts`               | pessoa com `isAdmin`   |
-| escalação pelo body rejeitada    | DTO/ValidationPipe                        | `auth.e2e-spec.ts`               | body fictício          |
-| bypass bloqueado                 | guard                                     | `auth.e2e-spec.ts`               | chave fictícia         |
-| sessão emitida                   | `auth-session.service.spec.ts`            | cookie usado em endpoint privado | segredo fictício       |
-| política `SameSite` por ambiente | `auth-cookie-options.spec.ts`             | cookie local permanece `Lax`     | não se aplica          |
-
-## Fora do comportamento atual
-
-- refresh token e APIs Google adicionais;
-- atualização dos dados pessoais em logins posteriores;
-- promoção ou revogação administrativa por endpoint;
-- logout e revogação;
-- bypass habilitado em produção.
+- unitários: PKCE, claims Google, rotação/claims JWT, cookies e guards;
+- E2E serial com MongoDB e Redis efêmeros reais: sessão, CSRF, logout, reset,
+  rate limit, CORS e preflight em `api/test/auth.e2e-spec.ts`;
+- Playwright cobre somente a jornada da UI; o consentimento Google real permanece
+  manual porque exige serviço e conta externos.

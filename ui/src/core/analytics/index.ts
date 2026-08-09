@@ -22,6 +22,7 @@ export type AnalyticsControl =
   | 'google_login'
   | 'home_link'
   | 'mobile_menu'
+  | 'logout'
   | 'name_field'
   | 'new_plan'
   | 'new_workout'
@@ -108,6 +109,7 @@ type UiAnalyticsEvent =
       eventName: 'ui_operation_started';
       operation:
         | 'google_login'
+        | 'logout'
         | 'pwa_install'
         | 'pwa_update'
         | 'theme_update'
@@ -121,6 +123,7 @@ type UiAnalyticsEvent =
       eventName: 'ui_operation_completed';
       operation:
         | 'google_login'
+        | 'logout'
         | 'pwa_install'
         | 'pwa_update'
         | 'theme_update'

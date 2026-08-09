@@ -15,39 +15,46 @@
 
 A jornada começa em `http://localhost:3000/`, que permanece pública. O ambiente
 real exige credencial OAuth válida, URI de callback exatamente igual à cadastrada,
-MongoDB disponível e segredo de sessão. Em desenvolvimento integrado, MSW simula
-as fronteiras externas sem acessar a API.
+MongoDB, Redis TLS e segredo de sessão disponíveis. Em desenvolvimento integrado,
+MSW simula requests Axios; a navegação top-level OAuth permanece na mesma origem
+controlada pelo middleware de teste do Vite, sem acessar a API real.
 
 ## Rotas e endpoints participantes
 
-| Ordem | Etapa                     | Rota de UI | Endpoint da API        |
-| ----: | ------------------------- | ---------- | ---------------------- |
-|     1 | Entrada pública           | `/`        | não se aplica          |
-|     2 | Preparar início OAuth     | `/`        | `POST /auth/google`    |
-|     3 | Consentimento Google      | externa    | não se aplica          |
-|     4 | Retorno do Google         | externa    | `GET /callback`        |
-|     5 | Validação da rota privada | `/dash`    | `GET /auth/me`         |
-|     6 | Menu autenticado          | `/dash`    | resposta já consultada |
+| Ordem | Etapa                     | Rota de UI | Endpoint da API          |
+| ----: | ------------------------- | ---------- | ------------------------ |
+|     1 | Entrada pública           | `/`        | não se aplica            |
+|     2 | Iniciar OAuth top-level   | `/`        | `GET /auth/google`       |
+|     3 | Consentimento Google      | externa    | não se aplica            |
+|     4 | Retorno do Google         | externa    | `GET /callback`          |
+|     5 | Validação da rota privada | `/dash`    | `GET /auth/me`           |
+|     6 | Bootstrap anti-CSRF       | `/dash`    | `GET /auth/csrf`         |
+|     7 | Menu autenticado          | `/dash`    | respostas já consultadas |
 
 `POST /auth/test-login` substitui as etapas 2 e 3 somente em local/teste.
 
 ## Sequência e decisões
 
-1. A pessoa aciona `Entrar com Google` na rota pública.
-   A UI emite o início de `google_login`; a preparação da URL encerra essa operação
-   com `success` ou `error`, sem confundir esse resultado com o consentimento Google.
-2. A API cria `state` e `nonce`, grava cookies temporários e devolve a URL Google.
-3. A UI navega para a URL; o Google autentica a pessoa e retorna um código ao
+1. A pessoa aciona `Entrar com Google`. A UI emite somente o início de
+   `google_login` e navega o documento diretamente para
+   `GET ${VITE_API_URL}/auth/google`; não emite conclusão antes de sair da página.
+2. A API cria `state`, `nonce` e verifier PKCE, grava cookies temporários e
+   redireciona para a URL Google com challenge S256.
+3. O Google autentica a pessoa e retorna um código ao
    callback.
-4. A API compara `state`, troca o código, valida o ID token e o `nonce`.
+4. A API compara `state`, troca o código com o verifier e valida assinatura,
+   issuer, audience, ID token e `nonce`.
 5. Se não houver `Person` para o `sub`, a API persiste nome, e-mail e foto sem
-   `isAdmin`; se já houver, reutiliza o cadastro sem duplicá-lo nem alterar a
-   condição administrativa.
-6. A API emite o cookie de sessão, remove cookies temporários e redireciona a
+   `isAdmin`; se já houver, sincroniza atomicamente somente nome, e-mail e foto
+   realmente alterados, sem duplicar cadastro nem alterar a condição
+   administrativa/configs.
+6. A API assina JWT técnico e só emite o cookie depois de criar o registro
+   revogável e o segredo CSRF no Redis. Remove cookies temporários e redireciona a
    `/dash`. No deploy da UI, o fallback da Vercel entrega `index.html` para esse
    acesso direto e o TanStack Router assume a rota, sem exigir um arquivo físico
    `/dash`.
-7. A rota-pai protegida consulta `GET /auth/me`.
+7. A rota-pai protegida consulta `GET /auth/me`; a API exige claims JWT, registro
+   Redis ativo e pessoa MongoDB ainda existente.
 8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
    público. Antes de pintar o shell, a UI aplica `configs.theme` e o sincroniza no
    navegador; quando ele não existe, remove uma escolha local potencialmente
@@ -55,7 +62,13 @@ as fronteiras externas sem acessar a API.
    O layout autenticado mostra avatar, nome, e-mail, toggle de tema, navegação
    `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
    de `/dash` permanece vazia.
-9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
+9. Ainda antes do shell, a UI consulta `GET /auth/csrf`, mantém o token apenas em
+   memória e habilita mutações somente após os dois bootstraps. Falha de CSRF é
+   recuperável e não apaga a autenticação; `401` limpa CSRF/cache privado e
+   redireciona a `/`.
+10. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
+    CSRF. Em sucesso limpa caches e navega com replace para `/`; em falha mantém a
+    tela e mostra feedback acessível.
 
 Analytics permanece uma observação exclusiva da UI: não acrescenta etapa HTTP da
 API, cookie, identificador ou alteração na sequência. O evento de login contém
@@ -66,11 +79,11 @@ global do componente oficial.
 
 ## Compatibilidade temporária do deploy
 
-No deploy atual, UI e API ocupam sites `vercel.app` distintos. A API usa cookies
-`SameSite=None; Secure` nesse ambiente para que o navegador preserve `state`,
-`nonce` e sessão durante a jornada cross-site; localmente, sem `Secure`, os cookies
-permanecem `SameSite=Lax`. As requests HTTP da UI usam credenciais e a API aceita
-somente a origem configurada em CORS.
+No deploy atual, UI e API ocupam sites `vercel.app` distintos. A sessão usa cookie
+`__Host-`, `SameSite=None; Secure`, host-only e path `/`. State, nonce e verifier
+usam `SameSite=Lax; Secure` porque participam da navegação top-level. Localmente,
+todos usam nomes sem prefixo, `SameSite=Lax` e sem `Secure`. Requests Axios usam
+credenciais e a API aceita somente a origem configurada exatamente em CORS.
 
 Essa flexibilização deve ser revertida quando frontend e backend compartilharem o
 mesmo site registrável. Nessa topologia futura, todos os cookies voltam a
@@ -79,17 +92,18 @@ devem acompanhar a reversão.
 
 ## Dados compartilhados
 
-| Dado            | Origem              | Consumidores      | Persistência                          | Observações                        |
-| --------------- | ------------------- | ----------------- | ------------------------------------- | ---------------------------------- |
-| `sub` Google    | ID token            | API               | MongoDB                               | chave externa estável, nunca na UI |
-| nome            | ID token            | API e UI          | MongoDB                               | dado pessoal, nunca em logs        |
-| e-mail          | ID token verificado | API e UI          | MongoDB                               | dado pessoal, não é chave          |
-| URL da foto     | ID token            | API e UI          | MongoDB                               | pode ser ausente                   |
-| ID de `Person`  | MongoDB             | sessão e API      | MongoDB e JWT                         | único dado da pessoa no JWT        |
-| `isAdmin`       | operação autorizada | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
-| tema            | pessoa ou sistema   | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
-| sessão          | API                 | browser e API     | cookie `HttpOnly` stateless           | não acessível ao JavaScript        |
-| `state`/`nonce` | API                 | Google e callback | cookies temporários                   | removidos ao terminar              |
+| Dado                     | Origem              | Consumidores      | Persistência                          | Observações                        |
+| ------------------------ | ------------------- | ----------------- | ------------------------------------- | ---------------------------------- |
+| `sub` Google             | ID token            | API               | MongoDB                               | chave externa estável, nunca na UI |
+| nome                     | ID token            | API e UI          | MongoDB                               | dado pessoal, nunca em logs        |
+| e-mail                   | ID token verificado | API e UI          | MongoDB                               | dado pessoal, não é chave          |
+| URL da foto              | ID token            | API e UI          | MongoDB                               | pode ser ausente                   |
+| ID de `Person`           | MongoDB             | sessão e API      | MongoDB, JWT e registro Redis         | claim técnica `sub`                |
+| `isAdmin`                | operação autorizada | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
+| tema                     | pessoa ou sistema   | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
+| sessão                   | API                 | browser e API     | cookie `HttpOnly` + registro Redis    | revogável, máximo sete dias        |
+| CSRF                     | API                 | UI e API          | Redis e memória volátil da UI         | nunca em armazenamento durável     |
+| `state`/`nonce`/verifier | API                 | Google e callback | cookies temporários                   | removidos ao terminar              |
 
 ## Estados e exceções
 
@@ -103,8 +117,8 @@ devem acompanhar a reversão.
   tema remove a chave local e acompanha o sistema. Falha de `/auth/me` mantém o
   tema do bootstrap sem inferir dado parcial.
 - Erro não recuperável: claims obrigatórias inválidas impedem cadastro e sessão.
-- Indisponibilidade: erro do Google ou MongoDB não cria sessão nem expõe detalhes
-  técnicos.
+- Indisponibilidade: erro do Google, MongoDB ou Redis não cria sessão nem expõe
+  detalhes técnicos; Redis indisponível nunca reativa validação stateless.
 
 ## Cenários funcionais
 
@@ -119,8 +133,8 @@ devem acompanhar a reversão.
 ### Cenário 2 — Jornada integrada fictícia
 
 - Link para testar: `http://127.0.0.1:3100/`
-- Given: o Vite está iniciado pelo Playwright com MSW Browser e o handler de
-  `POST /auth/google` devolve `/dash` como URL fictícia
+- Given: o Vite está iniciado pelo Playwright com MSW Browser e controla
+  `GET /api/auth/google` na mesma origem com redirect fictício para `/dash`
 - When: a pessoa aciona `Entrar com Google`
 - Then: o handler simula o retorno autenticado e `/dash` exibe a fixture no menu,
   com `Home` ativo e conteúdo de rota vazio
@@ -161,8 +175,9 @@ devem acompanhar a reversão.
 - Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
 - Analytics: testes da composição global, fronteira, home, menu, tema e PWA isolam
   o transporte oficial e validam eventos sem conteúdo.
-- E2E dos endpoints da API e fixtures MongoDB/Redis:
-  `api/test/auth.e2e-spec.ts` com MongoDB efêmero; Redis não participa.
+- E2E dos endpoints da API:
+  `api/test/auth.e2e-spec.ts` com MongoDB e Redis efêmeros reais, incluindo CSRF,
+  logout, reset do dataset, rate limit e CORS.
 - Handlers e fixtures MSW: `ui/src/mocks/handlers/auth.ts` e
   `ui/src/mocks/fixtures/person.ts`.
 - Cenários não automatizados e justificativa: a tela real de consentimento Google

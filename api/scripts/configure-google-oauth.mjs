@@ -47,16 +47,6 @@ environment = upsertEnvironmentValue(
 );
 environment = upsertEnvironmentValue(
   environment,
-  'AUTH_TEST_BYPASS_ENABLED',
-  'true',
-);
-environment = upsertEnvironmentValue(
-  environment,
-  'AUTH_TEST_BYPASS_KEY',
-  'local-auth-test-key',
-);
-environment = upsertEnvironmentValue(
-  environment,
   'UI_URL',
   'http://localhost:3000',
 );

@@ -67,6 +67,7 @@ describe('ApplicationMenu', () => {
       'aria-current',
       'page',
     );
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument();
   });
 
   it('shows first and last initials without reserving admin space', async () => {

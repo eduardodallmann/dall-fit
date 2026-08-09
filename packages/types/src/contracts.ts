@@ -31,8 +31,8 @@ export interface UpdateCurrentPersonConfigsRequest {
 
 export type UpdateCurrentPersonConfigsResponse = ApiResponse<Person>;
 
-export type StartGoogleLoginResponse = ApiResponse<{
-  authorizationUrl: string;
+export type CsrfTokenResponse = ApiResponse<{
+  token: string;
 }>;
 
 export interface CreateTrainingPlanRequest {

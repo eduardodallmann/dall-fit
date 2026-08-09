@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ensureCsrfToken,
   getCurrentPerson,
-  startGoogleLogin,
+  getGoogleLoginUrl,
   updateCurrentPersonConfigs,
 } from '~/auth/auth-service';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
@@ -14,13 +15,12 @@ describe('authService', () => {
     );
   });
 
-  it('prepares login through the API and returns its authorization URL', async () => {
-    await expect(startGoogleLogin()).resolves.toBe(
-      'http://localhost:4000/dash',
-    );
+  it('builds the top-level Google login endpoint', () => {
+    expect(getGoogleLoginUrl()).toBe('http://localhost:4000/auth/google');
   });
 
   it('updates the current person theme through the API client and MSW', async () => {
+    await ensureCsrfToken();
     const result = await updateCurrentPersonConfigs('light');
 
     expect(result.configs).toEqual({ theme: 'light' });

@@ -21,4 +21,31 @@ test.describe('Fluxo Login com Google', () => {
       page.getByRole('heading', { name: 'Entre para continuar' }),
     ).toBeVisible();
   });
+
+  test('Cenário 4 — Logout revoga a sessão simulada e volta à raiz', async ({
+    page,
+  }) => {
+    await page.goto('/dash');
+
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    await expect(page).toHaveURL('/');
+    await expect(
+      page.getByRole('heading', { name: 'Entre para continuar' }),
+    ).toBeVisible();
+  });
+
+  test('Cenário 5 — Falha de logout preserva a área autenticada', async ({
+    page,
+  }) => {
+    await page.goto('/dash?mockAuth=logout-error');
+
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    await expect(page).toHaveURL(/\/dash/);
+    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+    await expect(
+      page.getByText('Não foi possível sair. Tente novamente.'),
+    ).toBeVisible();
+  });
 });

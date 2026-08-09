@@ -223,6 +223,19 @@ test.describe('Rota /dash', () => {
     await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
   });
 
+  test('Cenário 15 — Falha recuperável no bootstrap de CSRF', async ({
+    page,
+  }) => {
+    await page.goto('/dash?mockAuth=csrf-error');
+
+    await expect(
+      page.getByRole('heading', {
+        name: 'Não foi possível carregar sua conta',
+      }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/mockAuth=csrf-error/);
+  });
+
   test('fecha o Drawer ao entrar no breakpoint desktop', async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 });
     await page.goto('/dash');

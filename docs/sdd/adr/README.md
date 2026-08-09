@@ -11,7 +11,9 @@ substituída permanece no histórico e aponta para a sucessora.
 
 - [`ADR-0001`](ADR-0001-estrategia-de-mocks-e-bancos-de-teste.md): estratégia de
   mocks e bancos de teste.
-- [`ADR-0002`](ADR-0002-autenticacao-google-e-sessao.md): autenticação Google,
-  sessão e bypass restrito de testes.
+- [`ADR-0002`](ADR-0002-autenticacao-google-e-sessao.md): decisão histórica de
+  autenticação Google e sessão stateless, substituída pela ADR-0004.
 - [`ADR-0003`](ADR-0003-modelagem-dos-planos-de-treino.md): coleção única de
   planos por owner e árvore embutida.
+- [`ADR-0004`](ADR-0004-sessao-revogavel-redis-e-csrf.md): sessão revogável no
+  Redis, defesa CSRF e proteção da fronteira cross-site.
