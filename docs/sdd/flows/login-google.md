@@ -34,6 +34,8 @@ as fronteiras externas sem acessar a API.
 ## Sequência e decisões
 
 1. A pessoa aciona `Entrar com Google` na rota pública.
+   A UI emite o início de `google_login`; a preparação da URL encerra essa operação
+   com `success` ou `error`, sem confundir esse resultado com o consentimento Google.
 2. A API cria `state` e `nonce`, grava cookies temporários e devolve a URL Google.
 3. A UI navega para a URL; o Google autentica a pessoa e retorna um código ao
    callback.
@@ -54,6 +56,13 @@ as fronteiras externas sem acessar a API.
    `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
    de `/dash` permanece vazia.
 9. Sem sessão válida ou sem pessoa, a API responde `401` e a UI redireciona a `/`.
+
+Analytics permanece uma observação exclusiva da UI: não acrescenta etapa HTTP da
+API, cookie, identificador ou alteração na sequência. O evento de login contém
+somente rota normalizada, superfície, controle, operação e resultado; URL de
+autorização, `state`, `nonce`, nome, e-mail, ID e erro técnico não são enviados.
+Pageviews do carregamento e das navegações SPA são coletados pela única montagem
+global do componente oficial.
 
 ## Compatibilidade temporária do deploy
 
@@ -150,6 +159,8 @@ devem acompanhar a reversão.
   administrativa, bootstrap/reconciliação do tema, rollback, iniciais e
   apresentação comum/administrativa do menu.
 - Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
+- Analytics: testes da composição global, fronteira, home, menu, tema e PWA isolam
+  o transporte oficial e validam eventos sem conteúdo.
 - E2E dos endpoints da API e fixtures MongoDB/Redis:
   `api/test/auth.e2e-spec.ts` com MongoDB efêmero; Redis não participa.
 - Handlers e fixtures MSW: `ui/src/mocks/handlers/auth.ts` e

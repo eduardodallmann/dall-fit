@@ -136,6 +136,20 @@ Não se aplica — não há formulário nem entrada local.
 - redimensionar o viewport altera somente a disposição visual e não confirma nem
   dispensa a atualização.
 
+## Analytics
+
+- `Entrar com Google` emite `ui_operation_started` para `google_login` e um único
+  `ui_operation_completed` com `success` quando a URL de autorização é preparada ou
+  `error` quando a preparação falha. O resultado não representa a conclusão do
+  consentimento externo.
+- `Atualizar agora` emite início e resultado `success|error` de `pwa_update`;
+  `Agora não` emite início e resultado `dismissed` da mesma operação.
+- o contexto usa somente `route=/`, superfície e controle enumerados. `authError`,
+  mensagens técnicas, URL de autorização e qualquer dado de pessoa não são
+  enviados.
+- o componente global do Vercel Analytics permanece invisível e uma falha ou
+  bloqueio de coleta não altera login, aviso de atualização ou navegação.
+
 ## Referências visuais de layout — opcional
 
 Não se aplica — não existem imagens em `routes/assets/root/`.

@@ -1,9 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PwaInstallAction } from '~/core/components/pwa-install-action';
 import { PwaContext, type PwaContextValue } from '~/core/pwa/pwa-context';
+
+const { trackUiEventMock } = vi.hoisted(() => ({
+  trackUiEventMock: vi.fn(),
+}));
+
+vi.mock('~/core/analytics', () => ({
+  trackUiEvent: trackUiEventMock,
+}));
 
 const baseContext: PwaContextValue = {
   dismissUpdate: vi.fn(),
@@ -24,6 +32,10 @@ function renderAction(value: Partial<PwaContextValue> = {}) {
 }
 
 describe('PwaInstallAction', () => {
+  beforeEach(() => {
+    trackUiEventMock.mockClear();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -52,6 +64,20 @@ describe('PwaInstallAction', () => {
 
     await user.click(trigger);
     expect(screen.getByText('Abra o menu do navegador.')).not.toBeVisible();
+    expect(trackUiEventMock).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        eventName: 'ui_disclosure_toggled',
+        state: 'open',
+      }),
+    );
+    expect(trackUiEventMock).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        eventName: 'ui_disclosure_toggled',
+        state: 'closed',
+      }),
+    );
   });
 
   it('shows the iOS share-menu instructions', async () => {

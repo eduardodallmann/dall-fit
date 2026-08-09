@@ -10,7 +10,12 @@ const pwaMocks = vi.hoisted(() => ({
   needRefresh: false,
   onRegisterError: undefined as (() => void) | undefined,
   setNeedRefresh: vi.fn(),
+  trackUiEvent: vi.fn(),
   updateServiceWorker: vi.fn(),
+}));
+
+vi.mock('~/core/analytics', () => ({
+  trackUiEvent: pwaMocks.trackUiEvent,
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -93,6 +98,7 @@ describe('PwaProvider', () => {
     pwaMocks.needRefresh = false;
     pwaMocks.onRegisterError = undefined;
     pwaMocks.setNeedRefresh.mockReset();
+    pwaMocks.trackUiEvent.mockReset();
     pwaMocks.updateServiceWorker.mockReset().mockResolvedValue(undefined);
     vi.stubGlobal(
       'matchMedia',
@@ -147,6 +153,19 @@ describe('PwaProvider', () => {
       expect(screen.getByText('installed')).toBeInTheDocument(),
     );
     expect(prompt).toHaveBeenCalledOnce();
+    expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_started',
+        operation: 'pwa_install',
+      }),
+    );
+    expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_install',
+        outcome: 'success',
+      }),
+    );
 
     await user.click(screen.getByRole('button', { name: 'install' }));
     expect(prompt).toHaveBeenCalledOnce();
@@ -435,6 +454,20 @@ describe('PwaProvider', () => {
 
     await user.click(screen.getByRole('button', { name: 'dismiss' }));
     expect(pwaMocks.setNeedRefresh).toHaveBeenCalledWith(false);
+    expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_update',
+        outcome: 'success',
+      }),
+    );
+    expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_update',
+        outcome: 'dismissed',
+      }),
+    );
   });
 
   it('recovers the update controls when service worker activation fails', async () => {
@@ -453,6 +486,13 @@ describe('PwaProvider', () => {
 
     await waitFor(() =>
       expect(screen.getByText('idle-update')).toBeInTheDocument(),
+    );
+    expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventName: 'ui_operation_completed',
+        operation: 'pwa_update',
+        outcome: 'error',
+      }),
     );
   });
 });

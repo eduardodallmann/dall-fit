@@ -28,7 +28,9 @@ import type {
 } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { trackUiEvent, type AnalyticsSurface } from '~/core/analytics';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
+import { useTrainingPlanFieldAnalytics } from '~/routes/training-plan/training-plan-analytics';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
 import {
   validateTrainingPlanDescription,
@@ -41,6 +43,10 @@ interface BreadcrumbProps {
   mockAuth?: MockAuthScenario;
   mockTrainingPlans?: MockTrainingPlansScenario;
   plan?: { id: string; name: string };
+  surface: Extract<
+    AnalyticsSurface,
+    'training_plan_detail' | 'training_plan_list' | 'workout'
+  >;
   workout?: { id: string; name: string };
 }
 
@@ -48,6 +54,7 @@ export function TrainingPlanBreadcrumbs({
   mockAuth,
   mockTrainingPlans,
   plan,
+  surface,
   workout,
 }: Readonly<BreadcrumbProps>) {
   return (
@@ -56,6 +63,15 @@ export function TrainingPlanBreadcrumbs({
         <li className={styles.breadcrumbItem()}>
           <Link
             className={styles.breadcrumbLink()}
+            onClick={() => {
+              trackUiEvent({
+                control: 'breadcrumb_home',
+                destination: 'dash',
+                eventName: 'ui_navigation_selected',
+                navigationKind: 'breadcrumb',
+                surface,
+              });
+            }}
             search={{ mockAuth }}
             to="/dash"
           >
@@ -72,6 +88,15 @@ export function TrainingPlanBreadcrumbs({
           ) : (
             <Link
               className={styles.breadcrumbLink()}
+              onClick={() => {
+                trackUiEvent({
+                  control: 'breadcrumb_training_plans',
+                  destination: 'training_plan_list',
+                  eventName: 'ui_navigation_selected',
+                  navigationKind: 'breadcrumb',
+                  surface,
+                });
+              }}
               search={{ mockAuth, mockTrainingPlans }}
               to="/global/training-plan"
             >
@@ -96,6 +121,15 @@ export function TrainingPlanBreadcrumbs({
             ) : (
               <Link
                 className={styles.breadcrumbLink()}
+                onClick={() => {
+                  trackUiEvent({
+                    control: 'breadcrumb_plan',
+                    destination: 'training_plan_detail',
+                    eventName: 'ui_navigation_selected',
+                    navigationKind: 'breadcrumb',
+                    surface,
+                  });
+                }}
                 params={{ trainingPlanId: plan.id }}
                 search={{ mockAuth, mockTrainingPlans }}
                 title={plan.name}
@@ -129,6 +163,7 @@ export function TrainingPlanBreadcrumbs({
 interface TrainingPlanFormProps {
   defaultValues?: CreateTrainingPlanRequest;
   legend: string;
+  mode: 'create' | 'edit' | 'inline_edit';
   onCancel?: () => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
   submitLabel: string;
@@ -137,13 +172,23 @@ interface TrainingPlanFormProps {
 export function TrainingPlanForm({
   defaultValues = { description: '', name: '' },
   legend,
+  mode,
   onCancel,
   onSubmit,
   submitLabel,
 }: Readonly<TrainingPlanFormProps>) {
+  const { trackFieldCompletion, trackFieldFocus } =
+    useTrainingPlanFieldAnalytics(defaultValues);
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      trackUiEvent({
+        control: 'submit',
+        eventName: 'ui_form_submitted',
+        form: 'training_plan',
+        mode,
+        surface: 'training_plan_form',
+      });
       await onSubmit({
         description: value.description.trim(),
         name: value.name.trim(),
@@ -177,8 +222,12 @@ export function TrainingPlanForm({
                 <Label>Nome</Label>
                 <Input
                   maxLength={120}
-                  onBlur={field.handleBlur}
+                  onBlur={(event) => {
+                    field.handleBlur();
+                    trackFieldCompletion('name', event.target.value);
+                  }}
                   onChange={(event) => field.handleChange(event.target.value)}
+                  onFocus={() => trackFieldFocus('name')}
                   value={field.state.value}
                 />
                 <FieldError className={styles.fieldError()}>
@@ -203,8 +252,12 @@ export function TrainingPlanForm({
                 <Label>Descrição</Label>
                 <TextArea
                   maxLength={1000}
-                  onBlur={field.handleBlur}
+                  onBlur={(event) => {
+                    field.handleBlur();
+                    trackFieldCompletion('description', event.target.value);
+                  }}
                   onChange={(event) => field.handleChange(event.target.value)}
+                  onFocus={() => trackFieldFocus('description')}
                   rows={5}
                   value={field.state.value}
                 />
@@ -259,9 +312,25 @@ export function TrainingPlanFormModal({
   plan,
 }: Readonly<FormModalProps>) {
   const editing = plan !== undefined;
+  const mode = editing ? 'edit' : 'create';
+  const close = (reason: 'cancel' | 'close_trigger' | 'escape' | 'submit') => {
+    trackUiEvent({
+      control: 'plan_form',
+      eventName: 'ui_overlay_closed',
+      overlay: 'plan_form',
+      reason,
+      surface: 'training_plan_list',
+    });
+    onOpenChange(false);
+  };
 
   return (
-    <Modal isOpen={open} onOpenChange={onOpenChange}>
+    <Modal
+      isOpen={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) close('escape');
+      }}
+    >
       <Modal.Backdrop isDismissable={false}>
         <Modal.Container>
           <Modal.Dialog>
@@ -278,9 +347,10 @@ export function TrainingPlanFormModal({
                     : { description: plan.description, name: plan.name }
                 }
                 legend="Identificação do plano"
-                onCancel={() => onOpenChange(false)}
+                mode={mode}
+                onCancel={() => close('cancel')}
                 onSubmit={async (input) => {
-                  onOpenChange(false);
+                  close('submit');
                   await onSubmit(input);
                 }}
                 submitLabel={editing ? 'Salvar alterações' : 'Criar plano'}
@@ -298,6 +368,10 @@ interface DeleteDialogProps {
   onConfirm: () => Promise<void>;
   onOpenChange: (isOpen: boolean) => void;
   open: boolean;
+  surface: Extract<
+    AnalyticsSurface,
+    'training_plan_detail' | 'training_plan_list'
+  >;
   title: string;
 }
 
@@ -306,10 +380,27 @@ export function DeleteConfirmationDialog({
   onConfirm,
   onOpenChange,
   open,
+  surface,
   title,
 }: Readonly<DeleteDialogProps>) {
+  const close = (reason: 'cancel' | 'close_trigger' | 'confirm') => {
+    trackUiEvent({
+      control: 'delete_confirmation',
+      eventName: 'ui_overlay_closed',
+      overlay: 'delete_confirmation',
+      reason,
+      surface,
+    });
+    onOpenChange(false);
+  };
+
   return (
-    <AlertDialog isOpen={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      isOpen={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) close('close_trigger');
+      }}
+    >
       <AlertDialog.Backdrop>
         <AlertDialog.Container>
           <AlertDialog.Dialog>
@@ -318,12 +409,12 @@ export function DeleteConfirmationDialog({
             </AlertDialog.Header>
             <AlertDialog.Body>{description}</AlertDialog.Body>
             <AlertDialog.Footer>
-              <Button onPress={() => onOpenChange(false)} variant="secondary">
+              <Button onPress={() => close('cancel')} variant="secondary">
                 Cancelar
               </Button>
               <Button
                 onPress={() => {
-                  onOpenChange(false);
+                  close('confirm');
                   void onConfirm();
                 }}
                 variant="danger"
@@ -342,15 +433,31 @@ interface ActionsMenuProps {
   ariaLabel: string;
   onDelete: () => void;
   onEdit?: () => void;
+  surface: Extract<
+    AnalyticsSurface,
+    'training_plan_detail' | 'training_plan_list'
+  >;
 }
 
 export function ActionsMenu({
   ariaLabel,
   onDelete,
   onEdit,
+  surface,
 }: Readonly<ActionsMenuProps>) {
   return (
-    <Dropdown>
+    <Dropdown
+      onOpenChange={(isOpen) => {
+        if (isOpen) {
+          trackUiEvent({
+            control: 'row_actions',
+            eventName: 'ui_menu_opened',
+            menu: 'row_actions',
+            surface,
+          });
+        }
+      }}
+    >
       <Dropdown.Trigger
         aria-label={ariaLabel}
         className={styles.actionTrigger()}
@@ -361,8 +468,26 @@ export function ActionsMenu({
         <Dropdown.Menu
           aria-label={ariaLabel}
           onAction={(key) => {
-            if (key === 'edit') onEdit?.();
-            if (key === 'delete') onDelete();
+            if (key === 'edit') {
+              trackUiEvent({
+                action: 'edit',
+                control: 'row_actions',
+                eventName: 'ui_menu_action_selected',
+                menu: 'row_actions',
+                surface,
+              });
+              onEdit?.();
+            }
+            if (key === 'delete') {
+              trackUiEvent({
+                action: 'delete',
+                control: 'row_actions',
+                eventName: 'ui_menu_action_selected',
+                menu: 'row_actions',
+                surface,
+              });
+              onDelete();
+            }
           }}
         >
           {onEdit === undefined ? null : (
