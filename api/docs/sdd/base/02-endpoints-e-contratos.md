@@ -19,12 +19,30 @@ Formato base de erro:
 ```json
 {
   "code": "RESOURCE_NOT_FOUND",
-  "message": "Resource not found",
-  "details": {}
+  "message": "The requested resource was not found.",
+  "details": {},
+  "requestId": "4ec21cc4-59d7-4473-b08c-5d8f6115e2b8"
 }
 ```
 
-Mensagens não são contrato para lógica do cliente; consumidores usam `code`.
+Os quatro campos são obrigatórios. `details` aceita somente objeto simples não
+anulável; `requestId` coincide com o header `x-request-id` da mesma response.
+Mensagens e identificadores não são contrato para lógica do cliente; consumidores
+usam status e `code`.
+
+O filtro global preserva status, `code`, `message` e `details` somente de
+`HttpException` cujo body já obedeça integralmente ao contrato. Outros 404 viram
+`RESOURCE_NOT_FOUND`, 503 viram `SERVICE_UNAVAILABLE`, demais `HttpException`
+viram `HTTP_ERROR` com o status original e falhas inesperadas viram
+`500 INTERNAL_SERVER_ERROR`. Nenhum fallback expõe mensagem, stack ou payload da
+dependência.
+
+Toda response, inclusive `204`, redirect, erro e preflight, devolve
+`x-request-id`. A API aceita o valor recebido apenas quando há exatamente um
+header e ele possui de 1 a 128 caracteres ASCII no formato
+`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`; ausência, repetição, combinação pelo parser
+ou formato inválido gera UUID novo. O CORS permite `X-Request-Id` na request e o
+expõe na response sem ampliar origem ou métodos.
 
 O `ValidationPipe` global transforma entradas, mantém somente propriedades dos
 DTOs e rejeita campos adicionais. Toda falha de query, param ou body validado por

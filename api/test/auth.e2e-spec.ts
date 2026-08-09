@@ -7,7 +7,15 @@ import type { Model } from 'mongoose';
 import { RedisMemoryServer } from 'redis-memory-server';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import {
   AUTH_SESSION_COOKIE,
@@ -15,6 +23,7 @@ import {
   OAUTH_NONCE_COOKIE,
   OAUTH_STATE_COOKIE,
 } from '~/auth/auth.constants';
+import { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
 
@@ -61,12 +70,6 @@ describe('Authentication (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
-    app.enableCors({
-      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
-      credentials: true,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      origin: 'http://localhost:3000',
-    });
     await app.init();
 
     personModel = app.get<Model<PersonDocument>>(
@@ -92,17 +95,24 @@ describe('Authentication (e2e)', () => {
     return body.data.token;
   }
 
-  it('rejects protected endpoints without a session', async () => {
+  it('returns the removed root as a public normalized 404', async () => {
     const rootResponse = await request(app.getHttpServer()).get('/');
+
+    expect(rootResponse.status).toBe(404);
+    expect(rootResponse.body).toEqual({
+      code: 'RESOURCE_NOT_FOUND',
+      details: {},
+      message: 'The requested resource was not found.',
+      requestId: rootResponse.headers['x-request-id'],
+    });
+  });
+
+  it('rejects protected endpoints without a session', async () => {
     const meResponse = await request(app.getHttpServer()).get('/auth/me');
     const configsResponse = await request(app.getHttpServer())
       .patch('/auth/me/configs')
       .send({ theme: 'dark' });
 
-    expect(rootResponse.status).toBe(401);
-    expect(rootResponse.body).toMatchObject({
-      code: 'AUTHENTICATION_REQUIRED',
-    });
     expect(meResponse.status).toBe(401);
     expect(meResponse.body).toMatchObject({
       code: 'AUTHENTICATION_REQUIRED',
@@ -126,7 +136,6 @@ describe('Authentication (e2e)', () => {
         photoUrl: 'https://example.test/alex.png',
       });
     const meResponse = await agent.get('/auth/me');
-    const rootResponse = await agent.get('/');
 
     expect(loginResponse.status).toBe(204);
     expect(loginResponse.headers['set-cookie']?.[0]).toContain(
@@ -146,8 +155,6 @@ describe('Authentication (e2e)', () => {
     const meBody = meResponse.body as { data: Record<string, unknown> };
     expect(meBody.data).not.toHaveProperty('googleSubject');
     expect(meBody.data).not.toHaveProperty('isAdmin');
-    expect(rootResponse.status).toBe(200);
-    expect(rootResponse.text).toBe('Hello World!');
     await expect(personModel.countDocuments()).resolves.toBe(1);
     const storedPerson = await personModel.collection.findOne({
       googleSubject: 'google-new-001',
@@ -479,6 +486,74 @@ describe('Authentication (e2e)', () => {
     await expect(personModel.countDocuments()).resolves.toBe(0);
   });
 
+  it('clears temporary OAuth cookies when validation rejects the callback', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/callback?error=')
+      .set(
+        'Cookie',
+        `${OAUTH_STATE_COOKIE}=state; ${OAUTH_NONCE_COOKIE}=nonce; ${OAUTH_CODE_VERIFIER_COOKIE}=verifier`,
+      );
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: 'VALIDATION_ERROR',
+      details: {},
+      requestId: response.headers['x-request-id'],
+    });
+    expect(response.headers['set-cookie']).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(`${OAUTH_STATE_COOKIE}=;`),
+        expect.stringContaining(`${OAUTH_NONCE_COOKIE}=;`),
+        expect.stringContaining(`${OAUTH_CODE_VERIFIER_COOKIE}=;`),
+      ]),
+    );
+  });
+
+  it('returns a normalized 500 without session when OAuth fails technically', async () => {
+    const googleOAuthService = app.get(GoogleOAuthService);
+    const exchangeSpy = vi
+      .spyOn(googleOAuthService, 'exchangeCode')
+      .mockRejectedValueOnce(new Error('provider unavailable'));
+
+    const response = await request(app.getHttpServer())
+      .get('/callback?code=fake-code&state=expected-state')
+      .set(
+        'Cookie',
+        `${OAUTH_STATE_COOKIE}=expected-state; ${OAUTH_NONCE_COOKIE}=fake-nonce; ${OAUTH_CODE_VERIFIER_COOKIE}=fake-verifier`,
+      );
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      details: {},
+      message: 'An unexpected error occurred.',
+      requestId: response.headers['x-request-id'],
+    });
+    expect(response.headers.location).toBeUndefined();
+    expect(response.headers['set-cookie']).toHaveLength(3);
+    expect(response.headers['set-cookie']).not.toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(`${AUTH_SESSION_COOKIE}=`),
+      ]),
+    );
+    exchangeSpy.mockRestore();
+  });
+
+  it('clears temporary OAuth cookies when the callback is rate limited', async () => {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await request(app.getHttpServer()).get('/callback').expect(302);
+    }
+
+    const response = await request(app.getHttpServer()).get('/callback');
+
+    expect(response.status).toBe(429);
+    expect(response.body).toMatchObject({
+      code: 'RATE_LIMIT_EXCEEDED',
+      requestId: response.headers['x-request-id'],
+    });
+    expect(response.headers['set-cookie']).toHaveLength(3);
+  });
+
   it('rejects a validly signed session after its person is removed', async () => {
     const agent = request.agent(app.getHttpServer());
     await agent
@@ -623,7 +698,48 @@ describe('Authentication (e2e)', () => {
       'http://localhost:3000',
     );
     expect(response.headers['access-control-allow-credentials']).toBe('true');
+    expect(response.headers['access-control-expose-headers']).toBe(
+      'X-Request-Id',
+    );
     expect(response.headers.vary).toContain('Origin');
+  });
+
+  it('correlates success, no-content, redirect, error and preflight responses', async () => {
+    const liveness = await request(app.getHttpServer())
+      .get('/health')
+      .set('x-request-id', 'client-request-001');
+    const ready = await request(app.getHttpServer()).get('/ready');
+    const noContent = await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('x-request-id', 'client-request-204');
+    const redirect = await request(app.getHttpServer()).get('/auth/google');
+    const error = await request(app.getHttpServer()).get('/missing');
+    const preflight = await request(app.getHttpServer())
+      .options('/auth/google')
+      .set('Origin', 'http://localhost:3000')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'X-Request-Id')
+      .set('x-request-id', 'invalid/request/id');
+
+    expect(liveness.status).toBe(200);
+    expect(liveness.body).toEqual({ status: 'ok' });
+    expect(liveness.headers['x-request-id']).toBe('client-request-001');
+    expect(ready.status).toBe(200);
+    expect(ready.body).toMatchObject({
+      details: { mongodb: { status: 'up' }, redis: { status: 'up' } },
+      status: 'ok',
+    });
+    const readyBody = ready.body as { details: Record<string, unknown> };
+    expect(Object.keys(readyBody.details).sort()).toEqual(['mongodb', 'redis']);
+    for (const response of [ready, noContent, redirect, error, preflight]) {
+      expect(response.headers['x-request-id']).toMatch(
+        /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/,
+      );
+    }
+    expect(preflight.headers['access-control-allow-headers']).toContain(
+      'X-Request-Id',
+    );
+    expect(preflight.headers['x-request-id']).not.toBe('invalid/request/id');
   });
 
   afterAll(async () => {

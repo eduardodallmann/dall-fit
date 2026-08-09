@@ -102,6 +102,11 @@ O E2E vigente de autenticação e `Person` está em
 resolvidos por [`api/test/seeds/cli.ts`](../../../test/seeds/cli.ts). Esses arquivos,
 e não uma árvore reproduzida no SDD, são a fonte de verdade da organização atual.
 
+A readiness usa os mesmos processos e clients da aplicação. A suíte
+[`api/test/operational.e2e-spec.ts`](../../../test/operational.e2e-spec.ts) cria
+ambientes isolados, encerra apenas MongoDB ou apenas Redis e confirma o `503`
+genérico sem compartilhar indisponibilidade com outras suítes.
+
 Quando factories ou helpers compartilhados surgirem por reutilização real, devem
 permanecer sob `api/test/`, próximos dos cenários consumidores e com nomes
 orientados ao domínio.

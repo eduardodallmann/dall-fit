@@ -9,7 +9,8 @@ import type {
 export interface ApiError {
   code: string;
   message: string;
-  details?: Readonly<Record<string, unknown>>;
+  details: Readonly<Record<string, unknown>>;
+  requestId: string;
 }
 
 export interface ApiResponse<TData> {

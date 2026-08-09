@@ -112,7 +112,15 @@ Testes reutilizam os handlers padrão. Para um cenário específico:
 ```ts
 mockServer.use(
   http.get('/resource', () =>
-    HttpResponse.json({ code: 'RESOURCE_UNAVAILABLE' }, { status: 503 }),
+    HttpResponse.json(
+      {
+        code: 'RESOURCE_UNAVAILABLE',
+        details: {},
+        message: 'Resource unavailable.',
+        requestId: 'mock-request-id',
+      },
+      { headers: { 'x-request-id': 'mock-request-id' }, status: 503 },
+    ),
   ),
 );
 ```
@@ -130,6 +138,12 @@ desenvolvimento documentado. Seguir `07-testes-integrados-playwright.md`.
 Handlers retornam os mesmos status, códigos e formatos documentados no endpoint.
 Loading é produzido com `delay(...)` no handler, não com temporizadores artificiais
 no componente.
+
+Toda response mockada da API Dall Fit — sucesso, erro, `204` ou redirect — inclui
+`x-request-id`. Erros incluem também `requestId` idêntico no body e os quatro
+campos obrigatórios de `ApiError`. O helper compartilhado de mocks centraliza esse
+valor para evitar divergência; o middleware Vite da navegação OAuth segue a mesma
+regra.
 
 Erros do frontend são documentados na rota; contratos HTTP permanecem no SDD da API.
 

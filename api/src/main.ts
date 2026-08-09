@@ -8,18 +8,13 @@ import { configureApplication } from '~/configure-application';
 const bootstrapLogger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const configService = app.get(ConfigService);
-  const corsOrigin = configService.getOrThrow<string>('CORS_ORIGIN');
   const port = configService.getOrThrow<number>('PORT');
 
   configureApplication(app);
-  app.enableCors({
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    origin: corsOrigin,
-  });
+  app.flushLogs();
+  app.enableShutdownHooks();
 
   await app.listen(port);
 }

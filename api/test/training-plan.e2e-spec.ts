@@ -63,12 +63,6 @@ describe('Global training plans (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
-    app.enableCors({
-      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
-      credentials: true,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      origin: 'http://localhost:3000',
-    });
     await app.init();
 
     personModel = app.get<Model<PersonDocument>>(
@@ -444,6 +438,7 @@ describe('Global training plans (e2e)', () => {
         code: 'VALIDATION_ERROR',
         details: {},
         message: 'Request validation failed.',
+        requestId: response.headers['x-request-id'],
       });
     }
   });

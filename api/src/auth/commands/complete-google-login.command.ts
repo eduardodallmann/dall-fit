@@ -100,14 +100,15 @@ export class CompleteGoogleLoginCommand {
 
       return result;
     } catch (error: unknown) {
+      if (!(error instanceof OAuthCallbackError)) {
+        throw error;
+      }
+
       this.logger.warn(
         'CompleteGoogleLoginCommand -> execute -> oauthFailure branch:',
         {
           data: {
-            code:
-              error instanceof OAuthCallbackError
-                ? 'OAUTH_CALLBACK_INVALID'
-                : 'OAUTH_CALLBACK_FAILED',
+            code: 'OAUTH_CALLBACK_INVALID',
           },
         },
       );
@@ -145,8 +146,19 @@ export class CompleteGoogleLoginCommand {
       },
     );
 
+    if (typeof input.callback.error === 'string') {
+      if (input.callback.error === 'access_denied') {
+        this.logger.warn(
+          'CompleteGoogleLoginCommand -> validateCallback -> accessDenied branch:',
+          { data: { code: 'OAUTH_ACCESS_DENIED' } },
+        );
+        throw new OAuthCallbackError('OAuth access was denied.');
+      }
+
+      throw new Error('OAuth provider returned an unexpected callback error.');
+    }
+
     if (
-      typeof input.callback.error === 'string' ||
       typeof input.callback.code !== 'string' ||
       typeof input.callback.state !== 'string' ||
       typeof input.stateCookie !== 'string' ||

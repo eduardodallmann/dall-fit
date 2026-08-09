@@ -13,6 +13,6 @@ import { SessionStoreService } from '~/redis/session-store.service';
     RedisKeyService,
     SessionStoreService,
   ],
-  exports: [RateLimitService, SessionStoreService],
+  exports: [RateLimitService, RedisClientService, SessionStoreService],
 })
 export class RedisModule {}

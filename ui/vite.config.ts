@@ -22,6 +22,7 @@ const mockOAuthNavigationPlugin: Plugin = {
 
       response.statusCode = 302;
       response.setHeader('Location', '/dash');
+      response.setHeader('x-request-id', 'mock-request-id');
       response.end();
     });
   },

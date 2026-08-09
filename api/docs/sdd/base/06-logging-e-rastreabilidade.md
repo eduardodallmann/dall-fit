@@ -11,15 +11,21 @@ incluindo controllers, commands, services, repositories, adapters de MongoDB ou
 Redis, clients externos, publishers e consumers. Métodos privados usados por essas
 classes também seguem o padrão.
 
-O backend usa o `Logger` do NestJS. Não usar `console.log`, `console.warn` ou
-`console.error`.
+O backend usa o `Logger` do NestJS com um `LoggerService` global injetado. Não usar
+`console.log`, `console.warn` ou `console.error`.
 
 ## Limites atuais
 
-Esta política padroniza os logs da aplicação com as dependências existentes. Ela
-não introduz biblioteca adicional, correlação distribuída, tracing nem plataforma
-externa de observabilidade. A adoção futura desses recursos exige atualizar esta
-base e registrar ADR quando houver trade-offs arquiteturais ou operacionais.
+Cada request possui correlação local por `requestId` em `AsyncLocalStorage`. Isso
+não constitui tracing distribuído nem plataforma externa de observabilidade. A
+adoção futura desses recursos exige atualizar esta base e registrar ADR quando
+houver trade-offs arquiteturais ou operacionais.
+
+O logger global acrescenta `requestId` aos metadados estruturados de `log`,
+`error`, `warn`, `debug`, `verbose` e `fatal`, preservando mensagem, argumentos,
+contexto e stack. Logs de bootstrap fora de uma request não inventam correlação.
+O identificador pode ser pesquisado, mas não autoriza registrar dados que esta
+política proíbe.
 
 ## Formato da mensagem
 
@@ -196,8 +202,9 @@ this.logger.warn('NomeDaClasse -> nomeDoMetodo -> profileNotFound error:', {
 
 Falhas técnicas são registradas com `error` no ponto em que forem tratadas,
 traduzidas ou compensadas. Não criar `try/catch` apenas para repetir o mesmo erro em
-todas as camadas. Erros não tratados são registrados pelo mecanismo global da
-aplicação.
+todas as camadas. Erros não tratados são registrados uma única vez pelo filtro
+global, com método, path sem query, nome e stack. Um erro já traduzido e registrado
+pela fronteira Redis não é repetido no filtro.
 
 Stacks, objetos de driver e respostas externas brutas não entram como dados
 estruturados comuns. Quando uma stack for necessária, ela é registrada somente no
@@ -326,4 +333,7 @@ restrições:
   resultado de validação e IDs técnicos necessários;
 - claims externos são resumidos por campos presentes e nunca pelo payload integral.
 
-O endpoint `GET /` segue integralmente esta política desde sua proteção por sessão.
+Logger, armazenamento de contexto e filtro são infraestrutura recursiva: seus
+métodos internos não emitem a sequência completa de logs de camada quando isso
+causaria recursão ou duplicação. O middleware de correlação registra somente a
+criação segura do contexto; o filtro registra apenas falhas técnicas inesperadas.

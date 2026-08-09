@@ -19,6 +19,6 @@ somente quando constituir requisito funcional excepcional.
 
 - [`Autenticação`](auth.md): início/callback Google e bypass restrito local/teste.
 - [`GET /auth/me`](current-person.md): pessoa vinculada à sessão.
-- [`GET /`](root.md): resposta técnica protegida por sessão.
+- [`Probes operacionais`](operational.md): liveness e readiness de MongoDB/Redis.
 - [`Planos de treino globais`](global-training-plans.md): sete operações
   administrativas de planos e workouts.

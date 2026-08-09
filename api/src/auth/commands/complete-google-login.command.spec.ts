@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CompleteGoogleLoginCommand } from '~/auth/commands/complete-google-login.command';
+import { OAuthCallbackError } from '~/auth/errors/oauth-callback.error';
 import type { AuthSessionService } from '~/auth/services/auth-session.service';
 import type { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 import type { FindOrCreatePersonService } from '~/person/services/find-or-create-person.service';
@@ -103,9 +104,9 @@ describe('CompleteGoogleLoginCommand', () => {
     expect(googleOAuthService.exchangeCode).not.toHaveBeenCalled();
   });
 
-  it('returns a generic failure when the provider rejects the code', async () => {
+  it('returns a generic redirect when the provider rejects the callback', async () => {
     googleOAuthService.exchangeCode.mockRejectedValue(
-      new Error('sensitive provider error'),
+      new OAuthCallbackError('sensitive provider error'),
     );
 
     const result = await command.execute({
@@ -118,5 +119,37 @@ describe('CompleteGoogleLoginCommand', () => {
     expect(result.succeeded).toBe(false);
     expect(result.session).toBeNull();
     expect(findOrCreatePersonService.execute).not.toHaveBeenCalled();
+  });
+
+  it('propagates an unexpected callback error as a technical failure', async () => {
+    const result = command.execute({
+      callback: { error: 'temporarily_unavailable' },
+      codeVerifierCookie: 'code-verifier',
+      nonceCookie: 'matching-nonce',
+      stateCookie: 'matching-state',
+    });
+
+    await expect(result).rejects.toThrow(
+      'OAuth provider returned an unexpected callback error.',
+    );
+    expect(googleOAuthService.exchangeCode).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Google exchange', googleOAuthService.exchangeCode],
+    ['person persistence', findOrCreatePersonService.execute],
+    ['session storage', authSessionService.createSession],
+  ])('propagates technical failure from %s', async (_step, failingMethod) => {
+    const technicalError = new Error('technical failure');
+    failingMethod.mockRejectedValueOnce(technicalError);
+
+    const result = command.execute({
+      callback: { code: 'one-time-code', state: 'matching-state' },
+      codeVerifierCookie: 'code-verifier',
+      nonceCookie: 'matching-nonce',
+      stateCookie: 'matching-state',
+    });
+
+    await expect(result).rejects.toBe(technicalError);
   });
 });

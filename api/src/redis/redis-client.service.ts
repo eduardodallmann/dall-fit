@@ -104,6 +104,19 @@ export class RedisClientService implements OnModuleDestroy, OnModuleInit {
     }
   }
 
+  async ping(): Promise<void> {
+    this.logger.log('RedisClientService -> ping -> params:', {
+      params: {},
+    });
+    const pong = await this.execute((client) => client.ping());
+    this.logger.log('RedisClientService -> ping -> execute return:', {
+      data: { ready: pong === 'PONG' },
+    });
+    this.logger.log('RedisClientService -> ping -> completed:', {
+      data: { ready: true },
+    });
+  }
+
   async onModuleDestroy(): Promise<void> {
     this.logger.log('RedisClientService -> onModuleDestroy -> params:', {
       params: {},

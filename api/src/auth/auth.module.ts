@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  RequestMethod,
+  type NestModule,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -16,6 +21,7 @@ import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
+import { OAuthCallbackCookiesMiddleware } from '~/auth/middleware/oauth-callback-cookies.middleware';
 import { AuthSessionService } from '~/auth/services/auth-session.service';
 import { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 import { PersonModule } from '~/person/person.module';
@@ -41,6 +47,7 @@ import { PersonModule } from '~/person/person.module';
     LogoutCommand,
     LogoutCsrfGuard,
     OptionalSessionGuard,
+    OAuthCallbackCookiesMiddleware,
     RateLimitGuard,
     SessionAuthGuard,
     StartGoogleLoginCommand,
@@ -55,4 +62,10 @@ import { PersonModule } from '~/person/person.module';
     SessionAuthGuard,
   ],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(OAuthCallbackCookiesMiddleware)
+      .forRoutes({ method: RequestMethod.GET, path: 'callback' });
+  }
+}

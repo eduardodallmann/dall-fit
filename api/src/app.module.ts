@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 
-import { AppController } from '~/app.controller';
 import { AuthModule } from '~/auth/auth.module';
-import { GetRootCommand } from '~/commands/get-root.command';
 import { validateEnvironment } from '~/config/environment';
+import { ObservabilityModule } from '~/observability/observability.module';
+import { OperationalModule } from '~/operational/operational.module';
 import { PersonModule } from '~/person/person.module';
 import { RedisModule } from '~/redis/redis.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
@@ -17,6 +17,7 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
       isGlobal: true,
       validate: validateEnvironment,
     }),
+    ObservabilityModule,
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -24,11 +25,10 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
       }),
     }),
     RedisModule,
+    OperationalModule,
     PersonModule,
     AuthModule,
     TrainingPlanModule,
   ],
-  controllers: [AppController],
-  providers: [GetRootCommand],
 })
 export class AppModule {}
