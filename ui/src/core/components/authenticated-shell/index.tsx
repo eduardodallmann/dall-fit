@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 
-import { Button, Drawer, useOverlayState } from '@heroui/react';
+import { Button, Drawer, toast, useOverlayState } from '@heroui/react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from '@tanstack/react-router';
 import { Menu } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
+import {
+  logout as logoutSession,
+  type MockAuthScenario,
+} from '~/auth/auth-service';
+import { clearCsrfToken } from '~/auth/csrf-token';
 import { trackUiEvent } from '~/core/analytics';
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { authenticatedShellStyles } from '~/core/components/authenticated-shell/styles';
@@ -14,14 +21,51 @@ const styles = authenticatedShellStyles();
 
 export interface AuthenticatedShellProps {
   children: ReactNode;
+  mockAuth?: MockAuthScenario;
   person: Person;
 }
 
 export function AuthenticatedShell({
   children,
+  mockAuth = 'authenticated',
   person,
 }: Readonly<AuthenticatedShellProps>) {
   const drawerOpenRef = useRef(false);
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const logoutMutation = useMutation({
+    mutationFn: () => logoutSession(mockAuth),
+    onMutate: () => {
+      trackUiEvent({
+        control: 'logout',
+        eventName: 'ui_operation_started',
+        operation: 'logout',
+        surface: 'application_menu',
+      });
+    },
+    onSuccess: () => {
+      trackUiEvent({
+        control: 'logout',
+        eventName: 'ui_operation_completed',
+        operation: 'logout',
+        outcome: 'success',
+        surface: 'application_menu',
+      });
+      clearCsrfToken();
+      queryClient.clear();
+      void router.navigate({ replace: true, to: '/' });
+    },
+    onError: () => {
+      trackUiEvent({
+        control: 'logout',
+        eventName: 'ui_operation_completed',
+        operation: 'logout',
+        outcome: 'error',
+        surface: 'application_menu',
+      });
+      toast.danger('Não foi possível sair. Tente novamente.');
+    },
+  });
   const closeReasonRef = useRef<
     'backdrop' | 'breakpoint' | 'close_trigger' | 'escape' | 'navigation'
   >('backdrop');
@@ -101,7 +145,11 @@ export function AuthenticatedShell({
   return (
     <div className={styles.shell()}>
       <aside aria-label="Menu da aplicação" className={styles.desktopMenu()}>
-        <ApplicationMenu person={person} />
+        <ApplicationMenu
+          isLogoutPending={logoutMutation.isPending}
+          onLogout={() => logoutMutation.mutate()}
+          person={person}
+        />
       </aside>
       <div className={styles.mobileTrigger()}>
         <Drawer state={drawerState}>
@@ -133,7 +181,9 @@ export function AuthenticatedShell({
                 />
                 <Drawer.Body className={styles.drawerBody()}>
                   <ApplicationMenu
+                    isLogoutPending={logoutMutation.isPending}
                     onNavigate={() => closeDrawer('navigation')}
+                    onLogout={() => logoutMutation.mutate()}
                     person={person}
                   />
                 </Drawer.Body>

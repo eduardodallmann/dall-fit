@@ -1,6 +1,7 @@
 # ADR-0002: Autenticação Google e sessão
 
-- Status: `aceita`
+- Status: `substituída` por
+  [`ADR-0004`](ADR-0004-sessao-revogavel-redis-e-csrf.md)
 - Data: `2026-07-24`
 - Responsáveis: time Dall Fit
 

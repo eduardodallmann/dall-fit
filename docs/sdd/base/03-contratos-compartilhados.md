@@ -54,8 +54,8 @@ como pontos de extensão hipotéticos.
 - `UpdateCurrentPersonConfigsRequest` aceita somente `theme`, e
   `UpdateCurrentPersonConfigsResponse` devolve a `Person` pública atualizada.
 - `CurrentPersonResponse` envolve `Person` em `ApiResponse`.
-- `StartGoogleLoginResponse` envolve a `authorizationUrl` temporária em
-  `ApiResponse`.
+- `CsrfTokenResponse` envolve o token anti-CSRF da sessão em `ApiResponse`; a UI
+  o conserva somente em memória.
 - o identificador Google, documentos MongoDB, cookies e payloads de sessão são
   detalhes exclusivos da API e não pertencem ao pacote.
 - `photoUrl` é anulável porque o claim de foto do provedor não é garantido.

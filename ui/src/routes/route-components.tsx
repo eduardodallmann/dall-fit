@@ -15,7 +15,7 @@ export function AuthenticatedRouteComponent() {
   }, [mockAuth, person, reconcileAuthenticated]);
 
   const result = (
-    <AuthenticatedShell person={person}>
+    <AuthenticatedShell mockAuth={mockAuth} person={person}>
       <Outlet />
     </AuthenticatedShell>
   );

@@ -30,6 +30,12 @@ o módulo de service diretamente em testes de rota. Overrides locais com
 `mockServer.use(...)` são permitidos para erros e casos específicos e devem ser
 restaurados após cada teste.
 
+Fluxos autenticados cobrem a confirmação da pessoa seguida pelo bootstrap do token
+CSRF, mantido somente em memória. Testes de mutation validam o header aplicado pelo
+client Axios único; cenários de `401`, falha técnica do CSRF e logout verificam
+respectivamente limpeza privada, recuperação sem logout simulado e preservação da
+rota quando a revogação falha.
+
 Vercel Analytics é isolado nos testes: a composição global substitui o componente
 oficial para confirmar uma única montagem sem carregar coleta externa; testes da
 fronteira substituem apenas `track` e validam schema, normalização, deduplicação,

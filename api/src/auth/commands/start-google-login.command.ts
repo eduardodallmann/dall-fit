@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -6,6 +6,7 @@ import { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 
 export interface StartGoogleLoginResult {
   authorizationUrl: string;
+  codeVerifier: string;
   nonce: string;
   state: string;
 }
@@ -23,6 +24,10 @@ export class StartGoogleLoginCommand {
 
     const state = randomBytes(32).toString('base64url');
     const nonce = randomBytes(32).toString('base64url');
+    const codeVerifier = randomBytes(64).toString('base64url');
+    const codeChallenge = createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
     this.logger.log(
       'StartGoogleLoginCommand -> execute -> oauthValues prepared:',
       { data: { nonceCreated: true, stateCreated: true } },
@@ -31,16 +36,18 @@ export class StartGoogleLoginCommand {
     const authorizationUrl = this.googleOAuthService.createAuthorizationUrl(
       state,
       nonce,
+      codeChallenge,
     );
     this.logger.log(
       'StartGoogleLoginCommand -> execute -> googleOAuthService return:',
       { data: { destination: 'google' } },
     );
 
-    const result = { authorizationUrl, nonce, state };
+    const result = { authorizationUrl, codeVerifier, nonce, state };
     this.logger.log('StartGoogleLoginCommand -> execute -> return:', {
       data: {
         authorizationUrlCreated: true,
+        codeVerifierCreated: true,
         nonceCreated: true,
         stateCreated: true,
       },

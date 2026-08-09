@@ -17,7 +17,8 @@
   plataforma.
 - Path e query params: `/dash`; a query `mockAuth` existe somente com MSW e aceita
   os cenários `admin`, `unauthenticated`, `error`, `theme-light`, `theme-dark`,
-  `theme-unset`, `theme-save-error` e `theme-save-error-unset`.
+  `theme-unset`, `theme-save-error`, `theme-save-error-unset`, `csrf-error` e
+  `logout-error`.
 - Contexto e estado persistido: cookie de sessão gerenciado pelo browser, cache
   TanStack Query, preferência opcional `dall-fit:theme` e estado local temporário
   do `Drawer` móvel.
@@ -48,6 +49,7 @@ Depois da proteção, o layout autenticado apresenta:
   `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
 - seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
   prompt ou orientação manual expansível quando ele não está disponível;
+- botão `Sair` compartilhado pelas apresentações persistente e móvel;
 - região `main` sem conteúdo próprio, título, placeholder, card ou mensagem.
 
 A rota pública `/` não recebe nenhum desses elementos.
@@ -55,8 +57,9 @@ A rota pública `/` não recebe nenhum desses elementos.
 ## Caminho feliz
 
 1. O layout autenticado executa `GET /auth/me` antes de renderizar o shell.
-2. A API responde com `CurrentPersonResponse`.
-3. Antes da pintura do shell, o layout reconcilia o provider: tema explícito do
+2. A API responde com `CurrentPersonResponse`; em seguida o layout obtém
+   `GET /auth/csrf` e conserva o token somente em memória.
+3. Somente após ambos concluírem, o layout reconcilia o provider: tema explícito do
    perfil prevalece e é sincronizado localmente; sem tema, remove a chave local e
    usa o sistema.
 4. O layout entrega a mesma `Person` ao shell e ao contexto dos filhos, sem segunda
@@ -137,6 +140,22 @@ enquanto o dashboard permanece intencionalmente vazio.
 - Resultado: mostra o toast acessível
   `Não foi possível salvar o tema. Tente novamente.` e permite tentar de novo.
 
+### Alternativa 8 — Falha no bootstrap anti-CSRF
+
+- Condição: pessoa foi carregada, mas `GET /auth/csrf` falha sem `401`.
+- Comportamento: o shell e suas mutações não são liberados; o error component
+  oferece recuperação por recarga e a UI não apaga autenticação por inferência.
+- Resultado: nenhum token parcial é persistido e nenhum dado privado incompleto é
+  renderizado.
+
+### Alternativa 9 — Falha ao sair
+
+- Condição: `POST /auth/logout` falha.
+- Comportamento: a área autenticada permanece visível, o botão deixa o pending e
+  um toast acessível informa a falha.
+- Resultado: a pessoa pode tentar novamente; cache e CSRF não são apagados sem
+  confirmação do endpoint.
+
 ## Validações
 
 Não se aplica — a rota e o menu não possuem formulário nem entrada editável.
@@ -153,7 +172,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro não recuperável: não se aplica.
 - Ações desabilitadas: controles de tema, instalação e atualização indicam o
   progresso e evitam ativações concorrentes. Os dois toggles de tema compartilham
-  exatamente o mesmo pending.
+  exatamente o mesmo pending; os dois botões de logout compartilham outra única
+  mutation e o mesmo pending.
 
 ## Integrações
 
@@ -169,11 +189,20 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erros: `401` redireciona; demais erros acionam o error component.
 - Retry, timeout e idempotência: política global de uma tentativa e cache por 30s.
 
+### Bootstrap anti-CSRF
+
+- Momento: depois de `GET /auth/me` e antes de renderizar o shell.
+- Endpoint documentado: `api/docs/sdd/endpoints/auth.md`.
+- Persistência: somente variável em memória consumida pelo interceptor Axios.
+- Erros: `401` limpa token/cache e redireciona; outra falha permanece recuperável
+  no error component sem declarar logout.
+
 ### Atualizar tema da pessoa atual
 
 - Momento: ativação de `Ativar tema claro` ou `Ativar tema escuro`.
 - Endpoint documentado: `api/docs/sdd/endpoints/current-person.md`.
-- Dados enviados: exatamente `{ theme: "light" | "dark" }` e cookie automático.
+- Dados enviados: exatamente `{ theme: "light" | "dark" }`, cookie automático e
+  `X-CSRF-Token`; o browser fornece Origin.
 - Antes da resposta: aplica `data-theme`, estado global e chave local de forma
   otimista; bloqueia ambos os toggles.
 - Sucesso: mantém a escolha, atualiza todas as queries de pessoa com a response e
@@ -181,6 +210,17 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro: executa o rollback descrito na alternativa 7 e anuncia a falha.
 - Retry, timeout e idempotência: sem retry adicional da mutation; nova ativação é
   possível depois do término e repetir o mesmo tema é idempotente na API.
+
+### Encerrar sessão
+
+- Momento: ativação de `Sair` em qualquer apresentação do menu.
+- Endpoint documentado: `api/docs/sdd/endpoints/auth.md`.
+- Dados enviados: body vazio, cookie automático e CSRF em memória.
+- Sucesso: limpa token e cache privado, emite resultado de analytics e navega com
+  replace para `/`.
+- Erro: mantém rota, identidade e caches; reabilita o botão e mostra
+  `Não foi possível sair. Tente novamente.`.
+- Retry: somente por nova ativação explícita.
 
 ## Responsividade e interações do menu
 
@@ -268,6 +308,8 @@ móvel não o reabre.
   e destino enumerado, sem query ou reload do documento;
 - o toggle emite início e resultado `success|error` de `theme_update`, sem enviar o
   tema anterior, o tema escolhido ou dados da pessoa;
+- logout emite início e resultado `success|error`, sem enviar token, pessoa ou
+  conteúdo do erro;
 - a instalação nativa emite início e resultado
   `success|dismissed|error` de `pwa_install`; `Como instalar` emite somente
   `ui_disclosure_toggled` com `open|closed`;
@@ -407,6 +449,28 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - When: `GET /auth/me` responde erro diferente de `401`
 - Then: o estado de erro usa esse tema sem inferir configuração parcial de perfil
 
+### Cenário 16 — Falha recuperável no bootstrap CSRF
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=csrf-error` com MSW
+- Given: a pessoa atual foi carregada
+- When: `GET /auth/csrf` falha tecnicamente
+- Then: mostra o error component, mantém a URL privada e não libera mutações
+
+### Cenário 17 — Logout confirmado
+
+- Link para testar: `http://localhost:3000/dash` com MSW
+- Given: pessoa e CSRF estão carregados
+- When: ativa `Sair`
+- Then: mostra pending, confirma `204`, limpa estado privado e substitui a URL por
+  `/`
+
+### Cenário 18 — Logout falhou
+
+- Link para testar: `http://localhost:3000/dash?mockAuth=logout-error` com MSW
+- Given: a pessoa está no shell autenticado
+- When: ativa `Sair` e o endpoint falha
+- Then: permanece no dashboard com identidade visível e toast acessível
+
 ## Estrutura técnica relevante
 
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
@@ -417,10 +481,13 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   `theme-toggle`, `pwa-install-action`, `pwa-update-notice` e `route-status`
 - Componentes exclusivos da rota: não se aplica; `/dash` não possui conteúdo
 - Hooks e serviços: `useOverlayState`, `currentPersonQueryOptions`,
-  `getCurrentPerson`, `ThemeProvider` e `updateCurrentPersonConfigs`
+  `getCurrentPerson`, `ensureCsrfToken`, `logout`, `ThemeProvider` e
+  `updateCurrentPersonConfigs`
 - Tipos compartilhados: `Theme`, `PersonConfigs`, `Person`,
-  `CurrentPersonResponse` e `UpdateCurrentPersonConfigsResponse`
-- Ícones: imports individuais `Menu`, `House`, `Sun` e `Moon` de `lucide-react`
+  `CurrentPersonResponse`, `CsrfTokenResponse` e
+  `UpdateCurrentPersonConfigsResponse`
+- Ícones: imports individuais `Menu`, `House`, `LogOut`, `Sun` e `Moon` de
+  `lucide-react`
 
 ## Cobertura automatizada
 
@@ -438,6 +505,8 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 | precedência perfil/local/sistema          | theme provider      | rota `/dash`     |
 | toggle, cache e pending compartilhado     | provider/menu       | rota `/dash`     |
 | rollback para perfil ou sistema           | theme provider      | rota `/dash`     |
+| bootstrap CSRF e falha recuperável        | auth service/router | rota `/dash`     |
+| logout compartilhado, sucesso e erro      | shell/menu          | flow login       |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts` e
   `src/mocks/fixtures/person.ts`.

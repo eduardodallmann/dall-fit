@@ -1,28 +1,41 @@
 import {
   Injectable,
   Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import { AUTH_SESSION_COOKIE } from '~/auth/auth.constants';
-import type { AuthenticatedRequest } from '~/auth/domain/auth.types';
+import { getAuthSessionCookieName } from '~/auth/auth.constants';
+import type {
+  AuthenticatedRequest,
+  VerifiedSession,
+} from '~/auth/domain/auth.types';
+import { InvalidSessionError } from '~/auth/errors/invalid-session.error';
 import { AuthSessionService } from '~/auth/services/auth-session.service';
 import { FindPersonByIdService } from '~/person/services/find-person-by-id.service';
+import { RedisUnavailableError } from '~/redis/redis.errors';
 
 @Injectable()
 export class SessionAuthGuard implements CanActivate {
   private readonly logger = new Logger(SessionAuthGuard.name);
+  private readonly cookieName: string;
 
   constructor(
+    configService: ConfigService,
     private readonly authSessionService: AuthSessionService,
     private readonly findPersonByIdService: FindPersonByIdService,
-  ) {}
+  ) {
+    this.cookieName = getAuthSessionCookieName(
+      configService.getOrThrow<boolean>('AUTH_COOKIE_SECURE'),
+    );
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = request.cookies?.[AUTH_SESSION_COOKIE];
+    const token = request.cookies?.[this.cookieName];
 
     this.logger.log('SessionAuthGuard -> canActivate -> params:', {
       params: {
@@ -39,16 +52,28 @@ export class SessionAuthGuard implements CanActivate {
       throw this.authenticationRequired();
     }
 
-    let personId: string;
+    let session: VerifiedSession;
     try {
-      personId = await this.authSessionService.verifySession(token);
-    } catch {
+      session = await this.authSessionService.verifySession(token);
+    } catch (error: unknown) {
+      if (error instanceof RedisUnavailableError) {
+        throw new ServiceUnavailableException({
+          code: 'AUTHENTICATION_UNAVAILABLE',
+          details: {},
+          message: 'Authentication is temporarily unavailable.',
+        });
+      }
+      if (!(error instanceof InvalidSessionError)) {
+        throw error;
+      }
       this.logger.warn(
         'SessionAuthGuard -> canActivate -> invalidSession error:',
         { data: { code: 'AUTHENTICATION_REQUIRED' } },
       );
       throw this.authenticationRequired();
     }
+
+    const personId = session.personId;
 
     this.logger.log(
       'SessionAuthGuard -> canActivate -> authSessionService return:',
@@ -70,6 +95,7 @@ export class SessionAuthGuard implements CanActivate {
     }
 
     request.currentPerson = person;
+    request.currentSession = session;
     const result = true;
     this.logger.log('SessionAuthGuard -> canActivate -> return:', {
       data: { authenticated: result, personId },

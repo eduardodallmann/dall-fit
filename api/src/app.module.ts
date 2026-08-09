@@ -7,6 +7,7 @@ import { AuthModule } from '~/auth/auth.module';
 import { GetRootCommand } from '~/commands/get-root.command';
 import { validateEnvironment } from '~/config/environment';
 import { PersonModule } from '~/person/person.module';
+import { RedisModule } from '~/redis/redis.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
         uri: configService.getOrThrow<string>('MONGODB_URI'),
       }),
     }),
+    RedisModule,
     PersonModule,
     AuthModule,
     TrainingPlanModule,

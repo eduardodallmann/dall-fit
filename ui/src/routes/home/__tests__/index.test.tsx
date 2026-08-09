@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppProviders } from '~/context/providers';
-import { mockServer } from '~/mocks/server';
 import { HomePage } from '~/routes/home';
 
 const { trackUiEventMock } = vi.hoisted(() => ({
@@ -13,6 +11,10 @@ const { trackUiEventMock } = vi.hoisted(() => ({
 
 vi.mock('~/core/analytics', () => ({
   trackUiEvent: trackUiEventMock,
+}));
+
+vi.mock('~/auth/auth-service', () => ({
+  getGoogleLoginUrl: () => '#google-login',
 }));
 
 describe('HomePage', () => {
@@ -52,15 +54,7 @@ describe('HomePage', () => {
     ).toBeInTheDocument();
   });
 
-  it('tracks login intent and a terminal failure without error content', async () => {
-    mockServer.use(
-      http.post('*/auth/google', () =>
-        HttpResponse.json(
-          { code: 'SERVICE_UNAVAILABLE', message: 'private provider detail' },
-          { status: 503 },
-        ),
-      ),
-    );
+  it('tracks only login intent before top-level navigation', async () => {
     const user = userEvent.setup();
     render(
       <AppProviders>
@@ -69,22 +63,14 @@ describe('HomePage', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Entrar com Google' }));
-    expect(await screen.findByText('Não foi possível entrar.')).toBeVisible();
     expect(trackUiEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: 'ui_operation_started',
         operation: 'google_login',
       }),
     );
-    expect(trackUiEventMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventName: 'ui_operation_completed',
-        operation: 'google_login',
-        outcome: 'error',
-      }),
-    );
-    expect(JSON.stringify(trackUiEventMock.mock.calls)).not.toContain(
-      'private provider detail',
+    expect(trackUiEventMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ eventName: 'ui_operation_completed' }),
     );
   });
 });

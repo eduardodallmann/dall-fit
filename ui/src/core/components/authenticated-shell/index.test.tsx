@@ -1,7 +1,10 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import type * as TanStackRouter from '@tanstack/react-router';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { queryClient } from '~/context/query-client';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { PwaContext } from '~/core/pwa/pwa-context';
 import { ThemeContext } from '~/core/theme/theme-context';
@@ -18,6 +21,11 @@ vi.mock('~/core/analytics', () => ({
 vi.mock('~/core/components/application-menu', () => ({
   ApplicationMenu: () => null,
 }));
+
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof TanStackRouter>();
+  return { ...actual, useRouter: () => ({ navigate: vi.fn() }) };
+});
 
 const pwaContextValue = {
   dismissUpdate: vi.fn(),
@@ -44,13 +52,15 @@ describe('AuthenticatedShell analytics', () => {
   it('tracks one mobile menu opening and its explicit close reason', async () => {
     const user = userEvent.setup();
     render(
-      <ThemeContext value={themeContextValue}>
-        <PwaContext value={pwaContextValue}>
-          <AuthenticatedShell person={authenticatedPersonFixture}>
-            <p>Conteúdo</p>
-          </AuthenticatedShell>
-        </PwaContext>
-      </ThemeContext>,
+      <QueryClientProvider client={queryClient}>
+        <ThemeContext value={themeContextValue}>
+          <PwaContext value={pwaContextValue}>
+            <AuthenticatedShell person={authenticatedPersonFixture}>
+              <p>Conteúdo</p>
+            </AuthenticatedShell>
+          </PwaContext>
+        </ThemeContext>
+      </QueryClientProvider>,
     );
 
     await user.click(screen.getByRole('button', { name: 'Abrir menu' }));

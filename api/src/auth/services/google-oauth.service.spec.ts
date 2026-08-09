@@ -11,6 +11,7 @@ const oauthClient = vi.hoisted(() => ({
 }));
 
 vi.mock('google-auth-library', () => ({
+  CodeChallengeMethod: { S256: 'S256' },
   OAuth2Client: class OAuth2ClientMock {
     generateAuthUrl = oauthClient.generateAuthUrl;
     getToken = oauthClient.getToken;
@@ -38,11 +39,17 @@ describe('GoogleOAuthService', () => {
       'https://accounts.google.com/authorize',
     );
 
-    const result = service.createAuthorizationUrl('state-value', 'nonce-value');
+    const result = service.createAuthorizationUrl(
+      'state-value',
+      'nonce-value',
+      'challenge-value',
+    );
 
     expect(result).toBe('https://accounts.google.com/authorize');
     expect(oauthClient.generateAuthUrl).toHaveBeenCalledWith({
       access_type: 'online',
+      code_challenge: 'challenge-value',
+      code_challenge_method: 'S256',
       include_granted_scopes: true,
       nonce: 'nonce-value',
       prompt: 'select_account',
@@ -57,6 +64,7 @@ describe('GoogleOAuthService', () => {
     });
     oauthClient.verifyIdToken.mockResolvedValue({
       getPayload: () => ({
+        iss: 'https://accounts.google.com',
         sub: 'google-subject-001',
         name: 'Alex Runner',
         email: 'alex.runner@example.test',
@@ -66,7 +74,11 @@ describe('GoogleOAuthService', () => {
       }),
     });
 
-    const result = await service.exchangeCode('one-time-code', 'nonce-value');
+    const result = await service.exchangeCode(
+      'one-time-code',
+      'nonce-value',
+      'code-verifier',
+    );
 
     expect(result).toEqual({
       googleSubject: 'google-subject-001',
@@ -78,18 +90,23 @@ describe('GoogleOAuthService', () => {
       audience: 'fake-client.apps.googleusercontent.com',
       idToken: 'signed-google-token',
     });
+    expect(oauthClient.getToken).toHaveBeenCalledWith({
+      code: 'one-time-code',
+      codeVerifier: 'code-verifier',
+    });
   });
 
   it('rejects a response without an ID token', async () => {
     oauthClient.getToken.mockResolvedValue({ tokens: {} });
 
     await expect(
-      service.exchangeCode('one-time-code', 'nonce-value'),
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
     ).rejects.toBeInstanceOf(OAuthCallbackError);
   });
 
   it.each([
     {
+      iss: 'https://accounts.google.com',
       sub: 'google-subject-001',
       name: 'Alex Runner',
       email: 'alex.runner@example.test',
@@ -97,6 +114,7 @@ describe('GoogleOAuthService', () => {
       nonce: 'different-nonce',
     },
     {
+      iss: 'https://accounts.google.com',
       sub: 'google-subject-001',
       name: 'Alex Runner',
       email: 'alex.runner@example.test',
@@ -104,6 +122,7 @@ describe('GoogleOAuthService', () => {
       nonce: 'nonce-value',
     },
     {
+      iss: 'https://accounts.google.com',
       sub: 'google-subject-001',
       email: 'alex.runner@example.test',
       email_verified: true,
@@ -118,7 +137,7 @@ describe('GoogleOAuthService', () => {
     });
 
     await expect(
-      service.exchangeCode('one-time-code', 'nonce-value'),
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
     ).rejects.toBeInstanceOf(OAuthCallbackError);
   });
 });

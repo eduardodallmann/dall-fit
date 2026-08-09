@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import {
   Injectable,
   Logger,
@@ -24,7 +26,9 @@ export class TestAuthBypassGuard implements CanActivate {
     const enabled = this.configService.getOrThrow<boolean>(
       'AUTH_TEST_BYPASS_ENABLED',
     );
-    const environment = this.configService.getOrThrow<string>('NODE_ENV');
+    const environment = this.configService.getOrThrow<string>(
+      'RUNTIME_ENVIRONMENT',
+    );
     const requestKey = request.header(AUTH_TEST_KEY_HEADER);
 
     this.logger.log('TestAuthBypassGuard -> canActivate -> params:', {
@@ -37,9 +41,10 @@ export class TestAuthBypassGuard implements CanActivate {
 
     const allowed =
       enabled &&
-      environment !== 'production' &&
+      (environment === 'local' || environment === 'test') &&
       typeof configuredKey === 'string' &&
-      requestKey === configuredKey;
+      typeof requestKey === 'string' &&
+      constantTimeMatches(requestKey, configuredKey);
 
     if (!allowed) {
       this.logger.warn(
@@ -64,4 +69,14 @@ export class TestAuthBypassGuard implements CanActivate {
 
     return result;
   }
+}
+
+function constantTimeMatches(first: string, second: string): boolean {
+  const firstBuffer = Buffer.from(first);
+  const secondBuffer = Buffer.from(second);
+  const result =
+    firstBuffer.length === secondBuffer.length &&
+    timingSafeEqual(firstBuffer, secondBuffer);
+
+  return result;
 }

@@ -2,6 +2,7 @@ import { delay, http, HttpResponse } from 'msw';
 
 import type { Person, Theme } from '@dall-fit/types';
 
+import { clearCsrfToken } from '~/auth/csrf-token';
 import {
   adminPersonFixture,
   authenticatedPersonFixture,
@@ -10,6 +11,7 @@ import {
 } from '~/mocks/fixtures/person';
 
 const personState = new Map<string, Person>();
+const mockCsrfToken = 'mock-csrf-token';
 
 function getInitialPerson(scenario: string | null): Person {
   if (scenario === 'admin') {
@@ -54,14 +56,68 @@ function isThemeBody(value: unknown): value is { theme: Theme } {
 
 export function resetAuthScenarioStates(): void {
   personState.clear();
+  clearCsrfToken();
 }
 
 export const authHandlers = [
-  http.post('*/auth/google', ({ request }) => {
-    const authorizationUrl = new URL('/dash', request.url).toString();
-    const result = HttpResponse.json({ data: { authorizationUrl } });
+  http.get('*/auth/google', ({ request }) => {
+    const destination = new URL('/dash', request.url).toString();
+    const result = HttpResponse.redirect(destination);
 
     return result;
+  }),
+  http.get('*/auth/csrf', async ({ request }) => {
+    const scenario = request.headers.get('x-dall-fit-mock-auth');
+    await delay(75);
+    if (scenario === 'unauthenticated') {
+      return HttpResponse.json(
+        {
+          code: 'AUTHENTICATION_REQUIRED',
+          details: {},
+          message: 'Authentication is required.',
+        },
+        { status: 401 },
+      );
+    }
+    if (scenario === 'csrf-error') {
+      return HttpResponse.json(
+        {
+          code: 'AUTHENTICATION_UNAVAILABLE',
+          details: {},
+          message: 'Authentication is temporarily unavailable.',
+        },
+        { status: 503 },
+      );
+    }
+    return HttpResponse.json(
+      { data: { token: mockCsrfToken } },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }),
+  http.post('*/auth/logout', async ({ request }) => {
+    const scenario = request.headers.get('x-dall-fit-mock-auth');
+    await delay(75);
+    if (scenario === 'logout-error') {
+      return HttpResponse.json(
+        {
+          code: 'SERVICE_UNAVAILABLE',
+          details: {},
+          message: 'Service unavailable.',
+        },
+        { status: 503 },
+      );
+    }
+    if (request.headers.get('x-csrf-token') !== mockCsrfToken) {
+      return HttpResponse.json(
+        {
+          code: 'CSRF_VALIDATION_FAILED',
+          details: {},
+          message: 'CSRF token is invalid.',
+        },
+        { status: 403 },
+      );
+    }
+    return new HttpResponse(null, { status: 204 });
   }),
   http.get('*/auth/me', async ({ request }) => {
     const scenario = request.headers.get('x-dall-fit-mock-auth');
@@ -100,6 +156,17 @@ export const authHandlers = [
   http.patch('*/auth/me/configs', async ({ request }) => {
     const scenario = request.headers.get('x-dall-fit-mock-auth');
     await delay(75);
+
+    if (request.headers.get('x-csrf-token') !== mockCsrfToken) {
+      return HttpResponse.json(
+        {
+          code: 'CSRF_VALIDATION_FAILED',
+          details: {},
+          message: 'CSRF token is invalid.',
+        },
+        { status: 403 },
+      );
+    }
 
     if (scenario === 'unauthenticated') {
       const result = HttpResponse.json(

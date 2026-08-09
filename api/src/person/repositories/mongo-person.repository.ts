@@ -68,9 +68,51 @@ export class MongoPersonRepository extends PersonRepository {
         { data: { personId: existingDocument.id } },
       );
 
+      const changed =
+        existingDocument.name !== person.name ||
+        existingDocument.email !== person.email ||
+        existingDocument.photoUrl !== person.photoUrl;
+      const synchronizedDocument = changed
+        ? await this.personModel
+            .findOneAndUpdate(
+              {
+                googleSubject: person.googleSubject,
+                $or: [
+                  { email: { $ne: person.email } },
+                  { name: { $ne: person.name } },
+                  { photoUrl: { $ne: person.photoUrl } },
+                ],
+              },
+              {
+                $set: {
+                  email: person.email,
+                  name: person.name,
+                  photoUrl: person.photoUrl,
+                },
+              },
+              { returnDocument: 'after', runValidators: true },
+            )
+            .exec()
+        : existingDocument;
+      const currentDocument =
+        synchronizedDocument ??
+        (await this.personModel
+          .findOne({ googleSubject: person.googleSubject })
+          .orFail()
+          .exec());
+      this.logger.log(
+        'MongoPersonRepository -> findOrCreateByGoogleSubject -> synchronizeProviderProfile completed:',
+        {
+          data: {
+            changed: synchronizedDocument !== null && changed,
+            personId: currentDocument.id,
+          },
+        },
+      );
+
       const result = {
         created: false,
-        person: this.mapDocument(existingDocument),
+        person: this.mapDocument(currentDocument),
       };
 
       this.logger.log(

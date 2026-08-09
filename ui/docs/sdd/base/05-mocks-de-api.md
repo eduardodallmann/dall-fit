@@ -144,19 +144,23 @@ Erros do frontend são documentados na rota; contratos HTTP permanecem no SDD da
 
 ## Estado de adoção
 
-MSW foi adotado com autenticação. Os handlers vigentes cobrem início fictício do
-login e consulta da pessoa atual. No modo mock, a query exclusiva `mockAuth` faz o
+MSW foi adotado com autenticação. Os handlers vigentes cobrem pessoa atual, CSRF,
+logout e mutações. A navegação de documento `GET /api/auth/google`, que não passa
+pelo `fetch` interceptável do Service Worker, usa no Playwright um middleware
+exclusivo do Vite que responde redirect fictício para `/dash`. No modo mock, a
+query exclusiva `mockAuth` faz o
 client enviar `x-dall-fit-mock-auth` com o cenário selecionado; o header nunca é
 enviado quando mocks estão desabilitados e não pertence ao contrato da API.
 
-O handler de `POST /auth/google` devolve `/dash` como URL de autorização,
-representando que o provedor e callback concluíram. `GET /auth/me` devolve a
+`GET /auth/me` devolve a
 fixture autenticada sem `isAdmin` por padrão, a fixture com `isAdmin: true` no
 seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
 `error`. Os seletores `theme-light`, `theme-dark` e `theme-unset` controlam a
 reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercitam os
 dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o body e
-devolve a `Person` atualizada ou a falha selecionada. O estado de autenticação é
+devolve a `Person` atualizada ou a falha selecionada. `GET /auth/csrf` devolve
+token fictício no-store e `POST /auth/logout` valida seu header, com cenários
+`csrf-error` e `logout-error`. O estado de autenticação é
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 

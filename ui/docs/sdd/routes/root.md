@@ -21,8 +21,7 @@
 - título `Entre para continuar`;
 - descrição curta de que a conta Google será usada;
 - botão `Entrar com Google`;
-- alerta `Não foi possível entrar. Tente novamente.` após erro de callback ou
-  falha ao preparar o login;
+- alerta `Não foi possível entrar. Tente novamente.` após erro de callback;
 - aviso global `Nova versão disponível` quando o service worker encontra uma
   versão em espera, com ações `Atualizar agora` e `Agora não`; em viewports
   estreitos, as ações ficam abaixo da mensagem e permanecem contidas no aviso.
@@ -36,8 +35,7 @@ preferência atualizam a rota sem escrever no armazenamento.
 
 1. O visitante acessa `/`.
 2. Aciona `Entrar com Google`.
-3. A UI chama `POST ${VITE_API_URL}/auth/google`.
-4. O browser navega para `authorizationUrl`.
+3. O browser navega o documento para `GET ${VITE_API_URL}/auth/google`.
 
 Resultado esperado: a API inicia o fluxo OAuth.
 
@@ -45,7 +43,7 @@ Resultado esperado: a API inicia o fluxo OAuth.
 
 ### Alternativa 1 — Login falhou
 
-- Condição: query `authError=oauth_failed` ou falha no `POST /auth/google`.
+- Condição: query `authError=oauth_failed` devolvida pelo callback.
 - Comportamento: a tela continua pública e mostra alerta genérico.
 - Resultado: nenhuma informação técnica é exposta e a ação pode ser repetida.
 
@@ -76,7 +74,7 @@ Não se aplica — não há formulário nem entrada local.
 
 ## Estados
 
-- Loading: botão desabilitado enquanto o início do login é preparado.
+- Loading: não se aplica ao início; a navegação top-level deixa o documento.
 - Vazio: não se aplica.
 - Sucesso: card de entrada e ação visíveis.
 - Erro recuperável: alerta após callback falho ou falha na preparação.
@@ -93,10 +91,9 @@ Não se aplica — não há formulário nem entrada local.
 - Momento: ativação do botão.
 - Endpoint documentado: `api/docs/sdd/endpoints/auth.md`.
 - Dados enviados: nenhum.
-- Resposta utilizada: `data.authorizationUrl`.
+- Resposta utilizada: redirect HTTP da API.
 - Sucesso: provedor Google.
-- Erros: falha do POST mostra alerta local; callback retorna à própria rota com
-  `authError=oauth_failed`.
+- Erros: callback retorna à própria rota com `authError=oauth_failed`.
 - Retry, timeout e idempotência: sem retry automático; nova ativação cria novo
   state/nonce.
 
@@ -138,10 +135,9 @@ Não se aplica — não há formulário nem entrada local.
 
 ## Analytics
 
-- `Entrar com Google` emite `ui_operation_started` para `google_login` e um único
-  `ui_operation_completed` com `success` quando a URL de autorização é preparada ou
-  `error` quando a preparação falha. O resultado não representa a conclusão do
-  consentimento externo.
+- `Entrar com Google` emite somente `ui_operation_started` para `google_login`
+  imediatamente antes da navegação. Não emite conclusão antecipada nem interpreta
+  redirect/consentimento externo como sucesso.
 - `Atualizar agora` emite início e resultado `success|error` de `pwa_update`;
   `Agora não` emite início e resultado `dismissed` da mesma operação.
 - o contexto usa somente `route=/`, superfície e controle enumerados. `authError`,
@@ -161,7 +157,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Link para testar: `http://localhost:3000/`
 - Given: a rota pública está carregada
 - When: o visitante aciona `Entrar com Google`
-- Then: a UI solicita `POST /auth/google` e navega para a URL devolvida
+- Then: o documento navega diretamente para `GET /auth/google`
 
 ### Cenário 2 — Exibir erro recuperável
 
@@ -204,8 +200,8 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Componentes core: `pwa-update-notice`, aplicado pelos providers globais
 - Infraestrutura core: `ThemeProvider` e `theme-storage`
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
-- Hooks e serviços: mutation TanStack Query e `startGoogleLogin`
-- Tipos compartilhados: `StartGoogleLoginResponse`
+- Hooks e serviços: `getGoogleLoginUrl`, sem mutation ou contrato JSON
+- Tipos compartilhados: nenhum para iniciar OAuth
 
 ## Cobertura automatizada
 

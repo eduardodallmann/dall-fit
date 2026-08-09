@@ -14,7 +14,12 @@ async function bootstrap() {
   const port = configService.getOrThrow<number>('PORT');
 
   configureApplication(app);
-  app.enableCors({ credentials: true, origin: corsOrigin });
+  app.enableCors({
+    allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    origin: corsOrigin,
+  });
 
   await app.listen(port);
 }

@@ -10,12 +10,22 @@ export interface ExternalIdentity {
 export interface AuthenticatedRequest {
   cookies?: Readonly<Record<string, string | undefined>>;
   currentPerson?: PersonEntity;
+  currentSession?: VerifiedSession;
+  ip?: string;
+  method?: string;
   originalUrl?: string;
 }
 
 export interface SessionCookieResult {
   maxAgeMs: number;
   token: string;
+}
+
+export interface VerifiedSession {
+  csrfToken: string;
+  expiresAt: number;
+  jti: string;
+  personId: string;
 }
 
 export interface CompleteLoginResult {
