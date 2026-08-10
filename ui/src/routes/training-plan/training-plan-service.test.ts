@@ -2,6 +2,10 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
+import {
+  createMockApiError,
+  createMockResponseInit,
+} from '~/mocks/mock-response';
 import { mockServer } from '~/mocks/server';
 import {
   createGlobalTrainingPlan,
@@ -84,12 +88,8 @@ describe('training plan service', () => {
     mockServer.use(
       http.get('*/global/training-plans', () =>
         HttpResponse.json(
-          {
-            code: 'SERVICE_UNAVAILABLE',
-            details: {},
-            message: 'Service unavailable.',
-          },
-          { status: 503 },
+          createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
+          createMockResponseInit({ status: 503 }),
         ),
       ),
     );

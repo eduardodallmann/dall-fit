@@ -16,8 +16,9 @@ adicional `noFallthroughCasesInSwitch` permanece ativa explicitamente, e o ESLin
 rejeita `any` explícito pela configuração type-aware transversal.
 
 `mongodb-memory-server` e `redis-memory-server` são usados pelos E2E de
-autenticação, pessoa e planos globais. As suítes exercitam os adapters reais e
-controlam integralmente o lifecycle dos dois processos efêmeros.
+autenticação, pessoa, planos globais e probes operacionais. As suítes exercitam os
+adapters reais, inclusive a indisponibilidade isolada de cada dependência na
+readiness, e controlam integralmente o lifecycle dos dois processos efêmeros.
 
 ## Princípio de teste
 

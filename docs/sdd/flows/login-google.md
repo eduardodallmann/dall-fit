@@ -48,8 +48,9 @@ controlada pelo middleware de teste do Vite, sem acessar a API real.
    `isAdmin`; se já houver, sincroniza atomicamente somente nome, e-mail e foto
    realmente alterados, sem duplicar cadastro nem alterar a condição
    administrativa/configs.
-6. A API assina JWT técnico e só emite o cookie depois de criar o registro
-   revogável e o segredo CSRF no Redis. Remove cookies temporários e redireciona a
+6. A fronteira HTTP já agenda a remoção dos cookies temporários antes de guards,
+   validação e command. A API assina JWT técnico e só emite o cookie depois de criar o registro
+   revogável e o segredo CSRF no Redis; em sucesso redireciona a
    `/dash`. No deploy da UI, o fallback da Vercel entrega `index.html` para esse
    acesso direto e o TanStack Router assume a rota, sem exigir um arquivo físico
    `/dash`.
@@ -92,33 +93,38 @@ devem acompanhar a reversão.
 
 ## Dados compartilhados
 
-| Dado                     | Origem              | Consumidores      | Persistência                          | Observações                        |
-| ------------------------ | ------------------- | ----------------- | ------------------------------------- | ---------------------------------- |
-| `sub` Google             | ID token            | API               | MongoDB                               | chave externa estável, nunca na UI |
-| nome                     | ID token            | API e UI          | MongoDB                               | dado pessoal, nunca em logs        |
-| e-mail                   | ID token verificado | API e UI          | MongoDB                               | dado pessoal, não é chave          |
-| URL da foto              | ID token            | API e UI          | MongoDB                               | pode ser ausente                   |
-| ID de `Person`           | MongoDB             | sessão e API      | MongoDB, JWT e registro Redis         | claim técnica `sub`                |
-| `isAdmin`                | operação autorizada | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
-| tema                     | pessoa ou sistema   | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
-| sessão                   | API                 | browser e API     | cookie `HttpOnly` + registro Redis    | revogável, máximo sete dias        |
-| CSRF                     | API                 | UI e API          | Redis e memória volátil da UI         | nunca em armazenamento durável     |
-| `state`/`nonce`/verifier | API                 | Google e callback | cookies temporários                   | removidos ao terminar              |
+| Dado                     | Origem                | Consumidores      | Persistência                          | Observações                        |
+| ------------------------ | --------------------- | ----------------- | ------------------------------------- | ---------------------------------- |
+| `sub` Google             | ID token              | API               | MongoDB                               | chave externa estável, nunca na UI |
+| nome                     | ID token              | API e UI          | MongoDB                               | dado pessoal, nunca em logs        |
+| e-mail                   | ID token verificado   | API e UI          | MongoDB                               | dado pessoal, não é chave          |
+| URL da foto              | ID token              | API e UI          | MongoDB                               | pode ser ausente                   |
+| ID de `Person`           | MongoDB               | sessão e API      | MongoDB, JWT e registro Redis         | claim técnica `sub`                |
+| `isAdmin`                | operação autorizada   | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
+| tema                     | pessoa ou sistema     | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
+| sessão                   | API                   | browser e API     | cookie `HttpOnly` + registro Redis    | revogável, máximo sete dias        |
+| CSRF                     | API                   | UI e API          | Redis e memória volátil da UI         | nunca em armazenamento durável     |
+| `state`/`nonce`/verifier | API                   | Google e callback | cookies temporários                   | removidos ao terminar              |
+| `requestId`              | API ou request válida | logs e consumidor | contexto volátil e header/erro HTTP   | não persiste                       |
 
 ## Estados e exceções
 
 - Caminho completo: consentimento aceito, claims válidas, cadastro encontrado ou
   criado, sessão emitida e `/dash` carregada com o menu autenticado.
-- Interrupção ou retomada: negar consentimento ou falhar o callback retorna a `/`
-  sem sessão; um novo acionamento reinicia o fluxo.
+- Interrupção ou retomada: negar consentimento, callback incompleto/divergente,
+  `invalid_grant`, ID token ausente ou rejeição OIDC conhecida retorna a `/` sem
+  sessão; um novo acionamento reinicia o fluxo.
 - Erro recuperável: sessão ausente/expirada redireciona à entrada pública; falha
   transitória de `/auth/me` exibe o erro da rota para nova tentativa por recarga.
 - Reconciliação: tema explícito do perfil substitui o bootstrap local; perfil sem
   tema remove a chave local e acompanha o sistema. Falha de `/auth/me` mantém o
   tema do bootstrap sem inferir dado parcial.
-- Erro não recuperável: claims obrigatórias inválidas impedem cadastro e sessão.
-- Indisponibilidade: erro do Google, MongoDB ou Redis não cria sessão nem expõe
-  detalhes técnicos; Redis indisponível nunca reativa validação stateless.
+- Erro não recuperável: claims obrigatórias inválidas impedem cadastro e sessão,
+  limpam os cookies temporários e retornam o redirect genérico esperado.
+- Indisponibilidade: erro inesperado do Google, configuração, rede, timeout,
+  resposta 5xx, MongoDB, Redis ou código não cria sessão nem redirect; a API
+  responde `500` genérico com correlação e limpa os cookies temporários. Redis
+  indisponível nunca reativa validação stateless.
 
 ## Cenários funcionais
 
@@ -177,7 +183,8 @@ devem acompanhar a reversão.
   o transporte oficial e validam eventos sem conteúdo.
 - E2E dos endpoints da API:
   `api/test/auth.e2e-spec.ts` com MongoDB e Redis efêmeros reais, incluindo CSRF,
-  logout, reset do dataset, rate limit e CORS.
+  logout, reset do dataset, rate limit, CORS, correlação, limpeza antecipada e
+  falha técnica do callback.
 - Handlers e fixtures MSW: `ui/src/mocks/handlers/auth.ts` e
   `ui/src/mocks/fixtures/person.ts`.
 - Cenários não automatizados e justificativa: a tela real de consentimento Google

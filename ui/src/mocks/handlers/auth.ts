@@ -9,6 +9,10 @@ import {
   lightThemePersonFixture,
   personWithoutThemeFixture,
 } from '~/mocks/fixtures/person';
+import {
+  createMockApiError,
+  createMockResponseInit,
+} from '~/mocks/mock-response';
 
 const personState = new Map<string, Person>();
 const mockCsrfToken = 'mock-csrf-token';
@@ -62,7 +66,13 @@ export function resetAuthScenarioStates(): void {
 export const authHandlers = [
   http.get('*/auth/google', ({ request }) => {
     const destination = new URL('/dash', request.url).toString();
-    const result = HttpResponse.redirect(destination);
+    const result = new HttpResponse(
+      null,
+      createMockResponseInit({
+        headers: { Location: destination },
+        status: 302,
+      }),
+    );
 
     return result;
   }),
@@ -71,27 +81,25 @@ export const authHandlers = [
     await delay(75);
     if (scenario === 'unauthenticated') {
       return HttpResponse.json(
-        {
-          code: 'AUTHENTICATION_REQUIRED',
-          details: {},
-          message: 'Authentication is required.',
-        },
-        { status: 401 },
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
       );
     }
     if (scenario === 'csrf-error') {
       return HttpResponse.json(
-        {
-          code: 'AUTHENTICATION_UNAVAILABLE',
-          details: {},
-          message: 'Authentication is temporarily unavailable.',
-        },
-        { status: 503 },
+        createMockApiError(
+          'AUTHENTICATION_UNAVAILABLE',
+          'Authentication is temporarily unavailable.',
+        ),
+        createMockResponseInit({ status: 503 }),
       );
     }
     return HttpResponse.json(
       { data: { token: mockCsrfToken } },
-      { headers: { 'Cache-Control': 'no-store' } },
+      createMockResponseInit({ headers: { 'Cache-Control': 'no-store' } }),
     );
   }),
   http.post('*/auth/logout', async ({ request }) => {
@@ -99,25 +107,17 @@ export const authHandlers = [
     await delay(75);
     if (scenario === 'logout-error') {
       return HttpResponse.json(
-        {
-          code: 'SERVICE_UNAVAILABLE',
-          details: {},
-          message: 'Service unavailable.',
-        },
-        { status: 503 },
+        createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
+        createMockResponseInit({ status: 503 }),
       );
     }
     if (request.headers.get('x-csrf-token') !== mockCsrfToken) {
       return HttpResponse.json(
-        {
-          code: 'CSRF_VALIDATION_FAILED',
-          details: {},
-          message: 'CSRF token is invalid.',
-        },
-        { status: 403 },
+        createMockApiError('CSRF_VALIDATION_FAILED', 'CSRF token is invalid.'),
+        createMockResponseInit({ status: 403 }),
       );
     }
-    return new HttpResponse(null, { status: 204 });
+    return new HttpResponse(null, createMockResponseInit({ status: 204 }));
   }),
   http.get('*/auth/me', async ({ request }) => {
     const scenario = request.headers.get('x-dall-fit-mock-auth');
@@ -125,12 +125,11 @@ export const authHandlers = [
 
     if (scenario === 'unauthenticated') {
       const result = HttpResponse.json(
-        {
-          code: 'AUTHENTICATION_REQUIRED',
-          details: {},
-          message: 'Authentication is required.',
-        },
-        { status: 401 },
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
       );
 
       return result;
@@ -138,18 +137,17 @@ export const authHandlers = [
 
     if (scenario === 'error') {
       const result = HttpResponse.json(
-        {
-          code: 'SERVICE_UNAVAILABLE',
-          details: {},
-          message: 'Service unavailable.',
-        },
-        { status: 503 },
+        createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
+        createMockResponseInit({ status: 503 }),
       );
 
       return result;
     }
 
-    const result = HttpResponse.json({ data: getScenarioPerson(scenario) });
+    const result = HttpResponse.json(
+      { data: getScenarioPerson(scenario) },
+      createMockResponseInit(),
+    );
 
     return result;
   }),
@@ -159,23 +157,18 @@ export const authHandlers = [
 
     if (request.headers.get('x-csrf-token') !== mockCsrfToken) {
       return HttpResponse.json(
-        {
-          code: 'CSRF_VALIDATION_FAILED',
-          details: {},
-          message: 'CSRF token is invalid.',
-        },
-        { status: 403 },
+        createMockApiError('CSRF_VALIDATION_FAILED', 'CSRF token is invalid.'),
+        createMockResponseInit({ status: 403 }),
       );
     }
 
     if (scenario === 'unauthenticated') {
       const result = HttpResponse.json(
-        {
-          code: 'AUTHENTICATION_REQUIRED',
-          details: {},
-          message: 'Authentication is required.',
-        },
-        { status: 401 },
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
       );
 
       return result;
@@ -186,12 +179,8 @@ export const authHandlers = [
       scenario === 'theme-save-error-unset'
     ) {
       const result = HttpResponse.json(
-        {
-          code: 'SERVICE_UNAVAILABLE',
-          details: {},
-          message: 'Service unavailable.',
-        },
-        { status: 503 },
+        createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
+        createMockResponseInit({ status: 503 }),
       );
 
       return result;
@@ -201,12 +190,8 @@ export const authHandlers = [
 
     if (!isThemeBody(body)) {
       const result = HttpResponse.json(
-        {
-          code: 'VALIDATION_ERROR',
-          details: {},
-          message: 'Request validation failed.',
-        },
-        { status: 400 },
+        createMockApiError('VALIDATION_ERROR', 'Request validation failed.'),
+        createMockResponseInit({ status: 400 }),
       );
 
       return result;
@@ -219,7 +204,10 @@ export const authHandlers = [
       updatedAt: '2026-08-08T12:00:00.000Z',
     };
     personState.set(scenario ?? 'authenticated', updatedPerson);
-    const result = HttpResponse.json({ data: updatedPerson });
+    const result = HttpResponse.json(
+      { data: updatedPerson },
+      createMockResponseInit(),
+    );
 
     return result;
   }),

@@ -6,6 +6,8 @@ import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
+import { MOCK_REQUEST_ID } from './src/mocks/mock-constants.js';
+
 const applicationBackgroundColor = '#f7f7f7';
 
 const mockOAuthNavigationPlugin: Plugin = {
@@ -22,6 +24,7 @@ const mockOAuthNavigationPlugin: Plugin = {
 
       response.statusCode = 302;
       response.setHeader('Location', '/dash');
+      response.setHeader('x-request-id', MOCK_REQUEST_ID);
       response.end();
     });
   },

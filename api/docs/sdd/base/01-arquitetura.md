@@ -2,8 +2,8 @@
 
 ## Stack
 
-A API usa NestJS 11, TypeScript, Node.js, Mongoose para MongoDB e ioredis para
-Redis. `@nestjs/config` carrega o ambiente e uma função baseada em Zod valida e
+A API usa NestJS 11, TypeScript, Node.js, Mongoose para MongoDB, ioredis para
+Redis e Terminus para probes operacionais. `@nestjs/config` carrega o ambiente e uma função baseada em Zod valida e
 tipa seus valores antes do bootstrap. O entrypoint é
 `src/main.ts`, a composição raiz está em `src/app.module.ts` e funcionalidades
 futuras devem ser organizadas em módulos por domínio.
@@ -137,6 +137,19 @@ A estrutura cresce com necessidade real; não criar camadas vazias.
 
 ## Logging e retornos
 
+Antes de Helmet, CORS e das rotas, `RequestContextMiddleware` valida ou cria
+`x-request-id`, abre um contexto `AsyncLocalStorage` e grava o mesmo valor no
+header da response. `RequestContextLogger`, instalado como logger global injetado,
+acrescenta esse identificador aos metadados estruturados de todos os níveis sem
+alterar mensagem, argumentos, contexto ou stack. O bootstrap usa buffering até o
+logger estar disponível.
+
+`GlobalExceptionFilter`, registrado por `APP_FILTER`, é a única fronteira pública
+para erros HTTP e falhas não tratadas. Ele aplica o contrato descrito em
+`02-endpoints-e-contratos.md`; falhas técnicas inesperadas são registradas uma vez
+com método, path sem query, nome e stack no canal de erro. Falhas já traduzidas e
+registradas pelo adapter Redis não são duplicadas.
+
 Todo método de classe que participa de um fluxo da API registra:
 
 1. entrada e parâmetros sanitizados;
@@ -191,6 +204,13 @@ comando Redis. Somente `RedisKeyService` compõe as chaves injetando o namespace
 nenhum adapter executa `KEYS`, `FLUSH*` ou limpeza por prefixo em runtime publicado.
 Falha, timeout, saturação, reset do dataset ou rejeição por `noeviction` nunca
 desabilitam autenticação, CSRF ou rate limit: o caminho protegido falha fechado.
+
+`OperationalModule` expõe liveness em `GET /health` sem dependências e readiness
+em `GET /ready`. A readiness usa Terminus para pingar a conexão Mongoose vigente e
+o mesmo singleton ioredis, ambos com espera finita; não cria client ou pool
+adicional. Durante shutdown ela responde indisponível. O bootstrap habilita os
+shutdown hooks antes de escutar, e o encerramento aguarda os lifecycles do MongoDB,
+Redis e integração Vercel já existentes.
 
 O domínio `Person` expõe ports de repository aos services. O adapter MongoDB mantém
 índice único para o identificador `sub` do Google e mapeia documentos para entidades
@@ -314,7 +334,10 @@ Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. Em local
 usam nome sem prefixo, `SameSite=Lax` e sem `Secure`; em produção/preview usam
 prefixo `__Host-`, `Secure`, host-only e `SameSite=None`. Os cookies temporários de
 `state`, `nonce` e verifier duram no máximo dez minutos, usam sempre
-`SameSite=Lax` e são removidos no callback, inclusive em erro.
+`SameSite=Lax` e são removidos por middleware HTTP específico do callback depois
+do parser de cookies e antes de guards, pipes e command. Assim a limpeza acontece
+também em validação, rate limit e falha técnica; o cookie de sessão preexistente
+não é tocado por essa limpeza.
 
 `GET /auth/csrf` devolve o segredo da sessão com `Cache-Control: no-store`.
 Mutações autenticadas exigem simultaneamente cookie, `X-CSRF-Token` comparado em
@@ -326,8 +349,15 @@ Rate limits distribuídos usam sessão/pessoa e IP conforme o endpoint. Início
 Google aceita 10/10min/IP; callback 30/10min/IP; bypass 5/min/IP; CSRF e logout
 30/min/sessão+IP; mutações autenticadas comuns 60/min/pessoa+IP; administrativas
 30/min/admin+IP. Preflight não consome quota. Excesso responde `429` estruturado e
-`Retry-After`. A API usa Helmet antes dos demais middlewares, CORS credenciado com
-origem, métodos e headers exatos e `trust proxy` explícito.
+`Retry-After`. Depois da correlação da request, a API usa Helmet e parser de
+cookies; CORS credenciado mantém origem e métodos exatos, permite e expõe somente o
+header adicional `X-Request-Id`, e `trust proxy` permanece explícito.
+
+No callback OAuth, somente negação de consentimento, callback ausente ou
+divergente, `invalid_grant`, ID token ausente e rejeições OIDC conhecidas retornam
+redirect genérico para a entrada pública. Erro inesperado do provedor,
+configuração, rede, timeout, resposta 5xx, MongoDB, Redis ou código propaga ao
+filtro global e termina em `500`, sem redirect e sem nova sessão.
 
 Essa política `SameSite=None` é uma compatibilidade temporária do deploy, não o
 estado de segurança desejado em definitivo. Quando frontend e backend compartilharem

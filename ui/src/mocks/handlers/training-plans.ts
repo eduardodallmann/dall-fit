@@ -12,6 +12,10 @@ import {
   trainingPlanDetailFixture,
   trainingPlanFixtures,
 } from '~/mocks/fixtures/training-plans';
+import {
+  createMockApiError,
+  createMockResponseInit,
+} from '~/mocks/mock-response';
 
 interface ScenarioState {
   detail: TrainingPlanDetails;
@@ -47,7 +51,10 @@ function getState(scenario: string): ScenarioState {
 }
 
 function apiError(code: string, message: string, status: number) {
-  const result = HttpResponse.json({ code, details: {}, message }, { status });
+  const result = HttpResponse.json(
+    createMockApiError(code, message),
+    createMockResponseInit({ status }),
+  );
 
   return result;
 }
@@ -68,6 +75,7 @@ export const trainingPlanHandlers = [
     const plans = scenario === 'empty' ? [] : state.plans;
     const result = HttpResponse.json(
       trainingPlanCollectionFixture(plans, page),
+      createMockResponseInit(),
     );
 
     return result;
@@ -87,7 +95,10 @@ export const trainingPlanHandlers = [
       updatedAt: now,
     };
     getState(scenario).plans.unshift(created);
-    const result = HttpResponse.json({ data: created }, { status: 201 });
+    const result = HttpResponse.json(
+      { data: created },
+      createMockResponseInit({ status: 201 }),
+    );
 
     return result;
   }),
@@ -121,7 +132,10 @@ export const trainingPlanHandlers = [
         plan.id === state.detail.id
           ? { ...state.detail, ...plan }
           : { ...plan, workouts: [] };
-      const result = HttpResponse.json({ data: detail });
+      const result = HttpResponse.json(
+        { data: detail },
+        createMockResponseInit(),
+      );
 
       return result;
     },
@@ -155,7 +169,10 @@ export const trainingPlanHandlers = [
       if (state.detail.id === updated.id) {
         state.detail = { ...state.detail, ...updated };
       }
-      const result = HttpResponse.json({ data: updated });
+      const result = HttpResponse.json(
+        { data: updated },
+        createMockResponseInit(),
+      );
 
       return result;
     },
@@ -180,7 +197,10 @@ export const trainingPlanHandlers = [
           404,
         );
       }
-      const result = new HttpResponse(null, { status: 204 });
+      const result = new HttpResponse(
+        null,
+        createMockResponseInit({ status: 204 }),
+      );
 
       return result;
     },
@@ -210,7 +230,10 @@ export const trainingPlanHandlers = [
         ...state.detail,
         workouts: [...state.detail.workouts, workout],
       };
-      const result = HttpResponse.json({ data: workout }, { status: 201 });
+      const result = HttpResponse.json(
+        { data: workout },
+        createMockResponseInit({ status: 201 }),
+      );
 
       return result;
     },
@@ -239,7 +262,10 @@ export const trainingPlanHandlers = [
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
       }
       state.detail = { ...state.detail, workouts };
-      const result = new HttpResponse(null, { status: 204 });
+      const result = new HttpResponse(
+        null,
+        createMockResponseInit({ status: 204 }),
+      );
 
       return result;
     },

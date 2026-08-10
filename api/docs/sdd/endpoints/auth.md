@@ -8,17 +8,18 @@ somente no processo da API.
 
 ## Referências técnicas
 
-| Papel      | Símbolo                                                                                     | Responsabilidade                                   |
-| ---------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Controller | [`AuthController`](../../../src/auth/controllers/auth.controller.ts)                        | cookies, redirects, status e chamadas dos commands |
-| Command    | [`StartGoogleLoginCommand`](../../../src/auth/commands/start-google-login.command.ts)       | cria state, nonce, verifier e challenge            |
-| Command    | [`CompleteGoogleLoginCommand`](../../../src/auth/commands/complete-google-login.command.ts) | valida callback, sincroniza pessoa e cria sessão   |
-| Command    | [`LogoutCommand`](../../../src/auth/commands/logout.command.ts)                             | revoga a sessão ativa                              |
-| Service    | [`GoogleOAuthService`](../../../src/auth/services/google-oauth.service.ts)                  | URL Google, troca do código e validação OIDC       |
-| Service    | [`AuthSessionService`](../../../src/auth/services/auth-session.service.ts)                  | JWT técnico, rotação e vínculo ao registro Redis   |
-| Adapter    | [`SessionStoreService`](../../../src/redis/session-store.service.ts)                        | sessão revogável com TTL absoluto                  |
-| Proteção   | [`RateLimitGuard`](../../../src/auth/guards/rate-limit.guard.ts)                            | quota distribuída e `Retry-After`                  |
-| Proteção   | [`CsrfGuard`](../../../src/auth/guards/csrf.guard.ts)                                       | token e Origin exatos                              |
+| Papel      | Símbolo                                                                                               | Responsabilidade                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Controller | [`AuthController`](../../../src/auth/controllers/auth.controller.ts)                                  | cookies, redirects, status e chamadas dos commands |
+| Command    | [`StartGoogleLoginCommand`](../../../src/auth/commands/start-google-login.command.ts)                 | cria state, nonce, verifier e challenge            |
+| Command    | [`CompleteGoogleLoginCommand`](../../../src/auth/commands/complete-google-login.command.ts)           | valida callback, sincroniza pessoa e cria sessão   |
+| Command    | [`LogoutCommand`](../../../src/auth/commands/logout.command.ts)                                       | revoga a sessão ativa                              |
+| Service    | [`GoogleOAuthService`](../../../src/auth/services/google-oauth.service.ts)                            | URL Google, troca do código e validação OIDC       |
+| Service    | [`AuthSessionService`](../../../src/auth/services/auth-session.service.ts)                            | JWT técnico, rotação e vínculo ao registro Redis   |
+| Adapter    | [`SessionStoreService`](../../../src/redis/session-store.service.ts)                                  | sessão revogável com TTL absoluto                  |
+| Proteção   | [`RateLimitGuard`](../../../src/auth/guards/rate-limit.guard.ts)                                      | quota distribuída e `Retry-After`                  |
+| Proteção   | [`CsrfGuard`](../../../src/auth/guards/csrf.guard.ts)                                                 | token e Origin exatos                              |
+| Middleware | [`OAuthCallbackCookiesMiddleware`](../../../src/auth/middleware/oauth-callback-cookies.middleware.ts) | limpa cookies antes de guards e pipes              |
 
 ## Contrato HTTP resumido
 
@@ -39,9 +40,15 @@ preparação da URL.
   cookies temporários e valida o ID token;
 - sincroniza nome, e-mail e foto somente quando mudaram, preservando
   `googleSubject`, `isAdmin`, configs e `createdAt`;
-- cria sessão Redis antes de entregar cookie e redireciona a `/dash`; qualquer
-  falha redireciona a `/?authError=oauth_failed` sem cookie de sessão;
-- sempre limpa os três cookies temporários;
+- cria sessão Redis antes de entregar cookie e redireciona a `/dash`;
+- consentimento negado, callback incompleto/divergente, `invalid_grant`, ID token
+  ausente e rejeição OIDC conhecida redirecionam a
+  `/?authError=oauth_failed` sem cookie de sessão;
+- erro inesperado do provedor, configuração, rede, timeout, resposta 5xx,
+  MongoDB, Redis ou código responde `500 INTERNAL_SERVER_ERROR`, sem redirect e
+  sem nova sessão;
+- sempre limpa os três cookies temporários, inclusive em validação, rate limit e
+  falha técnica; não limpa uma sessão preexistente;
 - limite: 30 chamadas por 10 minutos e IP.
 
 ### `POST /auth/test-login`
@@ -87,12 +94,16 @@ partir do token.
 2. O command gera valores criptograficamente aleatórios e chama
    `GoogleOAuthService.createAuthorizationUrl` com challenge S256, sem expor o
    verifier ao provedor.
-3. No callback, o controller entrega query e cookies ao
+3. No callback, `OAuthCallbackCookiesMiddleware` agenda a expiração dos três
+   cookies temporários depois do parser e antes de rate limit, validação e
+   controller. O controller entrega query e os valores já lidos ao
    `CompleteGoogleLoginCommand`. O command valida state, chama
    `GoogleOAuthService.exchangeCode`, `FindOrCreatePersonService` e
    `AuthSessionService.createSession` nessa ordem.
 4. O service Google troca o código com verifier e valida assinatura, issuer Google,
-   audience, nonce, e-mail verificado e claims obrigatórias.
+   audience, nonce, e-mail verificado e claims obrigatórias. Somente falhas OAuth
+   esperadas são traduzidas para `OAuthCallbackError`; as demais preservam o fluxo
+   técnico até o filtro global.
 5. O repository da pessoa atualiza atomicamente apenas dados de perfil realmente
    alterados. A condição administrativa e configurações nunca vêm do provedor.
 6. `AuthSessionService` assina com a chave ativa e chama `SessionStoreService`; se
@@ -135,11 +146,12 @@ ou contador silenciosamente.
 | Gatilho                            | Resultado                                 | Efeito                                            |
 | ---------------------------------- | ----------------------------------------- | ------------------------------------------------- |
 | OAuth válido                       | `302 /dash`                               | perfil criado/sincronizado, sessão Redis e cookie |
-| callback inválido                  | `302 /?authError=oauth_failed`            | cookies temporários limpos                        |
+| callback esperado inválido         | `302 /?authError=oauth_failed`            | cookies temporários limpos                        |
+| callback falha tecnicamente        | `500 INTERNAL_SERVER_ERROR`               | cookies temporários limpos; sem sessão/redirect   |
 | sessão ativa                       | endpoint privado continua                 | Redis lido e pessoa relida no MongoDB             |
 | JWT válido sem registro após reset | `401`                                     | nenhum estado reconstruído                        |
 | mutação sem CSRF/Origin exato      | `403 CSRF_VALIDATION_FAILED`              | nenhum efeito de domínio                          |
-| quota excedida                     | `429 RATE_LIMIT_EXCEEDED` + `Retry-After` | contador preservado                               |
+| quota excedida                     | `429 RATE_LIMIT_EXCEEDED` + `Retry-After` | contador preservado; cookies do callback limpos   |
 | Redis indisponível/saturado        | erro técnico sanitizado                   | proteção permanece ativa, sem fallback            |
 | logout válido                      | `204`                                     | sessão removida e cookies limpos                  |
 | logout sem sessão                  | `204`                                     | cookies limpos                                    |
@@ -229,9 +241,26 @@ curl --request GET \
 - When: o cookie antigo acessa endpoint privado
 - Then: recebe `401`; um novo login só funciona após novo `SET` bem-sucedido
 
+### Cenário 6 — Falha técnica no callback
+
+**Seed:** não se aplica — falhas de provedor e infraestrutura são isoladas por
+mock unitário ou infraestrutura efêmera automatizada.
+
+```bash
+curl --include --request GET \
+  --url 'http://localhost:4000/callback?error=temporarily_unavailable' \
+  --header 'cookie: dall_fit_oauth_state=state; dall_fit_oauth_nonce=nonce; dall_fit_oauth_code_verifier=verifier'
+```
+
+- Given: o provedor devolve um erro fora da allowlist funcional
+- When: chama o callback
+- Then: recebe `500 INTERNAL_SERVER_ERROR`, sem `Location` e sem novo cookie de
+  sessão, mas com os três cookies temporários expirados
+
 ## Cobertura automatizada
 
-- unitários: PKCE, claims Google, rotação/claims JWT, cookies e guards;
+- unitários: PKCE, classificação allowlist de falhas Google, rotação/claims JWT,
+  limpeza de cookies e guards;
 - E2E serial com MongoDB e Redis efêmeros reais: sessão, CSRF, logout, reset,
   rate limit, CORS e preflight em `api/test/auth.e2e-spec.ts`;
 - Playwright cobre somente a jornada da UI; o consentimento Google real permanece

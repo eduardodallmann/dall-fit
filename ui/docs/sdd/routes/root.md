@@ -77,7 +77,8 @@ Não se aplica — não há formulário nem entrada local.
 - Loading: não se aplica ao início; a navegação top-level deixa o documento.
 - Vazio: não se aplica.
 - Sucesso: card de entrada e ação visíveis.
-- Erro recuperável: alerta após callback falho ou falha na preparação.
+- Erro recuperável: alerta após falha OAuth esperada no callback ou falha na
+  preparação.
 - Erro não recuperável: não se aplica.
 - Ações desabilitadas: durante a ativação da nova versão, `Atualizar agora` indica
   progresso e `Agora não` fica indisponível para impedir ações concorrentes.
@@ -93,7 +94,9 @@ Não se aplica — não há formulário nem entrada local.
 - Dados enviados: nenhum.
 - Resposta utilizada: redirect HTTP da API.
 - Sucesso: provedor Google.
-- Erros: callback retorna à própria rota com `authError=oauth_failed`.
+- Erros OAuth esperados retornam à própria rota com `authError=oauth_failed`.
+  Falhas técnicas do callback terminam na resposta `500` correlacionada da API e
+  não navegam silenciosamente para esta tela.
 - Retry, timeout e idempotência: sem retry automático; nova ativação cria novo
   state/nonce.
 
@@ -162,7 +165,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 ### Cenário 2 — Exibir erro recuperável
 
 - Link para testar: `http://localhost:3000/?authError=oauth_failed`
-- Given: o callback retornou erro genérico
+- Given: o callback classificou uma falha OAuth esperada e retornou erro genérico
 - When: a rota renderiza
 - Then: mostra o alerta e mantém a ação de login disponível
 

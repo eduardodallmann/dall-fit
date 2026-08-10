@@ -31,7 +31,7 @@ o próprio tema sem expor um CRUD geral de pessoas.
 - Entrada: não se aplica
 - Saída comum: `{ data: Person }`, sem `isAdmin`
 - Saída administrativa: `{ data: Person }`, com `isAdmin: true`
-- Status: `200`, `401 AUTHENTICATION_REQUIRED`, `503` técnico sanitizado quando a
+- Status: `200`, `401 AUTHENTICATION_REQUIRED`, `500` técnico sanitizado quando a
   proteção distribuída está indisponível
 - Dados sensíveis: nome, e-mail e foto aparecem somente na resposta autorizada
 - Idempotência: GET seguro e idempotente

@@ -19,6 +19,10 @@ import {
   lightThemePersonFixture,
   personWithoutThemeFixture,
 } from '~/mocks/fixtures/person';
+import {
+  createMockApiError,
+  createMockResponseInit,
+} from '~/mocks/mock-response';
 import { mockServer } from '~/mocks/server';
 
 const { trackUiEventMock } = vi.hoisted(() => ({
@@ -103,7 +107,10 @@ describe('ThemeProvider', () => {
       http.patch('*/auth/me/configs', async () => {
         requestCount += 1;
         await delay(50);
-        return HttpResponse.json({ data: lightThemePersonFixture });
+        return HttpResponse.json(
+          { data: lightThemePersonFixture },
+          createMockResponseInit(),
+        );
       }),
     );
     const user = userEvent.setup();
@@ -160,8 +167,8 @@ describe('ThemeProvider', () => {
       http.patch('*/auth/me/configs', async () => {
         await delay(50);
         return HttpResponse.json(
-          { code: 'SERVICE_UNAVAILABLE', details: {}, message: 'Unavailable' },
-          { status: 503 },
+          createMockApiError('SERVICE_UNAVAILABLE', 'Unavailable'),
+          createMockResponseInit({ status: 503 }),
         );
       }),
     );
@@ -195,8 +202,8 @@ describe('ThemeProvider', () => {
       http.patch('*/auth/me/configs', async () => {
         await delay(50);
         return HttpResponse.json(
-          { code: 'SERVICE_UNAVAILABLE', details: {}, message: 'Unavailable' },
-          { status: 503 },
+          createMockApiError('SERVICE_UNAVAILABLE', 'Unavailable'),
+          createMockResponseInit({ status: 503 }),
         );
       }),
     );

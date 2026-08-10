@@ -104,6 +104,56 @@ describe('GoogleOAuthService', () => {
     ).rejects.toBeInstanceOf(OAuthCallbackError);
   });
 
+  it('classifies invalid_grant as an expected callback rejection', async () => {
+    oauthClient.getToken.mockRejectedValue({
+      response: { data: { error: 'invalid_grant' } },
+    });
+
+    await expect(
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
+    ).rejects.toBeInstanceOf(OAuthCallbackError);
+  });
+
+  it('propagates token exchange transport and provider configuration failures', async () => {
+    const technicalError = Object.assign(new Error('invalid_client'), {
+      response: { data: { error: 'invalid_client' }, status: 401 },
+    });
+    oauthClient.getToken.mockRejectedValue(technicalError);
+
+    await expect(
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
+    ).rejects.toBe(technicalError);
+  });
+
+  it('classifies a known ID token verification rejection as expected', async () => {
+    oauthClient.getToken.mockResolvedValue({
+      tokens: { id_token: 'signed-google-token' },
+    });
+    oauthClient.verifyIdToken.mockRejectedValue(
+      new Error('Invalid token signature: fixture'),
+    );
+
+    await expect(
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
+    ).rejects.toBeInstanceOf(OAuthCallbackError);
+  });
+
+  it.each([
+    Object.assign(new Error('certificate request failed'), {
+      request: {},
+    }),
+    new Error('unexpected programming failure'),
+  ])('propagates unexpected ID token verification errors', async (error) => {
+    oauthClient.getToken.mockResolvedValue({
+      tokens: { id_token: 'signed-google-token' },
+    });
+    oauthClient.verifyIdToken.mockRejectedValue(error);
+
+    await expect(
+      service.exchangeCode('one-time-code', 'nonce-value', 'code-verifier'),
+    ).rejects.toBe(error);
+  });
+
   it.each([
     {
       iss: 'https://accounts.google.com',

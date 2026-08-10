@@ -75,7 +75,16 @@ export class GoogleOAuthService {
       },
     });
 
-    const tokenResponse = await this.client.getToken({ code, codeVerifier });
+    let tokenResponse;
+    try {
+      tokenResponse = await this.client.getToken({ code, codeVerifier });
+    } catch (error: unknown) {
+      if (this.isInvalidGrantError(error)) {
+        throw new OAuthCallbackError('Google authorization code is invalid.');
+      }
+
+      throw error;
+    }
     this.logger.log(
       'GoogleOAuthService -> exchangeCode -> oauthClient return:',
       {
@@ -95,10 +104,19 @@ export class GoogleOAuthService {
       throw new OAuthCallbackError('Google did not return an ID token.');
     }
 
-    const ticket = await this.client.verifyIdToken({
-      audience: this.clientId,
-      idToken,
-    });
+    let ticket;
+    try {
+      ticket = await this.client.verifyIdToken({
+        audience: this.clientId,
+        idToken,
+      });
+    } catch (error: unknown) {
+      if (this.isKnownIdTokenRejection(error)) {
+        throw new OAuthCallbackError('Google ID token is invalid.');
+      }
+
+      throw error;
+    }
     const payload = ticket.getPayload();
 
     this.logger.log(
@@ -138,6 +156,60 @@ export class GoogleOAuthService {
     this.logger.log('GoogleOAuthService -> exchangeCode -> return:', {
       data: { fields: Object.keys(result) },
     });
+
+    return result;
+  }
+
+  private isInvalidGrantError(error: unknown): boolean {
+    const data = this.readRecord(this.readRecord(error)?.response)?.data;
+    const result = this.readRecord(data)?.error === 'invalid_grant';
+
+    return result;
+  }
+
+  private isKnownIdTokenRejection(error: unknown): boolean {
+    if (!(error instanceof Error) || this.isTransportError(error)) {
+      return false;
+    }
+
+    const knownMessages = [
+      "Can't parse token envelope",
+      "Can't parse token payload",
+      'Expiration time too far in future',
+      'Invalid issuer',
+      'Invalid token signature',
+      'No expiration time',
+      'No issue time',
+      'No pem found for envelope',
+      'Token used too early',
+      'Token used too late',
+      'Wrong recipient',
+      'exp field using invalid format',
+      'iat field using invalid format',
+    ];
+    const result = knownMessages.some((message) =>
+      error.message.startsWith(message),
+    );
+
+    return result;
+  }
+
+  private isTransportError(error: Error): boolean {
+    const candidate = this.readRecord(error);
+    const result =
+      candidate !== undefined &&
+      ('config' in candidate ||
+        'request' in candidate ||
+        'response' in candidate);
+
+    return result;
+  }
+
+  private readRecord(value: unknown): Record<string, unknown> | undefined {
+    const result =
+      typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : undefined;
 
     return result;
   }

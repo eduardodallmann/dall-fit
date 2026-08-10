@@ -22,7 +22,6 @@ import type {
 } from '@dall-fit/types';
 
 import {
-  createClearOAuthCookieOptions,
   createClearSessionCookieOptions,
   createOAuthCookieOptions,
   createSessionCookieOptions,
@@ -150,7 +149,6 @@ export class AuthController {
       },
     );
 
-    this.clearOAuthCookies(response);
     if (commandResult.session !== null) {
       response.cookie(
         this.sessionCookieName,
@@ -278,16 +276,6 @@ export class AuthController {
       data: { fields: Object.keys(result.data), personId: result.data.id },
     });
     return result;
-  }
-
-  private clearOAuthCookies(response: Response): void {
-    const options = createClearOAuthCookieOptions(this.secureCookies);
-    response.clearCookie(OAUTH_STATE_COOKIE, options);
-    response.clearCookie(OAUTH_NONCE_COOKIE, options);
-    response.clearCookie(OAUTH_CODE_VERIFIER_COOKIE, options);
-    this.logger.log('AuthController -> clearOAuthCookies -> completed:', {
-      data: { cookieCount: 3 },
-    });
   }
 
   private clearSessionCookies(response: Response): void {

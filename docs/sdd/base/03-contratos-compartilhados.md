@@ -60,6 +60,14 @@ como pontos de extensão hipotéticos.
   detalhes exclusivos da API e não pertencem ao pacote.
 - `photoUrl` é anulável porque o claim de foto do provedor não é garantido.
 
+## Contrato transversal de erro
+
+`ApiError` é obrigatório em toda resposta de erro da API e contém sempre
+`code`, `message`, `details` e `requestId`. `details` é um objeto não anulável,
+mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
+`x-request-id`. Consumidores tomam decisões por status e `code`, nunca por
+`message`, `details` ou pelo identificador de correlação.
+
 ## Contratos vigentes de planos de treino
 
 - `TrainingPlanSummary` expõe ID, nome, descrição e timestamps, sem ownership ou
