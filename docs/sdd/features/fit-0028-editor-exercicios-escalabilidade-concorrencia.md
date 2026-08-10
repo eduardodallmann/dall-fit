@@ -67,7 +67,8 @@
     queries](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation);
   - dnd kit: [React quickstart](https://dndkit.com/react/quickstart/) e
     [acessibilidade por teclado](https://docs.dndkit.com/guides/accessibility);
-  - YouTube Data API v3: [`videos.list`](https://developers.google.com/youtube/v3/docs/videos/list);
+  - YouTube: miniaturas `https://img.youtube.com/vi/{id}/default.jpg`, usadas para
+    exibição e para validar existência do vídeo (404 = inexistente);
   - Vercel Blob: [SDK para upload e
     exclusão](https://vercel.com/docs/vercel-blob/using-blob-sdk);
   - Sharp: [construtor e limites de
@@ -94,8 +95,10 @@
 - edição do nome do workout;
 - criação, edição parcial com autosave, exclusão e reordenação de exercícios;
 - upload, substituição e remoção da imagem de um exercício `image`;
-- normalização e validação de existência de vídeos pela YouTube Data API v3;
-- miniatura derivada do YouTube e referências do Vercel Blob no contrato HTTP;
+- normalização de referências de vídeo e validação de existência pela miniatura
+  `img.youtube.com`, sem YouTube Data API nem quota;
+- miniatura do YouTube sempre derivada do ID (nunca persistida) e referências do
+  Vercel Blob no contrato HTTP;
 - concorrência otimista explícita por ETag e `If-Match` em todas as mutações de um
   plano existente, inclusive nos sete endpoints atuais;
 - limites de 25 workouts por plano, 50 exercícios por workout e campos com tamanho
@@ -105,7 +108,6 @@
   retornam somente projeção ou resultado de escrita exigido pelo caso de uso;
 - `autoIndex` habilitado em local/teste e desabilitado em preview/produção, com
   aplicação explícita e versionada dos índices de produção;
-- migração dos documentos existentes para versão, timestamps e novo schema;
 - processamento seguro de imagens, adapters para YouTube e Vercel Blob e
   reconciliação de blobs órfãos;
 - handlers, fixtures e seletores MSW para todas as requests e estados novos;
@@ -129,7 +131,7 @@
 - transcodificação de animações; imagens animadas são rejeitadas;
 - edição ou exclusão em lote;
 - cursor na listagem de planos nesta entrega; ficam definidos o limite e o gatilho
-  objetivo para a migração;
+  objetivo para a transição;
 - Redis, cache de backend, broker, fila externa ou tracing distribuído;
 - mudança da concorrência de `Person`: o controle de versão pertence ao aggregate
   compartilhado de planos. `Person` conserva atualizações atômicas de campos
@@ -150,7 +152,7 @@
   - atualizar `api/docs/sdd/base/01-arquitetura.md` com versão, limites, adapters,
     gestão de índices e integrações;
   - atualizar `.env.example`, validação de ambiente e CSP/CORS quando aplicável;
-  - criar scripts versionados de migração, índices e reconciliação de imagens;
+  - criar scripts versionados de índices e reconciliação de imagens;
   - `auth.md` e `current-person.md` não mudam de contrato.
 - UI e rotas:
   - substituir `workout-page.tsx` e sua composição pelo editor;
@@ -277,7 +279,6 @@ interface YoutubeShortExercise {
   type: 'youtube-short';
   name: string;
   youtubeId: string;
-  thumbnailUrl: string;
   bodyArea: BodyArea;
   restSeconds: number;
   sets: number;
@@ -303,7 +304,6 @@ interface YoutubeLongExercise {
   type: 'youtube-long';
   name: string;
   youtubeId: string;
-  thumbnailUrl: string;
   bodyArea: BodyArea;
 }
 
@@ -377,8 +377,9 @@ type Exercise =
 - `duration`: `Novo exercício`, `other` e 15 minutos.
 
 O POST recebe somente `type`. A API aplica e valida os defaults antes de persistir
-e acrescenta o exercício ao fim. Nos tipos YouTube, `thumbnailUrl` é sempre
-`https://img.youtube.com/vi/{youtubeId}/default.jpg`, derivada e nunca persistida.
+e acrescenta o exercício ao fim. Nos tipos YouTube, a miniatura é sempre derivada:
+`https://img.youtube.com/vi/{youtubeId}/default.jpg`, montada pelo cliente a partir
+do ID e nunca persistida.
 
 ## Endpoints pretendidos
 
@@ -421,8 +422,9 @@ produzindo `404 TRAINING_PLAN_NOT_FOUND`.
 - Uma request traz todo o necessário para editor, cabeçalho e breadcrumb.
 - Exercícios seguem exatamente a ordem física persistida e não têm paginação.
 - A projeção retorna somente o workout alvo e os dados mínimos do plano.
-- Tipos YouTube recebem `thumbnailUrl` derivada; tipos imagem recebem somente URLs
-  públicas, nunca keys internas.
+- Tipos YouTube não expõem `thumbnailUrl`: o cliente monta
+  `https://img.youtube.com/vi/{youtubeId}/default.jpg` a partir do ID. Tipos
+  imagem recebem somente URLs públicas, nunca keys internas.
 
 ### Alterar nome do workout
 
@@ -443,10 +445,10 @@ Body `{ type: Exercise['type'] }`. Responde `201` com o `Exercise` completo em
 `PATCH /global/training-plans/:trainingPlanId/workouts/:workoutId/exercises/:exerciseId`
 
 - Recebe somente campos editáveis presentes e exige ao menos um campo.
-- `id`, `type`, `image` e `thumbnailUrl` não são editáveis neste endpoint.
+- `id`, `type` e `image` não são editáveis neste endpoint.
 - Valida contra o tipo persistido e rejeita campos de outro tipo.
 - Nos tipos YouTube, aceita ID ou URL suportada, normaliza, valida existência e
-  devolve exercício completo com ID e thumbnail canônicos.
+  devolve exercício completo com ID canônico.
 - Responde `200` com o exercício completo em `data` e ETag novo.
 
 Referências aceitas:
@@ -459,10 +461,12 @@ https://youtube.com/shorts/ZA8gs8XP2bs
 ```
 
 Hosts, paths, protocolos, parâmetros ou IDs fora da allowlist são rejeitados antes
-de chamar o YouTube. A API consulta `videos.list` com o ID normalizado e só aceita
-um vídeo existente, processado, não privado e incorporável. Ausência ou vídeo
-incompatível responde `400 INVALID_YOUTUBE_REFERENCE`; timeout, quota ou falha
-técnica responde `503 YOUTUBE_VALIDATION_UNAVAILABLE` e não persiste a alteração.
+de qualquer chamada externa. A API valida a existência do vídeo com um GET simples
+na miniatura `https://img.youtube.com/vi/{ID}/default.jpg` do host fixo
+`img.youtube.com`: resposta de não-sucesso (404 etc.) significa vídeo inexistente,
+privado ou não processado e responde `400 INVALID_YOUTUBE_REFERENCE`; timeout ou
+falha técnica responde `503 YOUTUBE_VALIDATION_UNAVAILABLE` e não persiste a
+alteração. Não há YouTube Data API, quota ou API key.
 
 ### Excluir exercício
 
@@ -535,7 +539,8 @@ PUT genérico do exercício inteiro
   exercícios ou imagem atualiza `workout.updatedAt`, `TrainingPlan.updatedAt` e a
   versão top-level.
 - Imagens persistem somente key, URL, largura e altura de `thumbnail` e `display`.
-  O original e `thumbnailUrl` do YouTube não são persistidos.
+  O original não é persistido e a miniatura do YouTube é sempre derivada do
+  `youtubeId`, nunca persistida.
 - A listagem usa projeção lean, ordem
   `{ createdAt: -1, _id: -1 }` e índice
   `{ ownerPersonId: 1, createdAt: -1, _id: -1 }`.
@@ -543,7 +548,7 @@ PUT genérico do exercício inteiro
 - `page` continua offset para preservar a UX atual, mas é limitado a 100. A UI
   limita sua paginação ao mesmo valor mesmo quando `total` for maior.
 - Ao total alcançar 1600 planos globais, a API emite warning de capacidade no
-  máximo uma vez por runtime aquecido. A migração para cursor deve estar entregue
+  máximo uma vez por runtime aquecido. A transição para cursor deve estar entregue
   antes de 2000 planos ou antes de elevar a página máxima; essa mudança exige
   feature própria e contrato de navegação.
 - Leitura de detalhe/workout usa aggregate/projeção POJO. Leituras simples apenas
@@ -562,24 +567,13 @@ PUT genérico do exercício inteiro
   flag permissiva ou fallback.
 - Um comando protegido e versionado cria explicitamente todos os índices vigentes,
   inclusive o único de `people.googleSubject` e o novo composto de planos.
-- A migração cria o índice novo antes de remover pelo nome exato o índice antigo.
-  Não usa `syncIndexes()` destrutivo sem plano explícito e nunca derruba índice por
-  descoberta genérica.
+- A transição de índice cria o índice novo antes de remover pelo nome exato o
+  índice antigo. Não usa `syncIndexes()` destrutivo sem plano explícito e nunca
+  derruba índice por descoberta genérica.
 - O deploy só promove código que consulta pelo índice novo depois de sua criação
   confirmada. Falha de criação interrompe o rollout.
-
-### Migração de dados
-
-1. Fazer preflight e interromper se existir exercício legado não vazio, pois não há
-   contrato histórico seguro para converter `Mixed` silenciosamente.
-2. Materializar `version: 0` em planos sem versão.
-3. Materializar timestamps ausentes dos workouts usando `TrainingPlan.createdAt`
-   e `TrainingPlan.updatedAt` correspondentes.
-4. Validar todos os documentos contra os limites e o schema pretendido.
-5. Criar o índice composto novo, validar sua presença e remover somente o índice
-   antigo conhecido.
-6. Tornar a migração idempotente, restrita ao ambiente alvo e incapaz de registrar
-   nomes, descrições ou exercícios.
+- Nesta feature não há migração de dados: ainda não estamos em produção e não
+  existe dado legado a preservar ou converter.
 
 ## Storage, imagens e integrações externas
 
@@ -587,11 +581,11 @@ PUT genérico do exercício inteiro
   `@types/multer` e os pacotes oficiais estáveis do dnd kit necessários à lista
   sortable. As versões serão fixadas no lockfile e validadas contra os tipos locais
   antes do uso.
-- `BLOB_STORE_ID`, `BLOB_READ_WRITE_TOKEN` e `YOUTUBE_API_KEY` são variáveis
-  exclusivas da API; tokens/chaves são segredos e nunca chegam à UI, fixtures ou
-  logs.
-- Timeout de YouTube é finito e configurado/validado. A API não segue URL fornecida
-  pelo cliente; chama somente o host fixo do Google após extrair um ID válido.
+- `BLOB_STORE_ID` e `BLOB_READ_WRITE_TOKEN` são variáveis exclusivas da API; são
+  segredos e nunca chegam à UI, fixtures ou logs.
+- O timeout da validação do YouTube é finito e configurado/validado. A API não
+  segue URL fornecida pelo cliente; chama somente o host fixo `img.youtube.com`
+  após extrair um ID válido.
 - O store é público porque as imagens são conteúdo de treino servido diretamente
   por URL. Escrita e exclusão continuam autenticadas pelo token da API.
 - Como MongoDB e Blob não possuem transação comum, a associação no MongoDB é a
@@ -632,8 +626,11 @@ PUT genérico do exercício inteiro
    próprios, nunca `Table` HeroUI, porque os tipos possuem campos diferentes.
 9. Cada item contém handle no início, campos próprios, `Chip` do tipo, status de
    salvamento e exclusão no final. A ordem visual é a ordem da API.
-10. Em viewport estreito, cada item reorganiza campos em blocos com labels; não
-    depende de scroll horizontal para editar.
+10. A responsividade da linha é progressiva e definida por breakpoints: em telas
+    largas, todos os campos de um exercício ficam em uma única linha; a cada
+    redução de breakpoint, os itens da linha se empilham em linhas com menos itens;
+    até que nas menores telas todos os elementos de uma linha ficam dispostos
+    verticalmente, em blocos com labels. Nunca há scroll horizontal para editar.
 11. O handle é operável por ponteiro, toque e teclado, fornece instruções e anuncia
     posição. Ícones são decorativos e botões icon-only têm nomes contextuais.
 12. A lista usa dnd kit em API compatível com React 19 e oferece sensor de teclado.
@@ -673,7 +670,8 @@ existentes.
 18. Sucesso de autosave não mostra toast. Falha mostra toast seguro e conserva o
     draft para nova edição/tentativa; não reverte o texto digitado.
 19. Em tipos YouTube, a miniatura atual permanece até o PATCH concluir. Sucesso
-    troca ID e URL pelos valores canônicos; falha mantém miniatura anterior.
+    troca o ID pelo canônico, atualizando também a miniatura derivada; falha mantém
+    miniatura anterior.
 20. Ao desmontar/navegar com timers ou drafts pendentes, a UI tenta esvaziar a fila
     já iniciada e apresenta confirmação de navegação para trabalho ainda não
     enviado; não usa request síncrona ou `beforeunload` para fingir garantia.
@@ -686,7 +684,8 @@ existentes.
     ID temporário pelo real. Falha remove a linha e mostra erro.
 23. Ao soltar uma reordenação, a UI aplica ordem otimista e envia todos os IDs uma
     vez. Falha restaura ordem anterior; `412` também ativa o estado de conflito.
-24. Excluir abre `Popover` de confirmação. Confirmar remove a linha otimisticamente;
+24. Excluir abre `Popover` de confirmação com um único botão vermelho (`Excluir`);
+    cancelar ocorre ao fechar o popover. Confirmar remove a linha otimisticamente;
     falha restaura item, draft e posição.
 25. Adição, reordenação e exclusão respeitam a fila e usam o ETag resultante da
     operação anterior. Não são repetidas automaticamente.
@@ -742,7 +741,7 @@ existentes.
   - host fixo/ID estrito elimina SSRF na validação do YouTube;
   - CSP da UI permite imagens somente da origem vigente, `img.youtube.com` e do
     domínio público exato do Vercel Blob necessário ao store;
-  - tokens, API key, blobs, nomes e payloads nunca entram em logs.
+  - tokens, blobs, nomes e payloads nunca entram em logs.
 - Observabilidade:
   - logs seguem controller -> command -> services -> adapters/repository;
   - registrar IDs técnicos, versão esperada/resultante, campos alterados, tipo como
@@ -846,15 +845,16 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
 - Given: workout abaixo do limite.
 - When: seleciona cada item do dropdown.
 - Then: linha temporária aparece ao fim, POST envia somente `type`, ID real e
-  defaults canônicos substituem o temporário; YouTube já retorna thumbnail.
+  defaults canônicos substituem o temporário; a miniatura é montada pela UI a
+  partir do ID.
 
 ### Cenário 8 — Normalizar e validar YouTube
 
 - Forma de validar: cenário vivo do PATCH com adapter determinístico.
 - Given: vídeo público/incorporável existente.
 - When: envia URL curta, watch ou shorts.
-- Then: persiste somente ID e responde thumbnail derivada; inexistente retorna
-  `INVALID_YOUTUBE_REFERENCE` e indisponibilidade retorna
+- Then: persiste somente o ID; a miniatura é montada pela UI a partir dele;
+  inexistente retorna `INVALID_YOUTUBE_REFERENCE` e indisponibilidade retorna
   `YOUTUBE_VALIDATION_UNAVAILABLE`, ambos sem alterar MongoDB.
 
 ### Cenário 9 — Reordenar com todos os IDs
@@ -942,15 +942,7 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
 - Then: `autoIndex` é true apenas em local/teste; comando explícito cria o índice
   novo antes da aplicação e não remove índices desconhecidos.
 
-### Cenário 20 — Migração recusa `Mixed` legado desconhecido
-
-- Forma de validar: teste do script em MongoDB efêmero.
-- Given: existe exercício legado não vazio sem discriminador reconhecido.
-- When: executa preflight.
-- Then: migração falha antes de escrita ou índice, informa apenas IDs técnicos e
-  exige decisão explícita de dados.
-
-### Cenário 21 — Acessibilidade da reordenação
+### Cenário 20 — Acessibilidade da reordenação
 
 - Forma de validar: Playwright no editor.
 - Given: pessoa usa somente teclado.
@@ -958,20 +950,21 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
 - Then: posição é anunciada, foco permanece no item e a mesma mutation de ordem é
   produzida sem depender de ponteiro ou cor.
 
-### Cenário 22 — CSP e segredos
+### Cenário 21 — CSP e segredos
 
 - Forma de validar: build, testes de ambiente e inspeção dos headers.
 - Given: editor possui miniaturas YouTube e Blob.
 - When: UI carrega as imagens.
-- Then: CSP permite somente hosts declarados; API key/token não aparecem no bundle,
+- Then: CSP permite somente hosts declarados; segredos/token não aparecem no bundle,
   responses, logs ou fixtures.
 
 ## Estratégia de entrega e compatibilidade
 
 1. Adicionar contratos compatíveis (`version`, unions e responses) e preparar
-   schemas/scripts sem ativar precondição antes da migração.
-2. Executar preflight, backfill e criação do índice novo; falhar o rollout diante
-   de exercício legado desconhecido ou limite violado.
+   schemas/scripts sem ativar precondição.
+2. Criar e confirmar o índice novo antes de publicar código que consulte por ele;
+   falhar o rollout se a criação falhar. Como ainda não há produção e não existe
+   dado legado, não há etapa de migração de dados.
 3. Publicar API que emite ETag e aceita `If-Match`, mantendo uma janela coordenada
    somente para o cliente anterior se API/UI não tiverem deploy atômico.
 4. Publicar UI com versão, fila, editor, MSW e tratamento de conflitos.
@@ -1007,7 +1000,7 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
   - schema/discriminadores, ordem, no-op, limites, tamanho BSON e índice;
   - multipart real com Sharp e adapter de Blob determinístico;
   - adapters de YouTube/Blob simulam sucesso, ausência, timeout e falhas parciais;
-  - migração e scripts em MongoDB efêmero preservando índices.
+  - scripts de índices em MongoDB efêmero preservando a coleção.
 - Unitários/componentes da UI:
   - query keys e services retornam payload + ETag;
   - timers fake cobrem debounce/coalescência sem testar tempo real;
@@ -1056,16 +1049,17 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
 - Vercel Blob e MongoDB não oferecem commit único. Persistir referências somente
   após os dois uploads protege a imagem anterior; limpeza posterior idempotente e
   reconciliação tratam órfãos sem introduzir broker nesta entrega.
-- Validar existência pelo YouTube Data API custa quota e depende de serviço externo.
-  O sistema falha sem persistir quando a validação está indisponível, em vez de
-  aceitar referência incerta.
-- URLs do YouTube são derivadas; URLs do Blob são persistidas com keys internas
-  porque o SDK precisa delas para gestão e o contrato HTTP não deve expô-las.
+- Validar existência pela miniatura `img.youtube.com` é barato e não consome
+  quota. O sistema falha sem persistir quando a validação está indisponível, em
+  vez de aceitar referência incerta.
+- URLs do YouTube são sempre derivadas do ID pelo cliente; URLs do Blob são
+  persistidas com keys internas porque o SDK precisa delas para gestão e o contrato
+  HTTP não deve expô-las.
 - O limite de imagem protege memória/CPU em runtime serverless. O arquivo fica em
   memória somente dentro de 10 MiB e nunca é logado ou preservado como original.
-- Habilitar version key em `TrainingPlan` exige backfill e atualização explícita em
-  operadores atômicos; confiar apenas no `optimisticConcurrency` de `save()` não
-  protegeria os `updateOne/findOneAndUpdate` usados pelo adapter.
+- Habilitar version key em `TrainingPlan` exige atualização explícita em operadores
+  atômicos; confiar apenas no `optimisticConcurrency` de `save()` não protegeria os
+  `updateOne/findOneAndUpdate` usados pelo adapter.
 - `autoIndex` em produção pode causar carga e rollout imprevisível. A criação
   versionada dos índices antecede o código e não usa sincronização destrutiva
   genérica.
@@ -1079,12 +1073,12 @@ commit não muda uma response bem-sucedida; ela é observável e reconciliável.
 - Limites 25/50, margem BSON e gatilhos de reavaliação validados
 - ETag/If-Match em todas as mutações do aggregate e conflito sem sobrescrita
 - Autosave por linha com fila, coalescência, preservação de draft e sem toast de sucesso
-- YouTube normalizado/validado e thumbnails derivadas
+- Vídeos normalizados e validados pela miniatura `img.youtube.com` (sem quota),
+  com miniatura sempre derivada do ID
 - Imagens WebP em duas variantes, sem original/base64 e com reconciliação de órfãos
 - Ownership global aplicado em toda query e mutação
 - Ordenação estável, paginação limitada, projeções lean e índice composto novo
 - `autoIndex` desligado em preview/produção e índices geridos explicitamente
-- Migração idempotente e incapaz de converter legado desconhecido silenciosamente
 - CORS, CSP, ambiente, rate limits e segredos atualizados com segurança
 - SDDs vivos e ADR afetados atualizados na implementação autorizada
 - MSW, unitários, E2E e Playwright cobrindo caminhos felizes, limites e falhas
