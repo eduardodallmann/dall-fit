@@ -192,7 +192,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         { _id: id, ownerPersonId: null, version: expectedVersion },
         { $inc: { version: 1 }, $set: changes },
-        { new: true, runValidators: true },
+        { returnDocument: 'after', runValidators: true },
       )
       .lean<PlainPlan>()
       .exec();
@@ -267,7 +267,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             },
           },
         },
-        { new: true, projection: { version: 1 } },
+        { returnDocument: 'after', projection: { version: 1 } },
       )
       .lean<PlainPlan>()
       .exec();
@@ -322,7 +322,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
           $inc: { version: 1 },
           $pull: { workouts: { _id: new Types.ObjectId(workoutId) } },
         },
-        { new: true, projection: { version: 1 } },
+        { returnDocument: 'after', projection: { version: 1 } },
       )
       .lean<PlainPlan>()
       .exec();
@@ -486,7 +486,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             { 'workout._id': new Types.ObjectId(workoutId) },
             { 'exercise._id': new Types.ObjectId(exerciseId) },
           ],
-          new: true,
+          returnDocument: 'after',
           projection: {
             version: 1,
             workouts: { $elemMatch: { _id: workoutId } },
@@ -554,7 +554,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
         },
         {
           arrayFilters: [{ 'workout._id': new Types.ObjectId(workoutId) }],
-          new: true,
+          returnDocument: 'after',
           projection: { version: 1 },
         },
       )
@@ -613,7 +613,11 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             'workouts.$.updatedAt': new Date(),
           },
         },
-        { new: true, projection: { version: 1 }, runValidators: true },
+        {
+          returnDocument: 'after',
+          projection: { version: 1 },
+          runValidators: true,
+        },
       )
       .lean<PlainPlan>()
       .exec();
@@ -676,7 +680,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             { 'workout._id': new Types.ObjectId(workoutId) },
             { 'exercise._id': new Types.ObjectId(exerciseId) },
           ],
-          new: true,
+          returnDocument: 'after',
           projection: { version: 1 },
           runValidators: true,
         },
@@ -890,7 +894,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
         },
         update,
         {
-          new: true,
+          returnDocument: 'after',
           projection: {
             version: 1,
             workouts: { $elemMatch: { _id: workoutId } },
