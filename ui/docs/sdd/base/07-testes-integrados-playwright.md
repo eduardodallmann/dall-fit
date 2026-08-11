@@ -115,6 +115,30 @@ definido em `05-mocks-de-api.md`.
 Cada teste inicia seu próprio estado, não depende da ordem da suíte e não reutiliza
 estado mutável deixado por outro teste.
 
+### Mutações assíncronas críticas
+
+Quando uma mutation possuir draft recuperável, efeito otimista, navegação protegida
+ou concorrência entre partes da tela, Playwright cobre pelo menos o percurso
+observável de maior risco descrito na rota ou no flow. O teste interage pelos
+controles reais e comprova o estado da superfície durante pending, o resultado
+terminal e a possibilidade de recuperação; toast isolado não é evidência de que a
+operação terminou corretamente.
+
+Falhas de rollback são exercitadas com uma mudança posterior ou um alvo não
+relacionado presente, para provar que a reversão não restaura um snapshot amplo.
+Respostas tardias são verificadas por seu efeito visível final, sem acessar estado
+interno do React. Quando sair descartaria trabalho recuperável, o cenário cobre a
+confirmação acessível e tanto permanecer quanto prosseguir quando essas decisões
+fizerem parte do contrato.
+
+Para aggregates versionados, não basta disparar duas ações enquanto a primeira
+ainda está pendente. Um cenário de regressão também conclui a primeira operação,
+espera a fila ficar ociosa e só então inicia a segunda, comprovando que a versão
+resultante foi propagada. Remontagem com leitura atrasada, conflito e independência
+entre aggregates entram no Playwright quando atravessarem componentes ou rotas;
+a matriz restante permanece em Vitest conforme
+`04-testes-e-qualidade.md`.
+
 ## Configuração
 
 [`ui/playwright.config.ts`](../../../playwright.config.ts) é a fonte de verdade da

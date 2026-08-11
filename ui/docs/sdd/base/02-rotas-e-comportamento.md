@@ -38,6 +38,12 @@ Registrar:
 - loading, vazio, sucesso, erro e indisponibilidade;
 - navegação de entrada, avanço, retorno e retomada;
 - integrações e comportamento por status;
+- para cada mutation, estado confirmado e draft, estratégia otimista ou confirmada,
+  duração do pending, momento de fechamento e prevenção de duplicidade;
+- rollback localizado, tratamento de resposta tardia, erro persistente, retry,
+  cancelamento e proteção de navegação aplicáveis;
+- idempotência e concorrência, incluindo precondição, versão, fila e recuperação de
+  conflito quando o recurso for um aggregate versionado;
 - acessibilidade, foco e teclado;
 - cenários Given/When/Then e casos limite.
 
