@@ -184,7 +184,9 @@ global limpa esse estado depois de cada teste, pois `resetHandlers()` restaura o
 handlers do MSW, mas não dados mutáveis mantidos pelos módulos. Há sucesso, vazio,
 not-found, loading prolongado para validar skeletons e falhas relevantes com
 latência; a proteção sentinela continua por último. O estado conserva `version`,
-valida `If-Match`, incrementa ETag por mutação efetiva e mantém ordem/imagem.
-`version-conflict`, `update-exercise-error`, `delete-exercise-error` e
+valida `X-Resource-Version`, devolve o valor resultante no mesmo header, incrementa
+a versão por mutação efetiva e mantém ordem/imagem. O header legado `If-Match` não
+satisfaz a precondição. `version-conflict`, `update-exercise-error`,
+`delete-exercise-error` e
 `image-error` cobrem falhas do editor. IDs criados são determinísticos; multipart
 exige um `File` no campo `file` e nunca é convertido em JSON/base64.

@@ -7,6 +7,17 @@ interface VersionedResult<T> {
   version: number;
 }
 
+function isTrainingPlanVersionConflict(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 412)
+    return false;
+  const data: unknown = error.response.data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data))
+    return false;
+  const result =
+    (data as Record<string, unknown>).code === 'TRAINING_PLAN_VERSION_CONFLICT';
+  return result;
+}
+
 export function useAggregateMutationQueue(
   initialVersion: number,
   onConflict: () => void,
@@ -31,7 +42,7 @@ export function useAggregateMutationQueue(
           version.current = result.version;
           return result.data;
         } catch (error) {
-          if (axios.isAxiosError(error) && error.response?.status === 412) {
+          if (isTrainingPlanVersionConflict(error)) {
             pausedRef.current = true;
             setPaused(true);
             onConflict();

@@ -53,9 +53,10 @@ import { UpdateTrainingPlanExerciseCommand } from '~/training-plan/commands/upda
 import { UpdateTrainingPlanWorkoutCommand } from '~/training-plan/commands/update-training-plan-workout.command';
 import { UploadTrainingPlanExerciseImageCommand } from '~/training-plan/commands/upload-training-plan-exercise-image.command';
 import {
-  formatTrainingPlanEtag,
-  parseTrainingPlanIfMatch,
-} from '~/training-plan/domain/training-plan-etag';
+  formatResourceVersion,
+  parseResourceVersion,
+  RESOURCE_VERSION_HEADER,
+} from '~/training-plan/domain/resource-version';
 import type { UploadedImageFile } from '~/training-plan/domain/training-plan.entity';
 import {
   CreateExerciseDto,
@@ -116,7 +117,7 @@ export class GlobalTrainingPlansController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateTrainingPlanResponse> {
     const result = await this.createCommand.execute(input);
-    this.setEtag(response, result.data.id, result.data.version);
+    this.setResourceVersion(response, result.data.version);
     return result;
   }
 
@@ -126,7 +127,7 @@ export class GlobalTrainingPlansController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<TrainingPlanDetailsResponse> {
     const result = await this.getCommand.execute(params.trainingPlanId);
-    this.setEtag(response, result.data.id, result.data.version);
+    this.setResourceVersion(response, result.data.version);
     return result;
   }
 
@@ -134,20 +135,17 @@ export class GlobalTrainingPlansController {
   @AdminMutation()
   async update(
     @Param() params: TrainingPlanParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() changes: UpdateTrainingPlanDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<UpdateTrainingPlanResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const result = await this.updateCommand.execute(
       params.trainingPlanId,
       expectedVersion,
       changes,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -156,12 +154,9 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async delete(
     @Param() params: TrainingPlanParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
   ): Promise<void> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     await this.deleteCommand.execute(params.trainingPlanId, expectedVersion);
   }
 
@@ -169,19 +164,16 @@ export class GlobalTrainingPlansController {
   @AdminMutation()
   async createWorkout(
     @Param() params: TrainingPlanParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() _body: EmptyTrainingPlanRequestDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateTrainingPlanWorkoutResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const result = await this.createWorkoutCommand.execute(
       params.trainingPlanId,
       expectedVersion,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -190,19 +182,16 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async deleteWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const version = await this.deleteWorkoutCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       expectedVersion,
     );
-    this.setEtag(response, params.trainingPlanId, version);
+    this.setResourceVersion(response, version);
   }
 
   @Get(':trainingPlanId/workouts/:workoutId')
@@ -214,7 +203,7 @@ export class GlobalTrainingPlansController {
       params.trainingPlanId,
       params.workoutId,
     );
-    this.setEtag(response, params.trainingPlanId, result.data.version);
+    this.setResourceVersion(response, result.data.version);
     return result;
   }
 
@@ -222,21 +211,18 @@ export class GlobalTrainingPlansController {
   @EditorMutation()
   async updateWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() input: UpdateTrainingPlanWorkoutDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<UpdateTrainingPlanWorkoutResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const result = await this.updateWorkoutCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       expectedVersion,
       input.name,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -244,21 +230,18 @@ export class GlobalTrainingPlansController {
   @EditorMutation()
   async createExercise(
     @Param() params: TrainingPlanWorkoutParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() input: CreateExerciseDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateExerciseResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const result = await this.createExerciseCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       expectedVersion,
       input.type,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -267,35 +250,29 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async reorderExercises(
     @Param() params: TrainingPlanWorkoutParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() input: ReorderExercisesDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const version = await this.reorderExercisesCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       expectedVersion,
       input.exerciseIds,
     );
-    this.setEtag(response, params.trainingPlanId, version);
+    this.setResourceVersion(response, version);
   }
 
   @Patch(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId')
   @EditorMutation()
   async updateExercise(
     @Param() params: TrainingPlanExerciseParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Body() input: UpdateExerciseDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<UpdateExerciseResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     if (Object.values(input).every((value) => value === undefined))
       throw createValidationException();
     const result = await this.updateExerciseCommand.execute(
@@ -305,7 +282,7 @@ export class GlobalTrainingPlansController {
       expectedVersion,
       input,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -314,20 +291,17 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async deleteExercise(
     @Param() params: TrainingPlanExerciseParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const version = await this.deleteExerciseCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       params.exerciseId,
       expectedVersion,
     );
-    this.setEtag(response, params.trainingPlanId, version);
+    this.setResourceVersion(response, version);
   }
 
   @Put(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image')
@@ -339,14 +313,11 @@ export class GlobalTrainingPlansController {
   )
   async uploadImage(
     @Param() params: TrainingPlanExerciseParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @UploadedFile() file: UploadedImageFile,
     @Res({ passthrough: true }) response: Response,
   ): Promise<UpdateExerciseImageResponse> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     if (file === undefined) throw createValidationException();
     const result = await this.uploadImageCommand.execute(
       params.trainingPlanId,
@@ -355,7 +326,7 @@ export class GlobalTrainingPlansController {
       expectedVersion,
       file,
     );
-    this.setEtag(response, params.trainingPlanId, result.version);
+    this.setResourceVersion(response, result.version);
     return result.response;
   }
 
@@ -364,27 +335,20 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async removeImage(
     @Param() params: TrainingPlanExerciseParamsDto,
-    @Headers('if-match') ifMatch: string | undefined,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const expectedVersion = parseTrainingPlanIfMatch(
-      ifMatch,
-      params.trainingPlanId,
-    );
+    const expectedVersion = parseResourceVersion(resourceVersion);
     const version = await this.removeImageCommand.execute(
       params.trainingPlanId,
       params.workoutId,
       params.exerciseId,
       expectedVersion,
     );
-    this.setEtag(response, params.trainingPlanId, version);
+    this.setResourceVersion(response, version);
   }
 
-  private setEtag(
-    response: Response,
-    trainingPlanId: string,
-    version: number,
-  ): void {
-    response.setHeader('ETag', formatTrainingPlanEtag(trainingPlanId, version));
+  private setResourceVersion(response: Response, version: number): void {
+    response.setHeader(RESOURCE_VERSION_HEADER, formatResourceVersion(version));
   }
 }

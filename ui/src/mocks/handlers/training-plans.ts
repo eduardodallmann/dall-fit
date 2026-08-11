@@ -66,13 +66,10 @@ function apiError(code: string, message: string, status: number) {
   );
 }
 
-function etag(id: string, version: number): string {
-  return `"training-plan:${id}:${version}"`;
-}
-function responseInit(id: string, version: number, status = 200): ResponseInit {
+function responseInit(version: number, status = 200): ResponseInit {
   return createMockResponseInit({
     status,
-    headers: { ETag: etag(id, version) },
+    headers: { 'X-Resource-Version': String(version) },
   });
 }
 
@@ -87,10 +84,16 @@ function validateMutation(
       'Training plan version conflict.',
       412,
     );
-  const expected = etag(state.detail.id, state.detail.version);
-  if (request.headers.get('if-match') === null)
-    return apiError('PRECONDITION_REQUIRED', 'If-Match is required.', 428);
-  if (request.headers.get('if-match') !== expected)
+  const value = request.headers.get('x-resource-version');
+  if (value === null)
+    return apiError(
+      'PRECONDITION_REQUIRED',
+      'X-Resource-Version is required.',
+      428,
+    );
+  if (!/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value)))
+    return apiError('VALIDATION_ERROR', 'Request validation failed.', 400);
+  if (Number(value) !== state.detail.version)
     return apiError(
       'TRAINING_PLAN_VERSION_CONFLICT',
       'Training plan version conflict.',
@@ -200,10 +203,7 @@ export const trainingPlanHandlers = [
       updatedAt: now,
     };
     getState(scenario).plans.unshift(created);
-    return HttpResponse.json(
-      { data: created },
-      responseInit(created.id, 0, 201),
-    );
+    return HttpResponse.json({ data: created }, responseInit(0, 201));
   }),
   http.get(
     '*/global/training-plans/:trainingPlanId/workouts/:workoutId',
@@ -223,7 +223,7 @@ export const trainingPlanHandlers = [
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
       return HttpResponse.json(
         { data: state.workout },
-        responseInit(state.detail.id, state.detail.version),
+        responseInit(state.detail.version),
       );
     },
   ),
@@ -251,7 +251,7 @@ export const trainingPlanHandlers = [
             updatedAt: state.workout.updatedAt,
           },
         },
-        responseInit(state.detail.id, version),
+        responseInit(version),
       );
     },
   ),
@@ -275,10 +275,7 @@ export const trainingPlanHandlers = [
         exercises: [...state.workout.exercises, exercise],
       };
       const version = increment(state);
-      return HttpResponse.json(
-        { data: exercise },
-        responseInit(state.detail.id, version, 201),
-      );
+      return HttpResponse.json({ data: exercise }, responseInit(version, 201));
     },
   ),
   http.put(
@@ -311,10 +308,7 @@ export const trainingPlanHandlers = [
         };
         increment(state);
       }
-      return new HttpResponse(
-        null,
-        responseInit(state.detail.id, state.detail.version, 204),
-      );
+      return new HttpResponse(null, responseInit(state.detail.version, 204));
     },
   ),
   http.patch(
@@ -323,7 +317,10 @@ export const trainingPlanHandlers = [
       const scenario = getScenario(request);
       await delay(75);
       if (scenario === 'update-exercise-error')
-        return apiError('SERVICE_UNAVAILABLE', 'Service unavailable.', 503);
+        return new HttpResponse('PRECONDITION_FAILED', {
+          status: 412,
+          headers: { 'x-vercel-error': 'PRECONDITION_FAILED' },
+        });
       const state = getState(scenario);
       const invalid = validateMutation(request, state, scenario);
       if (invalid !== null) return invalid;
@@ -344,10 +341,7 @@ export const trainingPlanHandlers = [
         ),
       };
       const version = increment(state);
-      return HttpResponse.json(
-        { data: updated },
-        responseInit(state.detail.id, version),
-      );
+      return HttpResponse.json({ data: updated }, responseInit(version));
     },
   ),
   http.delete(
@@ -366,10 +360,7 @@ export const trainingPlanHandlers = [
         return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
       state.workout = { ...state.workout, exercises };
       const version = increment(state);
-      return new HttpResponse(
-        null,
-        responseInit(state.detail.id, version, 204),
-      );
+      return new HttpResponse(null, responseInit(version, 204));
     },
   ),
   http.put(
@@ -399,10 +390,7 @@ export const trainingPlanHandlers = [
         ),
       };
       const version = increment(state);
-      return HttpResponse.json(
-        { data: { image } },
-        responseInit(state.detail.id, version),
-      );
+      return HttpResponse.json({ data: { image } }, responseInit(version));
     },
   ),
   http.delete(
@@ -432,10 +420,7 @@ export const trainingPlanHandlers = [
         };
         increment(state);
       }
-      return new HttpResponse(
-        null,
-        responseInit(state.detail.id, state.detail.version, 204),
-      );
+      return new HttpResponse(null, responseInit(state.detail.version, 204));
     },
   ),
   http.get(
@@ -465,10 +450,7 @@ export const trainingPlanHandlers = [
         plan.id === state.detail.id
           ? { ...state.detail, ...plan }
           : { ...plan, workouts: [] };
-      return HttpResponse.json(
-        { data: detail },
-        responseInit(plan.id, plan.version),
-      );
+      return HttpResponse.json({ data: detail }, responseInit(plan.version));
     },
   ),
   http.patch(
@@ -504,10 +486,7 @@ export const trainingPlanHandlers = [
         ...state.workout,
         trainingPlan: { id: updated.id, name: updated.name },
       };
-      return HttpResponse.json(
-        { data: updated },
-        responseInit(updated.id, version),
-      );
+      return HttpResponse.json({ data: updated }, responseInit(version));
     },
   ),
   http.delete(
@@ -566,10 +545,7 @@ export const trainingPlanHandlers = [
         updatedAt: new Date().toISOString(),
       };
       const version = increment(state);
-      return HttpResponse.json(
-        { data: workout },
-        responseInit(state.detail.id, version, 201),
-      );
+      return HttpResponse.json({ data: workout }, responseInit(version, 201));
     },
   ),
   http.delete(
@@ -588,10 +564,7 @@ export const trainingPlanHandlers = [
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
       state.detail = { ...state.detail, workouts };
       const version = increment(state);
-      return new HttpResponse(
-        null,
-        responseInit(state.detail.id, version, 204),
-      );
+      return new HttpResponse(null, responseInit(version, 204));
     },
   ),
 ];

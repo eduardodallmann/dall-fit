@@ -42,7 +42,8 @@ A tabela e seus cabeçalhos permanecem presentes em todos esses estados.
 3. Criar fecha o modal no disparo, navega à página 1, insere resumo temporário,
    envia o POST, substitui pelo resumo real e invalida listas.
 4. Editar fecha o modal no disparo, atualiza todas as listas/detalhes conhecidos,
-   envia `If-Match` da versão em cache, confirma pela response/ETag e invalida queries.
+   envia `X-Resource-Version` com a versão em cache, confirma pelo valor retornado
+   no mesmo header e invalida queries.
 5. Excluir fecha o dialog no disparo, remove o plano e decrementa o total; se era o
    único item de página maior que 1, antecipa retorno à anterior.
 
@@ -89,7 +90,8 @@ informa a falha.
 - Editar: `PATCH /global/training-plans/:id`.
 - Excluir: `DELETE /global/training-plans/:id`.
 
-Resumos carregam `version`; PATCH/DELETE enviam o ETag forte correspondente.
+Resumos carregam `version`; PATCH/DELETE enviam `X-Resource-Version` com o inteiro
+canônico correspondente.
 Conflito `412` não é repetido e passa pelo rollback seguro da mutation.
 
 Todas as mutações só ficam disponíveis depois do bootstrap autenticado de CSRF.

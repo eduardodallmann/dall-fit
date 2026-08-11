@@ -20,10 +20,12 @@ workouts, 50 exercícios e 12 MiB são regras de produto. Leituras internas calc
 `$bsonSize`, contagens e máximo por workout e emitem `aggregateNearLimit` a partir
 de 8 MiB, 20 ou 40, sem conteúdo do documento.
 
-Toda mutação de aggregate existente exige `If-Match`, compara owner/IDs/versão na
-mesma operação e incrementa exatamente uma vez. O adapter usa `lean`, projeções e
-retorno mínimo; falha do CAS faz uma inspeção projetada para distinguir not-found
-de `412`. A listagem tem page máxima 100, ordem
+Toda mutação de aggregate existente exige a versão inteira canônica no header
+`X-Resource-Version`, compara owner/IDs/versão na mesma operação e incrementa
+exatamente uma vez. Leituras e sucessos que preservam o aggregate devolvem a
+versão atual no mesmo header. O adapter usa `lean`, projeções e retorno mínimo;
+falha do CAS faz uma inspeção projetada para distinguir not-found de `412`. A
+listagem tem page máxima 100, ordem
 `createdAt/_id` decrescente e warning único a partir de 1600 globais.
 
 `YoutubeReferenceService` normaliza allowlist e consulta apenas o thumbnail do host

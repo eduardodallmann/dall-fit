@@ -60,25 +60,32 @@ export interface VersionedMutationResult<T> {
   version: number;
 }
 
-function ifMatch(trainingPlanId: string, version: number) {
-  return `"training-plan:${trainingPlanId}:${version}"`;
-}
+const RESOURCE_VERSION_HEADER = 'X-Resource-Version';
+const resourceVersionPattern = /^(0|[1-9]\d*)$/;
 
-function versionFromEtag(etag: string | undefined, fallback: number): number {
-  const match = /:(\d+)"$/.exec(etag ?? '');
-  return match === null ? fallback : Number(match[1]);
+function parseResourceVersion(value: unknown): number {
+  if (typeof value !== 'string' || !resourceVersionPattern.test(value))
+    throw new Error('API response has an invalid resource version.');
+  const result = Number(value);
+  if (!Number.isSafeInteger(result))
+    throw new Error('API response has an invalid resource version.');
+  return result;
 }
 
 function mutationConfig(
   mockScenario: MockTrainingPlansScenario,
-  trainingPlanId: string,
   version: number,
 ) {
   const base = requestConfig(mockScenario);
   return {
     ...base,
-    headers: { ...base?.headers, 'If-Match': ifMatch(trainingPlanId, version) },
+    headers: { ...base?.headers, [RESOURCE_VERSION_HEADER]: String(version) },
   };
+}
+
+function responseVersion(headers: Record<string, unknown>): number {
+  const result = parseResourceVersion(headers['x-resource-version']);
+  return result;
 }
 
 function requestConfig(mockScenario: MockTrainingPlansScenario) {
@@ -139,9 +146,12 @@ export async function updateGlobalTrainingPlan(
   const response = await apiClient.patch<UpdateTrainingPlanResponse>(
     `/global/training-plans/${trainingPlanId}`,
     changes,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
-  const result = response.data.data;
+  const result = {
+    ...response.data.data,
+    version: responseVersion(response.headers),
+  };
 
   return result;
 }
@@ -153,7 +163,7 @@ export async function deleteGlobalTrainingPlan(
 ): Promise<void> {
   await apiClient.delete(
     `/global/training-plans/${trainingPlanId}`,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
 }
 
@@ -165,14 +175,11 @@ export async function createTrainingPlanWorkout(
   const response = await apiClient.post<CreateTrainingPlanWorkoutResponse>(
     `/global/training-plans/${trainingPlanId}/workouts`,
     {},
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
   const result = {
     data: response.data.data,
-    version: versionFromEtag(
-      response.headers.etag as string | undefined,
-      version + 1,
-    ),
+    version: responseVersion(response.headers),
   };
 
   return result;
@@ -186,12 +193,9 @@ export async function deleteTrainingPlanWorkout(
 ): Promise<number> {
   const response = await apiClient.delete(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
-  return versionFromEtag(
-    response.headers.etag as string | undefined,
-    version + 1,
-  );
+  return responseVersion(response.headers);
 }
 
 export async function getTrainingPlanWorkout(
@@ -220,14 +224,11 @@ export async function updateTrainingPlanWorkout(
   }>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
     { name },
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
   return {
     data: response.data.data,
-    version: versionFromEtag(
-      response.headers.etag as string | undefined,
-      version + 1,
-    ),
+    version: responseVersion(response.headers),
   };
 }
 
@@ -241,14 +242,11 @@ export async function createTrainingPlanExercise(
   const response = await apiClient.post<CreateExerciseResponse>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises`,
     input,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
   return {
     data: response.data.data,
-    version: versionFromEtag(
-      response.headers.etag as string | undefined,
-      version + 1,
-    ),
+    version: responseVersion(response.headers),
   };
 }
 
@@ -263,14 +261,11 @@ export async function updateTrainingPlanExercise(
   const response = await apiClient.patch<UpdateExerciseResponse>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}`,
     changes,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
   return {
     data: response.data.data,
-    version: versionFromEtag(
-      response.headers.etag as string | undefined,
-      version + 1,
-    ),
+    version: responseVersion(response.headers),
   };
 }
 
@@ -283,12 +278,9 @@ export async function deleteTrainingPlanExercise(
 ): Promise<number> {
   const response = await apiClient.delete(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}`,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
-  return versionFromEtag(
-    response.headers.etag as string | undefined,
-    version + 1,
-  );
+  return responseVersion(response.headers);
 }
 
 export async function reorderTrainingPlanExercises(
@@ -301,12 +293,9 @@ export async function reorderTrainingPlanExercises(
   const response = await apiClient.put(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/order`,
     input,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
-  return versionFromEtag(
-    response.headers.etag as string | undefined,
-    version + 1,
-  );
+  return responseVersion(response.headers);
 }
 
 export async function uploadTrainingPlanExerciseImage(
@@ -322,14 +311,11 @@ export async function uploadTrainingPlanExerciseImage(
   const response = await apiClient.put<UpdateExerciseImageResponse>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}/image`,
     form,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
   return {
     data: response.data.data.image,
-    version: versionFromEtag(
-      response.headers.etag as string | undefined,
-      version + 1,
-    ),
+    version: responseVersion(response.headers),
   };
 }
 
@@ -342,10 +328,7 @@ export async function removeTrainingPlanExerciseImage(
 ): Promise<number> {
   const response = await apiClient.delete(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}/image`,
-    mutationConfig(mockScenario, trainingPlanId, version),
+    mutationConfig(mockScenario, version),
   );
-  return versionFromEtag(
-    response.headers.etag as string | undefined,
-    version + 1,
-  );
+  return responseVersion(response.headers);
 }

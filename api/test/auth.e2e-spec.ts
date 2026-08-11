@@ -699,9 +699,25 @@ describe('Authentication (e2e)', () => {
     );
     expect(response.headers['access-control-allow-credentials']).toBe('true');
     expect(response.headers['access-control-expose-headers']).toBe(
-      'ETag,X-Request-Id',
+      'X-Resource-Version,X-Request-Id',
     );
     expect(response.headers.vary).toContain('Origin');
+
+    const mutationPreflight = await request(app.getHttpServer())
+      .options('/global/training-plans/64b000000000000000000001')
+      .set('Origin', 'http://localhost:3000')
+      .set('Access-Control-Request-Method', 'PATCH')
+      .set(
+        'Access-Control-Request-Headers',
+        'Content-Type, X-Resource-Version, X-CSRF-Token, X-Request-Id',
+      );
+    expect(mutationPreflight.status).toBe(204);
+    expect(mutationPreflight.headers['access-control-allow-headers']).toContain(
+      'X-Resource-Version',
+    );
+    expect(
+      mutationPreflight.headers['access-control-allow-headers'],
+    ).not.toContain('If-Match');
   });
 
   it('correlates success, no-content, redirect, error and preflight responses', async () => {

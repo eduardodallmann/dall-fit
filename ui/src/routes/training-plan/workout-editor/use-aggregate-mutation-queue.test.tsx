@@ -33,9 +33,12 @@ describe('useAggregateMutationQueue', () => {
     expect(second).toHaveBeenCalledWith(3);
   });
 
-  it('pauses after a 412 and never starts later queued work', async () => {
+  it('pauses after a domain version conflict and never starts later queued work', async () => {
     const onConflict = vi.fn();
-    const response = { status: 412 } as AxiosResponse;
+    const response = {
+      status: 412,
+      data: { code: 'TRAINING_PLAN_VERSION_CONFLICT' },
+    } as AxiosResponse;
     const conflict = new AxiosError(
       'conflict',
       undefined,
@@ -60,5 +63,42 @@ describe('useAggregateMutationQueue', () => {
     expect(later).not.toHaveBeenCalled();
     expect(onConflict).toHaveBeenCalledOnce();
     expect(result.current.paused).toBe(true);
+  });
+
+  it('does not pause after an external 412 without the domain error code', async () => {
+    const onConflict = vi.fn();
+    const response = {
+      status: 412,
+      data: 'PRECONDITION_FAILED',
+      headers: { 'x-vercel-error': 'PRECONDITION_FAILED' },
+    } as unknown as AxiosResponse;
+    const externalFailure = new AxiosError(
+      'external precondition failure',
+      undefined,
+      undefined,
+      undefined,
+      response,
+    );
+    const { result } = renderHook(() =>
+      useAggregateMutationQueue(0, onConflict),
+    );
+    const later = vi.fn().mockResolvedValue({ data: 'later', version: 1 });
+
+    let failedTask: Promise<string> | undefined;
+    let laterTask: Promise<string> | undefined;
+    act(() => {
+      failedTask = result.current.enqueue(() =>
+        Promise.reject(externalFailure),
+      );
+      laterTask = result.current.enqueue(later);
+    });
+
+    await act(async () => {
+      await expect(failedTask).rejects.toBe(externalFailure);
+      await expect(laterTask).resolves.toBe('later');
+    });
+    expect(later).toHaveBeenCalledWith(0);
+    expect(onConflict).not.toHaveBeenCalled();
+    expect(result.current.paused).toBe(false);
   });
 });

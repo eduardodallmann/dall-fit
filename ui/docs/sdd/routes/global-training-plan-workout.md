@@ -43,8 +43,9 @@ própria e usa input file nativo acessível.
 
 Cada linha acumula somente campos alterados e dispara depois de três segundos sem
 nova edição. Timers são independentes; requests passam por uma fila FIFO do plano,
-que injeta o ETag mais recente. Refetches e atualizações de cache não recriam essa
-fila. Se houver edição durante um request, a response
+que injeta a versão mais recente em `X-Resource-Version` e exige o mesmo header na
+resposta bem-sucedida. Refetches e atualizações de cache não recriam essa fila. Se
+houver edição durante um request, a response
 canônica não substitui o draft mais novo. Sucesso de autosave não mostra toast;
 falha preserva draft/miniatura e anuncia erro.
 
@@ -64,10 +65,13 @@ loading e nunca lê base64. As URLs públicas pertencem ao host
 - GET/PATCH do workout;
 - POST/PATCH/DELETE de exercícios e PUT da ordem;
 - PUT multipart/DELETE da imagem;
-- `If-Match` em toda mutation e ETag em todo sucesso.
+- `X-Resource-Version` com inteiro canônico em toda mutation e em todo sucesso que
+  preserva o aggregate.
 
-Not-found distingue plano/workout na API sem expor ownership. Conflito preserva
-trabalho e pausa a fila. Erros iniciais não dependem de toast; saving usa aria-live
+Not-found distingue plano/workout na API sem expor ownership. Somente o erro
+`412 TRAINING_PLAN_VERSION_CONFLICT` preserva trabalho e pausa a fila; um `412`
+externo sem esse código segue como falha genérica. Erros iniciais não dependem de
+toast; saving usa aria-live
 e spinner nomeado. Handles e botões icon-only têm nomes contextuais, miniaturas têm
 alt derivado do nome visível e drag possui instruções do sensor de teclado.
 

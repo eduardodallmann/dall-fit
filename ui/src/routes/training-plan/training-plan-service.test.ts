@@ -72,7 +72,11 @@ describe('training plan service', () => {
       id: '64b000000000000000000099',
       name: 'Novo plano',
     });
-    expect(updated).toMatchObject({ id: planId, name: 'Plano atualizado' });
+    expect(updated).toMatchObject({
+      id: planId,
+      name: 'Plano atualizado',
+      version: 1,
+    });
   });
 
   it('restores stateful scenarios to their initial fixtures', async () => {
@@ -119,7 +123,7 @@ describe('training plan service', () => {
     ).rejects.toMatchObject({ response: { status: 503 } });
   });
 
-  it('uses ETag versions across editor mutations and uploads multipart files', async () => {
+  it('uses resource versions across editor mutations and multipart uploads', async () => {
     const workout = await getTrainingPlanWorkout(planId, workoutId, 'success');
     expect(workout).toMatchObject({ id: workoutId, version: 0 });
 
@@ -179,7 +183,7 @@ describe('training plan service', () => {
           },
         },
       },
-      headers: { etag: `"training-plan:${planId}:3"` },
+      headers: { 'x-resource-version': '3' },
     });
     const upload = await uploadTrainingPlanExerciseImage(
       planId,
@@ -192,5 +196,26 @@ describe('training plan service', () => {
     expect(upload.version).toBe(3);
     expect(put.mock.calls[0]?.[1]).toBeInstanceOf(FormData);
     put.mockRestore();
+  });
+
+  it('rejects a successful mutation response without a resource version', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+      data: {
+        data: {
+          exerciseCount: 0,
+          id: '64b000000000000000000199',
+          name: 'Novo treino',
+        },
+      },
+      headers: {},
+    });
+
+    await expect(
+      createTrainingPlanWorkout(planId, 0, 'success'),
+    ).rejects.toThrow('invalid resource version');
+    expect(post.mock.calls[0]?.[2]).toMatchObject({
+      headers: { 'X-Resource-Version': '0' },
+    });
+    post.mockRestore();
   });
 });

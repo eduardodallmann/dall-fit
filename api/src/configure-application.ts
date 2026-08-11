@@ -25,12 +25,12 @@ export function configureApplication(app: INestApplication): void {
   app.enableCors({
     allowedHeaders: [
       'Content-Type',
-      'If-Match',
+      'X-Resource-Version',
       'X-CSRF-Token',
       'X-Request-Id',
     ],
     credentials: true,
-    exposedHeaders: ['ETag', 'X-Request-Id'],
+    exposedHeaders: ['X-Resource-Version', 'X-Request-Id'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: corsOrigin,
   });
