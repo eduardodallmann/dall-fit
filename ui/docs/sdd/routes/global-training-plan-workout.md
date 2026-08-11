@@ -15,7 +15,10 @@ dado e alerta. Not-found/falha inicial mostra Alert com retorno/retry aplicável
 O cabeçalho mostra `Treino`, nome e lápis icon-only. A edição inline valida trim
 1–120, atualiza otimisticamente, entra na fila e usa toast.promise. Cancelar
 restaura o confirmado. `412` mostra alerta persistente, bloqueia novas gravações e
-oferece `Recarregar dados`, com confirmação antes de descartar drafts.
+oferece `Recarregar dados`, com confirmação antes de descartar drafts. Refetches
+normais não remontam o editor nem reinicializam sua fila; somente o reload
+confirmado descarta os drafts e reinicia a fila com a versão retornada pelo
+servidor.
 
 ## Lista e campos
 
@@ -40,7 +43,8 @@ própria e usa input file nativo acessível.
 
 Cada linha acumula somente campos alterados e dispara depois de três segundos sem
 nova edição. Timers são independentes; requests passam por uma fila FIFO do plano,
-que injeta o ETag mais recente. Se houver edição durante um request, a response
+que injeta o ETag mais recente. Refetches e atualizações de cache não recriam essa
+fila. Se houver edição durante um request, a response
 canônica não substitui o draft mais novo. Sucesso de autosave não mostra toast;
 falha preserva draft/miniatura e anuncia erro.
 

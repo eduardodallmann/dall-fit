@@ -35,6 +35,7 @@ export function TrainingPlanWorkoutPage({
     ),
   );
   const [conflict, setConflict] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const workout = query.data;
   const plan = workout?.trainingPlan;
 
@@ -56,7 +57,10 @@ export function TrainingPlanWorkoutPage({
       return;
     trackRetry();
     const result = await query.refetch();
-    if (result.isSuccess) setConflict(false);
+    if (result.isSuccess) {
+      setConflict(false);
+      setReloadKey((current) => current + 1);
+    }
   };
 
   return (
@@ -112,7 +116,7 @@ export function TrainingPlanWorkoutPage({
       {workout === undefined ? null : (
         <WorkoutEditor
           data={workout}
-          key={`${workout.id}:${workout.version}`}
+          key={`${workout.id}:${reloadKey}`}
           mockScenario={mockTrainingPlans}
           onConflict={() => setConflict(true)}
         />

@@ -192,7 +192,7 @@ export class TrainingPlanService {
     });
     const state =
       await this.trainingPlanRepository.inspectTarget(trainingPlanId);
-    this.assertState(state, expectedVersion);
+    this.assertState(state, expectedVersion, trainingPlanId);
     this.assertAggregateCapacity(state);
     if ((state.workoutCount ?? 0) >= MAX_WORKOUTS_PER_PLAN)
       throw createWorkoutLimitException();
@@ -381,7 +381,13 @@ export class TrainingPlanService {
       workoutId,
       exerciseId,
     );
-    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertState(
+      state,
+      expectedVersion,
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
     this.assertAggregateCapacity(state);
     const type = state.exerciseType;
     if (
@@ -467,8 +473,20 @@ export class TrainingPlanService {
       );
       return failure;
     }
-    if (workout.version !== expectedVersion)
+    if (workout.version !== expectedVersion) {
+      this.logger.warn(
+        'TrainingPlanService -> reorderExercises -> versionConflict branch:',
+        {
+          data: {
+            actualVersion: workout.version,
+            expectedVersion,
+            trainingPlanId,
+            workoutId,
+          },
+        },
+      );
       throw createVersionConflictException();
+    }
     const currentIds = workout.exercises.map((exercise) => exercise.id);
     const unique = new Set(exerciseIds);
     if (
@@ -506,7 +524,13 @@ export class TrainingPlanService {
       workoutId,
       exerciseId,
     );
-    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertState(
+      state,
+      expectedVersion,
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
     this.assertAggregateCapacity(state);
     if (state.exerciseType !== 'image')
       throw createInvalidExerciseTypeException();
@@ -548,7 +572,13 @@ export class TrainingPlanService {
       workoutId,
       exerciseId,
     );
-    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertState(
+      state,
+      expectedVersion,
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
     if (state.exerciseType !== 'image')
       throw createInvalidExerciseTypeException();
     const result = await this.trainingPlanRepository.updateExerciseImage(
@@ -583,13 +613,20 @@ export class TrainingPlanService {
       workoutId,
       exerciseId,
     );
-    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertState(
+      state,
+      expectedVersion,
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
     throw createVersionConflictException();
   }
 
   private assertState(
     state: TargetState,
     expectedVersion: number,
+    trainingPlanId: string,
     workoutId?: string,
     exerciseId?: string,
   ): void {
@@ -598,8 +635,21 @@ export class TrainingPlanService {
       throw createWorkoutNotFoundException();
     if (exerciseId !== undefined && !state.exerciseExists)
       throw createExerciseNotFoundException();
-    if (state.version !== expectedVersion)
+    if (state.version !== expectedVersion) {
+      this.logger.warn(
+        'TrainingPlanService -> assertState -> versionConflict branch:',
+        {
+          data: {
+            actualVersion: state.version,
+            expectedVersion,
+            exerciseId,
+            trainingPlanId,
+            workoutId,
+          },
+        },
+      );
       throw createVersionConflictException();
+    }
   }
 
   private assertAggregateCapacity(state: TargetState): void {
