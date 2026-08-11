@@ -180,15 +180,12 @@ describe('Global training plans (e2e)', () => {
     return result;
   }
 
-  function withIfMatch(
+  function withResourceVersion(
     test: SupertestTest,
-    trainingPlanId: string,
+    _trainingPlanId: string,
     version: number,
   ): SupertestTest {
-    const result = test.set(
-      'If-Match',
-      `"training-plan:${trainingPlanId}:${version}"`,
-    );
+    const result = test.set('X-Resource-Version', String(version));
     return result;
   }
 
@@ -259,6 +256,7 @@ describe('Global training plans (e2e)', () => {
     });
 
     expect(createResponse.status).toBe(201);
+    expect(createResponse.headers['x-resource-version']).toBe('0');
     expect(createResponse.body).toMatchObject({
       data: {
         name: 'Plano hipertrofia',
@@ -277,9 +275,14 @@ describe('Global training plans (e2e)', () => {
 
     const updateResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.patch(`/global/training-plans/${planId}`), planId, 0),
+      withResourceVersion(
+        agent.patch(`/global/training-plans/${planId}`),
+        planId,
+        0,
+      ),
     ).send({ name: '  Plano atualizado  ' });
     expect(updateResponse.status).toBe(200);
+    expect(updateResponse.headers['x-resource-version']).toBe('1');
     expect(updateResponse.body).toMatchObject({
       data: {
         id: planId,
@@ -290,7 +293,11 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      withIfMatch(agent.delete(`/global/training-plans/${planId}`), planId, 1),
+      withResourceVersion(
+        agent.delete(`/global/training-plans/${planId}`),
+        planId,
+        1,
+      ),
     ).expect(204);
     await expect(trainingPlanModel.findById(planId).exec()).resolves.toBeNull();
   });
@@ -354,6 +361,7 @@ describe('Global training plans (e2e)', () => {
     const detailResponse = await agent.get(`/global/training-plans/${plan.id}`);
     const detailBody = detailResponse.body as TrainingPlanDetailsResponse;
     expect(detailResponse.status).toBe(200);
+    expect(detailResponse.headers['x-resource-version']).toBe('0');
     expect(detailResponse.body).toMatchObject({
       data: {
         id: plan.id,
@@ -364,7 +372,7 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.delete(`/global/training-plans/${plan.id}`),
         plan.id,
         0,
@@ -390,7 +398,7 @@ describe('Global training plans (e2e)', () => {
 
     const createResponse = await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.post(`/global/training-plans/${plan.id}/workouts`),
         plan.id,
         0,
@@ -413,7 +421,7 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.delete(`/global/training-plans/${plan.id}/workouts/${workoutId}`),
         plan.id,
         1,
@@ -439,11 +447,15 @@ describe('Global training plans (e2e)', () => {
       const getResponse = await agent.get(`/global/training-plans/${planId}`);
       const patchResponse = await authenticatedMutation(
         agent,
-        withIfMatch(agent.patch(`/global/training-plans/${planId}`), planId, 0),
+        withResourceVersion(
+          agent.patch(`/global/training-plans/${planId}`),
+          planId,
+          0,
+        ),
       ).send({ name: 'Não atualiza' });
       const deleteResponse = await authenticatedMutation(
         agent,
-        withIfMatch(
+        withResourceVersion(
           agent.delete(`/global/training-plans/${planId}`),
           planId,
           0,
@@ -451,7 +463,7 @@ describe('Global training plans (e2e)', () => {
       );
       const workoutResponse = await authenticatedMutation(
         agent,
-        withIfMatch(
+        withResourceVersion(
           agent.post(`/global/training-plans/${planId}/workouts`),
           planId,
           0,
@@ -473,7 +485,7 @@ describe('Global training plans (e2e)', () => {
 
     const missingWorkoutResponse = await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.delete(
           `/global/training-plans/${globalPlan.id}/workouts/${missingWorkoutId}`,
         ),
@@ -483,7 +495,7 @@ describe('Global training plans (e2e)', () => {
     );
     const missingPlanWorkoutResponse = await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.delete(
           `/global/training-plans/${missingPlanId}/workouts/${missingWorkoutId}`,
         ),
@@ -555,7 +567,7 @@ describe('Global training plans (e2e)', () => {
 
     const getResponse = await agent.get(basePath);
     expect(getResponse.status).toBe(200);
-    expect(getResponse.headers.etag).toBe(`"training-plan:${plan.id}:0"`);
+    expect(getResponse.headers['x-resource-version']).toBe('0');
     expect(getResponse.body).toMatchObject({
       data: {
         id: workoutId.toString(),
@@ -567,10 +579,10 @@ describe('Global training plans (e2e)', () => {
 
     const nameResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.patch(basePath), plan.id, 0),
+      withResourceVersion(agent.patch(basePath), plan.id, 0),
     ).send({ name: '  Treino editado  ' });
     expect(nameResponse.status).toBe(200);
-    expect(nameResponse.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    expect(nameResponse.headers['x-resource-version']).toBe('1');
     expect(nameResponse.body).toMatchObject({
       data: { name: 'Treino editado' },
     });
@@ -586,11 +598,15 @@ describe('Global training plans (e2e)', () => {
     for (const [index, type] of types.entries()) {
       const createResponse = await authenticatedMutation(
         agent,
-        withIfMatch(agent.post(`${basePath}/exercises`), plan.id, index + 1),
+        withResourceVersion(
+          agent.post(`${basePath}/exercises`),
+          plan.id,
+          index + 1,
+        ),
       ).send({ type });
       expect(createResponse.status).toBe(201);
-      expect(createResponse.headers.etag).toBe(
-        `"training-plan:${plan.id}:${index + 2}"`,
+      expect(createResponse.headers['x-resource-version']).toBe(
+        String(index + 2),
       );
       expect(createResponse.body).toMatchObject({ data: { type } });
       exercises.push(
@@ -602,7 +618,7 @@ describe('Global training plans (e2e)', () => {
     expect(pause).toBeDefined();
     const updateResponse = await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.patch(`${basePath}/exercises/${pause?.id}`),
         plan.id,
         6,
@@ -616,21 +632,21 @@ describe('Global training plans (e2e)', () => {
     const reversedIds = exercises.map((exercise) => exercise.id).reverse();
     const reorderResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.put(`${basePath}/exercises/order`), plan.id, 7),
+      withResourceVersion(agent.put(`${basePath}/exercises/order`), plan.id, 7),
     ).send({ exerciseIds: reversedIds });
     expect(reorderResponse.status).toBe(204);
-    expect(reorderResponse.headers.etag).toBe(`"training-plan:${plan.id}:8"`);
+    expect(reorderResponse.headers['x-resource-version']).toBe('8');
 
     const noOpResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.put(`${basePath}/exercises/order`), plan.id, 8),
+      withResourceVersion(agent.put(`${basePath}/exercises/order`), plan.id, 8),
     ).send({ exerciseIds: reversedIds });
     expect(noOpResponse.status).toBe(204);
-    expect(noOpResponse.headers.etag).toBe(`"training-plan:${plan.id}:8"`);
+    expect(noOpResponse.headers['x-resource-version']).toBe('8');
 
     const conflictResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.patch(basePath), plan.id, 7),
+      withResourceVersion(agent.patch(basePath), plan.id, 7),
     ).send({ name: 'Não sobrescreve' });
     expect(conflictResponse.status).toBe(412);
     expect(conflictResponse.body).toMatchObject({
@@ -686,14 +702,14 @@ describe('Global training plans (e2e)', () => {
 
     const uploadResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.put(imagePath), plan.id, 0),
+      withResourceVersion(agent.put(imagePath), plan.id, 0),
     ).attach('file', jpeg, {
       contentType: 'image/jpeg',
       filename: 'exercise.jpg',
     });
 
     expect(uploadResponse.status).toBe(200);
-    expect(uploadResponse.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    expect(uploadResponse.headers['x-resource-version']).toBe('1');
     const uploadBody = uploadResponse.body as {
       data: {
         image: { displayUrl: string; thumbnailUrl: string };
@@ -722,10 +738,10 @@ describe('Global training plans (e2e)', () => {
 
     const removeResponse = await authenticatedMutation(
       agent,
-      withIfMatch(agent.delete(imagePath), plan.id, 1),
+      withResourceVersion(agent.delete(imagePath), plan.id, 1),
     );
     expect(removeResponse.status).toBe(204);
-    expect(removeResponse.headers.etag).toBe(`"training-plan:${plan.id}:2"`);
+    expect(removeResponse.headers['x-resource-version']).toBe('2');
     expect(deletedBlobKeys).toEqual([uploadedBlobs.map(({ key }) => key)]);
     const stored = await trainingPlanModel.findById(plan.id).lean().exec();
     expect(stored?.workouts[0]?.exercises[0]).toMatchObject({ image: null });
@@ -757,11 +773,11 @@ describe('Global training plans (e2e)', () => {
 
     const response = await authenticatedMutation(
       agent,
-      withIfMatch(agent.patch(exercisePath), plan.id, 0),
+      withResourceVersion(agent.patch(exercisePath), plan.id, 0),
     ).send({ youtubeId: reference });
 
     expect(response.status).toBe(200);
-    expect(response.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    expect(response.headers['x-resource-version']).toBe('1');
     expect(response.body).toMatchObject({
       data: { type: 'youtube-long', youtubeId: 'ZA8gs8XP2bs' },
     });
@@ -786,13 +802,32 @@ describe('Global training plans (e2e)', () => {
       name: 'Sem versão',
     });
     expect(missing.status).toBe(428);
-    expect(missing.body).toMatchObject({ code: 'PRECONDITION_REQUIRED' });
+    expect(missing.body).toMatchObject({
+      code: 'PRECONDITION_REQUIRED',
+      message: 'X-Resource-Version is required.',
+    });
+    const legacyHeader = await authenticatedMutation(
+      agent,
+      agent.patch(path).set('If-Match', '"training-plan:legacy:0"'),
+    ).send({ name: 'Versão legada' });
+    expect(legacyHeader.status).toBe(428);
+    expect(legacyHeader.body).toMatchObject({
+      code: 'PRECONDITION_REQUIRED',
+    });
     const malformed = await authenticatedMutation(
       agent,
-      agent.patch(path).set('If-Match', 'W/"anything"'),
+      agent.patch(path).set('X-Resource-Version', 'invalid'),
     ).send({ name: 'Versão fraca' });
     expect(malformed.status).toBe(400);
     expect(malformed.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+    const unsafe = await authenticatedMutation(
+      agent,
+      agent
+        .patch(path)
+        .set('X-Resource-Version', String(Number.MAX_SAFE_INTEGER + 1)),
+    ).send({ name: 'Versão insegura' });
+    expect(unsafe.status).toBe(400);
+    expect(unsafe.body).toMatchObject({ code: 'VALIDATION_ERROR' });
 
     const fullExercises = Array.from({ length: 50 }, () => ({
       type: 'duration',
@@ -815,7 +850,7 @@ describe('Global training plans (e2e)', () => {
 
     const workoutLimit = await authenticatedMutation(
       agent,
-      withIfMatch(
+      withResourceVersion(
         agent.post(`/global/training-plans/${plan.id}/workouts`),
         plan.id,
         0,
@@ -825,7 +860,7 @@ describe('Global training plans (e2e)', () => {
     expect(workoutLimit.body).toMatchObject({ code: 'WORKOUT_LIMIT_REACHED' });
     const exerciseLimit = await authenticatedMutation(
       agent,
-      withIfMatch(agent.post(`${path}/exercises`), plan.id, 0),
+      withResourceVersion(agent.post(`${path}/exercises`), plan.id, 0),
     ).send({ type: 'pause' });
     expect(exerciseLimit.status).toBe(409);
     expect(exerciseLimit.body).toMatchObject({

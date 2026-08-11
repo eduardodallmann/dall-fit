@@ -131,8 +131,9 @@ seguindo `07-testes-integrados-playwright.md`.
 ### Coordenação do editor de workout
 
 O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação do
-mesmo plano passa por uma fila FIFO local que conserva a versão do ETag resultante;
-debounces de três segundos continuam independentes por linha. Não há retry de
+mesmo plano passa por uma fila FIFO local que conserva o valor retornado em
+`X-Resource-Version`; debounces de três segundos continuam independentes por
+linha. Não há retry de
 mutation. Um `412` pausa a fila, mantém drafts e exige recarga confirmada. Resposta
 de autosave é mesclada apenas nos campos que não receberam edição posterior.
 

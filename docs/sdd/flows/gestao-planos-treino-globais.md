@@ -31,8 +31,9 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 1. A listagem ordena globalmente por criação e `_id`, usa 20 itens e limita a URL
    às páginas 1–100.
 2. Criação de treino aguarda o ID real antes de navegar. Lista/detalhe carregam e
-   conservam `version`; toda mutação de aggregate existente envia o ETag forte em
-   `If-Match` e incorpora o ETag resultante ao próximo write.
+   conservam `version`; toda mutação de aggregate existente envia a versão
+   canônica em `X-Resource-Version` e incorpora o valor retornado no mesmo header
+   ao próximo write.
 3. A rota de workout faz uma leitura projetada com plano mínimo, nome, timestamps
    e até 50 exercícios. O breadcrumb é
    `Home / Planos de treino / <plano> / <treino>` apenas quando esses nomes foram
@@ -53,9 +54,10 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 
 ## Concorrência e falhas
 
-- `412 TRAINING_PLAN_VERSION_CONFLICT` preserva drafts, pausa a fila e mostra
-  alerta persistente. `Recarregar dados` pede confirmação antes de descartar o
-  trabalho local; não há reenvio automático.
+- somente `412 TRAINING_PLAN_VERSION_CONFLICT` preserva drafts, pausa a fila e
+  mostra alerta persistente. Um `412` externo sem esse código é falha genérica,
+  não pausa a fila e não é interpretado como conflito. `Recarregar dados` pede
+  confirmação antes de descartar o trabalho local; não há reenvio automático.
 - falha de autosave conserva texto e miniatura confirmada, encerra o status de
   saving e anuncia erro sem toast de sucesso;
 - falha de criação remove somente a linha temporária; falha de ordem/exclusão
@@ -86,8 +88,8 @@ no drop e recarga de conflito é retry.
 
 ## Cobertura automatizada
 
-- E2E Nest/MongoDB/Redis: `api/test/training-plan.e2e-spec.ts`, incluindo ETags,
-  discriminadores, limites, ordem, fronteira BSON e ownership.
+- E2E Nest/MongoDB/Redis: `api/test/training-plan.e2e-spec.ts`, incluindo versões
+  de recurso, discriminadores, limites, ordem, fronteira BSON e ownership.
 - Vitest UI: services HTTP, fila FIFO/conflito, componentes e Analytics.
 - Playwright: `ui/tests/integration/routes/training-plan.spec.ts` e
   `ui/tests/integration/flows/gestao-planos-treino.spec.ts`, sempre com Vite,

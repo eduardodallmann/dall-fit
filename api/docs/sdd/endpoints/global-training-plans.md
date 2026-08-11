@@ -10,7 +10,7 @@ embutidos. O caminho interno é sempre controller → command proprietário →
 
 | Papel        | Símbolo                                                                 |
 | ------------ | ----------------------------------------------------------------------- |
-| transporte   | `GlobalTrainingPlansController`, DTOs e ETag parser                     |
+| transporte   | `GlobalTrainingPlansController`, DTOs e parser de versão                |
 | orquestração | classes em `src/training-plan/commands/`                                |
 | domínio      | `TrainingPlanService`                                                   |
 | integrações  | `YoutubeReferenceService`, `ExerciseImageService`, `BlobStorageService` |
@@ -24,32 +24,35 @@ do editor e 10/minuto no upload. Plano pessoal é indistinguível de ausente.
 ## Concorrência HTTP
 
 POST de plano nasce com `version: 0`. GET de item e toda resposta bem-sucedida que
-mantém o aggregate devolvem `ETag: "training-plan:<id>:<version>"`. Toda mutação de
-plano existente exige exatamente essa tag forte em `If-Match`; ausência é
-`428 PRECONDITION_REQUIRED`, formato fraco/lista/wildcard/alheio é
-`400 VALIDATION_ERROR` e versão antiga de recurso existente é
-`412 TRAINING_PLAN_VERSION_CONFLICT`. CORS permite `If-Match`, expõe `ETag` e
-aceita PUT.
+mantém o aggregate devolvem `X-Resource-Version: <version>`, inclusive `204` e
+no-ops; DELETE do plano não devolve versão porque o aggregate deixa de existir.
+Toda mutação de plano existente exige nesse header a forma decimal canônica de um
+inteiro não negativo seguro: `0` ou valor sem zero à esquerda até
+`Number.MAX_SAFE_INTEGER`. Ausência é `428 PRECONDITION_REQUIRED`; valor repetido,
+malformado ou inseguro é `400 VALIDATION_ERROR`; versão antiga de recurso existente
+é `412 TRAINING_PLAN_VERSION_CONFLICT`. `If-Match` legado não satisfaz a
+precondição. CORS permite e expõe `X-Resource-Version`, não anuncia `If-Match` ou
+ETag, e aceita PUT.
 
 ## Contratos
 
-| Método e path                                  | Entrada                             | Sucesso                         |
-| ---------------------------------------------- | ----------------------------------- | ------------------------------- |
-| `GET /global/training-plans?page=1`            | página 1–100                        | `200`, 20 resumos com versão    |
-| `POST /global/training-plans`                  | `{name,description}`                | `201`, resumo v0 + ETag         |
-| `GET /global/training-plans/:planId`           | IDs MongoDB                         | `200`, detalhe projetado + ETag |
-| `PATCH /global/training-plans/:planId`         | campos parciais + If-Match          | `200`, resumo + novo ETag       |
-| `DELETE /global/training-plans/:planId`        | If-Match                            | `204`, remove árvore/mídia      |
-| `POST /global/training-plans/:planId/workouts` | `{}` + If-Match                     | `201`, `Novo treino`            |
-| `DELETE .../workouts/:workoutId`               | If-Match                            | `204`, remove workout/mídia     |
-| `GET .../workouts/:workoutId`                  | IDs MongoDB                         | `200`, editor completo + ETag   |
-| `PATCH .../workouts/:workoutId`                | `{name}` + If-Match                 | `200`, nome/timestamp           |
-| `POST .../workouts/:workoutId/exercises`       | `{type}` + If-Match                 | `201`, exercício com defaults   |
-| `PATCH .../exercises/:exerciseId`              | campos válidos do tipo + If-Match   | `200`, exercício canônico       |
-| `DELETE .../exercises/:exerciseId`             | If-Match                            | `204`, remove linha/mídia       |
-| `PUT .../exercises/order`                      | `{exerciseIds}` completo + If-Match | `204`; ordem igual é no-op      |
-| `PUT .../exercises/:exerciseId/image`          | multipart `file` + If-Match         | `200`, URLs thumbnail/display   |
-| `DELETE .../exercises/:exerciseId/image`       | If-Match                            | `204`; imagem nula é no-op      |
+| Método e path                                  | Entrada                                 | Sucesso                         |
+| ---------------------------------------------- | --------------------------------------- | ------------------------------- |
+| `GET /global/training-plans?page=1`            | página 1–100                            | `200`, 20 resumos com versão    |
+| `POST /global/training-plans`                  | `{name,description}`                    | `201`, resumo v0 + header       |
+| `GET /global/training-plans/:planId`           | IDs MongoDB                             | `200`, detalhe + header         |
+| `PATCH /global/training-plans/:planId`         | campos + `X-Resource-Version`           | `200`, resumo + novo header     |
+| `DELETE /global/training-plans/:planId`        | `X-Resource-Version`                    | `204`, remove árvore/mídia      |
+| `POST /global/training-plans/:planId/workouts` | `{}` + `X-Resource-Version`             | `201`, `Novo treino` + header   |
+| `DELETE .../workouts/:workoutId`               | `X-Resource-Version`                    | `204`, remove workout + header  |
+| `GET .../workouts/:workoutId`                  | IDs MongoDB                             | `200`, editor completo + header |
+| `PATCH .../workouts/:workoutId`                | `{name}` + `X-Resource-Version`         | `200`, nome/timestamp + header  |
+| `POST .../workouts/:workoutId/exercises`       | `{type}` + `X-Resource-Version`         | `201`, defaults + header        |
+| `PATCH .../exercises/:exerciseId`              | campos do tipo + `X-Resource-Version`   | `200`, exercício + header       |
+| `DELETE .../exercises/:exerciseId`             | `X-Resource-Version`                    | `204`, remove linha + header    |
+| `PUT .../exercises/order`                      | ordem completa + `X-Resource-Version`   | `204`, inclusive no-op + header |
+| `PUT .../exercises/:exerciseId/image`          | multipart `file` + `X-Resource-Version` | `200`, URLs + header            |
+| `DELETE .../exercises/:exerciseId/image`       | `X-Resource-Version`                    | `204`, inclusive no-op + header |
 
 GET do workout retorna plano mínimo, timestamps e exercícios na ordem física. Os
 tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
@@ -119,10 +122,10 @@ curl --request POST http://localhost:4000/auth/test-login \
   --cookie /tmp/dall-fit-fit28.txt
 ```
 
-Lista é determinística, criação retorna v0/ETag e detalhe contém cinco exercícios
+Lista é determinística, criação retorna v0 no header e detalhe contém cinco exercícios
 apenas como `exerciseCount`.
 
-### Cenário 2 — mutações existentes com If-Match
+### Cenário 2 — mutações existentes com X-Resource-Version
 
 **Seed**
 
@@ -140,12 +143,12 @@ curl --request POST http://localhost:4000/auth/test-login \
 && CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
 && curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001 \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header 'x-resource-version: 0' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt \
   --data '{"name":"Plano atualizado"}' \
 && curl --include --request POST http://localhost:4000/global/training-plans/64b000000000000000000001/workouts \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:1"' \
+  --header 'x-resource-version: 1' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt --data '{}'
 ```
 
@@ -171,15 +174,15 @@ curl --request POST http://localhost:4000/auth/test-login \
 && curl --include http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 --cookie /tmp/dall-fit-fit28.txt \
 && curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:0"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --header 'x-resource-version: 0' --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-fit28.txt --data '{"name":"Treino editado"}' \
 && curl --include --request POST http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:1"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --header 'x-resource-version: 1' --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-fit28.txt --data '{"type":"pause"}' \
 && curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000205 \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:2"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --header 'x-resource-version: 2' --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-fit28.txt --data '{"durationMinutes":20}'
 ```
 
@@ -204,11 +207,11 @@ curl --request POST http://localhost:4000/auth/test-login \
 && CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
 && curl --include --request PUT http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/order \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header 'if-match: "training-plan:64b000000000000000000001:0"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --header 'x-resource-version: 0' --header "x-csrf-token: ${CSRF_TOKEN}" \
   --cookie /tmp/dall-fit-fit28.txt \
   --data '{"exerciseIds":["64b000000000000000000205","64b000000000000000000204","64b000000000000000000203","64b000000000000000000202","64b000000000000000000201"]}' \
 && curl --include --request DELETE http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000201 \
-  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header 'origin: http://localhost:3000' --header 'x-resource-version: 0' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt
 ```
 
@@ -232,11 +235,11 @@ curl --request POST http://localhost:4000/auth/test-login \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
 && CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
 && curl --include --request PUT http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000202/image \
-  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header 'origin: http://localhost:3000' --header 'x-resource-version: 0' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt \
   --form 'file=@./fixtures/exercise.jpg;type=image/jpeg' \
 && curl --include --request DELETE http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000202/image \
-  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:1"' \
+  --header 'origin: http://localhost:3000' --header 'x-resource-version: 1' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt
 ```
 
@@ -262,7 +265,7 @@ curl --request POST http://localhost:4000/auth/test-login \
 && CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
 && curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001 \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
-  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt --data '{"name":"Sem If-Match"}' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt --data '{"name":"Sem versão"}' \
 && curl --include http://localhost:4000/global/training-plans/64b000000000000000000002 --cookie /tmp/dall-fit-fit28.txt \
 && curl --include 'http://localhost:4000/global/training-plans?page=101' --cookie /tmp/dall-fit-fit28.txt
 ```
@@ -273,7 +276,7 @@ As respostas são respectivamente `428`, `404 TRAINING_PLAN_NOT_FOUND` e
 
 ## Testes e operação
 
-`training-plan-etag.spec.ts`, services/commands e adapters cobrem parser, defaults,
+`resource-version.spec.ts`, services/commands e adapters cobrem parser, defaults,
 validação YouTube, processamento/compensação de imagem, CAS, no-op e falhas. O E2E
 serial usa Nest, MongoDB e Redis efêmeros e valida transporte, ownership, schema,
 índice, limites e BSON. Aplicação de índice: `pnpm -C api indexes:apply` com

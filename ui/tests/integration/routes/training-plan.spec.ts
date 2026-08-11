@@ -197,9 +197,8 @@ test.describe('Rotas administrativas de planos de treino', () => {
     );
     await firstExercise.getByLabel('Nome').fill('Agachamento atualizado');
     const request = await autosaveRequest;
-    expect(request.headers()['if-match']).toBe(
-      '"training-plan:64b000000000000000000001:0"',
-    );
+    expect(request.headers()['x-resource-version']).toBe('0');
+    expect(request.headers()['if-match']).toBeUndefined();
     expect(request.postDataJSON()).toEqual({ name: 'Agachamento atualizado' });
     await expect(firstExercise.getByLabel('Nome')).toHaveValue(
       'Agachamento atualizado',
@@ -228,6 +227,32 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(
       page.getByRole('button', { name: 'Recarregar dados' }),
     ).toBeVisible();
+  });
+
+  test('trata 412 externo como falha genérica sem pausar a fila', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=update-exercise-error`,
+    );
+    const name = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome');
+
+    await name.fill('Rascunho preservado');
+
+    await expect(
+      page.getByText(
+        'Não foi possível salvar o exercício. O rascunho foi preservado.',
+      ),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByText('Este plano foi alterado em outro lugar.'),
+    ).not.toBeVisible();
+    await expect(name).toHaveValue('Rascunho preservado');
+    await expect(page.getByRole('button', { name: 'Adicionar' })).toBeEnabled();
   });
 
   test('confirma navegação quando há autosave ainda não enviado', async ({

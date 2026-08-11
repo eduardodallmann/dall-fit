@@ -85,7 +85,8 @@ mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
   `ImageExercise.image` aceita `null`.
 - requests do editor cobrem nome do treino, criação por tipo, PATCH parcial do
   exercício, ordem final completa e imagem. Respostas de mutação expõem o recurso
-  público; a versão resultante é transportada pelo `ETag` HTTP.
+  público; leituras e sucessos que preservam o aggregate transportam a versão
+  canônica no header `X-Resource-Version`.
 - `ownerPersonId`, documentos Mongoose, keys/dimensões internas do Blob e o
   original da imagem são exclusivos da API.
 

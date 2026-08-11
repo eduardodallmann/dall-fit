@@ -37,7 +37,7 @@ export const createPreconditionRequiredException = () =>
   domainException(
     HttpStatus.PRECONDITION_REQUIRED,
     'PRECONDITION_REQUIRED',
-    'If-Match is required.',
+    'X-Resource-Version is required.',
   );
 export const createValidationException = () =>
   domainException(
