@@ -218,5 +218,9 @@ junto dos testes Playwright e não substituem as imagens curadas do SDD.
 ## Estado de adoção
 
 Playwright cobre a jornada de login e a gestão administrativa de planos globais.
+Nesta última, valida também URL e janela de paginação, permanência de overlays em
+falha, propagação de versão entre adições consecutivas, drafts de autosave,
+conflito de domínio, exclusão durante debounce, rollback de ordem, reordenação por
+teclado e o `AlertDialog` que protege a saída.
 Configuração, scripts, Chromium, MSW Browser, specs de rota/flow e ignores seguem
 o contrato desta página.

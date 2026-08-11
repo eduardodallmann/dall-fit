@@ -26,7 +26,9 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     await expect(page.getByText('Plano criado.')).toBeVisible();
   });
 
-  test('restaura página e cache quando a criação falha', async ({ page }) => {
+  test('restaura página, cache e draft quando a criação falha', async ({
+    page,
+  }) => {
     await page.goto(
       '/global/training-plan?mockAuth=admin&mockTrainingPlans=create-error&page=2',
     );
@@ -38,13 +40,19 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
 
     await expect(
       page.getByRole('dialog', { name: 'Novo plano de treino' }),
-    ).not.toBeVisible();
+    ).toBeVisible();
+    await expect(page.getByLabel('Nome')).toHaveValue('Plano que falha');
+    await expect(page.getByLabel('Descrição')).toHaveValue(
+      'Descrição que falha.',
+    );
     await expect(page).toHaveURL(/page=2/);
     await expect(
       page.getByRole('link', { name: 'Plano global 21' }),
     ).toBeVisible();
     await expect(
-      page.getByText('Não foi possível criar o plano.'),
+      page
+        .getByRole('dialog', { name: 'Novo plano de treino' })
+        .getByText('Não foi possível criar o plano.'),
     ).toBeVisible();
   });
 
@@ -70,7 +78,7 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     await expect(page.getByText('Plano atualizado.')).toBeVisible();
   });
 
-  test('fecha o modal de edição e restaura o cache quando a atualização falha', async ({
+  test('mantém o modal de edição e restaura somente o cache quando a atualização falha', async ({
     page,
   }) => {
     await page.goto(
@@ -85,10 +93,12 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
 
     await expect(
       page.getByRole('dialog', { name: 'Editar plano de treino' }),
-    ).not.toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Nome otimista temporário' }),
     ).toBeVisible();
+    await expect(
+      page
+        .getByRole('dialog', { name: 'Editar plano de treino' })
+        .getByRole('textbox', { name: 'Nome*' }),
+    ).toHaveValue('Nome otimista temporário');
     await expect(
       page.getByRole('link', { name: 'Hipertrofia iniciante' }),
     ).toBeVisible();
@@ -97,7 +107,7 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     ).toBeVisible();
   });
 
-  test('fecha a confirmação e restaura o plano quando a exclusão falha', async ({
+  test('mantém a confirmação recuperável e restaura o plano quando a exclusão falha', async ({
     page,
   }) => {
     await page.goto(
@@ -111,13 +121,59 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
 
     await expect(
       page.getByRole('alertdialog', { name: 'Excluir plano de treino?' }),
-    ).not.toBeVisible();
+    ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Hipertrofia iniciante' }),
     ).toBeVisible();
     await expect(
       page.getByText('Não foi possível excluir o plano.'),
     ).toBeVisible();
+    await expect(page.getByText('O item foi restaurado.')).toBeVisible();
+  });
+
+  test('limita a janela visual mesmo com mais de cem páginas', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/global/training-plan?mockAuth=admin&mockTrainingPlans=large-pagination&page=50',
+    );
+
+    await expect(page.getByText('Página 50 de 100')).toBeVisible();
+    const pagination = page.getByRole('navigation', {
+      name: 'Paginação dos planos',
+    });
+    await expect(pagination.getByRole('button')).toHaveCount(7);
+    await expect(pagination.getByText('49', { exact: true })).toBeVisible();
+    await expect(pagination.getByText('50', { exact: true })).toBeVisible();
+    await expect(pagination.getByText('51', { exact: true })).toBeVisible();
+    await expect(pagination.getByText('100', { exact: true })).toBeVisible();
+  });
+
+  test('canonicaliza página inválida sem manter entrada no histórico', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/global/training-plan?mockAuth=admin&mockTrainingPlans=two-pages&page=101',
+    );
+
+    await expect(page).not.toHaveURL(/page=/);
+    await expect(page.getByText('Página 1 de 2')).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Hipertrofia iniciante' }),
+    ).toBeVisible();
+  });
+
+  test('corrige página válida acima do último resultado', async ({ page }) => {
+    await page.goto(
+      '/global/training-plan?mockAuth=admin&mockTrainingPlans=two-pages&page=100',
+    );
+
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page.getByText('Página 2 de 2')).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Plano global 21' }),
+    ).toBeVisible();
+    await expect(page.getByText('Nenhum plano de treino')).not.toBeVisible();
   });
 
   test('edita nome e descrição inline no detalhe com ações icon-only', async ({

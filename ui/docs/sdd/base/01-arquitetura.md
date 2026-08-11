@@ -128,14 +128,28 @@ MSW está configurado para autenticação e planos globais, seguindo
 `05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
 
-### Coordenação do editor de workout
+### Coordenação das mutações de planos
 
-O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação do
-mesmo plano passa por uma fila FIFO local que conserva o valor retornado em
-`X-Resource-Version`; debounces de três segundos continuam independentes por
-linha. Não há retry de
-mutation. Um `412` pausa a fila, mantém drafts e exige recarga confirmada. Resposta
-de autosave é mesclada apenas nos campos que não receberam edição posterior.
+O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação de
+um plano existente, seja iniciada na lista, detalhe ou editor, passa pelo mesmo
+coordenador FIFO por `trainingPlanId`. O coordenador pertence ao `QueryClient`,
+preserva-se entre rotas, injeta a versão somente quando a tarefa chega à cabeça da
+fila e conserva o valor retornado em `X-Resource-Version`. Planos diferentes
+mantêm filas independentes; a criação de plano, ainda sem ID, permanece fora
+delas. O efeito otimista também só começa na cabeça da fila.
+
+A versão proveniente de uma leitura cria um estado que ainda não existe ou avança
+uma fila ociosa sem conflito; nunca regride a versão já produzida por uma mutation.
+Depois do primeiro sucesso, novas mutations usam a versão interna produzida pela
+fila mesmo quando começam após um período ocioso e a tela ainda conserva a versão
+da leitura original. Somente uma leitura canônica confirmada pela recuperação de
+conflito reinicializa e libera explicitamente uma fila pausada.
+
+Debounces de três segundos continuam independentes por linha. Não há retry
+automático de mutation. Somente `412 TRAINING_PLAN_VERSION_CONFLICT` pausa a fila,
+mantém drafts e exige recarga confirmada; outro `412` é falha genérica. Resposta de
+autosave é mesclada apenas nos campos que não receberam edição posterior. O reload
+só libera a fila e descarta os drafts depois de uma leitura canônica bem-sucedida.
 
 Reordenação usa dnd kit com sensores de ponteiro e teclado e só envia a ordem no
 drop. O seletor transversal `core/components/image-file-picker` valida
@@ -308,12 +322,18 @@ planos e a ausência da chave redireciona com substituição de histórico para
 `/dash`. Lista, detalhe e workout são filhos desse layout, cuja branch faz parte da
 `routeTree`. A proteção visual não substitui `AdminOnly` na API.
 
-O módulo `src/routes/training-plan/` possui services Axios, query keys, queries e
-mutations. Criação/edição/exclusão de plano e exclusão de workout usam snapshot,
-atualização otimista e rollback; overlays de edição/exclusão fecham ao disparar a
-mutation e não reabrem no rollback. Criar workout espera o ID real. Toda mutation
-usa `toast.promise` e invalida o cache proprietário ao terminar. Falha de refetch
-preserva dado válido e é comunicada sem apagar conteúdo.
+O módulo `src/routes/training-plan/` possui services Axios, query keys, queries,
+coordenador e mutations. Atualizações otimistas registram tokens, entidades,
+posições e campos mínimos; o rollback altera somente o alvo que ainda contém o
+efeito daquela mutation, sem restaurar snapshots amplos. Detalhes de plano só são
+removidos do cache depois de DELETE bem-sucedido.
+
+Modal, formulário inline e confirmação permanecem no contexto durante pending e
+falha, bloqueiam dismiss ou duplicidade durante a request e fecham somente após
+sucesso. Erro persistente preserva o draft e permite retry ou cancelamento. Criar
+workout espera o ID real. Toda mutation usa `toast.promise` como feedback
+complementar e invalida apenas as famílias proprietárias; falha de refetch preserva
+dado válido sem apagar conteúdo.
 
 ## Ambiente local
 

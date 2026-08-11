@@ -84,6 +84,15 @@ aplicável:
 - respostas relevantes da API;
 - regressões descritas no SDD da rota.
 
+Na gestão de planos, funções puras cobrem canonicalização e janela limitada de
+paginação, merge por revisão de draft, reinserção e restauração de ordem. Testes de
+hooks cobrem FIFO e versão por aggregate, independência entre planos, propagação da
+versão entre mutations concorrentes e sequenciais separadas por um período ocioso,
+classificação exata de conflito e rollback localizado. Playwright cobre overlays
+recuperáveis, página acima do total, paginação grande, duas adições consecutivas,
+autosave/conflito, exclusão durante debounce, ordem por teclado e proteção
+acessível da navegação.
+
 ## Comandos
 
 ```bash

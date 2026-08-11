@@ -186,7 +186,9 @@ not-found, loading prolongado para validar skeletons e falhas relevantes com
 latência; a proteção sentinela continua por último. O estado conserva `version`,
 valida `X-Resource-Version`, devolve o valor resultante no mesmo header, incrementa
 a versão por mutação efetiva e mantém ordem/imagem. O header legado `If-Match` não
-satisfaz a precondição. `version-conflict`, `update-exercise-error`,
-`delete-exercise-error` e
-`image-error` cobrem falhas do editor. IDs criados são determinísticos; multipart
-exige um `File` no campo `file` e nunca é convertido em JSON/base64.
+satisfaz a precondição. `large-pagination` disponibiliza mais de 2000 itens e
+`two-pages` permite consultar uma página HTTP válida acima do total.
+`version-conflict`, `update-exercise-error`, `delete-exercise-error`,
+`reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor.
+IDs criados são determinísticos; multipart exige um `File` no campo `file` e nunca
+é convertido em JSON/base64.

@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
+import { AggregateMutationCoordinator } from '../aggregate-mutation-coordinator';
 import { useAggregateMutationQueue } from './use-aggregate-mutation-queue';
 
 describe('useAggregateMutationQueue', () => {
@@ -15,7 +17,17 @@ describe('useAggregateMutationQueue', () => {
         }),
     );
     const second = vi.fn().mockResolvedValue({ data: 'second', version: 4 });
-    const { result } = renderHook(() => useAggregateMutationQueue(2, vi.fn()));
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => useAggregateMutationQueue('plan-1', 2, vi.fn()),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
+    );
 
     let firstTask: Promise<string> | undefined;
     let secondTask: Promise<string> | undefined;
@@ -33,6 +45,50 @@ describe('useAggregateMutationQueue', () => {
     expect(second).toHaveBeenCalledWith(3);
   });
 
+  it('keeps the produced version when a later operation starts after the queue becomes idle', async () => {
+    const first = vi.fn().mockResolvedValue({ data: 'first', version: 3 });
+    const second = vi.fn().mockResolvedValue({ data: 'second', version: 4 });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => useAggregateMutationQueue('plan-1', 2, vi.fn()),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    await act(async () => {
+      await expect(result.current.enqueue(first)).resolves.toBe('first');
+    });
+    await vi.waitFor(() => expect(result.current.isPending).toBe(false));
+    await act(async () => {
+      await expect(result.current.enqueue(second)).resolves.toBe('second');
+    });
+
+    expect(first).toHaveBeenCalledWith(2);
+    expect(second).toHaveBeenCalledWith(3);
+  });
+
+  it('does not regress the produced version when a stale screen seeds the idle coordinator', async () => {
+    const coordinator = new AggregateMutationCoordinator();
+    const first = vi.fn().mockResolvedValue({ data: 'first', version: 3 });
+    const second = vi.fn().mockResolvedValue({ data: 'second', version: 4 });
+
+    await expect(coordinator.enqueue('plan-1', 2, first)).resolves.toBe(
+      'first',
+    );
+    coordinator.seed('plan-1', 2);
+    await expect(coordinator.enqueue('plan-1', 2, second)).resolves.toBe(
+      'second',
+    );
+
+    expect(first).toHaveBeenCalledWith(2);
+    expect(second).toHaveBeenCalledWith(3);
+  });
+
   it('pauses after a domain version conflict and never starts later queued work', async () => {
     const onConflict = vi.fn();
     const response = {
@@ -46,8 +102,16 @@ describe('useAggregateMutationQueue', () => {
       undefined,
       response,
     );
-    const { result } = renderHook(() =>
-      useAggregateMutationQueue(0, onConflict),
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => useAggregateMutationQueue('plan-1', 0, onConflict),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
     );
     const later = vi.fn().mockResolvedValue({ data: 'later', version: 1 });
     let conflictTask: Promise<string> | undefined;
@@ -79,8 +143,16 @@ describe('useAggregateMutationQueue', () => {
       undefined,
       response,
     );
-    const { result } = renderHook(() =>
-      useAggregateMutationQueue(0, onConflict),
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => useAggregateMutationQueue('plan-1', 0, onConflict),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
     );
     const later = vi.fn().mockResolvedValue({ data: 'later', version: 1 });
 
@@ -100,5 +172,50 @@ describe('useAggregateMutationQueue', () => {
     expect(later).toHaveBeenCalledWith(0);
     expect(onConflict).not.toHaveBeenCalled();
     expect(result.current.paused).toBe(false);
+  });
+
+  it('keeps different training plans independent', async () => {
+    const queryClient = new QueryClient();
+    let finishPlanA:
+      ((value: { data: string; version: number }) => void) | undefined;
+    const firstPlanA = vi.fn(
+      () =>
+        new Promise<{ data: string; version: number }>((resolve) => {
+          finishPlanA = resolve;
+        }),
+    );
+    const secondPlanA = vi
+      .fn()
+      .mockResolvedValue({ data: 'second-a', version: 2 });
+    const planB = vi.fn().mockResolvedValue({ data: 'plan-b', version: 1 });
+    const { result } = renderHook(
+      () => ({
+        planA: useAggregateMutationQueue('plan-a', 0, vi.fn()),
+        planB: useAggregateMutationQueue('plan-b', 0, vi.fn()),
+      }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    let firstTask: Promise<string> | undefined;
+    let secondTask: Promise<string> | undefined;
+    let planBTask: Promise<string> | undefined;
+    act(() => {
+      firstTask = result.current.planA.enqueue(firstPlanA);
+      secondTask = result.current.planA.enqueue(secondPlanA);
+      planBTask = result.current.planB.enqueue(planB);
+    });
+
+    await expect(planBTask).resolves.toBe('plan-b');
+    expect(secondPlanA).not.toHaveBeenCalled();
+    finishPlanA?.({ data: 'first-a', version: 1 });
+    await expect(firstTask).resolves.toBe('first-a');
+    await expect(secondTask).resolves.toBe('second-a');
+    expect(secondPlanA).toHaveBeenCalledWith(1);
   });
 });

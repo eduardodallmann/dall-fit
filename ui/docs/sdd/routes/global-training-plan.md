@@ -12,8 +12,10 @@
 ## Entradas e pré-condições
 
 - Entrada: item administrativo `Planos de treino` ou retorno do detalhe.
-- Query: `page` inteiro positivo, normalizado para 1 quando ausente/inválido na
-  URL e limitado a 100; `mockAuth` e `mockTrainingPlans` existem apenas com MSW.
+- Query: ausência de `page` representa a página 1 e é sua forma canônica. Somente
+  inteiros decimais sem sinal ou zero à esquerda entre 2 e 100 permanecem na URL;
+  qualquer outra forma é substituída por página 1 antes da consulta. `mockAuth` e
+  `mockTrainingPlans` existem apenas com MSW e são preservados na correção.
 - Estado: cache TanStack Query por página e cenário.
 - Permissão: filha de `adminRoute`; pessoa comum retorna a `/dash` e sessão ausente
   segue a proteção para `/`.
@@ -25,7 +27,8 @@
 - `Table` HeroUI com nome, descrição, atualização e dropdown de ações;
 - nome como `Link` tipado para o detalhe, com cor de ação e sublinhado persistente
   para tornar a navegação evidente sem depender de hover;
-- `Pagination` HeroUI, fixa em 20 itens por página;
+- `Pagination` HeroUI, fixa em 20 itens por página, com summary, anterior/próxima,
+  primeira, última, vizinhança da atual e elipses não interativas;
 - `Modal`, `Fieldset`, TanStack Form e campos HeroUI para criar/editar;
 - `AlertDialog` antes de excluir;
 - `Toast.Provider` global e `toast.promise` em todas as mutations.
@@ -38,14 +41,20 @@ A tabela e seus cabeçalhos permanecem presentes em todos esses estados.
 ## Caminho feliz
 
 1. A query carrega `GET /global/training-plans?page=<page>`.
-2. A tabela exibe até 20 resumos e a paginação deriva o total de páginas.
-3. Criar fecha o modal no disparo, navega à página 1, insere resumo temporário,
-   envia o POST, substitui pelo resumo real e invalida listas.
-4. Editar fecha o modal no disparo, atualiza todas as listas/detalhes conhecidos,
-   envia `X-Resource-Version` com a versão em cache, confirma pelo valor retornado
-   no mesmo header e invalida queries.
-5. Excluir fecha o dialog no disparo, remove o plano e decrementa o total; se era o
-   único item de página maior que 1, antecipa retorno à anterior.
+2. A tabela exibe até 20 resumos. A última página é
+   `min(100, max(1, ceil(total / 20)))`; a navegação materializa no máximo sete
+   posições, sem array proporcional ao total.
+3. Se uma response bem-sucedida revelar `page > lastPage`, a rota usa `replace`
+   para consultar a última página e não apresenta o vazio excedente.
+4. Criar mantém a modal aberta e não dismissable durante a request, navega à
+   página 1, insere resumo temporário, envia o POST e fecha somente depois de
+   substituir pelo resumo real e reconciliar as listas.
+5. Editar mantém o draft na modal, entra no coordenador FIFO do plano, aplica a
+   alteração otimista apenas na cabeça da fila, envia a versão corrente e fecha
+   somente depois da response canônica.
+6. Excluir mantém o `AlertDialog` aberto durante o DELETE, remove somente a linha e
+   o delta de total daquela operação e fecha após sucesso; se era o único item de
+   página maior que 1, antecipa retorno à anterior.
 
 ## Caminhos alternativos
 
@@ -60,9 +69,21 @@ que os dados exibidos são a última versão disponível, com retry.
 
 ### Falha de mutation
 
-O hook restaura snapshots de todas as queries tocadas; criação e exclusão também
-restauram a página anterior. O modal/dialog já fechado não reabre, e o toast
-informa a falha.
+O rollback usa token, entidade e posição da própria operação e não restaura arrays
+ou detalhes inteiros. Criação remove só seu temporário e retorna à página anterior
+se a navegação ainda estiver na página 1 produzida pelo submit; edição restaura só
+o plano que ainda possui seu token; exclusão reinsere apenas o alvo ausente e seu
+delta de total. Modal ou dialog permanece aberto, preserva o draft, mostra erro
+persistente e oferece retry/cancelamento; toast é complementar.
+
+### Conflito de versão
+
+Somente `412 TRAINING_PLAN_VERSION_CONFLICT` desfaz o efeito local, pausa a fila do
+plano e mantém o formulário/draft. Um alerta persistente bloqueia novas gravações
+desse aggregate e oferece `Recarregar dados`. A confirmação informa o descarte;
+somente uma leitura canônica bem-sucedida fecha o formulário, atualiza a versão e
+libera a fila. Falha de leitura conserva pausa e draft. Não há merge ou reenvio
+automático.
 
 ## Validações
 
@@ -79,7 +100,9 @@ informa a falha.
   paginação.
 - Sucesso: linhas, ações e paginação quando total > 0.
 - Erro recuperável: retry dentro da tabela no primeiro load; `Alert` preservando
-  linhas em background.
+  linhas em background; formulários e confirmações preservados em falha.
+- Conflito: alerta persistente, draft visível e gravações do plano pausadas até a
+  recarga confirmada.
 - Erro não recuperável: não se aplica; erros de integração são recuperáveis.
 - Ações desabilitadas: submit inválido/em progresso e navegação além dos limites.
 
@@ -90,9 +113,10 @@ informa a falha.
 - Editar: `PATCH /global/training-plans/:id`.
 - Excluir: `DELETE /global/training-plans/:id`.
 
-Resumos carregam `version`; PATCH/DELETE enviam `X-Resource-Version` com o inteiro
-canônico correspondente.
-Conflito `412` não é repetido e passa pelo rollback seguro da mutation.
+Resumos carregam `version`; PATCH/DELETE entram no coordenador compartilhado por
+`trainingPlanId`, recebem a versão quando chegam à cabeça da fila e enviam
+`X-Resource-Version`. Planos diferentes continuam independentes. Conflito de
+domínio não é repetido e passa pelo rollback localizado.
 
 Todas as mutações só ficam disponíveis depois do bootstrap autenticado de CSRF.
 O Axios compartilhado injeta `X-CSRF-Token` em memória e envia o cookie; `403` não
@@ -107,7 +131,9 @@ Breadcrumb, link do plano e mudanças de página usam o TanStack Router sem relo
 documento. O menu marca `Planos de treino` ativo também em descendentes. Tabela,
 dialogs, campos e botões possuem nomes textuais; menu de reticências recebe `Ações
 de <nome>`. O nome do plano mantém affordance visual de link por cor e sublinhado.
-Truncamento visual preserva o texto integral e `title`.
+Truncamento visual preserva o texto integral e `title`. A página ativa usa a
+semântica do HeroUI; elipses não recebem foco, anterior/próxima desabilitam nos
+limites e URL inválida é corrigida com `replace`.
 
 ## Analytics
 
@@ -137,13 +163,19 @@ Não se aplica — não existem imagens em `routes/assets/global-training-plan/`
 2. Vazio: `?mockAuth=admin&mockTrainingPlans=empty` mantém a tabela com empty state.
 3. Falha inicial: `?mockAuth=admin&mockTrainingPlans=list-error` mostra retry dentro
    do grid.
-4. Rollback: `?mockAuth=admin&mockTrainingPlans=create-error&page=2` retorna à
-   página 2 e conserva sua linha.
+4. Rollback recuperável:
+   `?mockAuth=admin&mockTrainingPlans=create-error&page=2` retorna à página 2,
+   conserva sua linha e mantém modal/draft.
 5. Loading: `?mockAuth=admin&mockTrainingPlans=loading` mostra skeletons de linhas
    antes de exibir o conteúdo.
-6. Overlays otimistas: criação, edição e exclusão fecham modal/dialog no disparo,
-   mostram o dado otimista e, nos cenários `create-error`, `update-error` e
-   `delete-error`, restauram o cache sem reabrir o overlay.
+6. Overlays: criação, edição e exclusão permanecem durante pending; nos cenários
+   `create-error`, `update-error` e `delete-error`, restauram só o alvo e continuam
+   abertos com erro persistente.
+7. Paginação grande: `large-pagination&page=50` mostra
+   `1 … 49 50 51 … 100`; `two-pages&page=100` substitui a URL por `page=2`.
+8. URL inválida: `two-pages&page=101` remove `page` com `replace`, preserva os
+   seletores mock e consulta a página 1.
+9. Conflito: `version-conflict` preserva formulário e exige recarga confirmada.
 
 ## Estrutura técnica relevante
 
@@ -160,8 +192,9 @@ Não se aplica — não existem imagens em `routes/assets/global-training-plan/`
 | Regra                            | Vitest/typecheck                   | Playwright |
 | -------------------------------- | ---------------------------------- | ---------- |
 | acesso administrativo/menu       | `admin-access`, `application-menu` | rota       |
-| tabela, paginação e erro interno | composição tipada                  | rota       |
-| criar/editar e rollback          | hooks tipados                      | flow       |
+| tabela, paginação e erro interno | helper puro e composição tipada    | rota/flow  |
+| criar/editar e rollback          | mutations e concorrência por token | flow       |
+| fila e conflito                  | coordenador por `QueryClient`      | rota/flow  |
 
 - Fixtures/handlers: `src/mocks/fixtures/training-plans.ts` e
   `src/mocks/handlers/training-plans.ts`.

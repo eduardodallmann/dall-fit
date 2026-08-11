@@ -1,6 +1,7 @@
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import {
+  Alert,
   Button,
   FieldError,
   Input,
@@ -27,18 +28,23 @@ interface InlineFormProps {
   defaultValues: CreateTrainingPlanRequest;
   onCancel: () => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
+  isWritePaused?: boolean;
 }
 
 export function TrainingPlanInlineForm({
   defaultValues,
   onCancel,
   onSubmit,
+  isWritePaused = false,
 }: Readonly<InlineFormProps>) {
+  const [submissionError, setSubmissionError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { trackFieldCompletion, trackFieldFocus } =
     useTrainingPlanFieldAnalytics(defaultValues);
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      setSubmissionError(false);
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_form_submitted',
@@ -46,16 +52,24 @@ export function TrainingPlanInlineForm({
         mode: 'inline_edit',
         surface: 'training_plan_form',
       });
-      await onSubmit({
-        description: value.description.trim(),
-        name: value.name.trim(),
-      });
+      try {
+        setSubmitting(true);
+        await onSubmit({
+          description: value.description.trim(),
+          name: value.name.trim(),
+        });
+      } catch (error) {
+        setSubmissionError(true);
+        throw error;
+      } finally {
+        setSubmitting(false);
+      }
     },
   });
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    void form.handleSubmit();
+    void form.handleSubmit().catch(() => undefined);
   };
 
   return (
@@ -71,6 +85,7 @@ export function TrainingPlanInlineForm({
           <div className={styles.inlineTitleRow()}>
             <TextField
               className={styles.inlineTitleField()}
+              isDisabled={submitting || isWritePaused}
               isInvalid={field.state.meta.errors.length > 0}
               isRequired
               name={field.name}
@@ -98,7 +113,7 @@ export function TrainingPlanInlineForm({
                 <div className={styles.inlineActions()}>
                   <Button
                     aria-label="Cancelar edição"
-                    isDisabled={isSubmitting}
+                    isDisabled={isSubmitting || isWritePaused}
                     isIconOnly
                     onPress={() => {
                       trackUiEvent({
@@ -117,7 +132,7 @@ export function TrainingPlanInlineForm({
                   </Button>
                   <Button
                     aria-label="Salvar alterações"
-                    isDisabled={!canSubmit}
+                    isDisabled={!canSubmit || isWritePaused}
                     isIconOnly
                     isPending={isSubmitting}
                     size="sm"
@@ -141,6 +156,7 @@ export function TrainingPlanInlineForm({
         {(field) => (
           <TextField
             className={styles.inlineDescriptionField()}
+            isDisabled={submitting || isWritePaused}
             isInvalid={field.state.meta.errors.length > 0}
             isRequired
             name={field.name}
@@ -163,6 +179,17 @@ export function TrainingPlanInlineForm({
           </TextField>
         )}
       </form.Field>
+      {submissionError ? (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Não foi possível salvar o plano.</Alert.Title>
+            <Alert.Description>
+              O rascunho foi preservado. Tente novamente ou cancele a edição.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
     </form>
   );
 }
