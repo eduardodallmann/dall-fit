@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   closestCenter,
@@ -109,6 +109,7 @@ export function WorkoutEditor({
   );
   const [workoutName, setWorkoutName] = useState(data.name);
   const [nameDraft, setNameDraft] = useState(data.name);
+  const confirmedWorkoutName = useRef(data.name);
   const [editingName, setEditingName] = useState(false);
   const [savingIds, setSavingIds] = useState<ReadonlySet<string>>(new Set());
   const [draftIds, setDraftIds] = useState<ReadonlySet<string>>(new Set());
@@ -134,15 +135,19 @@ export function WorkoutEditor({
     setEditingName(false);
     setWorkoutName(name);
     trackStarted('workout_update', 'workout_name');
-    const promise = queue.enqueue((version) =>
-      updateTrainingPlanWorkout(
+    let rollbackName = confirmedWorkoutName.current;
+    const promise = queue.enqueue(async (version) => {
+      rollbackName = confirmedWorkoutName.current;
+      const result = await updateTrainingPlanWorkout(
         data.trainingPlan.id,
         data.id,
         name,
         version,
         mockScenario,
-      ),
-    );
+      );
+      confirmedWorkoutName.current = result.data.name;
+      return result;
+    });
     toast.promise(promise, {
       loading: 'Salvando nome…',
       success: 'Nome atualizado.',
@@ -155,7 +160,7 @@ export function WorkoutEditor({
         trackCompleted('workout_update', 'workout_name', 'success');
       })
       .catch(() => {
-        setWorkoutName(data.name);
+        setWorkoutName(rollbackName);
         setEditingName(true);
         trackCompleted('workout_update', 'workout_name', 'error');
       });

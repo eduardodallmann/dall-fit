@@ -38,15 +38,23 @@ export function TrainingPlanWorkoutPage({
   const workout = query.data;
   const plan = workout?.trainingPlan;
 
-  const reload = async () => {
-    if (!window.confirm('Recarregar os dados e descartar os rascunhos locais?'))
-      return;
+  const trackRetry = () =>
     trackUiEvent({
       eventName: 'ui_retry_requested',
       resource: 'workout',
       control: 'retry',
       surface: 'workout',
     });
+
+  const retryInitialLoad = () => {
+    trackRetry();
+    void query.refetch();
+  };
+
+  const reload = async () => {
+    if (!window.confirm('Recarregar os dados e descartar os rascunhos locais?'))
+      return;
+    trackRetry();
     const result = await query.refetch();
     if (result.isSuccess) setConflict(false);
   };
@@ -72,7 +80,7 @@ export function TrainingPlanWorkoutPage({
               O plano ou o treino pode não existir.
             </Alert.Description>
           </Alert.Content>
-          <Button onPress={() => void query.refetch()} variant="secondary">
+          <Button onPress={retryInitialLoad} variant="secondary">
             Tentar novamente
           </Button>
         </Alert>

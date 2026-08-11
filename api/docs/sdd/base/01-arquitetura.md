@@ -30,7 +30,9 @@ de `412`. A listagem tem page máxima 100, ordem
 fixo. `ExerciseImageService` valida até 10 MiB/40 MP, rejeita animação, remove
 metadata e gera WebP 160x160 e 1080x1920 sem ampliação. `BlobStorageService`
 encapsula o SDK público e grava apenas sob `exercise-images/` no store
-`gvi3tyf5ckqiqlak`; token/key nunca cruzam a API HTTP. MongoDB é a verdade,
+`gvi3tyf5ckqiqlak`. Cada upload confirma que o hostname público devolvido pertence
+ao `BLOB_STORE_ID` configurado; divergência tenta remover o blob recém-criado e
+falha sem persistir a referência. Token/key nunca cruzam a API HTTP. MongoDB é a verdade,
 uploads parciais são compensados e limpezas pós-commit podem ser retomadas por
 `pnpm -C api images:reconcile` (dry-run por padrão; `--execute` é explícito).
 

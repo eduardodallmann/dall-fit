@@ -18,13 +18,42 @@ export class BlobStorageService {
     this.logger.log('BlobStorageService -> upload -> params:', {
       params: { bytes: content.byteLength, prefix: 'exercise-images' },
     });
+    const token = this.configService.getOrThrow<string>(
+      'BLOB_READ_WRITE_TOKEN',
+    );
+    const storeId = this.configService.getOrThrow<string>('BLOB_STORE_ID');
     const blob = await put(pathname, content, {
       access: 'public',
       addRandomSuffix: true,
       abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
       contentType: 'image/webp',
-      token: this.configService.getOrThrow<string>('BLOB_READ_WRITE_TOKEN'),
+      token,
     });
+    let actualHostname: string | undefined;
+    try {
+      actualHostname = new URL(blob.url).hostname;
+    } catch {
+      actualHostname = undefined;
+    }
+    const expectedHostname = `${storeId}.public.blob.vercel-storage.com`;
+    if (actualHostname !== expectedHostname) {
+      this.logger.warn(
+        'BlobStorageService -> upload -> unexpectedStore error:',
+        { data: { expectedStoreMatched: false } },
+      );
+      try {
+        await del(blob.pathname, {
+          abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+          token,
+        });
+      } catch {
+        this.logger.warn(
+          'BlobStorageService -> upload -> cleanupPending branch:',
+          { data: { count: 1 } },
+        );
+      }
+      throw new Error('Blob storage returned an unexpected public hostname.');
+    }
     const result = { key: blob.pathname, url: blob.url };
     this.logger.log('BlobStorageService -> upload -> return:', {
       data: { uploaded: true },
