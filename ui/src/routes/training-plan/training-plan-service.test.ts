@@ -19,6 +19,7 @@ import {
   listGlobalTrainingPlans,
   removeTrainingPlanExerciseImage,
   reorderTrainingPlanExercises,
+  trainingPlanMockSearch,
   updateGlobalTrainingPlan,
   updateTrainingPlanExercise,
   uploadTrainingPlanExerciseImage,
@@ -28,6 +29,18 @@ const planId = '64b000000000000000000001';
 const workoutId = '64b000000000000000000101';
 
 describe('training plan service', () => {
+  it('serializes the mock selector only when API mocks are enabled', () => {
+    vi.stubEnv('VITE_ENABLE_API_MOCKS', 'false');
+    expect(trainingPlanMockSearch('success')).toEqual({});
+
+    vi.stubEnv('VITE_ENABLE_API_MOCKS', 'true');
+    expect(trainingPlanMockSearch('success')).toEqual({
+      mockTrainingPlans: 'success',
+    });
+
+    vi.unstubAllEnvs();
+  });
+
   it('loads the typed collection and projected detail through MSW', async () => {
     const collection = await listGlobalTrainingPlans(1, 'success');
     const detail = await getGlobalTrainingPlan(planId, 'success');

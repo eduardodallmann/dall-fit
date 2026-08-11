@@ -176,7 +176,9 @@ Playwright.
 Planos globais usam fixtures tipadas e handlers para as quinze operações em arquivos
 `training-plans.ts`. A query exclusiva `mockTrainingPlans` vira o header
 `x-dall-fit-mock-training-plans` somente com mocks ativos; nenhum dos dois pertence
-ao contrato real. Cenários de mutation mantêm estado separado por valor do seletor,
+ao contrato real. A navegação entre lista, detalhe e workout só serializa esse
+seletor quando os mocks estão ativos; em produção, os links omitem a query. Cenários
+de mutation mantêm estado separado por valor do seletor,
 evitando interferência entre jornadas Playwright paralelas. No Vitest, o setup
 global limpa esse estado depois de cada teste, pois `resetHandlers()` restaura os
 handlers do MSW, mas não dados mutáveis mantidos pelos módulos. Há sucesso, vazio,

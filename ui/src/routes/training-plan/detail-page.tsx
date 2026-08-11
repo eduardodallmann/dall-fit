@@ -24,7 +24,10 @@ import {
   useUpdateTrainingPlanMutation,
 } from '~/routes/training-plan/training-plan-mutations';
 import { trainingPlanDetailQueryOptions } from '~/routes/training-plan/training-plan-queries';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import {
+  trainingPlanMockSearch,
+  type MockTrainingPlansScenario,
+} from '~/routes/training-plan/training-plan-service';
 
 const styles = trainingPlanStyles();
 
@@ -48,6 +51,7 @@ export function TrainingPlanDetailPage({
     useCreateTrainingPlanWorkoutMutation(mockTrainingPlans);
   const deleteWorkoutMutation =
     useDeleteTrainingPlanWorkoutMutation(mockTrainingPlans);
+  const mockSearch = trainingPlanMockSearch(mockTrainingPlans);
   const [editing, setEditing] = useState(false);
   const [deleteWorkoutId, setDeleteWorkoutId] = useState<string>();
   const plan = query.data;
@@ -117,7 +121,7 @@ export function TrainingPlanDetailPage({
       });
       await navigate({
         params: { trainingPlanId, workoutId: workout.id },
-        search: { mockAuth, mockTrainingPlans },
+        search: { mockAuth, ...mockSearch },
         to: '/global/training-plan/$trainingPlanId/workout/$workoutId',
       });
     } catch {
@@ -323,7 +327,7 @@ export function TrainingPlanDetailPage({
                           });
                         }}
                         params={{ trainingPlanId, workoutId: workout.id }}
-                        search={{ mockAuth, mockTrainingPlans }}
+                        search={{ mockAuth, ...mockSearch }}
                         to="/global/training-plan/$trainingPlanId/workout/$workoutId"
                       >
                         {workout.name}

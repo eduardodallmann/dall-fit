@@ -31,7 +31,10 @@ import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent, type AnalyticsSurface } from '~/core/analytics';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import { useTrainingPlanFieldAnalytics } from '~/routes/training-plan/training-plan-analytics';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import {
+  trainingPlanMockSearch,
+  type MockTrainingPlansScenario,
+} from '~/routes/training-plan/training-plan-service';
 import {
   validateTrainingPlanDescription,
   validateTrainingPlanName,
@@ -57,6 +60,11 @@ export function TrainingPlanBreadcrumbs({
   surface,
   workout,
 }: Readonly<BreadcrumbProps>) {
+  const mockSearch =
+    mockTrainingPlans === undefined
+      ? {}
+      : trainingPlanMockSearch(mockTrainingPlans);
+
   return (
     <nav aria-label="Navegação estrutural">
       <ol aria-label="Navegação estrutural" className={styles.breadcrumbs()}>
@@ -97,7 +105,7 @@ export function TrainingPlanBreadcrumbs({
                   surface,
                 });
               }}
-              search={{ mockAuth, mockTrainingPlans }}
+              search={{ mockAuth, ...mockSearch }}
               to="/global/training-plan"
             >
               Planos de treino
@@ -131,7 +139,7 @@ export function TrainingPlanBreadcrumbs({
                   });
                 }}
                 params={{ trainingPlanId: plan.id }}
-                search={{ mockAuth, mockTrainingPlans }}
+                search={{ mockAuth, ...mockSearch }}
                 title={plan.name}
                 to="/global/training-plan/$trainingPlanId"
               >

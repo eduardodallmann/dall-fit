@@ -44,6 +44,17 @@ export type MockTrainingPlansScenario =
   | 'image-error'
   | 'version-conflict';
 
+export function trainingPlanMockSearch(
+  mockScenario: MockTrainingPlansScenario,
+): { mockTrainingPlans?: MockTrainingPlansScenario } {
+  const result =
+    import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
+      ? { mockTrainingPlans: mockScenario }
+      : {};
+
+  return result;
+}
+
 export interface VersionedMutationResult<T> {
   data: T;
   version: number;

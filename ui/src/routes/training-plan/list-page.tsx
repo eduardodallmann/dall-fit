@@ -27,7 +27,10 @@ import {
   useUpdateTrainingPlanMutation,
 } from '~/routes/training-plan/training-plan-mutations';
 import { trainingPlanListQueryOptions } from '~/routes/training-plan/training-plan-queries';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import {
+  trainingPlanMockSearch,
+  type MockTrainingPlansScenario,
+} from '~/routes/training-plan/training-plan-service';
 
 const styles = trainingPlanStyles();
 
@@ -47,6 +50,7 @@ export function TrainingPlanListPage({
   const createMutation = useCreateTrainingPlanMutation(mockTrainingPlans);
   const updateMutation = useUpdateTrainingPlanMutation(mockTrainingPlans);
   const deleteMutation = useDeleteTrainingPlanMutation(mockTrainingPlans);
+  const mockSearch = trainingPlanMockSearch(mockTrainingPlans);
   const [formPlan, setFormPlan] = useState<
     TrainingPlanSummary | null | undefined
   >(null);
@@ -58,7 +62,7 @@ export function TrainingPlanListPage({
   );
   const navigateToPage = (nextPage: number) =>
     navigate({
-      search: { mockAuth, mockTrainingPlans, page: nextPage },
+      search: { mockAuth, ...mockSearch, page: nextPage },
       to: '/global/training-plan',
     });
   const submitPlan = async (input: CreateTrainingPlanRequest) => {
@@ -289,7 +293,7 @@ export function TrainingPlanListPage({
                           });
                         }}
                         params={{ trainingPlanId: plan.id }}
-                        search={{ mockAuth, mockTrainingPlans }}
+                        search={{ mockAuth, ...mockSearch }}
                         title={plan.name}
                         to="/global/training-plan/$trainingPlanId"
                       >
