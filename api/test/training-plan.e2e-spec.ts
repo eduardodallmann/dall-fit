@@ -5,9 +5,18 @@ import Redis from 'ioredis';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Types, type Model } from 'mongoose';
 import { RedisMemoryServer } from 'redis-memory-server';
+import sharp from 'sharp';
 import request, { type Test as SupertestTest } from 'supertest';
 import type { App } from 'supertest/types';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import type {
   GlobalTrainingPlanCollectionResponse,
@@ -17,6 +26,8 @@ import type {
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
 import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan.schema';
+import { BlobStorageService } from '~/training-plan/services/blob-storage.service';
+import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
 
 const googleCredential = Buffer.from(
   JSON.stringify({
@@ -36,6 +47,28 @@ describe('Global training plans (e2e)', () => {
   let redisClient: Redis;
   let redisServer: RedisMemoryServer;
   let trainingPlanModel: Model<TrainingPlanDocument>;
+  const uploadedBlobs: Array<{ content: Buffer; key: string }> = [];
+  const deletedBlobKeys: string[][] = [];
+  const blobStorage = {
+    delete: vi.fn((keys: readonly string[]): Promise<void> => {
+      deletedBlobKeys.push([...keys]);
+      return Promise.resolve();
+    }),
+    listExerciseKeys: vi.fn((): Promise<readonly string[]> =>
+      Promise.resolve([]),
+    ),
+    upload: vi.fn((pathname: string, content: Buffer) => {
+      const key = `${pathname.replace('.webp', '')}-${uploadedBlobs.length + 1}.webp`;
+      uploadedBlobs.push({ content, key });
+      return Promise.resolve({
+        key,
+        url: `https://gvi3tyf5ckqiqlak.public.blob.vercel-storage.com/${key}`,
+      });
+    }),
+  };
+  const youtubeReference = {
+    normalizeAndValidate: vi.fn(() => Promise.resolve('ZA8gs8XP2bs')),
+  };
   const csrfTokens = new WeakMap<ReturnType<typeof request.agent>, string>();
 
   beforeAll(async () => {
@@ -59,7 +92,12 @@ describe('Global training plans (e2e)', () => {
     const { AppModule } = await import('~/app.module.js');
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(BlobStorageService)
+      .useValue(blobStorage)
+      .overrideProvider(YoutubeReferenceService)
+      .useValue(youtubeReference)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     configureApplication(app);
@@ -79,6 +117,9 @@ describe('Global training plans (e2e)', () => {
   });
 
   beforeEach(async () => {
+    uploadedBlobs.length = 0;
+    deletedBlobKeys.length = 0;
+    vi.clearAllMocks();
     await Promise.all([
       personModel.deleteMany({}).exec(),
       trainingPlanModel.deleteMany({}).exec(),
@@ -139,6 +180,18 @@ describe('Global training plans (e2e)', () => {
     return result;
   }
 
+  function withIfMatch(
+    test: SupertestTest,
+    trainingPlanId: string,
+    version: number,
+  ): SupertestTest {
+    const result = test.set(
+      'If-Match',
+      `"training-plan:${trainingPlanId}:${version}"`,
+    );
+    return result;
+  }
+
   async function createGlobalPlan(
     overrides: Partial<TrainingPlanDocument> = {},
   ) {
@@ -156,6 +209,9 @@ describe('Global training plans (e2e)', () => {
   it('protects every operation with authentication and administrative authorization', async () => {
     const planId = new Types.ObjectId().toString();
     const workoutId = new Types.ObjectId().toString();
+    const exerciseId = new Types.ObjectId().toString();
+    const workoutPath = `/global/training-plans/${planId}/workouts/${workoutId}`;
+    const exercisePath = `${workoutPath}/exercises/${exerciseId}`;
     const operations = [
       ['get', '/global/training-plans'],
       ['post', '/global/training-plans'],
@@ -163,7 +219,15 @@ describe('Global training plans (e2e)', () => {
       ['patch', `/global/training-plans/${planId}`],
       ['delete', `/global/training-plans/${planId}`],
       ['post', `/global/training-plans/${planId}/workouts`],
-      ['delete', `/global/training-plans/${planId}/workouts/${workoutId}`],
+      ['delete', workoutPath],
+      ['get', workoutPath],
+      ['patch', workoutPath],
+      ['post', `${workoutPath}/exercises`],
+      ['put', `${workoutPath}/exercises/order`],
+      ['patch', exercisePath],
+      ['delete', exercisePath],
+      ['put', `${exercisePath}/image`],
+      ['delete', `${exercisePath}/image`],
     ] as const;
 
     for (const [method, path] of operations) {
@@ -199,6 +263,7 @@ describe('Global training plans (e2e)', () => {
       data: {
         name: 'Plano hipertrofia',
         description: 'Um plano global completo.',
+        version: 0,
       },
     });
     const planId = (createResponse.body as { data: { id: string } }).data.id;
@@ -212,7 +277,7 @@ describe('Global training plans (e2e)', () => {
 
     const updateResponse = await authenticatedMutation(
       agent,
-      agent.patch(`/global/training-plans/${planId}`),
+      withIfMatch(agent.patch(`/global/training-plans/${planId}`), planId, 0),
     ).send({ name: '  Plano atualizado  ' });
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body).toMatchObject({
@@ -225,7 +290,7 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      agent.delete(`/global/training-plans/${planId}`),
+      withIfMatch(agent.delete(`/global/training-plans/${planId}`), planId, 1),
     ).expect(204);
     await expect(trainingPlanModel.findById(planId).exec()).resolves.toBeNull();
   });
@@ -273,7 +338,15 @@ describe('Global training plans (e2e)', () => {
         {
           _id: new Types.ObjectId(),
           name: 'Treino A',
-          exercises: [{ name: 'Agachamento' }, { name: 'Supino' }],
+          exercises: [
+            { type: 'pause', restSeconds: 60 },
+            {
+              type: 'duration',
+              name: 'Supino',
+              bodyArea: 'chest',
+              durationMinutes: 10,
+            },
+          ],
         },
       ],
     });
@@ -291,7 +364,11 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      agent.delete(`/global/training-plans/${plan.id}`),
+      withIfMatch(
+        agent.delete(`/global/training-plans/${plan.id}`),
+        plan.id,
+        0,
+      ),
     ).expect(204);
     await expect(
       trainingPlanModel.findById(plan.id).exec(),
@@ -306,14 +383,18 @@ describe('Global training plans (e2e)', () => {
         {
           _id: preservedWorkoutId,
           name: 'Treino preservado',
-          exercises: [{ name: 'Remada' }],
+          exercises: [{ type: 'pause', restSeconds: 60 }],
         },
       ],
     });
 
     const createResponse = await authenticatedMutation(
       agent,
-      agent.post(`/global/training-plans/${plan.id}/workouts`),
+      withIfMatch(
+        agent.post(`/global/training-plans/${plan.id}/workouts`),
+        plan.id,
+        0,
+      ),
     ).send({});
     expect(createResponse.status).toBe(201);
     expect(createResponse.body).toMatchObject({
@@ -332,7 +413,11 @@ describe('Global training plans (e2e)', () => {
 
     await authenticatedMutation(
       agent,
-      agent.delete(`/global/training-plans/${plan.id}/workouts/${workoutId}`),
+      withIfMatch(
+        agent.delete(`/global/training-plans/${plan.id}/workouts/${workoutId}`),
+        plan.id,
+        1,
+      ),
     ).expect(204);
     const afterDelete = await trainingPlanModel.findById(plan.id).lean().exec();
     expect(afterDelete?.workouts).toHaveLength(1);
@@ -354,15 +439,23 @@ describe('Global training plans (e2e)', () => {
       const getResponse = await agent.get(`/global/training-plans/${planId}`);
       const patchResponse = await authenticatedMutation(
         agent,
-        agent.patch(`/global/training-plans/${planId}`),
+        withIfMatch(agent.patch(`/global/training-plans/${planId}`), planId, 0),
       ).send({ name: 'Não atualiza' });
       const deleteResponse = await authenticatedMutation(
         agent,
-        agent.delete(`/global/training-plans/${planId}`),
+        withIfMatch(
+          agent.delete(`/global/training-plans/${planId}`),
+          planId,
+          0,
+        ),
       );
       const workoutResponse = await authenticatedMutation(
         agent,
-        agent.post(`/global/training-plans/${planId}/workouts`),
+        withIfMatch(
+          agent.post(`/global/training-plans/${planId}/workouts`),
+          planId,
+          0,
+        ),
       ).send({});
 
       for (const response of [
@@ -380,14 +473,22 @@ describe('Global training plans (e2e)', () => {
 
     const missingWorkoutResponse = await authenticatedMutation(
       agent,
-      agent.delete(
-        `/global/training-plans/${globalPlan.id}/workouts/${missingWorkoutId}`,
+      withIfMatch(
+        agent.delete(
+          `/global/training-plans/${globalPlan.id}/workouts/${missingWorkoutId}`,
+        ),
+        globalPlan.id,
+        0,
       ),
     );
     const missingPlanWorkoutResponse = await authenticatedMutation(
       agent,
-      agent.delete(
-        `/global/training-plans/${missingPlanId}/workouts/${missingWorkoutId}`,
+      withIfMatch(
+        agent.delete(
+          `/global/training-plans/${missingPlanId}/workouts/${missingWorkoutId}`,
+        ),
+        missingPlanId,
+        0,
       ),
     );
     expect(missingWorkoutResponse.status).toBe(404);
@@ -406,6 +507,7 @@ describe('Global training plans (e2e)', () => {
     const invalidRequests = [
       () => agent.get('/global/training-plans?page=0'),
       () => agent.get('/global/training-plans?page=1.5'),
+      () => agent.get('/global/training-plans?page=101'),
       () => agent.get('/global/training-plans/not-an-id'),
       () =>
         authenticatedMutation(agent, agent.post('/global/training-plans')).send(
@@ -443,12 +545,310 @@ describe('Global training plans (e2e)', () => {
     }
   });
 
+  it('edits a workout with typed exercises, stable ordering and aggregate concurrency', async () => {
+    const agent = await login(true);
+    const workoutId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      workouts: [{ _id: workoutId, name: 'Treino inicial', exercises: [] }],
+    });
+    const basePath = `/global/training-plans/${plan.id}/workouts/${workoutId.toString()}`;
+
+    const getResponse = await agent.get(basePath);
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.etag).toBe(`"training-plan:${plan.id}:0"`);
+    expect(getResponse.body).toMatchObject({
+      data: {
+        id: workoutId.toString(),
+        name: 'Treino inicial',
+        version: 0,
+        exercises: [],
+      },
+    });
+
+    const nameResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.patch(basePath), plan.id, 0),
+    ).send({ name: '  Treino editado  ' });
+    expect(nameResponse.status).toBe(200);
+    expect(nameResponse.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    expect(nameResponse.body).toMatchObject({
+      data: { name: 'Treino editado' },
+    });
+
+    const types = [
+      'youtube-short',
+      'image',
+      'youtube-long',
+      'pause',
+      'duration',
+    ] as const;
+    const exercises: Array<{ id: string; type: string }> = [];
+    for (const [index, type] of types.entries()) {
+      const createResponse = await authenticatedMutation(
+        agent,
+        withIfMatch(agent.post(`${basePath}/exercises`), plan.id, index + 1),
+      ).send({ type });
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.headers.etag).toBe(
+        `"training-plan:${plan.id}:${index + 2}"`,
+      );
+      expect(createResponse.body).toMatchObject({ data: { type } });
+      exercises.push(
+        (createResponse.body as { data: { id: string; type: string } }).data,
+      );
+    }
+
+    const pause = exercises.find((exercise) => exercise.type === 'pause');
+    expect(pause).toBeDefined();
+    const updateResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(
+        agent.patch(`${basePath}/exercises/${pause?.id}`),
+        plan.id,
+        6,
+      ),
+    ).send({ restSeconds: 90 });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body).toMatchObject({
+      data: { id: pause?.id, type: 'pause', restSeconds: 90 },
+    });
+
+    const reversedIds = exercises.map((exercise) => exercise.id).reverse();
+    const reorderResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.put(`${basePath}/exercises/order`), plan.id, 7),
+    ).send({ exerciseIds: reversedIds });
+    expect(reorderResponse.status).toBe(204);
+    expect(reorderResponse.headers.etag).toBe(`"training-plan:${plan.id}:8"`);
+
+    const noOpResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.put(`${basePath}/exercises/order`), plan.id, 8),
+    ).send({ exerciseIds: reversedIds });
+    expect(noOpResponse.status).toBe(204);
+    expect(noOpResponse.headers.etag).toBe(`"training-plan:${plan.id}:8"`);
+
+    const conflictResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.patch(basePath), plan.id, 7),
+    ).send({ name: 'Não sobrescreve' });
+    expect(conflictResponse.status).toBe(412);
+    expect(conflictResponse.body).toMatchObject({
+      code: 'TRAINING_PLAN_VERSION_CONFLICT',
+    });
+
+    const finalRead = await agent.get(basePath);
+    expect(finalRead.body).toMatchObject({
+      data: { name: 'Treino editado', version: 8 },
+    });
+    expect(
+      (
+        finalRead.body as { data: { exercises: Array<{ id: string }> } }
+      ).data.exercises.map((exercise) => exercise.id),
+    ).toEqual(reversedIds);
+  });
+
+  it('processes multipart images through Sharp and keeps Blob cleanup consistent', async () => {
+    const agent = await login(true);
+    const workoutId = new Types.ObjectId();
+    const exerciseId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      workouts: [
+        {
+          _id: workoutId,
+          name: 'Treino com imagem',
+          exercises: [
+            {
+              _id: exerciseId,
+              type: 'image',
+              name: 'Agachamento',
+              image: null,
+              bodyArea: 'quadriceps',
+              restSeconds: 60,
+              sets: 3,
+              repetitions: 12,
+            },
+          ],
+        },
+      ],
+    });
+    const imagePath = `/global/training-plans/${plan.id}/workouts/${workoutId.toString()}/exercises/${exerciseId.toString()}/image`;
+    const jpeg = await sharp({
+      create: {
+        background: { alpha: 1, b: 50, g: 100, r: 200 },
+        channels: 4,
+        height: 800,
+        width: 1200,
+      },
+    })
+      .jpeg()
+      .toBuffer();
+
+    const uploadResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.put(imagePath), plan.id, 0),
+    ).attach('file', jpeg, {
+      contentType: 'image/jpeg',
+      filename: 'exercise.jpg',
+    });
+
+    expect(uploadResponse.status).toBe(200);
+    expect(uploadResponse.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    const uploadBody = uploadResponse.body as {
+      data: {
+        image: { displayUrl: string; thumbnailUrl: string };
+      };
+    };
+    expect(uploadBody.data.image.displayUrl).toContain(
+      '/exercise-images/display-',
+    );
+    expect(uploadBody.data.image.thumbnailUrl).toContain(
+      '/exercise-images/thumbnail-',
+    );
+    expect(uploadedBlobs).toHaveLength(2);
+    const [thumbnailMetadata, displayMetadata] = await Promise.all(
+      uploadedBlobs.map(({ content }) => sharp(content).metadata()),
+    );
+    expect(thumbnailMetadata).toMatchObject({
+      format: 'webp',
+      height: 107,
+      width: 160,
+    });
+    expect(displayMetadata).toMatchObject({
+      format: 'webp',
+      height: 720,
+      width: 1080,
+    });
+
+    const removeResponse = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.delete(imagePath), plan.id, 1),
+    );
+    expect(removeResponse.status).toBe(204);
+    expect(removeResponse.headers.etag).toBe(`"training-plan:${plan.id}:2"`);
+    expect(deletedBlobKeys).toEqual([uploadedBlobs.map(({ key }) => key)]);
+    const stored = await trainingPlanModel.findById(plan.id).lean().exec();
+    expect(stored?.workouts[0]?.exercises[0]).toMatchObject({ image: null });
+  });
+
+  it('persists the canonical YouTube id returned by the deterministic adapter', async () => {
+    const agent = await login(true);
+    const workoutId = new Types.ObjectId();
+    const exerciseId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      workouts: [
+        {
+          _id: workoutId,
+          name: 'Treino com vídeo',
+          exercises: [
+            {
+              _id: exerciseId,
+              type: 'youtube-long',
+              name: 'Mobilidade',
+              youtubeId: '2isq0vuKruE',
+              bodyArea: 'mobility',
+            },
+          ],
+        },
+      ],
+    });
+    const exercisePath = `/global/training-plans/${plan.id}/workouts/${workoutId.toString()}/exercises/${exerciseId.toString()}`;
+    const reference = 'https://youtu.be/ZA8gs8XP2bs';
+
+    const response = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.patch(exercisePath), plan.id, 0),
+    ).send({ youtubeId: reference });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.etag).toBe(`"training-plan:${plan.id}:1"`);
+    expect(response.body).toMatchObject({
+      data: { type: 'youtube-long', youtubeId: 'ZA8gs8XP2bs' },
+    });
+    expect(youtubeReference.normalizeAndValidate).toHaveBeenCalledWith(
+      reference,
+    );
+    const stored = await trainingPlanModel.findById(plan.id).lean().exec();
+    expect(stored?.workouts[0]?.exercises[0]).toMatchObject({
+      youtubeId: 'ZA8gs8XP2bs',
+    });
+  });
+
+  it('enforces preconditions, aggregate limits and the operational BSON boundary', async () => {
+    const agent = await login(true);
+    const workoutId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      workouts: [{ _id: workoutId, name: 'Limites', exercises: [] }],
+    });
+    const path = `/global/training-plans/${plan.id}/workouts/${workoutId.toString()}`;
+
+    const missing = await authenticatedMutation(agent, agent.patch(path)).send({
+      name: 'Sem versão',
+    });
+    expect(missing.status).toBe(428);
+    expect(missing.body).toMatchObject({ code: 'PRECONDITION_REQUIRED' });
+    const malformed = await authenticatedMutation(
+      agent,
+      agent.patch(path).set('If-Match', 'W/"anything"'),
+    ).send({ name: 'Versão fraca' });
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    const fullExercises = Array.from({ length: 50 }, () => ({
+      type: 'duration',
+      name: 'x'.repeat(40),
+      bodyArea: 'cardio',
+      durationMinutes: 1440,
+    }));
+    const fullWorkouts = Array.from({ length: 25 }, (_, index) => ({
+      _id: index === 0 ? workoutId : new Types.ObjectId(),
+      name: `Treino ${index}`.padEnd(120, 'x'),
+      exercises: fullExercises,
+    }));
+    await trainingPlanModel
+      .updateOne(
+        { _id: plan._id },
+        { $set: { workouts: fullWorkouts } },
+        { runValidators: true },
+      )
+      .exec();
+
+    const workoutLimit = await authenticatedMutation(
+      agent,
+      withIfMatch(
+        agent.post(`/global/training-plans/${plan.id}/workouts`),
+        plan.id,
+        0,
+      ),
+    ).send({});
+    expect(workoutLimit.status).toBe(409);
+    expect(workoutLimit.body).toMatchObject({ code: 'WORKOUT_LIMIT_REACHED' });
+    const exerciseLimit = await authenticatedMutation(
+      agent,
+      withIfMatch(agent.post(`${path}/exercises`), plan.id, 0),
+    ).send({ type: 'pause' });
+    expect(exerciseLimit.status).toBe(409);
+    expect(exerciseLimit.body).toMatchObject({
+      code: 'EXERCISE_LIMIT_REACHED',
+    });
+
+    const [sizeResult] = await trainingPlanModel
+      .aggregate<{ size: number }>([
+        { $match: { _id: plan._id } },
+        { $project: { size: { $bsonSize: '$$ROOT' } } },
+      ])
+      .exec();
+    expect(sizeResult?.size).toBeLessThan(12 * 1024 * 1024);
+  });
+
   it('creates the compound owner and creation index', async () => {
     const indexes = await trainingPlanModel.collection.indexes();
 
     expect(indexes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: { ownerPersonId: 1, createdAt: -1 } }),
+        expect.objectContaining({
+          key: { ownerPersonId: 1, createdAt: -1, _id: -1 },
+        }),
       ]),
     );
   });

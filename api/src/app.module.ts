@@ -21,6 +21,9 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
+        autoIndex: ['local', 'test'].includes(
+          configService.getOrThrow<string>('RUNTIME_ENVIRONMENT'),
+        ),
         uri: configService.getOrThrow<string>('MONGODB_URI'),
       }),
     }),

@@ -8,6 +8,8 @@
   "scripts": {
     "build": "nest build",
     "configure:google-oauth": "node ./scripts/configure-google-oauth.mjs",
+    "indexes:apply": "tsx ./scripts/apply-indexes.ts",
+    "images:reconcile": "tsx ./scripts/reconcile-training-exercise-images.ts",
     "dev": "concurrently --kill-others --no-color --names infra,api \"pnpm dev:infra\" \"pnpm start:dev\"",
     "dev:infra": "node ./scripts/dev-infra.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -35,6 +37,7 @@
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/terminus": "^11.1.1",
+    "@vercel/blob": "^2.7.0",
     "@vercel/functions": "^3.9.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -46,6 +49,7 @@
     "mongoose": "^9.8.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -55,6 +59,7 @@
     "@swc/core": "^1.15.46",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "^26.1.1",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^4.1.10",

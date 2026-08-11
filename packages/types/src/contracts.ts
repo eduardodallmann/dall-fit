@@ -1,8 +1,12 @@
 import type {
+  Exercise,
+  ExerciseImage,
+  ExerciseType,
   Person,
   Theme,
   TrainingPlanDetails,
   TrainingPlanSummary,
+  TrainingPlanWorkoutDetails,
   TrainingPlanWorkoutSummary,
 } from './entities.js';
 
@@ -54,3 +58,40 @@ export type UpdateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
 export type TrainingPlanDetailsResponse = ApiResponse<TrainingPlanDetails>;
 export type CreateTrainingPlanWorkoutResponse =
   ApiResponse<TrainingPlanWorkoutSummary>;
+
+export interface UpdateTrainingPlanWorkoutRequest {
+  name: string;
+}
+
+export type TrainingPlanWorkoutDetailsResponse =
+  ApiResponse<TrainingPlanWorkoutDetails>;
+
+export type UpdateTrainingPlanWorkoutResponse = ApiResponse<{
+  id: string;
+  name: string;
+  updatedAt: string;
+}>;
+
+export interface CreateExerciseRequest {
+  type: ExerciseType;
+}
+
+export type CreateExerciseResponse = ApiResponse<Exercise>;
+
+export type UpdateExerciseRequest = Partial<
+  Pick<
+    Extract<Exercise, { type: 'youtube-short' }>,
+    'bodyArea' | 'name' | 'repetitions' | 'restSeconds' | 'sets' | 'youtubeId'
+  > &
+    Pick<Extract<Exercise, { type: 'duration' }>, 'durationMinutes'>
+>;
+
+export type UpdateExerciseResponse = ApiResponse<Exercise>;
+
+export interface ReorderExercisesRequest {
+  exerciseIds: string[];
+}
+
+export type UpdateExerciseImageResponse = ApiResponse<{
+  image: ExerciseImage;
+}>;

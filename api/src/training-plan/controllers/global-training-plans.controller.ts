@@ -3,39 +3,74 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Logger,
   Param,
   Patch,
   Post,
+  Put,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 
 import type {
+  CreateExerciseResponse,
   CreateTrainingPlanResponse,
   CreateTrainingPlanWorkoutResponse,
   GlobalTrainingPlanCollectionResponse,
   TrainingPlanDetailsResponse,
+  TrainingPlanWorkoutDetailsResponse,
+  UpdateExerciseImageResponse,
+  UpdateExerciseResponse,
   UpdateTrainingPlanResponse,
+  UpdateTrainingPlanWorkoutResponse,
 } from '@dall-fit/types';
 
 import { AdminOnly } from '~/auth/decorators/admin-only';
-import { AdminMutation } from '~/auth/decorators/authenticated-mutation';
+import {
+  AdminMutation,
+  EditorMutation,
+  ImageMutation,
+} from '~/auth/decorators/authenticated-mutation';
 import { CreateGlobalTrainingPlanCommand } from '~/training-plan/commands/create-global-training-plan.command';
+import { CreateTrainingPlanExerciseCommand } from '~/training-plan/commands/create-training-plan-exercise.command';
 import { CreateTrainingPlanWorkoutCommand } from '~/training-plan/commands/create-training-plan-workout.command';
 import { DeleteGlobalTrainingPlanCommand } from '~/training-plan/commands/delete-global-training-plan.command';
+import { DeleteTrainingPlanExerciseCommand } from '~/training-plan/commands/delete-training-plan-exercise.command';
 import { DeleteTrainingPlanWorkoutCommand } from '~/training-plan/commands/delete-training-plan-workout.command';
 import { GetGlobalTrainingPlanCommand } from '~/training-plan/commands/get-global-training-plan.command';
+import { GetTrainingPlanWorkoutCommand } from '~/training-plan/commands/get-training-plan-workout.command';
 import { ListGlobalTrainingPlansCommand } from '~/training-plan/commands/list-global-training-plans.command';
+import { RemoveTrainingPlanExerciseImageCommand } from '~/training-plan/commands/remove-training-plan-exercise-image.command';
+import { ReorderTrainingPlanExercisesCommand } from '~/training-plan/commands/reorder-training-plan-exercises.command';
 import { UpdateGlobalTrainingPlanCommand } from '~/training-plan/commands/update-global-training-plan.command';
+import { UpdateTrainingPlanExerciseCommand } from '~/training-plan/commands/update-training-plan-exercise.command';
+import { UpdateTrainingPlanWorkoutCommand } from '~/training-plan/commands/update-training-plan-workout.command';
+import { UploadTrainingPlanExerciseImageCommand } from '~/training-plan/commands/upload-training-plan-exercise-image.command';
 import {
+  formatTrainingPlanEtag,
+  parseTrainingPlanIfMatch,
+} from '~/training-plan/domain/training-plan-etag';
+import type { UploadedImageFile } from '~/training-plan/domain/training-plan.entity';
+import {
+  CreateExerciseDto,
   CreateTrainingPlanDto,
   EmptyTrainingPlanRequestDto,
   ListTrainingPlansQueryDto,
+  ReorderExercisesDto,
+  TrainingPlanExerciseParamsDto,
   TrainingPlanParamsDto,
   TrainingPlanWorkoutParamsDto,
+  UpdateExerciseDto,
   UpdateTrainingPlanDto,
+  UpdateTrainingPlanWorkoutDto,
 } from '~/training-plan/dto/training-plan.dto';
+import { createValidationException } from '~/training-plan/errors/training-plan.errors';
 
 @AdminOnly()
 @Controller('global/training-plans')
@@ -43,13 +78,21 @@ export class GlobalTrainingPlansController {
   private readonly logger = new Logger(GlobalTrainingPlansController.name);
 
   constructor(
-    private readonly listGlobalTrainingPlansCommand: ListGlobalTrainingPlansCommand,
-    private readonly createGlobalTrainingPlanCommand: CreateGlobalTrainingPlanCommand,
-    private readonly getGlobalTrainingPlanCommand: GetGlobalTrainingPlanCommand,
-    private readonly updateGlobalTrainingPlanCommand: UpdateGlobalTrainingPlanCommand,
-    private readonly deleteGlobalTrainingPlanCommand: DeleteGlobalTrainingPlanCommand,
-    private readonly createTrainingPlanWorkoutCommand: CreateTrainingPlanWorkoutCommand,
-    private readonly deleteTrainingPlanWorkoutCommand: DeleteTrainingPlanWorkoutCommand,
+    private readonly listCommand: ListGlobalTrainingPlansCommand,
+    private readonly createCommand: CreateGlobalTrainingPlanCommand,
+    private readonly getCommand: GetGlobalTrainingPlanCommand,
+    private readonly updateCommand: UpdateGlobalTrainingPlanCommand,
+    private readonly deleteCommand: DeleteGlobalTrainingPlanCommand,
+    private readonly createWorkoutCommand: CreateTrainingPlanWorkoutCommand,
+    private readonly deleteWorkoutCommand: DeleteTrainingPlanWorkoutCommand,
+    private readonly getWorkoutCommand: GetTrainingPlanWorkoutCommand,
+    private readonly updateWorkoutCommand: UpdateTrainingPlanWorkoutCommand,
+    private readonly createExerciseCommand: CreateTrainingPlanExerciseCommand,
+    private readonly updateExerciseCommand: UpdateTrainingPlanExerciseCommand,
+    private readonly deleteExerciseCommand: DeleteTrainingPlanExerciseCommand,
+    private readonly reorderExercisesCommand: ReorderTrainingPlanExercisesCommand,
+    private readonly uploadImageCommand: UploadTrainingPlanExerciseImageCommand,
+    private readonly removeImageCommand: RemoveTrainingPlanExerciseImageCommand,
   ) {}
 
   @Get()
@@ -59,26 +102,10 @@ export class GlobalTrainingPlansController {
     this.logger.log('GlobalTrainingPlansController -> list -> params:', {
       params: { page: query.page },
     });
-
-    const commandResult = await this.listGlobalTrainingPlansCommand.execute(
-      query.page,
-    );
-    this.logger.log(
-      'GlobalTrainingPlansController -> list -> listGlobalTrainingPlansCommand return:',
-      {
-        data: { count: commandResult.data.length, total: commandResult.total },
-      },
-    );
-
-    const result = commandResult;
+    const result = await this.listCommand.execute(query.page);
     this.logger.log('GlobalTrainingPlansController -> list -> return:', {
-      data: {
-        count: result.data.length,
-        page: result.page,
-        total: result.total,
-      },
+      data: { count: result.data.length, total: result.total },
     });
-
     return result;
   }
 
@@ -86,55 +113,20 @@ export class GlobalTrainingPlansController {
   @AdminMutation()
   async create(
     @Body() input: CreateTrainingPlanDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CreateTrainingPlanResponse> {
-    this.logger.log('GlobalTrainingPlansController -> create -> params:', {
-      params: { fields: Object.keys(input) },
-    });
-
-    const commandResult =
-      await this.createGlobalTrainingPlanCommand.execute(input);
-    this.logger.log(
-      'GlobalTrainingPlansController -> create -> createGlobalTrainingPlanCommand return:',
-      { data: { trainingPlanId: commandResult.data.id } },
-    );
-
-    const result = commandResult;
-    this.logger.log('GlobalTrainingPlansController -> create -> return:', {
-      data: { trainingPlanId: result.data.id },
-    });
-
+    const result = await this.createCommand.execute(input);
+    this.setEtag(response, result.data.id, result.data.version);
     return result;
   }
 
   @Get(':trainingPlanId')
   async get(
     @Param() params: TrainingPlanParamsDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<TrainingPlanDetailsResponse> {
-    this.logger.log('GlobalTrainingPlansController -> get -> params:', {
-      params: { trainingPlanId: params.trainingPlanId },
-    });
-
-    const commandResult = await this.getGlobalTrainingPlanCommand.execute(
-      params.trainingPlanId,
-    );
-    this.logger.log(
-      'GlobalTrainingPlansController -> get -> getGlobalTrainingPlanCommand return:',
-      {
-        data: {
-          trainingPlanId: commandResult.data.id,
-          workoutCount: commandResult.data.workouts.length,
-        },
-      },
-    );
-
-    const result = commandResult;
-    this.logger.log('GlobalTrainingPlansController -> get -> return:', {
-      data: {
-        trainingPlanId: result.data.id,
-        workoutCount: result.data.workouts.length,
-      },
-    });
-
+    const result = await this.getCommand.execute(params.trainingPlanId);
+    this.setEtag(response, result.data.id, result.data.version);
     return result;
   }
 
@@ -142,91 +134,55 @@ export class GlobalTrainingPlansController {
   @AdminMutation()
   async update(
     @Param() params: TrainingPlanParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
     @Body() changes: UpdateTrainingPlanDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<UpdateTrainingPlanResponse> {
-    this.logger.log('GlobalTrainingPlansController -> update -> params:', {
-      params: {
-        fields: Object.keys(changes),
-        trainingPlanId: params.trainingPlanId,
-      },
-    });
-
-    const commandResult = await this.updateGlobalTrainingPlanCommand.execute(
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
       params.trainingPlanId,
+    );
+    const result = await this.updateCommand.execute(
+      params.trainingPlanId,
+      expectedVersion,
       changes,
     );
-    this.logger.log(
-      'GlobalTrainingPlansController -> update -> updateGlobalTrainingPlanCommand return:',
-      { data: { trainingPlanId: commandResult.data.id } },
-    );
-
-    const result = commandResult;
-    this.logger.log('GlobalTrainingPlansController -> update -> return:', {
-      data: { trainingPlanId: result.data.id },
-    });
-
-    return result;
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
   }
 
   @Delete(':trainingPlanId')
   @AdminMutation()
   @HttpCode(204)
-  async delete(@Param() params: TrainingPlanParamsDto): Promise<void> {
-    this.logger.log('GlobalTrainingPlansController -> delete -> params:', {
-      params: { trainingPlanId: params.trainingPlanId },
-    });
-
-    await this.deleteGlobalTrainingPlanCommand.execute(params.trainingPlanId);
-    this.logger.log(
-      'GlobalTrainingPlansController -> delete -> deleteGlobalTrainingPlanCommand completed:',
-      { data: { trainingPlanId: params.trainingPlanId } },
+  async delete(
+    @Param() params: TrainingPlanParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+  ): Promise<void> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
     );
-    this.logger.log('GlobalTrainingPlansController -> delete -> completed:', {
-      data: { trainingPlanId: params.trainingPlanId },
-    });
+    await this.deleteCommand.execute(params.trainingPlanId, expectedVersion);
   }
 
   @Post(':trainingPlanId/workouts')
   @AdminMutation()
   async createWorkout(
     @Param() params: TrainingPlanParamsDto,
-    @Body() body: EmptyTrainingPlanRequestDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Body() _body: EmptyTrainingPlanRequestDto,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<CreateTrainingPlanWorkoutResponse> {
-    this.logger.log(
-      'GlobalTrainingPlansController -> createWorkout -> params:',
-      {
-        params: {
-          bodyFields: Object.keys(body),
-          trainingPlanId: params.trainingPlanId,
-        },
-      },
-    );
-
-    const commandResult = await this.createTrainingPlanWorkoutCommand.execute(
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
       params.trainingPlanId,
     );
-    this.logger.log(
-      'GlobalTrainingPlansController -> createWorkout -> createTrainingPlanWorkoutCommand return:',
-      {
-        data: {
-          trainingPlanId: params.trainingPlanId,
-          workoutId: commandResult.data.id,
-        },
-      },
+    const result = await this.createWorkoutCommand.execute(
+      params.trainingPlanId,
+      expectedVersion,
     );
-
-    const result = commandResult;
-    this.logger.log(
-      'GlobalTrainingPlansController -> createWorkout -> return:',
-      {
-        data: {
-          trainingPlanId: params.trainingPlanId,
-          workoutId: result.data.id,
-        },
-      },
-    );
-
-    return result;
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
   }
 
   @Delete(':trainingPlanId/workouts/:workoutId')
@@ -234,38 +190,201 @@ export class GlobalTrainingPlansController {
   @HttpCode(204)
   async deleteWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    this.logger.log(
-      'GlobalTrainingPlansController -> deleteWorkout -> params:',
-      {
-        params: {
-          trainingPlanId: params.trainingPlanId,
-          workoutId: params.workoutId,
-        },
-      },
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
     );
+    const version = await this.deleteWorkoutCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      expectedVersion,
+    );
+    this.setEtag(response, params.trainingPlanId, version);
+  }
 
-    await this.deleteTrainingPlanWorkoutCommand.execute(
+  @Get(':trainingPlanId/workouts/:workoutId')
+  async getWorkout(
+    @Param() params: TrainingPlanWorkoutParamsDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TrainingPlanWorkoutDetailsResponse> {
+    const result = await this.getWorkoutCommand.execute(
       params.trainingPlanId,
       params.workoutId,
     );
-    this.logger.log(
-      'GlobalTrainingPlansController -> deleteWorkout -> deleteTrainingPlanWorkoutCommand completed:',
-      {
-        data: {
-          trainingPlanId: params.trainingPlanId,
-          workoutId: params.workoutId,
-        },
-      },
+    this.setEtag(response, params.trainingPlanId, result.data.version);
+    return result;
+  }
+
+  @Patch(':trainingPlanId/workouts/:workoutId')
+  @EditorMutation()
+  async updateWorkout(
+    @Param() params: TrainingPlanWorkoutParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Body() input: UpdateTrainingPlanWorkoutDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<UpdateTrainingPlanWorkoutResponse> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
     );
-    this.logger.log(
-      'GlobalTrainingPlansController -> deleteWorkout -> completed:',
-      {
-        data: {
-          trainingPlanId: params.trainingPlanId,
-          workoutId: params.workoutId,
-        },
-      },
+    const result = await this.updateWorkoutCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      expectedVersion,
+      input.name,
     );
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
+  }
+
+  @Post(':trainingPlanId/workouts/:workoutId/exercises')
+  @EditorMutation()
+  async createExercise(
+    @Param() params: TrainingPlanWorkoutParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Body() input: CreateExerciseDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<CreateExerciseResponse> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    const result = await this.createExerciseCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      expectedVersion,
+      input.type,
+    );
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
+  }
+
+  @Put(':trainingPlanId/workouts/:workoutId/exercises/order')
+  @EditorMutation()
+  @HttpCode(204)
+  async reorderExercises(
+    @Param() params: TrainingPlanWorkoutParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Body() input: ReorderExercisesDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    const version = await this.reorderExercisesCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      expectedVersion,
+      input.exerciseIds,
+    );
+    this.setEtag(response, params.trainingPlanId, version);
+  }
+
+  @Patch(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId')
+  @EditorMutation()
+  async updateExercise(
+    @Param() params: TrainingPlanExerciseParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Body() input: UpdateExerciseDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<UpdateExerciseResponse> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    if (Object.values(input).every((value) => value === undefined))
+      throw createValidationException();
+    const result = await this.updateExerciseCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      params.exerciseId,
+      expectedVersion,
+      input,
+    );
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
+  }
+
+  @Delete(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId')
+  @EditorMutation()
+  @HttpCode(204)
+  async deleteExercise(
+    @Param() params: TrainingPlanExerciseParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    const version = await this.deleteExerciseCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      params.exerciseId,
+      expectedVersion,
+    );
+    this.setEtag(response, params.trainingPlanId, version);
+  }
+
+  @Put(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image')
+  @ImageMutation()
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    }),
+  )
+  async uploadImage(
+    @Param() params: TrainingPlanExerciseParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @UploadedFile() file: UploadedImageFile,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<UpdateExerciseImageResponse> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    if (file === undefined) throw createValidationException();
+    const result = await this.uploadImageCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      params.exerciseId,
+      expectedVersion,
+      file,
+    );
+    this.setEtag(response, params.trainingPlanId, result.version);
+    return result.response;
+  }
+
+  @Delete(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image')
+  @EditorMutation()
+  @HttpCode(204)
+  async removeImage(
+    @Param() params: TrainingPlanExerciseParamsDto,
+    @Headers('if-match') ifMatch: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    const expectedVersion = parseTrainingPlanIfMatch(
+      ifMatch,
+      params.trainingPlanId,
+    );
+    const version = await this.removeImageCommand.execute(
+      params.trainingPlanId,
+      params.workoutId,
+      params.exerciseId,
+      expectedVersion,
+    );
+    this.setEtag(response, params.trainingPlanId, version);
+  }
+
+  private setEtag(
+    response: Response,
+    trainingPlanId: string,
+    version: number,
+  ): void {
+    response.setHeader('ETag', formatTrainingPlanEtag(trainingPlanId, version));
   }
 }

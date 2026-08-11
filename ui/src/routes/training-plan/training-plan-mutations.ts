@@ -33,6 +33,7 @@ function createTemporaryPlan(input: CreateTrainingPlanRequest) {
     id: `temporary-${crypto.randomUUID()}`,
     name: input.name.trim(),
     description: input.description.trim(),
+    version: 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -122,11 +123,13 @@ export function useUpdateTrainingPlanMutation(
   const result = useMutation({
     mutationFn: ({
       changes,
+      version,
       trainingPlanId,
     }: {
       changes: UpdateTrainingPlanRequest;
+      version: number;
       trainingPlanId: string;
-    }) => updateGlobalTrainingPlan(trainingPlanId, changes, scenario),
+    }) => updateGlobalTrainingPlan(trainingPlanId, changes, version, scenario),
     onMutate: async ({ changes, trainingPlanId }) => {
       await queryClient.cancelQueries({ queryKey: trainingPlanKeys.all });
       const snapshot: QuerySnapshot = {
@@ -212,9 +215,14 @@ export function useDeleteTrainingPlanMutation(
 ) {
   const queryClient = useQueryClient();
   const result = useMutation({
-    mutationFn: (trainingPlanId: string) =>
-      deleteGlobalTrainingPlan(trainingPlanId, scenario),
-    onMutate: async (trainingPlanId) => {
+    mutationFn: ({
+      trainingPlanId,
+      version,
+    }: {
+      trainingPlanId: string;
+      version: number;
+    }) => deleteGlobalTrainingPlan(trainingPlanId, version, scenario),
+    onMutate: async ({ trainingPlanId }) => {
       await queryClient.cancelQueries({ queryKey: trainingPlanKeys.all });
       const snapshot: QuerySnapshot = {
         details: queryClient.getQueriesData<TrainingPlanDetails>({
@@ -269,15 +277,24 @@ export function useCreateTrainingPlanWorkoutMutation(
 ) {
   const queryClient = useQueryClient();
   const result = useMutation({
-    mutationFn: (trainingPlanId: string) =>
-      createTrainingPlanWorkout(trainingPlanId, scenario),
-    onSuccess: (workout, trainingPlanId) => {
+    mutationFn: ({
+      trainingPlanId,
+      version,
+    }: {
+      trainingPlanId: string;
+      version: number;
+    }) => createTrainingPlanWorkout(trainingPlanId, version, scenario),
+    onSuccess: (result, { trainingPlanId }) => {
       for (const [queryKey] of queryClient.getQueriesData({
         queryKey: trainingPlanKeys.details(),
       })) {
         queryClient.setQueryData<TrainingPlanDetails>(queryKey, (cached) =>
           cached?.id === trainingPlanId
-            ? { ...cached, workouts: [...cached.workouts, workout] }
+            ? {
+                ...cached,
+                version: result.version,
+                workouts: [...cached.workouts, result.data],
+              }
             : cached,
         );
       }
@@ -300,10 +317,13 @@ export function useDeleteTrainingPlanWorkoutMutation(
     mutationFn: ({
       trainingPlanId,
       workoutId,
+      version,
     }: {
       trainingPlanId: string;
       workoutId: string;
-    }) => deleteTrainingPlanWorkout(trainingPlanId, workoutId, scenario),
+      version: number;
+    }) =>
+      deleteTrainingPlanWorkout(trainingPlanId, workoutId, version, scenario),
     onMutate: async ({ trainingPlanId, workoutId }) => {
       await queryClient.cancelQueries({ queryKey: trainingPlanKeys.details() });
       const details = queryClient.getQueriesData<TrainingPlanDetails>({
@@ -327,6 +347,15 @@ export function useDeleteTrainingPlanWorkoutMutation(
     onError: (_error, _variables, context) => {
       for (const [queryKey, cached] of context?.details ?? []) {
         queryClient.setQueryData(queryKey, cached);
+      }
+    },
+    onSuccess: (version, { trainingPlanId }) => {
+      for (const [queryKey] of queryClient.getQueriesData({
+        queryKey: trainingPlanKeys.details(),
+      })) {
+        queryClient.setQueryData<TrainingPlanDetails>(queryKey, (cached) =>
+          cached?.id === trainingPlanId ? { ...cached, version } : cached,
+        );
       }
     },
     onSettled: async () => {

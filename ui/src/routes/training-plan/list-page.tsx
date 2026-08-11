@@ -111,6 +111,7 @@ export function TrainingPlanListPage({
     const promise = updateMutation.mutateAsync({
       changes: input,
       trainingPlanId: formPlan.id,
+      version: formPlan.version,
     });
     toast.promise(promise, {
       error: 'Não foi possível salvar o plano.',
@@ -148,7 +149,10 @@ export function TrainingPlanListPage({
     const previousPage = page;
     const shouldReturnPage = rows.length === 1 && page > 1;
     if (shouldReturnPage) await navigateToPage(page - 1);
-    const promise = deleteMutation.mutateAsync(deletePlan.id);
+    const promise = deleteMutation.mutateAsync({
+      trainingPlanId: deletePlan.id,
+      version: deletePlan.version,
+    });
     toast.promise(promise, {
       error: 'Não foi possível excluir o plano.',
       loading: 'Excluindo plano…',

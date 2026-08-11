@@ -32,3 +32,29 @@ export function AdminMutation(): MethodDecorator {
 
   return result;
 }
+
+export function EditorMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'editor-mutation',
+      limitConfigKey: 'RATE_LIMIT_EDITOR_MUTATION_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_EDITOR_MUTATION_WINDOW_MS',
+    }),
+    UseGuards(RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}
+
+export function ImageMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'image-mutation',
+      limitConfigKey: 'RATE_LIMIT_IMAGE_MUTATION_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_IMAGE_MUTATION_WINDOW_MS',
+    }),
+    UseGuards(RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}

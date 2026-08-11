@@ -132,7 +132,7 @@ const trainingPlanListRoute = createRoute({
     const common = parseTrainingPlanSearch(search);
     const numericPage = Number(search.page);
     const page =
-      Number.isInteger(numericPage) && numericPage > 1
+      Number.isInteger(numericPage) && numericPage > 1 && numericPage <= 100
         ? numericPage
         : undefined;
     const result = page === undefined ? common : { ...common, page };
@@ -242,6 +242,10 @@ function parseTrainingPlanSearch(
     'success',
     'update-error',
     'update-success',
+    'update-exercise-error',
+    'delete-exercise-error',
+    'image-error',
+    'version-conflict',
   ];
   const mockTrainingPlans = scenarios.find(
     (scenario) => scenario === search.mockTrainingPlans,

@@ -1,4 +1,6 @@
-import { Alert, Button, Card } from '@heroui/react';
+import { useState } from 'react';
+
+import { Alert, Button } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
@@ -6,8 +8,9 @@ import { trackUiEvent } from '~/core/analytics';
 import { TrainingPlanBreadcrumbs } from '~/routes/training-plan/components';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
-import { trainingPlanDetailQueryOptions } from '~/routes/training-plan/training-plan-queries';
+import { trainingPlanWorkoutQueryOptions } from '~/routes/training-plan/training-plan-queries';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import { WorkoutEditor } from '~/routes/training-plan/workout-editor';
 
 const styles = trainingPlanStyles();
 
@@ -25,10 +28,28 @@ export function TrainingPlanWorkoutPage({
   workoutId,
 }: Readonly<WorkoutPageProps>) {
   const query = useQuery(
-    trainingPlanDetailQueryOptions(trainingPlanId, mockTrainingPlans),
+    trainingPlanWorkoutQueryOptions(
+      trainingPlanId,
+      workoutId,
+      mockTrainingPlans,
+    ),
   );
-  const plan = query.data;
-  const workout = plan?.workouts.find((item) => item.id === workoutId);
+  const [conflict, setConflict] = useState(false);
+  const workout = query.data;
+  const plan = workout?.trainingPlan;
+
+  const reload = async () => {
+    if (!window.confirm('Recarregar os dados e descartar os rascunhos locais?'))
+      return;
+    trackUiEvent({
+      eventName: 'ui_retry_requested',
+      resource: 'workout',
+      control: 'retry',
+      surface: 'workout',
+    });
+    const result = await query.refetch();
+    if (result.isSuccess) setConflict(false);
+  };
 
   return (
     <div className={styles.page()}>
@@ -39,66 +60,55 @@ export function TrainingPlanWorkoutPage({
         surface="workout"
         workout={workout}
       />
-      {query.isLoading ? (
+      {query.isLoading && workout === undefined ? (
         <TrainingPlanPageSkeleton label="Carregando treino" />
       ) : null}
-      {query.isError && plan === undefined ? (
+      {query.isError && workout === undefined ? (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Não foi possível carregar o plano.</Alert.Title>
+            <Alert.Title>Não foi possível carregar o treino.</Alert.Title>
             <Alert.Description>
-              Os nomes do plano e do treino foram omitidos do breadcrumb.
+              O plano ou o treino pode não existir.
             </Alert.Description>
           </Alert.Content>
-          <Button
-            onPress={() => {
-              trackUiEvent({
-                control: 'retry',
-                eventName: 'ui_retry_requested',
-                resource: 'workout',
-                surface: 'workout',
-              });
-              void query.refetch();
-            }}
-            variant="secondary"
-          >
+          <Button onPress={() => void query.refetch()} variant="secondary">
             Tentar novamente
           </Button>
         </Alert>
       ) : null}
-      {query.isError && plan !== undefined ? (
+      {query.isError && workout !== undefined ? (
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Não foi possível atualizar o plano.</Alert.Title>
+            <Alert.Title>Não foi possível atualizar o treino.</Alert.Title>
             <Alert.Description>
-              Os nomes em cache permanecem disponíveis.
+              O editor preserva a última versão disponível.
             </Alert.Description>
           </Alert.Content>
         </Alert>
       ) : null}
-      {plan !== undefined && workout === undefined ? (
+      {conflict ? (
         <Alert status="danger">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Treino não encontrado.</Alert.Title>
+            <Alert.Title>Este plano foi alterado em outro lugar.</Alert.Title>
             <Alert.Description>
-              O plano foi carregado, mas este treino não pertence a ele.
+              Seus rascunhos permanecem visíveis, mas novas gravações estão
+              pausadas.
             </Alert.Description>
           </Alert.Content>
+          <Button onPress={() => void reload()}>Recarregar dados</Button>
         </Alert>
       ) : null}
-      {plan !== undefined && workout !== undefined ? (
-        <Card>
-          <Card.Header>
-            <h1 className={styles.title()}>{workout.name}</h1>
-            <p className={styles.description()}>
-              O editor de exercícios será disponibilizado em uma próxima etapa.
-            </p>
-          </Card.Header>
-        </Card>
-      ) : null}
+      {workout === undefined ? null : (
+        <WorkoutEditor
+          data={workout}
+          key={`${workout.id}:${workout.version}`}
+          mockScenario={mockTrainingPlans}
+          onConflict={() => setConflict(true)}
+        />
+      )}
     </div>
   );
 }

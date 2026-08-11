@@ -4,131 +4,93 @@
 
 ## Objetivo funcional
 
-- Ator: pessoa autenticada com `isAdmin: true`.
-- Problema resolvido: cadastrar e manter modelos globais de plano e seus treinos.
-- Resultado esperado: a pessoa entra pelo menu, mantém planos e treinos e navega
-  ao stub reservado ao futuro editor de exercícios.
+Uma pessoa com `isAdmin: true` mantém planos globais, seus treinos e uma lista
+ordenada de exercícios tipados. A jornada termina no editor real, com autosave,
+concorrência explícita e mídia processada pela API.
 
-## Entrada e pré-condições
+## Entrada e proteção
 
-A sessão precisa ser válida e a pessoa precisa ser administradora. Antes de
-disponibilizar o layout, a UI confirma a pessoa por `GET /auth/me` e mantém em
-memória o token de `GET /auth/csrf`. A UI protege a navegação por `adminRoute`; a
-API reaplica autenticação e autorização por `AdminOnly`, rate limit e validação de
-origem/CSRF em toda mutação. Em desenvolvimento integrado, `mockAuth=admin` e
-`mockTrainingPlans` selecionam fixtures MSW sem alterar o contrato de produção.
+A UI resolve `GET /auth/me` e `GET /auth/csrf` no layout autenticado, aplica
+`adminRoute` e usa a instância Axios única. A API reaplica sessão, admin, origem,
+CSRF e rate limit. IDs pessoais continuam ocultos por
+`404 TRAINING_PLAN_NOT_FOUND`. Em desenvolvimento, `mockAuth=admin` e
+`mockTrainingPlans` selecionam estado MSW sem integrar o contrato de produção.
 
-## Rotas e endpoints participantes
+## Sequência
 
-| Ordem | Etapa                | Rota de UI                                                 | Endpoint da API                                        |
-| ----: | -------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
-|     1 | Proteger layout      | layout autenticado                                         | `GET /auth/me` e `GET /auth/csrf`                      |
-|     2 | Abrir lista          | `/global/training-plan`                                    | `GET /global/training-plans`                           |
-|     3 | Criar/editar/excluir | lista ou detalhe                                           | `POST`, `PATCH` ou `DELETE /global/training-plans/...` |
-|     4 | Abrir detalhe        | `/global/training-plan/:trainingPlanId`                    | `GET /global/training-plans/:trainingPlanId`           |
-|     5 | Criar/excluir treino | detalhe                                                    | `POST` ou `DELETE .../workouts/...`                    |
-|     6 | Abrir editor futuro  | `/global/training-plan/:trainingPlanId/workout/:workoutId` | reutiliza o detalhe                                    |
+| Etapa | UI                             | API                                              |
+| ----: | ------------------------------ | ------------------------------------------------ |
+|     1 | abre coleção paginada          | `GET /global/training-plans?page=`               |
+|     2 | cria/edita/exclui plano        | `POST`, `PATCH`, `DELETE /global/training-plans` |
+|     3 | abre detalhe e mantém treinos  | detalhe, `POST/DELETE .../workouts`              |
+|     4 | abre editor projetado          | `GET .../workouts/:workoutId`                    |
+|     5 | edita nome e linhas            | PATCH de workout/exercício                       |
+|     6 | cria, reordena ou exclui linha | POST, PUT order ou DELETE exercício              |
+|     7 | associa ou remove imagem       | PUT multipart ou DELETE image                    |
 
-## Sequência e decisões
+1. A listagem ordena globalmente por criação e `_id`, usa 20 itens e limita a URL
+   às páginas 1–100.
+2. Criação de treino aguarda o ID real antes de navegar. Lista/detalhe carregam e
+   conservam `version`; toda mutação de aggregate existente envia o ETag forte em
+   `If-Match` e incorpora o ETag resultante ao próximo write.
+3. A rota de workout faz uma leitura projetada com plano mínimo, nome, timestamps
+   e até 50 exercícios. O breadcrumb é
+   `Home / Planos de treino / <plano> / <treino>` apenas quando esses nomes foram
+   resolvidos; falhas nunca mostram IDs.
+4. O nome do treino usa edição inline otimista. Cada linha mantém draft e debounce
+   independente de três segundos, enviando somente campos alterados.
+5. Todos os timers, adições, exclusões, reordenação e mídia convergem numa fila
+   FIFO por aggregate. A fila injeta a última versão, não faz retry de mutation e
+   mantém outras linhas editáveis.
+6. A criação recebe só o tipo e a API aplica defaults. Drag por ponteiro, toque ou
+   teclado só persiste ao soltar e envia a ordem final completa. Exclusão usa
+   confirmação e snapshot para rollback.
+7. YouTube aceita ID/URLs permitidas, mas a API chama somente
+   `img.youtube.com`; a UI deriva a miniatura do ID. Imagens JPEG/PNG/WebP são
+   enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
+   thumbnail/display sob o prefixo público `exercise-images/`, sem base64 ou
+   original persistido.
 
-1. O layout confirma sessão/pessoa e obtém uma vez o CSRF da sessão; falha técnica
-   desse bootstrap apresenta erro recuperável e não libera mutações.
-2. O menu exibe `Planos de treino` somente à pessoa administradora.
-3. A lista consulta a página da URL, limitada a 20 itens e ordenada pela criação.
-4. Criar, editar e excluir plano enviam `Origin` e `X-CSRF-Token` pelo client Axios
-   único e atualizam o cache otimisticamente; os modais de
-   criação/edição e a confirmação de exclusão fecham assim que a mutation é
-   disparada, e falha restaura snapshot, página e conteúdo anterior sem reabrir o
-   overlay.
-5. O detalhe consulta o plano e recebe apenas nome, descrição e resumos de treino.
-6. Criar treino aguarda a API devolver o ID real, atualiza o cache e só então
-   navega ao stub do editor.
-7. Excluir treino fecha a confirmação e remove o resumo otimisticamente; falha
-   restaura o snapshot sem reabrir o dialog.
-8. Toda mutation usa `toast.promise` e invalida as queries relacionadas ao terminar.
+## Concorrência e falhas
 
-Cada intenção navegável, menu, overlay, campo, submissão, retry e mutation desse
-fluxo passa pela fronteira única de Analytics da UI. Mutations emitem início depois
-que a UI aceita a ação e exatamente um resultado `success|error`; overlays registram
-abertura e fechamento com a razão efetiva. A instrumentação não muda a ordem acima,
-não cria request da API e não recebe nomes, descrições, IDs, página, query, erros de
-campo ou conteúdo de treino.
+- `412 TRAINING_PLAN_VERSION_CONFLICT` preserva drafts, pausa a fila e mostra
+  alerta persistente. `Recarregar dados` pede confirmação antes de descartar o
+  trabalho local; não há reenvio automático.
+- falha de autosave conserva texto e miniatura confirmada, encerra o status de
+  saving e anuncia erro sem toast de sucesso;
+- falha de criação remove somente a linha temporária; falha de ordem/exclusão
+  restaura posição, item e draft;
+- upload/substituição conserva a imagem anterior até o CAS; remoção de imagem nula
+  e ordem já idêntica são no-op sem nova versão;
+- primeira falha de leitura mostra estado persistente com retry; refetch falho com
+  cache mantém o editor e usa alerta não bloqueante;
+- `401` limpa CSRF/cache e volta à raiz; `403` e mutations não têm retry.
 
-## Dados compartilhados
+## Dados e privacidade
 
-| Dado             | Origem           | Consumidores                  | Persistência        | Observações                    |
-| ---------------- | ---------------- | ----------------------------- | ------------------- | ------------------------------ |
-| resumo do plano  | API              | lista e cache                 | MongoDB/Query cache | não expõe owner/workouts       |
-| detalhe do plano | API              | detalhe, workout e breadcrumb | MongoDB/Query cache | workouts são resumos           |
-| ID do workout    | MongoDB/API      | detalhe, cache e rota         | documento do plano  | nunca é fabricado pela UI      |
-| `exerciseCount`  | projeção MongoDB | tabela de workouts            | derivado            | exercícios não atravessam HTTP |
+`TrainingPlanSummary`, detalhe e workout expõem `version`. `Exercise` é union dos
+cinco tipos e `BodyArea` tem 16 valores compartilhados. Keys de Blob, documento
+MongoDB, arquivo, URL informada, nomes, valores de campos e IDs nunca entram em
+Analytics. Operações emitem somente início/terminal enumerados; drag emite uma vez
+no drop e recarga de conflito é retry.
 
-## Estados e exceções
+## Cenários vivos
 
-- Caminho completo: lista, mutation confirmada, detalhe e stub carregados.
-- Interrupção ou retomada: browser preserva URL/página; dialogs fechados não são
-  persistidos.
-- Erro recuperável: primeira falha da lista aparece no `EmptyState` dentro da
-  tabela com retry; falha em background conserva conteúdo válido e usa `Alert`.
-- Loading estrutural: skeletons representam cabeçalho e conteúdo enquanto uma
-  rota inteira ainda não possui dado válido; loading de tabela usa skeletons de
-  linhas e não se apresenta como estado vazio.
-- Erro não recuperável: plano ou treino inexistente apresenta o estado da rota.
-- Indisponibilidade: rollback conserva o último snapshot e toast comunica a falha;
-  `401` limpa token CSRF e caches privados e volta à raiz, enquanto rejeição CSRF
-  não repete automaticamente a mutação.
-- Breadcrumb: falha sem cache omite nomes dinâmicos; plano carregado com treino
-  ausente conserva somente o nome do plano; ancestrais navegáveis usam o router da
-  SPA e não recarregam o documento.
-
-## Cenários funcionais
-
-### Cenário 1 — Gestão completa
-
-- Link para testar: `http://localhost:3000/global/training-plan?mockAuth=admin`
-- Given: pessoa administradora e handlers de sucesso
-- When: cria ou edita um plano, abre seu detalhe e cria/exclui treino
-- Then: caches e tabelas refletem a confirmação e a navegação usa IDs reais
-
-### Cenário 2 — Rollback de criação
-
-- Link para testar:
-  `http://localhost:3000/global/training-plan?mockAuth=admin&mockTrainingPlans=create-error&page=2`
-- Given: página 2 carregada e POST indisponível
-- When: tenta criar um plano
-- Then: a UI retorna à página 2, restaura seu conteúdo e anuncia a falha
-
-### Cenário 3 — Falha inicial da lista
-
-- Link para testar:
-  `http://localhost:3000/global/training-plan?mockAuth=admin&mockTrainingPlans=list-error`
-- Given: não existe dado válido no cache
-- When: a primeira consulta falha
-- Then: o corpo da tabela contém o `EmptyState` com `Tentar novamente`
-
-### Cenário 4 — Overlays e rollback otimistas
-
-- Link para testar:
-  `http://localhost:3000/global/training-plan?mockAuth=admin&mockTrainingPlans=update-error`
-- Given: plano carregado e PATCH indisponível
-- When: salva a edição ou confirma uma exclusão em um cenário de erro equivalente
-- Then: o overlay de criação, edição ou exclusão fecha no disparo, o dado muda
-  otimisticamente e o rollback restaura o cache sem reabrir modal ou dialog
+1. Editor completo:
+   `http://localhost:3000/global/training-plan/64b000000000000000000001/workout/64b000000000000000000101?mockAuth=admin`.
+2. Loading: acrescentar `mockTrainingPlans=loading`.
+3. Falha de autosave: acrescentar `mockTrainingPlans=update-exercise-error`.
+4. Conflito preservado: acrescentar `mockTrainingPlans=version-conflict`.
+5. Falha de imagem: acrescentar `mockTrainingPlans=image-error`.
+6. Proteção administrativa: remover `mockAuth=admin` e confirmar redirect.
 
 ## Cobertura automatizada
 
-- Regras e caminhos de negócio protegidos: unitários de `TrainingPlanService`.
-- Unitários e componentes da UI: serviços, menu e typecheck das composições HeroUI.
-- Playwright da jornada UI:
-  `ui/tests/integration/flows/gestao-planos-treino.spec.ts`.
-- Analytics: testes da fronteira e dos componentes validam schema, privacidade,
-  campos, menus e overlays; a jornada Playwright preserva navegação e mutations sem
-  implementação paralela de coleta.
-- E2E dos endpoints: `api/test/training-plan.e2e-spec.ts`, com MongoDB e Redis
-  efêmeros, execução serial, sessão real, CSRF, origem e rate limit.
-- Handlers e fixtures MSW: `training-plans.ts`, com estado isolado por seletor.
-- Cenários não automatizados: regressão visual não se aplica, pois não há imagens
-  de referência nas novas rotas.
-
-O Playwright usa MSW Browser e valida somente a jornada do frontend; os E2E da API
-validam separadamente os adapters e endpoints reais.
+- E2E Nest/MongoDB/Redis: `api/test/training-plan.e2e-spec.ts`, incluindo ETags,
+  discriminadores, limites, ordem, fronteira BSON e ownership.
+- Vitest UI: services HTTP, fila FIFO/conflito, componentes e Analytics.
+- Playwright: `ui/tests/integration/routes/training-plan.spec.ts` e
+  `ui/tests/integration/flows/gestao-planos-treino.spec.ts`, sempre com Vite,
+  Chromium e MSW Browser, sem API real nem `page.route`.
+- Não há regressão visual porque as pastas de assets das rotas não contêm
+  screenshots.

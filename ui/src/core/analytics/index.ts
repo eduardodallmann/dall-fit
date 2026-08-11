@@ -12,14 +12,20 @@ export type AnalyticsSurface =
   | 'workout';
 
 export type AnalyticsControl =
+  | 'add_exercise'
   | 'breadcrumb_home'
   | 'breadcrumb_plan'
   | 'breadcrumb_training_plans'
   | 'cancel'
   | 'delete_confirmation'
   | 'description_field'
+  | 'delete_exercise'
   | 'edit_plan'
   | 'google_login'
+  | 'exercise_field'
+  | 'image_remove'
+  | 'image_replace'
+  | 'image_upload'
   | 'home_link'
   | 'mobile_menu'
   | 'logout'
@@ -36,11 +42,13 @@ export type AnalyticsControl =
   | 'pwa_update'
   | 'pwa_update_dismiss'
   | 'retry'
+  | 'reorder_handle'
   | 'row_actions'
   | 'submit'
   | 'theme_toggle'
   | 'training_plans_link'
-  | 'workout_link';
+  | 'workout_link'
+  | 'workout_name';
 
 type CommonEvent = {
   control: AnalyticsControl;
@@ -109,6 +117,13 @@ type UiAnalyticsEvent =
       eventName: 'ui_operation_started';
       operation:
         | 'google_login'
+        | 'exercise_create'
+        | 'exercise_delete'
+        | 'exercise_image_remove'
+        | 'exercise_image_replace'
+        | 'exercise_image_upload'
+        | 'exercise_reorder'
+        | 'exercise_update'
         | 'logout'
         | 'pwa_install'
         | 'pwa_update'
@@ -117,12 +132,20 @@ type UiAnalyticsEvent =
         | 'training_plan_delete'
         | 'training_plan_update'
         | 'workout_create'
-        | 'workout_delete';
+        | 'workout_delete'
+        | 'workout_update';
     })
   | (CommonEvent & {
       eventName: 'ui_operation_completed';
       operation:
         | 'google_login'
+        | 'exercise_create'
+        | 'exercise_delete'
+        | 'exercise_image_remove'
+        | 'exercise_image_replace'
+        | 'exercise_image_upload'
+        | 'exercise_reorder'
+        | 'exercise_update'
         | 'logout'
         | 'pwa_install'
         | 'pwa_update'
@@ -131,7 +154,8 @@ type UiAnalyticsEvent =
         | 'training_plan_delete'
         | 'training_plan_update'
         | 'workout_create'
-        | 'workout_delete';
+        | 'workout_delete'
+        | 'workout_update';
       outcome: 'dismissed' | 'error' | 'success' | 'unavailable';
     })
   | (CommonEvent & {

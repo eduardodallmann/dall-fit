@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query';
 
 import {
   getGlobalTrainingPlan,
+  getTrainingPlanWorkout,
   listGlobalTrainingPlans,
   type MockTrainingPlansScenario,
 } from '~/routes/training-plan/training-plan-service';
@@ -14,6 +15,18 @@ export const trainingPlanKeys = {
   lists: () => [...trainingPlanKeys.all, 'list'] as const,
   list: (page: number, scenario: MockTrainingPlansScenario) =>
     [...trainingPlanKeys.lists(), page, scenario] as const,
+  workouts: () => [...trainingPlanKeys.all, 'workout'] as const,
+  workout: (
+    trainingPlanId: string,
+    workoutId: string,
+    scenario: MockTrainingPlansScenario,
+  ) =>
+    [
+      ...trainingPlanKeys.workouts(),
+      trainingPlanId,
+      workoutId,
+      scenario,
+    ] as const,
 };
 
 export function trainingPlanListQueryOptions(
@@ -26,6 +39,17 @@ export function trainingPlanListQueryOptions(
   });
 
   return result;
+}
+
+export function trainingPlanWorkoutQueryOptions(
+  trainingPlanId: string,
+  workoutId: string,
+  scenario: MockTrainingPlansScenario,
+) {
+  return queryOptions({
+    queryKey: trainingPlanKeys.workout(trainingPlanId, workoutId, scenario),
+    queryFn: () => getTrainingPlanWorkout(trainingPlanId, workoutId, scenario),
+  });
 }
 
 export function trainingPlanDetailQueryOptions(

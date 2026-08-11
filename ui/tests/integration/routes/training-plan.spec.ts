@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const planId = '64b000000000000000000001';
+const workoutId = '64b000000000000000000101';
 
 test.describe('Rotas administrativas de planos de treino', () => {
   test('redireciona pessoa comum antes de renderizar conteúdo administrativo', async ({
@@ -155,7 +156,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(breadcrumbs).not.toContainText('Hipertrofia iniciante');
   });
 
-  test('mantém o plano e omite somente o workout ausente do breadcrumb', async ({
+  test('omite identificadores dinâmicos quando o workout está ausente', async ({
     page,
   }) => {
     await page.goto(
@@ -165,8 +166,126 @@ test.describe('Rotas administrativas de planos de treino', () => {
     const breadcrumbs = page.getByRole('list', {
       name: 'Navegação estrutural',
     });
-    await expect(breadcrumbs.getByText('Hipertrofia iniciante')).toBeVisible();
+    await expect(breadcrumbs).not.toContainText(planId);
     await expect(breadcrumbs).not.toContainText('workout-ausente');
-    await expect(page.getByText('Treino não encontrado.')).toBeVisible();
+    await expect(
+      page.getByText('Não foi possível carregar o treino.'),
+    ).toBeVisible();
+  });
+
+  test('carrega o editor tipado e salva linhas por autosave', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+
+    await expect(page.getByRole('heading', { name: 'Treino A' })).toBeVisible();
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    await expect(list.getByRole('listitem')).toHaveCount(5);
+    await expect(list.getByText('YouTube Short')).toBeVisible();
+    await expect(list.getByText('Imagem', { exact: true })).toBeVisible();
+    await expect(list.getByText('YouTube Longo')).toBeVisible();
+    await expect(list.getByText('Pausa')).toBeVisible();
+    await expect(list.getByText('Duração', { exact: true })).toBeVisible();
+
+    const firstExercise = list.getByRole('listitem').first();
+    const autosaveRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'PATCH' &&
+        request.url().includes('/exercises/64b000000000000000000201'),
+    );
+    await firstExercise.getByLabel('Nome').fill('Agachamento atualizado');
+    const request = await autosaveRequest;
+    expect(request.headers()['if-match']).toBe(
+      '"training-plan:64b000000000000000000001:0"',
+    );
+    expect(request.postDataJSON()).toEqual({ name: 'Agachamento atualizado' });
+    await expect(firstExercise.getByLabel('Nome')).toHaveValue(
+      'Agachamento atualizado',
+    );
+  });
+
+  test('preserva o rascunho e pausa a fila quando há conflito', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=version-conflict`,
+    );
+    const name = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome');
+    await name.fill('Rascunho concorrente');
+    await expect(
+      page.getByText('Este plano foi alterado em outro lugar.'),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(name).toHaveValue('Rascunho concorrente');
+    await expect(
+      page.getByRole('button', { name: 'Adicionar' }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Recarregar dados' }),
+    ).toBeVisible();
+  });
+
+  test('confirma navegação quando há autosave ainda não enviado', async ({
+    page,
+  }) => {
+    const editorUrl = `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`;
+    await page.goto(editorUrl);
+    await page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome')
+      .fill('Rascunho aguardando envio');
+    const plansLink = page
+      .getByRole('list', { name: 'Navegação estrutural' })
+      .getByRole('link', { name: 'Planos de treino' });
+
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('alterações ainda não enviadas');
+      await dialog.dismiss();
+    });
+    await plansLink.click();
+    await expect(page).toHaveURL(new RegExp(`/workout/${workoutId}`));
+
+    page.once('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    await plansLink.click();
+    await expect(page).toHaveURL(/\/global\/training-plan\?/);
+  });
+
+  test('reordena exercícios pelo teclado e envia a ordem completa', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    const reorderRequest = page.waitForRequest(
+      (request) =>
+        request.method() === 'PUT' &&
+        request.url().endsWith('/exercises/order'),
+    );
+    const handle = page.getByRole('button', { name: 'Mover Duração' });
+    await handle.focus();
+    await handle.press('Space');
+    await handle.press('ArrowUp');
+    await handle.press('Space');
+    const request = await reorderRequest;
+
+    expect(request.postDataJSON()).toEqual({
+      exerciseIds: [
+        '64b000000000000000000201',
+        '64b000000000000000000202',
+        '64b000000000000000000203',
+        '64b000000000000000000205',
+        '64b000000000000000000204',
+      ],
+    });
+    await expect(handle).toBeFocused();
   });
 });

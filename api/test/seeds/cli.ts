@@ -20,6 +20,9 @@ const trainingPlanScenarios = [
   'training-plans:list',
   'training-plans:not-found',
   'training-plans:update',
+  'training-plans:workout-editor',
+  'training-plans:workout-conflict',
+  'training-plans:workout-limits',
 ] as const;
 
 async function main(): Promise<void> {
@@ -169,7 +172,47 @@ async function main(): Promise<void> {
             {
               _id: workoutId,
               name: 'Treino A',
-              exercises: [{ name: 'Exercício fictício' }],
+              exercises: [
+                {
+                  _id: new Types.ObjectId('64b000000000000000000201'),
+                  type: 'youtube-short',
+                  name: 'Agachamento',
+                  youtubeId: 'ZA8gs8XP2bs',
+                  bodyArea: 'quadriceps',
+                  restSeconds: 60,
+                  sets: 3,
+                  repetitions: 12,
+                },
+                {
+                  _id: new Types.ObjectId('64b000000000000000000202'),
+                  type: 'image',
+                  name: 'Supino',
+                  image: null,
+                  bodyArea: 'chest',
+                  restSeconds: 60,
+                  sets: 3,
+                  repetitions: 12,
+                },
+                {
+                  _id: new Types.ObjectId('64b000000000000000000203'),
+                  type: 'youtube-long',
+                  name: 'Mobilidade',
+                  youtubeId: '2isq0vuKruE',
+                  bodyArea: 'mobility',
+                },
+                {
+                  _id: new Types.ObjectId('64b000000000000000000204'),
+                  type: 'pause',
+                  restSeconds: 60,
+                },
+                {
+                  _id: new Types.ObjectId('64b000000000000000000205'),
+                  type: 'duration',
+                  name: 'Cardio',
+                  bodyArea: 'cardio',
+                  durationMinutes: 15,
+                },
+              ],
             },
           ],
         },

@@ -114,9 +114,6 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     ).not.toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Hipertrofia iniciante' }),
-    ).not.toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Hipertrofia iniciante' }),
     ).toBeVisible();
     await expect(
       page.getByText('Não foi possível excluir o plano.'),

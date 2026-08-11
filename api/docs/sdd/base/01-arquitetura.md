@@ -11,6 +11,35 @@ futuras devem ser organizadas em módulos por domínio.
 O servidor HTTP usa a porta `4000` por padrão e aceita requests da origem da UI em
 `http://localhost:3000`. Ambos os valores são configuráveis por ambiente.
 
+## Aggregate de planos, concorrência e integrações
+
+`TrainingPlanModule` mantém `TrainingPlan -> Workout -> Exercise` em um documento
+MongoDB. O top-level usa `versionKey: 'version'`; workouts têm timestamps e o array
+de exercícios usa discriminador `type` com cinco schemas estritos. Limites de 25
+workouts, 50 exercícios e 12 MiB são regras de produto. Leituras internas calculam
+`$bsonSize`, contagens e máximo por workout e emitem `aggregateNearLimit` a partir
+de 8 MiB, 20 ou 40, sem conteúdo do documento.
+
+Toda mutação de aggregate existente exige `If-Match`, compara owner/IDs/versão na
+mesma operação e incrementa exatamente uma vez. O adapter usa `lean`, projeções e
+retorno mínimo; falha do CAS faz uma inspeção projetada para distinguir not-found
+de `412`. A listagem tem page máxima 100, ordem
+`createdAt/_id` decrescente e warning único a partir de 1600 globais.
+
+`YoutubeReferenceService` normaliza allowlist e consulta apenas o thumbnail do host
+fixo. `ExerciseImageService` valida até 10 MiB/40 MP, rejeita animação, remove
+metadata e gera WebP 160x160 e 1080x1920 sem ampliação. `BlobStorageService`
+encapsula o SDK público e grava apenas sob `exercise-images/` no store
+`gvi3tyf5ckqiqlak`; token/key nunca cruzam a API HTTP. MongoDB é a verdade,
+uploads parciais são compensados e limpezas pós-commit podem ser retomadas por
+`pnpm -C api images:reconcile` (dry-run por padrão; `--execute` é explícito).
+
+`autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
+`pnpm -C api indexes:apply -- --execute` com
+`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v1`. O comando cria primeiro
+os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
+usa `syncIndexes()`.
+
 ## Imports internos e compartilhados
 
 Imports de arquivos em `src/` usam `~/*`, resolvido para o `src/` exclusivo da

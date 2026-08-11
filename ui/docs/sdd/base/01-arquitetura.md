@@ -75,8 +75,10 @@ Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras indivi
 `ui/vercel.json` também aplica CSP e headers defensivos a todas as respostas. A
 CSP permite scripts e endpoints do Vercel Analytics v2 pela própria origem,
 conexão somente com a própria origem e a origem exata da API vigente, imagem local,
-data URI e avatar Google, e bloqueia objetos, frames e ancestrais. A política não
-usa wildcard de `vercel.app`.
+data URI, avatar Google, `img.youtube.com` e o host público exato
+`gvi3tyf5ckqiqlak.public.blob.vercel-storage.com`, e bloqueia objetos, frames e
+ancestrais. Imagens de exercícios são servidas pelo prefixo público
+`exercise-images/`; a política não usa wildcard de `vercel.app`.
 
 ## Estado e integrações
 
@@ -126,6 +128,19 @@ MSW está configurado para autenticação e planos globais, seguindo
 `05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
 
+### Coordenação do editor de workout
+
+O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação do
+mesmo plano passa por uma fila FIFO local que conserva a versão do ETag resultante;
+debounces de três segundos continuam independentes por linha. Não há retry de
+mutation. Um `412` pausa a fila, mantém drafts e exige recarga confirmada. Resposta
+de autosave é mesclada apenas nos campos que não receberam edição posterior.
+
+Reordenação usa dnd kit com sensores de ponteiro e teclado e só envia a ordem no
+drop. O seletor transversal `core/components/image-file-picker` valida
+preliminarmente tipo/tamanho e envia `FormData`; arquivo nunca vira base64. Campos,
+Select, NumberField, Dropdown, Popover, Alert, Chip e Spinner permanecem HeroUI.
+
 ### Analytics e privacidade
 
 `src/core/analytics/index.ts` é a única fronteira de eventos customizados. Ela usa
@@ -167,6 +182,11 @@ Eventos nunca recebem nome, e-mail, foto, token, payload HTTP, texto de plano ou
 treino, ID de domínio, valor/tamanho/erro de campo, texto visível arbitrário ou
 seletor `mock*`. Campos emitem o primeiro foco de cada montagem e um término apenas
 quando o valor mudou desde o término anterior, sempre como estado enumerado.
+
+O catálogo do workout inclui nome, tipo/adicionar, campo, handle/drop, exclusão,
+upload/substituição/remoção, conflito e retry. Operações de workout/exercício/mídia
+emitem início e terminal `success|error`; movimento intermediário do drag não
+emite evento e nenhuma propriedade inclui IDs, ordem, URL, arquivo ou valor.
 
 Todo novo botão, link acionável, campo, seleção, paginação, menu, disclosure,
 overlay, toast com ação ou fluxo assíncrono deve mapear a interação a um evento do

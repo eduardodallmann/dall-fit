@@ -5,24 +5,26 @@ import { TrainingPlanService } from '~/training-plan/services/training-plan.serv
 @Injectable()
 export class DeleteGlobalTrainingPlanCommand {
   private readonly logger = new Logger(DeleteGlobalTrainingPlanCommand.name);
-
   constructor(private readonly trainingPlanService: TrainingPlanService) {}
 
-  async execute(trainingPlanId: string): Promise<void> {
+  async execute(
+    trainingPlanId: string,
+    expectedVersion: number,
+  ): Promise<void> {
     this.logger.log('DeleteGlobalTrainingPlanCommand -> execute -> params:', {
-      params: { trainingPlanId },
+      params: { expectedVersion, trainingPlanId },
     });
-
-    await this.trainingPlanService.deleteGlobal(trainingPlanId);
+    await this.trainingPlanService.deleteGlobal(
+      trainingPlanId,
+      expectedVersion,
+    );
     this.logger.log(
       'DeleteGlobalTrainingPlanCommand -> execute -> trainingPlanService completed:',
       { data: { trainingPlanId } },
     );
     this.logger.log(
       'DeleteGlobalTrainingPlanCommand -> execute -> completed:',
-      {
-        data: { trainingPlanId },
-      },
+      { data: { trainingPlanId } },
     );
   }
 }

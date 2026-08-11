@@ -1,58 +1,102 @@
+import { randomBytes } from 'node:crypto';
+
 import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   CreateTrainingPlanRequest,
+  Exercise,
+  ExerciseImage,
+  ExerciseType,
   TrainingPlanSummary,
+  TrainingPlanWorkoutDetails,
   TrainingPlanWorkoutSummary,
+  UpdateExerciseRequest,
   UpdateTrainingPlanRequest,
 } from '@dall-fit/types';
 
 import type {
+  StoredExercise,
+  StoredExerciseImage,
+  TargetState,
   TrainingPlanEntity,
   TrainingPlanPage,
+  UploadedImageFile,
+  VersionedResult,
+  WorkoutNameResult,
 } from '~/training-plan/domain/training-plan.entity';
 import {
+  createExerciseLimitException,
+  createExerciseNotFoundException,
+  createInvalidExerciseOrderException,
+  createInvalidExerciseTypeException,
   createTrainingPlanNotFoundException,
+  createTrainingPlanSizeLimitException,
+  createVersionConflictException,
+  createWorkoutLimitException,
   createWorkoutNotFoundException,
 } from '~/training-plan/errors/training-plan.errors';
 import { TrainingPlanRepository } from '~/training-plan/repositories/training-plan.repository';
+import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
+import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
 import {
   DEFAULT_WORKOUT_NAME,
+  MAX_EXERCISES_PER_WORKOUT,
+  MAX_WORKOUTS_PER_PLAN,
+  TRAINING_PLAN_CURSOR_WARNING_TOTAL,
+  TRAINING_PLAN_EXERCISE_WARNING,
+  TRAINING_PLAN_OPERATIONAL_SIZE_LIMIT,
   TRAINING_PLAN_PAGE_SIZE,
+  TRAINING_PLAN_SIZE_WARNING,
+  TRAINING_PLAN_WORKOUT_WARNING,
 } from '~/training-plan/training-plan.constants';
+
+const editableFields: Record<ExerciseType, ReadonlySet<string>> = {
+  'youtube-short': new Set([
+    'name',
+    'youtubeId',
+    'bodyArea',
+    'restSeconds',
+    'sets',
+    'repetitions',
+  ]),
+  image: new Set(['name', 'bodyArea', 'restSeconds', 'sets', 'repetitions']),
+  'youtube-long': new Set(['name', 'youtubeId', 'bodyArea']),
+  pause: new Set(['restSeconds']),
+  duration: new Set(['name', 'bodyArea', 'durationMinutes']),
+};
 
 @Injectable()
 export class TrainingPlanService {
   private readonly logger = new Logger(TrainingPlanService.name);
+  private cursorCapacityWarningEmitted = false;
 
   constructor(
     private readonly trainingPlanRepository: TrainingPlanRepository,
+    private readonly youtubeReferenceService: YoutubeReferenceService,
+    private readonly exerciseImageService: ExerciseImageService,
   ) {}
 
   async listGlobal(page: number): Promise<TrainingPlanPage> {
     this.logger.log('TrainingPlanService -> listGlobal -> params:', {
-      params: { page, pageSize: TRAINING_PLAN_PAGE_SIZE },
+      params: { page },
     });
-
-    const repositoryResult = await this.trainingPlanRepository.listGlobal(
+    const result = await this.trainingPlanRepository.listGlobal(
       page,
       TRAINING_PLAN_PAGE_SIZE,
     );
-    this.logger.log(
-      'TrainingPlanService -> listGlobal -> trainingPlanRepository return:',
-      {
-        data: {
-          count: repositoryResult.data.length,
-          total: repositoryResult.total,
-        },
-      },
-    );
-
-    const result = repositoryResult;
+    if (
+      result.total >= TRAINING_PLAN_CURSOR_WARNING_TOTAL &&
+      !this.cursorCapacityWarningEmitted
+    ) {
+      this.cursorCapacityWarningEmitted = true;
+      this.logger.warn(
+        'TrainingPlanService -> listGlobal -> cursorCapacityNearLimit:',
+        { data: { total: result.total } },
+      );
+    }
     this.logger.log('TrainingPlanService -> listGlobal -> return:', {
       data: { count: result.data.length, total: result.total },
     });
-
     return result;
   }
 
@@ -60,25 +104,15 @@ export class TrainingPlanService {
     input: CreateTrainingPlanRequest,
   ): Promise<TrainingPlanEntity> {
     this.logger.log('TrainingPlanService -> createGlobal -> params:', {
-      params: { fields: Object.keys(input), ownerIsGlobal: true },
+      params: { fields: Object.keys(input) },
     });
-
-    const plan = { ...input, ownerPersonId: null };
-    this.logger.log('TrainingPlanService -> createGlobal -> entity prepared:', {
-      data: { fields: Object.keys(plan), ownerIsGlobal: true },
+    const result = await this.trainingPlanRepository.create({
+      ...input,
+      ownerPersonId: null,
     });
-
-    const repositoryResult = await this.trainingPlanRepository.create(plan);
-    this.logger.log(
-      'TrainingPlanService -> createGlobal -> trainingPlanRepository return:',
-      { data: { trainingPlanId: repositoryResult.id } },
-    );
-
-    const result = repositoryResult;
     this.logger.log('TrainingPlanService -> createGlobal -> return:', {
-      data: { trainingPlanId: result.id },
+      data: { trainingPlanId: result.id, version: result.version },
     });
-
     return result;
   }
 
@@ -86,188 +120,599 @@ export class TrainingPlanService {
     this.logger.log('TrainingPlanService -> getGlobal -> params:', {
       params: { trainingPlanId },
     });
-
-    const repositoryResult =
+    const result =
       await this.trainingPlanRepository.findGlobalById(trainingPlanId);
-    this.logger.log(
-      'TrainingPlanService -> getGlobal -> trainingPlanRepository return:',
-      { data: { found: repositoryResult !== null, trainingPlanId } },
-    );
-
-    if (repositoryResult === null) {
-      this.logger.warn(
-        'TrainingPlanService -> getGlobal -> trainingPlanNotFound error:',
-        { data: { code: 'TRAINING_PLAN_NOT_FOUND', trainingPlanId } },
-      );
-      throw createTrainingPlanNotFoundException();
-    }
-
-    const result = repositoryResult;
+    if (result === null) throw createTrainingPlanNotFoundException();
     this.logger.log('TrainingPlanService -> getGlobal -> return:', {
-      data: { trainingPlanId: result.id },
+      data: { trainingPlanId, version: result.version },
     });
-
     return result;
   }
 
   async updateGlobal(
     trainingPlanId: string,
+    expectedVersion: number,
     changes: UpdateTrainingPlanRequest,
-  ): Promise<TrainingPlanSummary> {
+  ): Promise<VersionedResult<TrainingPlanSummary>> {
     this.logger.log('TrainingPlanService -> updateGlobal -> params:', {
-      params: { fields: Object.keys(changes), trainingPlanId },
+      params: { expectedVersion, fields: Object.keys(changes), trainingPlanId },
     });
-
     const repositoryResult = await this.trainingPlanRepository.updateGlobal(
       trainingPlanId,
+      expectedVersion,
       changes,
     );
-    this.logger.log(
-      'TrainingPlanService -> updateGlobal -> trainingPlanRepository return:',
-      { data: { found: repositoryResult !== null, trainingPlanId } },
-    );
-
     if (repositoryResult === null) {
-      this.logger.warn(
-        'TrainingPlanService -> updateGlobal -> trainingPlanNotFound error:',
-        { data: { code: 'TRAINING_PLAN_NOT_FOUND', trainingPlanId } },
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
       );
-      throw createTrainingPlanNotFoundException();
+      return failure;
     }
-
-    const result = this.toSummary(repositoryResult);
+    const result = {
+      data: this.toSummary(repositoryResult.data),
+      version: repositoryResult.version,
+    };
     this.logger.log('TrainingPlanService -> updateGlobal -> return:', {
-      data: { trainingPlanId: result.id },
+      data: { trainingPlanId, version: result.version },
     });
-
     return result;
   }
 
-  async deleteGlobal(trainingPlanId: string): Promise<void> {
+  async deleteGlobal(
+    trainingPlanId: string,
+    expectedVersion: number,
+  ): Promise<void> {
     this.logger.log('TrainingPlanService -> deleteGlobal -> params:', {
-      params: { trainingPlanId },
+      params: { expectedVersion, trainingPlanId },
     });
-
-    const deleted =
-      await this.trainingPlanRepository.deleteGlobal(trainingPlanId);
-    this.logger.log(
-      'TrainingPlanService -> deleteGlobal -> trainingPlanRepository return:',
-      { data: { deleted, trainingPlanId } },
+    const images = await this.trainingPlanRepository.deleteGlobal(
+      trainingPlanId,
+      expectedVersion,
     );
-
-    if (!deleted) {
-      this.logger.warn(
-        'TrainingPlanService -> deleteGlobal -> trainingPlanNotFound error:',
-        { data: { code: 'TRAINING_PLAN_NOT_FOUND', trainingPlanId } },
+    if (images === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
       );
-      throw createTrainingPlanNotFoundException();
+      return failure;
     }
-
+    await this.exerciseImageService.deleteImages(images);
     this.logger.log('TrainingPlanService -> deleteGlobal -> completed:', {
-      data: { deleted: true, trainingPlanId },
+      data: { imageCount: images.length, trainingPlanId },
     });
   }
 
   async createWorkout(
     trainingPlanId: string,
-  ): Promise<TrainingPlanWorkoutSummary> {
+    expectedVersion: number,
+  ): Promise<VersionedResult<TrainingPlanWorkoutSummary>> {
     this.logger.log('TrainingPlanService -> createWorkout -> params:', {
-      params: { trainingPlanId },
+      params: { expectedVersion, trainingPlanId },
     });
-
-    const repositoryResult = await this.trainingPlanRepository.createWorkout(
+    const state =
+      await this.trainingPlanRepository.inspectTarget(trainingPlanId);
+    this.assertState(state, expectedVersion);
+    this.assertAggregateCapacity(state);
+    if ((state.workoutCount ?? 0) >= MAX_WORKOUTS_PER_PLAN)
+      throw createWorkoutLimitException();
+    const result = await this.trainingPlanRepository.createWorkout(
       trainingPlanId,
+      expectedVersion,
       DEFAULT_WORKOUT_NAME,
     );
-    this.logger.log(
-      'TrainingPlanService -> createWorkout -> trainingPlanRepository return:',
-      {
-        data: {
-          created: repositoryResult !== null,
-          trainingPlanId,
-          workoutId: repositoryResult?.id,
-        },
-      },
-    );
-
-    if (repositoryResult === null) {
-      this.logger.warn(
-        'TrainingPlanService -> createWorkout -> trainingPlanNotFound error:',
-        { data: { code: 'TRAINING_PLAN_NOT_FOUND', trainingPlanId } },
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
       );
-      throw createTrainingPlanNotFoundException();
+      return failure;
     }
-
-    const result = repositoryResult;
     this.logger.log('TrainingPlanService -> createWorkout -> return:', {
-      data: { trainingPlanId, workoutId: result.id },
+      data: {
+        trainingPlanId,
+        version: result.version,
+        workoutId: result.data.id,
+      },
     });
-
     return result;
   }
 
   async deleteWorkout(
     trainingPlanId: string,
     workoutId: string,
-  ): Promise<void> {
+    expectedVersion: number,
+  ): Promise<number> {
     this.logger.log('TrainingPlanService -> deleteWorkout -> params:', {
+      params: { expectedVersion, trainingPlanId, workoutId },
+    });
+    const result = await this.trainingPlanRepository.deleteWorkout(
+      trainingPlanId,
+      workoutId,
+      expectedVersion,
+    );
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+      );
+      return failure;
+    }
+    await this.exerciseImageService.deleteImages(result.data);
+    this.logger.log('TrainingPlanService -> deleteWorkout -> return:', {
+      data: { trainingPlanId, version: result.version, workoutId },
+    });
+    return result.version;
+  }
+
+  async getWorkout(
+    trainingPlanId: string,
+    workoutId: string,
+  ): Promise<TrainingPlanWorkoutDetails> {
+    this.logger.log('TrainingPlanService -> getWorkout -> params:', {
       params: { trainingPlanId, workoutId },
     });
-
-    const repositoryResult = await this.trainingPlanRepository.deleteWorkout(
+    const result = await this.trainingPlanRepository.findWorkout(
       trainingPlanId,
       workoutId,
     );
-    this.logger.log(
-      'TrainingPlanService -> deleteWorkout -> trainingPlanRepository return:',
-      { data: { repositoryResult, trainingPlanId, workoutId } },
-    );
-
-    if (repositoryResult === 'training-plan-not-found') {
-      this.logger.warn(
-        'TrainingPlanService -> deleteWorkout -> trainingPlanNotFound error:',
-        {
-          data: {
-            code: 'TRAINING_PLAN_NOT_FOUND',
-            trainingPlanId,
-            workoutId,
-          },
-        },
+    if (result === null) {
+      const state = await this.trainingPlanRepository.inspectTarget(
+        trainingPlanId,
+        workoutId,
       );
-      throw createTrainingPlanNotFoundException();
-    }
-
-    if (repositoryResult === 'workout-not-found') {
-      this.logger.warn(
-        'TrainingPlanService -> deleteWorkout -> workoutNotFound error:',
-        {
-          data: { code: 'WORKOUT_NOT_FOUND', trainingPlanId, workoutId },
-        },
-      );
+      this.assertState(state, state.version ?? 0, workoutId);
       throw createWorkoutNotFoundException();
     }
-
-    this.logger.log('TrainingPlanService -> deleteWorkout -> completed:', {
-      data: { deleted: true, trainingPlanId, workoutId },
+    const metrics = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+    );
+    this.warnIfAggregateNearLimit(trainingPlanId, metrics);
+    const response = {
+      ...result,
+      exercises: result.exercises.map((exercise) =>
+        this.toPublicExercise(exercise),
+      ),
+    };
+    this.logger.log('TrainingPlanService -> getWorkout -> return:', {
+      data: {
+        exerciseCount: response.exercises.length,
+        trainingPlanId,
+        version: response.version,
+        workoutId,
+      },
     });
+    return response;
+  }
+
+  async updateWorkoutName(
+    trainingPlanId: string,
+    workoutId: string,
+    expectedVersion: number,
+    name: string,
+  ): Promise<VersionedResult<WorkoutNameResult>> {
+    const result = await this.trainingPlanRepository.updateWorkoutName(
+      trainingPlanId,
+      workoutId,
+      expectedVersion,
+      name,
+    );
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+      );
+      return failure;
+    }
+    return result;
+  }
+
+  async createExercise(
+    trainingPlanId: string,
+    workoutId: string,
+    expectedVersion: number,
+    type: ExerciseType,
+  ): Promise<VersionedResult<Exercise>> {
+    this.logger.log('TrainingPlanService -> createExercise -> params:', {
+      params: { expectedVersion, trainingPlanId, type, workoutId },
+    });
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+    );
+    this.assertState(state, expectedVersion, workoutId);
+    this.assertAggregateCapacity(state);
+    if ((state.exerciseCount ?? 0) >= MAX_EXERCISES_PER_WORKOUT)
+      throw createExerciseLimitException();
+    const exercise = this.createDefaultExercise(type);
+    const repositoryResult = await this.trainingPlanRepository.createExercise(
+      trainingPlanId,
+      workoutId,
+      expectedVersion,
+      exercise,
+    );
+    if (repositoryResult === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+      );
+      return failure;
+    }
+    const result = {
+      data: this.toPublicExercise(repositoryResult.data),
+      version: repositoryResult.version,
+    };
+    this.logger.log('TrainingPlanService -> createExercise -> return:', {
+      data: {
+        exerciseId: result.data.id,
+        trainingPlanId,
+        version: result.version,
+        workoutId,
+      },
+    });
+    return result;
+  }
+
+  async updateExercise(
+    trainingPlanId: string,
+    workoutId: string,
+    exerciseId: string,
+    expectedVersion: number,
+    changes: UpdateExerciseRequest,
+  ): Promise<VersionedResult<Exercise>> {
+    const definedChanges = Object.fromEntries(
+      Object.entries(changes).filter(([, value]) => value !== undefined),
+    ) as UpdateExerciseRequest;
+    this.logger.log('TrainingPlanService -> updateExercise -> params:', {
+      params: {
+        exerciseId,
+        expectedVersion,
+        fields: Object.keys(definedChanges),
+        trainingPlanId,
+        workoutId,
+      },
+    });
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
+    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertAggregateCapacity(state);
+    const type = state.exerciseType;
+    if (
+      type === undefined ||
+      Object.keys(definedChanges).some(
+        (field) => !editableFields[type].has(field),
+      )
+    )
+      throw createInvalidExerciseTypeException();
+    const normalized = { ...definedChanges };
+    if ('youtubeId' in normalized && normalized.youtubeId !== undefined)
+      normalized.youtubeId =
+        await this.youtubeReferenceService.normalizeAndValidate(
+          normalized.youtubeId,
+        );
+    const repositoryResult = await this.trainingPlanRepository.updateExercise(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+      expectedVersion,
+      normalized,
+    );
+    if (repositoryResult === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+        exerciseId,
+      );
+      return failure;
+    }
+    const result = {
+      data: this.toPublicExercise(repositoryResult.data),
+      version: repositoryResult.version,
+    };
+    this.logger.log('TrainingPlanService -> updateExercise -> return:', {
+      data: { exerciseId, trainingPlanId, version: result.version, workoutId },
+    });
+    return result;
+  }
+
+  async deleteExercise(
+    trainingPlanId: string,
+    workoutId: string,
+    exerciseId: string,
+    expectedVersion: number,
+  ): Promise<number> {
+    const result = await this.trainingPlanRepository.deleteExercise(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+      expectedVersion,
+    );
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+        exerciseId,
+      );
+      return failure;
+    }
+    if (result.data !== null)
+      await this.exerciseImageService.deleteImages([result.data]);
+    return result.version;
+  }
+
+  async reorderExercises(
+    trainingPlanId: string,
+    workoutId: string,
+    expectedVersion: number,
+    exerciseIds: readonly string[],
+  ): Promise<number> {
+    const workout = await this.trainingPlanRepository.findWorkout(
+      trainingPlanId,
+      workoutId,
+    );
+    if (workout === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+      );
+      return failure;
+    }
+    if (workout.version !== expectedVersion)
+      throw createVersionConflictException();
+    const currentIds = workout.exercises.map((exercise) => exercise.id);
+    const unique = new Set(exerciseIds);
+    if (
+      unique.size !== exerciseIds.length ||
+      exerciseIds.length !== currentIds.length ||
+      currentIds.some((id) => !unique.has(id))
+    )
+      throw createInvalidExerciseOrderException();
+    const result = await this.trainingPlanRepository.reorderExercises(
+      trainingPlanId,
+      workoutId,
+      expectedVersion,
+      exerciseIds,
+    );
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+      );
+      return failure;
+    }
+    return result.version;
+  }
+
+  async uploadExerciseImage(
+    trainingPlanId: string,
+    workoutId: string,
+    exerciseId: string,
+    expectedVersion: number,
+    file: UploadedImageFile,
+  ): Promise<VersionedResult<ExerciseImage>> {
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
+    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    this.assertAggregateCapacity(state);
+    if (state.exerciseType !== 'image')
+      throw createInvalidExerciseTypeException();
+    const image = await this.exerciseImageService.processAndUpload(file);
+    const result = await this.trainingPlanRepository.updateExerciseImage(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+      expectedVersion,
+      { image },
+    );
+    if (result === null) {
+      await this.exerciseImageService.deleteImages([image]);
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+        exerciseId,
+      );
+      return failure;
+    }
+    if (result.data !== null)
+      await this.exerciseImageService.deleteImages([result.data]);
+    const response = {
+      data: this.toPublicImage(image),
+      version: result.version,
+    };
+    return response;
+  }
+
+  async removeExerciseImage(
+    trainingPlanId: string,
+    workoutId: string,
+    exerciseId: string,
+    expectedVersion: number,
+  ): Promise<number> {
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
+    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    if (state.exerciseType !== 'image')
+      throw createInvalidExerciseTypeException();
+    const result = await this.trainingPlanRepository.updateExerciseImage(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+      expectedVersion,
+      { image: null },
+    );
+    if (result === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        workoutId,
+        exerciseId,
+      );
+      return failure;
+    }
+    if (result.data !== null)
+      await this.exerciseImageService.deleteImages([result.data]);
+    return result.version;
+  }
+
+  private async throwMutationFailure(
+    trainingPlanId: string,
+    expectedVersion: number,
+    workoutId?: string,
+    exerciseId?: string,
+  ): Promise<never> {
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      workoutId,
+      exerciseId,
+    );
+    this.assertState(state, expectedVersion, workoutId, exerciseId);
+    throw createVersionConflictException();
+  }
+
+  private assertState(
+    state: TargetState,
+    expectedVersion: number,
+    workoutId?: string,
+    exerciseId?: string,
+  ): void {
+    if (!state.trainingPlanExists) throw createTrainingPlanNotFoundException();
+    if (workoutId !== undefined && !state.workoutExists)
+      throw createWorkoutNotFoundException();
+    if (exerciseId !== undefined && !state.exerciseExists)
+      throw createExerciseNotFoundException();
+    if (state.version !== expectedVersion)
+      throw createVersionConflictException();
+  }
+
+  private assertAggregateCapacity(state: TargetState): void {
+    if ((state.bsonSize ?? 0) >= TRAINING_PLAN_OPERATIONAL_SIZE_LIMIT)
+      throw createTrainingPlanSizeLimitException();
+  }
+
+  private warnIfAggregateNearLimit(
+    trainingPlanId: string,
+    state: TargetState,
+  ): void {
+    if (
+      (state.bsonSize ?? 0) < TRAINING_PLAN_SIZE_WARNING &&
+      (state.workoutCount ?? 0) < TRAINING_PLAN_WORKOUT_WARNING &&
+      (state.maxExerciseCount ?? 0) < TRAINING_PLAN_EXERCISE_WARNING
+    )
+      return;
+    this.logger.warn(
+      'TrainingPlanService -> warnIfAggregateNearLimit -> aggregateNearLimit:',
+      {
+        data: {
+          bsonSize: state.bsonSize,
+          maxExerciseCount: state.maxExerciseCount,
+          trainingPlanId,
+          workoutCount: state.workoutCount,
+        },
+      },
+    );
+  }
+
+  private createDefaultExercise(type: ExerciseType): StoredExercise {
+    const id = randomBytes(12).toString('hex');
+    let result: StoredExercise;
+    switch (type) {
+      case 'youtube-short':
+        result = {
+          id,
+          type,
+          name: 'Novo exercício',
+          youtubeId: 'ZA8gs8XP2bs',
+          bodyArea: 'other',
+          restSeconds: 60,
+          sets: 3,
+          repetitions: 12,
+        };
+        break;
+      case 'image':
+        result = {
+          id,
+          type,
+          name: 'Novo exercício',
+          image: null,
+          bodyArea: 'other',
+          restSeconds: 60,
+          sets: 3,
+          repetitions: 12,
+        };
+        break;
+      case 'youtube-long':
+        result = {
+          id,
+          type,
+          name: 'Novo exercício',
+          youtubeId: '2isq0vuKruE',
+          bodyArea: 'other',
+        };
+        break;
+      case 'pause':
+        result = { id, type, restSeconds: 60 };
+        break;
+      case 'duration':
+        result = {
+          id,
+          type,
+          name: 'Novo exercício',
+          bodyArea: 'other',
+          durationMinutes: 15,
+        };
+        break;
+    }
+    return result;
   }
 
   private toSummary(plan: TrainingPlanEntity): TrainingPlanSummary {
-    this.logger.log('TrainingPlanService -> toSummary -> params:', {
-      params: { trainingPlanId: plan.id },
-    });
-
     const result = {
       id: plan.id,
       name: plan.name,
       description: plan.description,
+      version: plan.version,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
     };
-    this.logger.log('TrainingPlanService -> toSummary -> return:', {
-      data: { trainingPlanId: result.id },
-    });
+    return result;
+  }
 
+  private toPublicExercise(exercise: StoredExercise): Exercise {
+    if (exercise.type !== 'image') {
+      const result = exercise;
+      return result;
+    }
+    const result = {
+      ...exercise,
+      image:
+        exercise.image === null ? null : this.toPublicImage(exercise.image),
+    };
+    return result;
+  }
+
+  private toPublicImage(image: StoredExerciseImage): ExerciseImage {
+    const result = {
+      thumbnailUrl: image.thumbnail.url,
+      displayUrl: image.display.url,
+    };
     return result;
   }
 }

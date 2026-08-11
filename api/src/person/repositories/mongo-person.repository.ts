@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import { Types, type Model } from 'mongoose';
 
 import type { Theme } from '@dall-fit/types';
 
@@ -9,10 +9,30 @@ import {
   PersonRepository,
   type FindOrCreatePersonResult,
 } from '~/person/repositories/person.repository';
-import {
-  PersonDocument,
-  type PersonHydratedDocument,
-} from '~/person/repositories/person.schema';
+import { PersonDocument } from '~/person/repositories/person.schema';
+
+interface PlainPerson {
+  _id: Types.ObjectId;
+  configs?: { theme?: Theme };
+  googleSubject: string;
+  name: string;
+  email: string;
+  photoUrl: string | null;
+  isAdmin?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const publicProjection = {
+  configs: 1,
+  googleSubject: 1,
+  name: 1,
+  email: 1,
+  photoUrl: 1,
+  isAdmin: 1,
+  createdAt: 1,
+  updatedAt: 1,
+};
 
 @Injectable()
 export class MongoPersonRepository extends PersonRepository {
@@ -30,7 +50,11 @@ export class MongoPersonRepository extends PersonRepository {
       params: { personId: id },
     });
 
-    const document = await this.personModel.findById(id).exec();
+    const document = await this.personModel
+      .findById(id)
+      .select(publicProjection)
+      .lean<PlainPerson>()
+      .exec();
     const data = { found: document !== null, personId: id };
 
     this.logger.log('MongoPersonRepository -> findById -> mongoose return:', {
@@ -55,6 +79,8 @@ export class MongoPersonRepository extends PersonRepository {
 
     const existingDocument = await this.personModel
       .findOne({ googleSubject: person.googleSubject })
+      .select(publicProjection)
+      .lean<PlainPerson>()
       .exec();
 
     this.logger.log(
@@ -65,7 +91,7 @@ export class MongoPersonRepository extends PersonRepository {
     if (existingDocument !== null) {
       this.logger.log(
         'MongoPersonRepository -> findOrCreateByGoogleSubject -> existingPerson branch:',
-        { data: { personId: existingDocument.id } },
+        { data: { personId: existingDocument._id.toString() } },
       );
 
       const changed =
@@ -92,12 +118,16 @@ export class MongoPersonRepository extends PersonRepository {
               },
               { returnDocument: 'after', runValidators: true },
             )
+            .select(publicProjection)
+            .lean<PlainPerson>()
             .exec()
         : existingDocument;
       const currentDocument =
         synchronizedDocument ??
         (await this.personModel
           .findOne({ googleSubject: person.googleSubject })
+          .select(publicProjection)
+          .lean<PlainPerson>()
           .orFail()
           .exec());
       this.logger.log(
@@ -105,7 +135,7 @@ export class MongoPersonRepository extends PersonRepository {
         {
           data: {
             changed: synchronizedDocument !== null && changed,
-            personId: currentDocument.id,
+            personId: currentDocument._id.toString(),
           },
         },
       );
@@ -133,7 +163,7 @@ export class MongoPersonRepository extends PersonRepository {
 
       const result = {
         created: true,
-        person: this.mapDocument(createdDocument),
+        person: this.mapDocument(createdDocument.toObject()),
       };
 
       this.logger.log(
@@ -154,6 +184,8 @@ export class MongoPersonRepository extends PersonRepository {
 
       const concurrentDocument = await this.personModel
         .findOne({ googleSubject: person.googleSubject })
+        .select(publicProjection)
+        .lean<PlainPerson>()
         .orFail()
         .exec();
       const result = {
@@ -184,6 +216,8 @@ export class MongoPersonRepository extends PersonRepository {
         { $set: { 'configs.theme': theme } },
         { returnDocument: 'after', runValidators: true },
       )
+      .select(publicProjection)
+      .lean<PlainPerson>()
       .exec();
     const data = { found: document !== null, personId };
     this.logger.log(
@@ -199,9 +233,9 @@ export class MongoPersonRepository extends PersonRepository {
     return result;
   }
 
-  private mapDocument(document: PersonHydratedDocument): PersonEntity {
+  private mapDocument(document: PlainPerson): PersonEntity {
     this.logger.log('MongoPersonRepository -> mapDocument -> params:', {
-      params: { personId: document.id },
+      params: { personId: document._id.toString() },
     });
 
     const result = {
@@ -209,7 +243,7 @@ export class MongoPersonRepository extends PersonRepository {
         document.configs?.theme === undefined
           ? {}
           : { theme: document.configs.theme },
-      id: document.id,
+      id: document._id.toString(),
       googleSubject: document.googleSubject,
       name: document.name,
       email: document.email,

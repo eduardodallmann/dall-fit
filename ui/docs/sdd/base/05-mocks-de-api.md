@@ -173,7 +173,7 @@ token fictício no-store e `POST /auth/logout` valida seu header, com cenários
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 
-Planos globais usam fixtures tipadas e handlers para as sete operações em arquivos
+Planos globais usam fixtures tipadas e handlers para as quinze operações em arquivos
 `training-plans.ts`. A query exclusiva `mockTrainingPlans` vira o header
 `x-dall-fit-mock-training-plans` somente com mocks ativos; nenhum dos dois pertence
 ao contrato real. Cenários de mutation mantêm estado separado por valor do seletor,
@@ -181,4 +181,8 @@ evitando interferência entre jornadas Playwright paralelas. No Vitest, o setup
 global limpa esse estado depois de cada teste, pois `resetHandlers()` restaura os
 handlers do MSW, mas não dados mutáveis mantidos pelos módulos. Há sucesso, vazio,
 not-found, loading prolongado para validar skeletons e falhas relevantes com
-latência; a proteção sentinela continua por último.
+latência; a proteção sentinela continua por último. O estado conserva `version`,
+valida `If-Match`, incrementa ETag por mutação efetiva e mantém ordem/imagem.
+`version-conflict`, `update-exercise-error`, `delete-exercise-error` e
+`image-error` cobrem falhas do editor. IDs criados são determinísticos; multipart
+exige um `File` no campo `file` e nunca é convertido em JSON/base64.

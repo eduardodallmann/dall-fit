@@ -1,66 +1,91 @@
 # Rota `/global/training-plan/:trainingPlanId/workout/:workoutId`
 
-## Objetivo funcional
+## Objetivo
 
-- Problema resolvido: integrar a árvore e reservar um destino estável ao futuro
-  editor de exercícios.
-- Ator: pessoa administradora.
-- Resultado: breadcrumb resolvido e aviso de editor ainda indisponível.
-- Fluxo: `../../../../docs/sdd/flows/gestao-planos-treino-globais.md`.
+Editor administrativo completo de um workout global e sua lista ordenada de até
+50 exercícios. A rota é filha de `adminRoute` e faz uma única leitura projetada em
+`GET /global/training-plans/:trainingPlanId/workouts/:workoutId`.
 
-## Entradas e pré-condições
+## Entrada, cabeçalho e estados
 
-IDs do plano e do treino vêm do path. A rota é filha de `adminRoute`; não possui
-endpoint isolado de treino e reutiliza a query
-`GET /global/training-plans/:trainingPlanId`.
+Breadcrumb resolvido: `Home / Planos de treino / <plano> / <treino>`. IDs nunca
+viram labels. Sem cache, skeleton estrutural precede o editor; refetch falho mantém
+dado e alerta. Not-found/falha inicial mostra Alert com retorno/retry aplicável.
 
-## Caminho feliz
+O cabeçalho mostra `Treino`, nome e lápis icon-only. A edição inline valida trim
+1–120, atualiza otimisticamente, entra na fila e usa toast.promise. Cancelar
+restaura o confirmado. `412` mostra alerta persistente, bloqueia novas gravações e
+oferece `Recarregar dados`, com confirmação antes de descartar drafts.
 
-1. Carrega ou reutiliza o detalhe em cache.
-2. Localiza o treino pelo ID entre os resumos.
-3. Renderiza `Home / Planos de treino / <plano> / <treino>`.
-4. Mostra o nome e informa que o editor será disponibilizado em outra etapa.
+## Lista e campos
 
-Não há formulário, mutation ou persistência nesta rota.
+A composição é lista semântica responsiva, não Table. Cada item possui handle,
+campos com labels, Chip do tipo, status anunciado e exclusão em Popover. Em telas
+menores o grid empilha campos sem scroll horizontal. dnd kit aceita ponteiro,
+toque/teclado e persiste apenas no drop.
 
-## Estados e caminhos alternativos
+| Tipo          | Campos                                                                  |
+| ------------- | ----------------------------------------------------------------------- |
+| YouTube Short | nome, vídeo/miniatura derivada, body area, descanso, séries, repetições |
+| Imagem        | nome, imagem, body area, descanso, séries, repetições                   |
+| YouTube Longo | nome, vídeo/miniatura derivada, body area                               |
+| Pausa         | descanso                                                                |
+| Duração       | nome, body area, minutos                                                |
 
-- Loading: breadcrumb apenas com segmentos já resolvidos e skeletons que
-  representam o conteúdo da rota.
-- Falha do detalhe sem cache: omite plano e treino, mostra `Alert` e retry.
-- Falha em background com cache: preserva nomes válidos.
-- Plano carregado e treino ausente: mantém o nome do plano, omite o segmento do
-  treino e mostra `Treino não encontrado`.
-- Nenhum breadcrumb usa ID, placeholder ou mensagem de erro como label.
+TextField/Input, NumberField, Select/ListBox, Chip, Spinner, Dropdown, Popover,
+Button e Alert são HeroUI. `ImageFilePicker` é a única composição transversal
+própria e usa input file nativo acessível.
 
-## Navegação e acessibilidade
+## Autosave e mutações
 
-Ancestrais usam navegação SPA pelo TanStack Router; o último item é atual e não é
-link. Nomes longos são truncados apenas visualmente e permanecem no `title`. O
-alerta não depende de cor. Voltar retorna ao detalhe com seu cache.
-Textos visíveis e nomes acessíveis usam `treino`; `workout` permanece somente nos
-identificadores técnicos da rota e do contrato.
+Cada linha acumula somente campos alterados e dispara depois de três segundos sem
+nova edição. Timers são independentes; requests passam por uma fila FIFO do plano,
+que injeta o ETag mais recente. Se houver edição durante um request, a response
+canônica não substitui o draft mais novo. Sucesso de autosave não mostra toast;
+falha preserva draft/miniatura e anuncia erro.
 
-## Analytics
+Adicionar escolhe um dos cinco tipos, põe linha temporária no fim e troca pelo
+default retornado. Ordem envia todos os IDs uma vez e faz rollback em falha.
+Excluir confirma, remove otimisticamente e restaura item/posição/draft se falhar.
+Nenhuma mutation tem retry automático.
 
-Breadcrumbs emitem somente destinos enumerados e a rota comum normaliza os dois
-segmentos dinâmicos. Quando a falha sem cache oferece `Tentar novamente`, a ação
-emite `ui_retry_requested` para `workout`. IDs, nomes, query e conteúdo do plano ou
-treino não são enviados.
+Upload/substituição/remover imagem são imediatos, mas usam a mesma fila. A UI
+valida JPEG/PNG/WebP e 10 MiB antes de FormData, conserva a imagem anterior durante
+loading e nunca lê base64. As URLs públicas pertencem ao host
+`gvi3tyf5ckqiqlak.public.blob.vercel-storage.com` e ao prefixo
+`exercise-images/`. `image:null` não mostra placeholder de mídia.
 
-## Referências visuais de layout
+## Integrações e falhas
 
-Não se aplica — não existem imagens em
+- GET/PATCH do workout;
+- POST/PATCH/DELETE de exercícios e PUT da ordem;
+- PUT multipart/DELETE da imagem;
+- `If-Match` em toda mutation e ETag em todo sucesso.
+
+Not-found distingue plano/workout na API sem expor ownership. Conflito preserva
+trabalho e pausa a fila. Erros iniciais não dependem de toast; saving usa aria-live
+e spinner nomeado. Handles e botões icon-only têm nomes contextuais, miniaturas têm
+alt derivado do nome visível e drag possui instruções do sensor de teclado.
+
+## Analytics e privacidade
+
+Nome, adicionar/tipo, campos, drop, exclusão, mídia e retry usam enums do catálogo.
+Cada operação aceita emite início e terminal; conflito é erro e recarga é retry.
+Não se enviam IDs, nomes, valores, URLs, arquivos, tamanhos, ordem, código externo
+ou seletor mock.
+
+## Cenários e cobertura
+
+- sucesso:
+  `/global/training-plan/64b000000000000000000001/workout/64b000000000000000000101?mockAuth=admin`;
+- loading: `mockTrainingPlans=loading`;
+- autosave falho: `update-exercise-error`;
+- conflito: `version-conflict`;
+- imagem falha: `image-error`.
+
+Vitest cobre services e fila; Playwright cobre render dos cinco tipos, autosave,
+conflito e proteção. E2E separado cobre API/MongoDB. Não há referência visual em
 `routes/assets/global-training-plan-workout/`.
 
-## Cenários funcionais e cobertura
-
-- Sucesso: criar treino pelo detalhe e chegar ao ID devolvido pelo MSW.
-- Loading: usar `mockTrainingPlans=loading`; skeletons precedem o conteúdo.
-- Ausente:
-  `/global/training-plan/64b000000000000000000001/workout/workout-ausente?mockAuth=admin`.
-- Falha de plano: usar `mockTrainingPlans=detail-error`; somente ancestrais
-  estáticos permanecem.
-- Arquivo: `src/routes/training-plan/workout-page.tsx`.
-- Specs: `tests/integration/routes/training-plan.spec.ts` e
-  `tests/integration/flows/gestao-planos-treino.spec.ts`.
+Arquivos: `workout-page.tsx`, `workout-editor/`, `training-plan-service.ts`,
+queries e handlers/fixtures `training-plans.ts`.
