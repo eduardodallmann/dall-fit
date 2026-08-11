@@ -92,7 +92,11 @@ mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
 O pacote é compilado por `pnpm install` e novamente antes dos comandos agregadores
 da raiz. Sua saída de runtime é CommonJS para ser compatível com a API NestJS,
 que é emitida como CommonJS; a API e a UI devem consumir somente as exportações
-públicas do pacote. Durante desenvolvimento, execute
+públicas do pacote. Como o pnpm vincula o pacote à UI como dependência local, o
+Vite o inclui explicitamente no pré-empacotamento de dependências para converter
+suas exportações de runtime em ESM no servidor de desenvolvimento; o build de
+produção faz a mesma interoperabilidade durante o bundling. Durante
+desenvolvimento, execute
 `pnpm -C packages/types build` após mudar uma exportação pública caso o consumidor
 esteja sendo iniciado isoladamente.
 

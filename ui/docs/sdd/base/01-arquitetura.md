@@ -339,6 +339,12 @@ Contratos do monorepo são consumidos por seus pacotes públicos no namespace
 `@dall-fit/*`, como `@dall-fit/types`. `~/` nunca aponta para a API ou para outro
 pacote do workspace, e `@/*` não é um alias válido.
 
+`@dall-fit/types` publica valores de runtime em CommonJS para a API NestJS e é uma
+dependência vinculada pelo workspace. `vite.config.ts` mantém esse pacote em
+`optimizeDeps.include`, fazendo o servidor de desenvolvimento convertê-lo para ESM
+antes de expor imports nomeados ao navegador. O build de produção preserva o mesmo
+consumo público por meio da interoperabilidade CommonJS do Vite.
+
 ## Referências oficiais
 
 - [TanStack Router React](https://tanstack.com/router/latest/docs/framework/react/start/overview)

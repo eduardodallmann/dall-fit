@@ -32,6 +32,9 @@ const mockOAuthNavigationPlugin: Plugin = {
 
 // https://vite.dev/config/
 export default defineConfig({
+  optimizeDeps: {
+    include: ['@dall-fit/types'],
+  },
   plugins: [
     react(),
     mockOAuthNavigationPlugin,
