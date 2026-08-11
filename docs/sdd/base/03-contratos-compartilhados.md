@@ -70,14 +70,24 @@ mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
 
 ## Contratos vigentes de planos de treino
 
-- `TrainingPlanSummary` expõe ID, nome, descrição e timestamps, sem ownership ou
-  workouts.
+- `TrainingPlanSummary` expõe ID, nome, descrição, `version` inteira a partir de
+  zero e timestamps, sem ownership ou workouts.
 - `TrainingPlanDetails` acrescenta resumos de workouts com ID, nome e
   `exerciseCount`, sem o array de exercícios.
 - requests de criação exigem nome/descrição; requests de edição são parciais.
 - a coleção global usa `CollectionResponse<TrainingPlanSummary>` e as respostas de
   item usam `ApiResponse`.
-- `ownerPersonId`, documentos Mongoose e exercícios embutidos são internos da API.
+- `TrainingPlanWorkoutDetails` representa uma leitura projetada do editor com
+  plano pai mínimo, timestamps, versão e exercícios na ordem persistida.
+- `BodyArea`/`BODY_AREAS` definem os 16 locais aceitos. `Exercise` é uma union
+  discriminada por `type` entre `youtube-short`, `image`, `youtube-long`, `pause`
+  e `duration`; campos alheios ao discriminador não existem e somente
+  `ImageExercise.image` aceita `null`.
+- requests do editor cobrem nome do treino, criação por tipo, PATCH parcial do
+  exercício, ordem final completa e imagem. Respostas de mutação expõem o recurso
+  público; a versão resultante é transportada pelo `ETag` HTTP.
+- `ownerPersonId`, documentos Mongoose, keys/dimensões internas do Blob e o
+  original da imagem são exclusivos da API.
 
 O pacote é compilado por `pnpm install` e novamente antes dos comandos agregadores
 da raiz. Durante desenvolvimento, execute `pnpm -C packages/types build` após mudar

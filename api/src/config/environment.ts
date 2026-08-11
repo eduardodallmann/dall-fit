@@ -96,6 +96,26 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(60_000),
+  RATE_LIMIT_EDITOR_MUTATION_LIMIT: z.coerce.number().int().min(1).default(120),
+  RATE_LIMIT_EDITOR_MUTATION_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
+  RATE_LIMIT_IMAGE_MUTATION_LIMIT: z.coerce.number().int().min(1).default(10),
+  RATE_LIMIT_IMAGE_MUTATION_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
+  YOUTUBE_VALIDATION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(10_000)
+    .default(2_000),
+  BLOB_STORE_ID: optionalNonEmptyString,
+  BLOB_READ_WRITE_TOKEN: optionalNonEmptyString,
   GOOGLE_OAUTH_CREDENTIALS_BASE64: z.string().min(1),
   AUTH_SESSION_SECRET: z.string().min(32),
   AUTH_SESSION_ACTIVE_KEY_ID: z.string().min(1).default('active-v1'),
@@ -140,6 +160,8 @@ export type RuntimeEnvironment = 'local' | 'preview' | 'production' | 'test';
 
 type ParsedEnvironment = z.infer<typeof environmentSchema>;
 type EnvironmentVariables = ParsedEnvironment & {
+  BLOB_READ_WRITE_TOKEN: string;
+  BLOB_STORE_ID: string;
   GOOGLE_OAUTH_CREDENTIALS: GoogleOAuthCredentials;
   REDIS_NAMESPACE: string;
   REDIS_URL: string;
@@ -163,9 +185,11 @@ export function validateEnvironment(
   );
   const redisUrl = resolveRedisUrl(parsed, runtimeEnvironment);
   const redisNamespace = resolveRedisNamespace(parsed, runtimeEnvironment);
+  const blob = resolveBlobConfiguration(parsed, runtimeEnvironment);
 
   const result = {
     ...parsed,
+    ...blob,
     GOOGLE_OAUTH_CREDENTIALS: googleCredentials,
     REDIS_NAMESPACE: redisNamespace,
     REDIS_URL: redisUrl,
@@ -173,6 +197,26 @@ export function validateEnvironment(
   };
 
   return result;
+}
+
+function resolveBlobConfiguration(
+  config: ParsedEnvironment,
+  runtimeEnvironment: RuntimeEnvironment,
+): { BLOB_READ_WRITE_TOKEN: string; BLOB_STORE_ID: string } {
+  if (
+    (runtimeEnvironment === 'preview' || runtimeEnvironment === 'production') &&
+    (config.BLOB_READ_WRITE_TOKEN === undefined ||
+      config.BLOB_STORE_ID === undefined)
+  ) {
+    throw new Error(
+      'Invalid environment variables: BLOB_READ_WRITE_TOKEN and BLOB_STORE_ID are required in production and preview',
+    );
+  }
+  return {
+    BLOB_READ_WRITE_TOKEN:
+      config.BLOB_READ_WRITE_TOKEN ?? 'local-blob-token-not-configured',
+    BLOB_STORE_ID: config.BLOB_STORE_ID ?? 'local-blob-store-not-configured',
+  };
 }
 
 function resolveRuntimeEnvironment(

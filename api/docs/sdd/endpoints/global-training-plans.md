@@ -1,143 +1,100 @@
-# Endpoints administrativos de planos de treino globais
+# Endpoints `global-training-plans`
 
-> Documentação viva das sete operações inseparáveis do recurso global.
+## Objetivo e hierarquia
 
-## Objetivo funcional
+As quinze operações administrativas mantêm planos globais, workouts e exercícios
+embutidos. O caminho interno é sempre controller → command proprietário →
+`TrainingPlanService` → `TrainingPlanRepository`; mídia acrescenta
+`ExerciseImageService`/`BlobStorageService` e referências YouTube acrescentam
+`YoutubeReferenceService`. Commands/controllers não acessam MongoDB ou SDKs.
 
-- Problema resolvido: listar e manter planos globais e seus workouts embutidos.
-- Ator/consumidor: UI administrativa, exclusivamente para pessoa com
-  `isAdmin: true`.
-- Resultado esperado: persistir documentos em `training_plans`, sem expor owner ou
-  exercícios, e responder com contratos compartilhados estáveis.
-- Módulo proprietário: `TrainingPlanModule`.
-- Fluxo relacionado:
-  `../../../../docs/sdd/flows/gestao-planos-treino-globais.md`.
+| Papel        | Símbolo                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| transporte   | `GlobalTrainingPlansController`, DTOs e ETag parser                     |
+| orquestração | classes em `src/training-plan/commands/`                                |
+| domínio      | `TrainingPlanService`                                                   |
+| integrações  | `YoutubeReferenceService`, `ExerciseImageService`, `BlobStorageService` |
+| persistência | `MongoTrainingPlanRepository`, schemas discriminados                    |
+| contratos    | `@dall-fit/types`                                                       |
 
-## Referências técnicas
+Todas exigem sessão ativa e `isAdmin: true`. Mutações exigem origem/CSRF e quota:
+30/minuto nas operações administrativas existentes, 120/minuto nas mutations JSON
+do editor e 10/minuto no upload. Plano pessoal é indistinguível de ausente.
 
-| Papel      | Símbolo/arquivo                                                                                               | Responsabilidade                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Proteção   | [`AdminOnly`](../../../src/auth/decorators/admin-only.ts)                                                     | executa sessão e autorização administrativa                  |
-| Controller | [`GlobalTrainingPlansController`](../../../src/training-plan/controllers/global-training-plans.controller.ts) | valida transporte, registra e chama o command proprietário   |
-| Entrada    | [`training-plan.dto.ts`](../../../src/training-plan/dto/training-plan.dto.ts)                                 | valida página, IDs, bodies, trim e limites                   |
-| Commands   | [`commands/`](../../../src/training-plan/commands)                                                            | um orquestrador por operação e montagem da response          |
-| Service    | [`TrainingPlanService`](../../../src/training-plan/services/training-plan.service.ts)                         | aplica ownership global, page size, nomes padrão e not-found |
-| Port       | [`TrainingPlanRepository`](../../../src/training-plan/repositories/training-plan.repository.ts)               | contrato de persistência independente do MongoDB             |
-| Adapter    | [`MongoTrainingPlanRepository`](../../../src/training-plan/repositories/mongo-training-plan.repository.ts)    | consultas, projeções e mutações atômicas                     |
-| Schema     | [`training-plan.schema.ts`](../../../src/training-plan/repositories/training-plan.schema.ts)                  | coleção, subdocumentos e índice                              |
-| Saídas     | [`contracts.ts`](../../../../packages/types/src/contracts.ts)                                                 | responses compartilhadas com a UI                            |
+## Concorrência HTTP
 
-## Contrato HTTP resumido
+POST de plano nasce com `version: 0`. GET de item e toda resposta bem-sucedida que
+mantém o aggregate devolvem `ETag: "training-plan:<id>:<version>"`. Toda mutação de
+plano existente exige exatamente essa tag forte em `If-Match`; ausência é
+`428 PRECONDITION_REQUIRED`, formato fraco/lista/wildcard/alheio é
+`400 VALIDATION_ERROR` e versão antiga de recurso existente é
+`412 TRAINING_PLAN_VERSION_CONFLICT`. CORS permite `If-Match`, expõe `ETag` e
+aceita PUT.
 
-Todas as operações exigem o cookie de sessão vigente, registro ativo no Redis e
-`isAdmin: true`. Sessão
-ausente/inválida responde `401 AUTHENTICATION_REQUIRED`; pessoa comum responde
-`403 ADMIN_ACCESS_REQUIRED` antes do controller. Propriedades adicionais, IDs,
-query e bodies inválidos respondem `400 VALIDATION_ERROR` com detalhes vazios.
-POST, PATCH e DELETE também exigem `Origin` exato, `X-CSRF-Token` da sessão e
-quota distribuída de 30/minuto por administradora+IP; falhas respondem `403`,
-`429` com `Retry-After` ou erro técnico sanitizado sem executar o command.
+## Contratos
 
-| Método e path                                                       | Entrada                       | Sucesso | Saída                           |
-| ------------------------------------------------------------------- | ----------------------------- | ------- | ------------------------------- |
-| `GET /global/training-plans?page=1`                                 | `page` inteiro >= 1, padrão 1 | `200`   | coleção com `pageSize: 20`      |
-| `POST /global/training-plans`                                       | nome e descrição              | `201`   | resumo criado                   |
-| `GET /global/training-plans/:trainingPlanId`                        | ID MongoDB                    | `200`   | detalhe com resumos de workouts |
-| `PATCH /global/training-plans/:trainingPlanId`                      | nome e/ou descrição           | `200`   | resumo atualizado               |
-| `DELETE /global/training-plans/:trainingPlanId`                     | ID MongoDB                    | `204`   | sem body                        |
-| `POST /global/training-plans/:trainingPlanId/workouts`              | body ausente ou `{}`          | `201`   | workout criado                  |
-| `DELETE /global/training-plans/:trainingPlanId/workouts/:workoutId` | dois IDs MongoDB              | `204`   | sem body                        |
+| Método e path                                  | Entrada                             | Sucesso                         |
+| ---------------------------------------------- | ----------------------------------- | ------------------------------- |
+| `GET /global/training-plans?page=1`            | página 1–100                        | `200`, 20 resumos com versão    |
+| `POST /global/training-plans`                  | `{name,description}`                | `201`, resumo v0 + ETag         |
+| `GET /global/training-plans/:planId`           | IDs MongoDB                         | `200`, detalhe projetado + ETag |
+| `PATCH /global/training-plans/:planId`         | campos parciais + If-Match          | `200`, resumo + novo ETag       |
+| `DELETE /global/training-plans/:planId`        | If-Match                            | `204`, remove árvore/mídia      |
+| `POST /global/training-plans/:planId/workouts` | `{}` + If-Match                     | `201`, `Novo treino`            |
+| `DELETE .../workouts/:workoutId`               | If-Match                            | `204`, remove workout/mídia     |
+| `GET .../workouts/:workoutId`                  | IDs MongoDB                         | `200`, editor completo + ETag   |
+| `PATCH .../workouts/:workoutId`                | `{name}` + If-Match                 | `200`, nome/timestamp           |
+| `POST .../workouts/:workoutId/exercises`       | `{type}` + If-Match                 | `201`, exercício com defaults   |
+| `PATCH .../exercises/:exerciseId`              | campos válidos do tipo + If-Match   | `200`, exercício canônico       |
+| `DELETE .../exercises/:exerciseId`             | If-Match                            | `204`, remove linha/mídia       |
+| `PUT .../exercises/order`                      | `{exerciseIds}` completo + If-Match | `204`; ordem igual é no-op      |
+| `PUT .../exercises/:exerciseId/image`          | multipart `file` + If-Match         | `200`, URLs thumbnail/display   |
+| `DELETE .../exercises/:exerciseId/image`       | If-Match                            | `204`; imagem nula é no-op      |
 
-`name` recebe trim e exige 1 a 120 caracteres; `description` recebe trim e exige 1
-a 1000. PATCH vazio é inválido. Nomes não são únicos. Um ID válido inexistente ou
-de plano pessoal responde `404 TRAINING_PLAN_NOT_FOUND`. Ao excluir workout de um
-plano global existente, ID ausente responde `404 WORKOUT_NOT_FOUND`.
+GET do workout retorna plano mínimo, timestamps e exercícios na ordem física. Os
+tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
+25 workouts, 50 exercícios, números finitos, 16 body areas. Página 101 é inválida.
+YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Imagem
+pública expõe apenas URLs; keys, dimensões internas e original não atravessam HTTP.
 
-As datas são ISO 8601. Resumos de lista nunca incluem workouts. O detalhe inclui
-`workouts: [{ id, name, exerciseCount }]`; não inclui `ownerPersonId` nem
-`exercises`. GET é seguro; PATCH/DELETE não são garantidos como idempotentes no
-sentido de resposta, pois repetir depois da exclusão produz not-found.
+## Persistência e branches
 
-## Fluxo completo
+Listagem usa projeção lean, ordem `{createdAt:-1,_id:-1}` e índice
+`{ownerPersonId:1,createdAt:-1,_id:-1}`. Detalhe/workout retornam somente campos
+necessários. PATCH substitui/projeta só o subdocumento alvo e todos os writes CAS
+incluem `ownerPersonId:null`. Uma inspeção mínima distingue plano, workout,
+exercício e versão quando um filtro não casa.
 
-### 1. Entrada e proteção — `GlobalTrainingPlansController`
+Criação rejeita 25/50 por `409 WORKOUT_LIMIT_REACHED` ou
+`EXERCISE_LIMIT_REACHED`; documento no limite operacional rejeita por
+`TRAINING_PLAN_SIZE_LIMIT_REACHED`. Ordem deve conter uma vez todos os IDs atuais.
+Campos de outro discriminador são `INVALID_EXERCISE_TYPE`.
 
-`AdminOnly` executa `SessionAuthGuard` e `AdminAuthorizationGuard` nessa ordem.
-Nas mutações, `RateLimitGuard` e `CsrfGuard` completam a proteção antes do
-controller. O
-pipe global transforma query, aplica whitelist e rejeita propriedades extras com o
-erro estável. O controller registra somente IDs e nomes de campos, chama exatamente
-um command e devolve o resultado sem acessar repository.
+No YouTube, allowlist aceita ID, youtu.be, watch e shorts HTTPS; resposta externa
+não bem-sucedida vira `INVALID_YOUTUBE_REFERENCE`, falha/timeout vira
+`YOUTUBE_VALIDATION_UNAVAILABLE`, sem write. No upload, Sharp valida bytes,
+10 MiB, 40 MP e ausência de animação, gera duas variantes e só então executa CAS.
+Falha pré-commit remove novas keys; sucesso remove variantes antigas depois do
+MongoDB. Exclusões coletam referências antes do CAS e limpam depois.
 
-### 2. Orquestração — commands proprietários
+## Erros estáveis
 
-- `ListGlobalTrainingPlansCommand` recebe a página, chama `listGlobal` e monta
-  `data`, `page`, `pageSize: 20` e `total`.
-- `CreateGlobalTrainingPlanCommand` chama `createGlobal` e envolve o resumo em
-  `{ data }`.
-- `GetGlobalTrainingPlanCommand` chama `getGlobal` e envolve o detalhe.
-- `UpdateGlobalTrainingPlanCommand` encaminha somente os campos validados e envolve
-  o resumo atualizado.
-- `DeleteGlobalTrainingPlanCommand` e `DeleteTrainingPlanWorkoutCommand` aguardam a
-  conclusão e não montam body.
-- `CreateTrainingPlanWorkoutCommand` solicita o workout com nome padrão e envolve
-  seu resumo.
+`VALIDATION_ERROR`, `INVALID_YOUTUBE_REFERENCE`, `INVALID_EXERCISE_ORDER`,
+`INVALID_EXERCISE_TYPE`, `AUTHENTICATION_REQUIRED`, `ADMIN_ACCESS_REQUIRED`,
+`TRAINING_PLAN_NOT_FOUND`, `WORKOUT_NOT_FOUND`, `EXERCISE_NOT_FOUND`,
+`WORKOUT_LIMIT_REACHED`, `EXERCISE_LIMIT_REACHED`,
+`TRAINING_PLAN_SIZE_LIMIT_REACHED`, `TRAINING_PLAN_VERSION_CONFLICT`,
+`IMAGE_TOO_LARGE`, `UNSUPPORTED_IMAGE_TYPE`, `PRECONDITION_REQUIRED`,
+`YOUTUBE_VALIDATION_UNAVAILABLE` e `IMAGE_UPLOAD_FAILED`. Todo erro segue
+`ApiError` e `x-request-id`.
 
-Cada command registra entrada, retorno do service e saída. Não acessa o adapter.
+## Cenários reproduzíveis
 
-### 3. Regra e persistência — `TrainingPlanService` e repository
+Os comandos usam bypass somente local. A fixture tem plano
+`64b000000000000000000001`, workout `...101`, exercícios `...201` a `...205` e
+versão zero. Cada cenário prepara novamente o seed.
 
-`TrainingPlanService` fixa 20 itens, prepara criação com `ownerPersonId: null` e
-usa `Novo treino` no workout criado. Ele transforma ausência do plano e distinção
-da exclusão de workout nos erros funcionais estáveis.
-
-`MongoTrainingPlanRepository` sempre filtra operações globais por
-`ownerPersonId: null`:
-
-- lista ordena `createdAt` decrescente, aplica skip/limit e conta somente globais;
-- detalhe usa projeção MongoDB para calcular `$size` dos exercícios sem retorná-los;
-- criação materializa workouts vazios;
-- edição e exclusão combinam ID e owner no mesmo filtro;
-- criação de workout gera `ObjectId` antes de um único `$push`, com exercícios
-  vazios;
-- exclusão usa `$pull` por plano e workout; se nada for removido, consulta a
-  existência do plano para distinguir os dois not-found.
-
-MongoDB é a única dependência do domínio de planos. Redis participa somente na
-fronteira transversal de sessão, rate limit e CSRF; mensageria, serviço externo e
-transação não participam.
-
-### 4. Saída e falhas
-
-Commands montam os tipos de `@dall-fit/types`, controllers registram uma
-representação sanitizada e devolvem o objeto original. Falhas técnicas atravessam
-o tratamento global como erro genérico, sem query, documento ou stack. Não há
-efeito parcial compensável: cada alteração do plano/workout é uma operação MongoDB
-atômica sobre um documento.
-
-## Mapa de caminhos possíveis
-
-| Caminho              | Gatilho                          | Sequência interna                                 | Resultado                     | Efeito                |
-| -------------------- | -------------------------------- | ------------------------------------------------- | ----------------------------- | --------------------- |
-| lista                | página válida                    | controller → command → service → find/count       | `200`                         | nenhum                |
-| cria plano           | body válido                      | controller → command → service → create           | `201`                         | documento global      |
-| detalhe              | plano global                     | controller → command → service → aggregate        | `200`                         | nenhum                |
-| edita                | plano global e PATCH não vazio   | controller → command → service → findOneAndUpdate | `200`                         | campos alterados      |
-| exclui plano         | plano global                     | controller → command → service → findOneAndDelete | `204`                         | árvore removida       |
-| cria workout         | plano global                     | controller → command → service → `$push`          | `201`                         | subdocumento vazio    |
-| exclui workout       | IDs pertencentes                 | controller → command → service → `$pull`          | `204`                         | subdocumento removido |
-| plano oculto/ausente | owner não nulo ou ID inexistente | service interrompe após repository                | `404 TRAINING_PLAN_NOT_FOUND` | nenhum                |
-| workout ausente      | plano existe, workout não        | service distingue após repository                 | `404 WORKOUT_NOT_FOUND`       | nenhum                |
-| validação            | entrada inválida                 | pipe interrompe antes do command                  | `400 VALIDATION_ERROR`        | nenhum                |
-
-## Cenários detalhados
-
-Todos os exemplos locais usam o bypass restrito de autenticação. O seed indicado
-cria a administradora e as fixtures com IDs estáveis. O ID do plano global é
-`64b000000000000000000001`, o pessoal é `64b000000000000000000002` e o workout é
-`64b000000000000000000101`.
-
-### Cenário 1 — Listar a primeira página
+### Cenário 1 — listar, criar e ler detalhe
 
 **Seed**
 
@@ -145,67 +102,27 @@ cria a administradora e as fixtures com IDs estáveis. O ID do plano global é
 pnpm -C api seed -- training-plans:list
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' \
-  --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":"https://example.test/admin-avatar.png"}' \
-&& curl --request GET \
-  --url 'http://localhost:4000/global/training-plans?page=1' \
-  --cookie /tmp/dall-fit-training-plan-cookie.txt
-```
-
-- Then: `200`, apenas planos globais, ordem decrescente, página 1 e page size 20.
-
-### Cenário 2 — Criar plano com normalização
-
-**Seed**
-
-```bash
-pnpm -C api seed -- training-plans:create
-```
-
-**cURL**
-
-```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request POST --url http://localhost:4000/global/training-plans \
-  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{"name":"  Plano corrida  ","description":"  Preparação global.  "}'
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include 'http://localhost:4000/global/training-plans?page=1' --cookie /tmp/dall-fit-fit28.txt \
+&& curl --include --request POST http://localhost:4000/global/training-plans \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt \
+  --data '{"name":"Plano corrida","description":"Preparação global."}' \
+&& curl --include http://localhost:4000/global/training-plans/64b000000000000000000001 \
+  --cookie /tmp/dall-fit-fit28.txt
 ```
 
-- Then: `201` com strings normalizadas; persiste owner nulo e workouts vazios.
+Lista é determinística, criação retorna v0/ETag e detalhe contém cinco exercícios
+apenas como `exerciseCount`.
 
-### Cenário 3 — Consultar detalhe projetado
-
-**Seed**
-
-```bash
-pnpm -C api seed -- training-plans:detail
-```
-
-**cURL**
-
-```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& curl --request GET \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --cookie /tmp/dall-fit-training-plan-cookie.txt
-```
-
-- Then: `200`, workout `Treino A` com `exerciseCount: 1`, sem exercícios/owner.
-
-### Cenário 4 — Editar plano parcialmente
+### Cenário 2 — mutações existentes com If-Match
 
 **Seed**
 
@@ -213,152 +130,152 @@ curl --request POST --url http://localhost:4000/auth/test-login \
 pnpm -C api seed -- training-plans:update
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request PATCH \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{"name":"Plano global atualizado"}'
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001 \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt \
+  --data '{"name":"Plano atualizado"}' \
+&& curl --include --request POST http://localhost:4000/global/training-plans/64b000000000000000000001/workouts \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:1"' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt --data '{}'
 ```
 
-- Then: `200`; atualiza somente o nome e mantém a descrição.
+Cada write incrementa uma vez. DELETE de workout/plano usa o mesmo formato com a
+versão vigente e limpa imagens somente depois do commit.
 
-### Cenário 5 — Criar workout
+### Cenário 3 — ler e editar workout/exercícios
 
 **Seed**
 
 ```bash
-pnpm -C api seed -- training-plans:create-workout
+pnpm -C api seed -- training-plans:workout-editor
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request POST \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001/workouts \
-  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{}'
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 --cookie /tmp/dall-fit-fit28.txt \
+&& curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:0"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-fit28.txt --data '{"name":"Treino editado"}' \
+&& curl --include --request POST http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:1"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-fit28.txt --data '{"type":"pause"}' \
+&& curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000205 \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:2"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-fit28.txt --data '{"durationMinutes":20}'
 ```
 
-- Then: `201` com ID MongoDB real, nome `Novo treino` e `exerciseCount: 0`.
+GET traz os cinco tipos; POST recebe somente tipo e PATCH aceita somente campos do
+discriminador persistido.
 
-### Cenário 6 — Excluir workout
+### Cenário 4 — reordenar e detectar conflito
 
 **Seed**
 
 ```bash
-pnpm -C api seed -- training-plans:delete-workout
+pnpm -C api seed -- training-plans:workout-conflict
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request DELETE \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101 \
-  --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include --request PUT http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/order \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'if-match: "training-plan:64b000000000000000000001:0"' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-fit28.txt \
+  --data '{"exerciseIds":["64b000000000000000000205","64b000000000000000000204","64b000000000000000000203","64b000000000000000000202","64b000000000000000000201"]}' \
+&& curl --include --request DELETE http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000201 \
+  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt
 ```
 
-- Then: `204`; remove apenas o workout indicado.
+PUT retorna v1. O DELETE deliberadamente reutiliza v0, recebe `412` e não remove.
+Duplicar/omitir/desconhecer ID na ordem produz `INVALID_EXERCISE_ORDER` sem efeito.
 
-### Cenário 7 — Excluir plano e sua árvore
+### Cenário 5 — upload e remoção de imagem
 
 **Seed**
 
 ```bash
-pnpm -C api seed -- training-plans:delete
+pnpm -C api seed -- training-plans:workout-editor
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request DELETE \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include --request PUT http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000202/image \
+  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:0"' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt \
+  --form 'file=@./fixtures/exercise.jpg;type=image/jpeg' \
+&& curl --include --request DELETE http://localhost:4000/global/training-plans/64b000000000000000000001/workouts/64b000000000000000000101/exercises/64b000000000000000000202/image \
+  --header 'origin: http://localhost:3000' --header 'if-match: "training-plan:64b000000000000000000001:1"' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt
 ```
 
-- Then: `204`; documento e árvore embutida deixam de existir.
+Requer o Blob público `gvi3tyf5ckqiqlak` configurado e arquivo fictício local. PUT
+grava as variantes sob `exercise-images/` e devolve somente duas URLs; DELETE
+preserva o exercício e remove a associação.
 
-### Cenário 8 — Plano pessoal não é acessível como global
+### Cenário 6 — limites, ownership e precondição
 
 **Seed**
 
 ```bash
-pnpm -C api seed -- training-plans:not-found
+pnpm -C api seed -- training-plans:workout-limits
 ```
 
-**cURL**
+**cURL completo**
 
 ```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit28.txt \
   --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& curl --request GET \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000002 \
-  --cookie /tmp/dall-fit-training-plan-cookie.txt
+&& CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit28.txt | jq -r '.data.token')" \
+&& curl --include --request PATCH http://localhost:4000/global/training-plans/64b000000000000000000001 \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt --data '{"name":"Sem If-Match"}' \
+&& curl --include http://localhost:4000/global/training-plans/64b000000000000000000002 --cookie /tmp/dall-fit-fit28.txt \
+&& curl --include 'http://localhost:4000/global/training-plans?page=101' --cookie /tmp/dall-fit-fit28.txt
 ```
 
-- Then: `404 TRAINING_PLAN_NOT_FOUND`; nenhum dado pessoal é exposto.
+As respostas são respectivamente `428`, `404 TRAINING_PLAN_NOT_FOUND` e
+`400 VALIDATION_ERROR`. Seeds/E2E de fronteira exercitam 25/50 e confirmam
+`$bsonSize < 12 MiB` sem depender do limite físico de 16 MiB.
 
-### Cenário 9 — PATCH vazio
+## Testes e operação
 
-**Seed**
-
-```bash
-pnpm -C api seed -- training-plans:update
-```
-
-**cURL**
-
-```bash
-curl --request POST --url http://localhost:4000/auth/test-login \
-  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL_ALEATORIA>' \
-  --cookie-jar /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null}' \
-&& CSRF_TOKEN="$(curl --silent --request GET --url http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-training-plan-cookie.txt | jq --raw-output '.data.token')" \
-&& curl --request PATCH \
-  --url http://localhost:4000/global/training-plans/64b000000000000000000001 \
-  --header 'content-type: application/json' --header 'origin: http://localhost:3000' --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-training-plan-cookie.txt \
-  --data '{}'
-```
-
-- Then: `400 VALIDATION_ERROR`; command e persistência não executam.
-
-## Regras de negócio cobertas por testes
-
-| Regra                                   | Unitário                        | E2E                         | Fixture                  |
-| --------------------------------------- | ------------------------------- | --------------------------- | ------------------------ |
-| page size, owner nulo e nome padrão     | `training-plan.service.spec.ts` | `training-plan.e2e-spec.ts` | 21 globais + pessoal     |
-| projeção e contagem sem exercícios      | service/repository por contrato | `training-plan.e2e-spec.ts` | workout com 2 exercícios |
-| CRUD e cascata documental               | service                         | `training-plan.e2e-spec.ts` | plano global             |
-| criação e remoção atômica de workout    | service                         | `training-plan.e2e-spec.ts` | workouts embutidos       |
-| plano pessoal/missing e workout missing | service                         | `training-plan.e2e-spec.ts` | IDs distintos            |
-| autenticação, admin e validação         | guards/DTOs                     | `training-plan.e2e-spec.ts` | pessoa comum/admin       |
-| índice owner/data                       | não se aplica                   | `training-plan.e2e-spec.ts` | schema real              |
-
-## Fora do comportamento atual
-
-- planos pessoais, clonagem, busca, filtros e page size variável;
-- edição ou consulta isolada de workout;
-- exercícios, ordenação, transações, Redis, auditoria e soft delete.
+`training-plan-etag.spec.ts`, services/commands e adapters cobrem parser, defaults,
+validação YouTube, processamento/compensação de imagem, CAS, no-op e falhas. O E2E
+serial usa Nest, MongoDB e Redis efêmeros e valida transporte, ownership, schema,
+índice, limites e BSON. Aplicação de índice: `pnpm -C api indexes:apply` com
+confirmação explícita. Reconciliação: `pnpm -C api images:reconcile`, dry-run por
+padrão.

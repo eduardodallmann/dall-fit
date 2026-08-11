@@ -31,6 +31,7 @@ export class CreateGlobalTrainingPlanCommand {
         id: serviceResult.id,
         name: serviceResult.name,
         description: serviceResult.description,
+        version: serviceResult.version,
         createdAt: serviceResult.createdAt,
         updatedAt: serviceResult.updatedAt,
       },

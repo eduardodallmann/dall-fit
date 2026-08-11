@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { apiClient } from '~/core/http/api-client';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import {
   createMockApiError,
@@ -9,12 +10,18 @@ import {
 import { mockServer } from '~/mocks/server';
 import {
   createGlobalTrainingPlan,
+  createTrainingPlanExercise,
   createTrainingPlanWorkout,
   deleteGlobalTrainingPlan,
   deleteTrainingPlanWorkout,
   getGlobalTrainingPlan,
+  getTrainingPlanWorkout,
   listGlobalTrainingPlans,
+  removeTrainingPlanExerciseImage,
+  reorderTrainingPlanExercises,
   updateGlobalTrainingPlan,
+  updateTrainingPlanExercise,
+  uploadTrainingPlanExerciseImage,
 } from '~/routes/training-plan/training-plan-service';
 
 const planId = '64b000000000000000000001';
@@ -44,6 +51,7 @@ describe('training plan service', () => {
     const updated = await updateGlobalTrainingPlan(
       planId,
       { name: 'Plano atualizado' },
+      0,
       'update-success',
     );
 
@@ -70,20 +78,20 @@ describe('training plan service', () => {
   });
 
   it('creates and deletes a workout through its real returned id', async () => {
-    const workout = await createTrainingPlanWorkout(planId, 'success');
+    const workout = await createTrainingPlanWorkout(planId, 0, 'success');
 
-    expect(workout).toMatchObject({
+    expect(workout.data).toMatchObject({
       id: '64b000000000000000000199',
       exerciseCount: 0,
     });
     await expect(
-      deleteTrainingPlanWorkout(planId, workoutId, 'delete-workout-success'),
-    ).resolves.toBeUndefined();
+      deleteTrainingPlanWorkout(planId, workoutId, 1, 'success'),
+    ).resolves.toBe(2);
   });
 
   it('deletes a plan and propagates integration errors', async () => {
     await expect(
-      deleteGlobalTrainingPlan(planId, 'delete-success'),
+      deleteGlobalTrainingPlan(planId, 0, 'delete-success'),
     ).resolves.toBeUndefined();
     mockServer.use(
       http.get('*/global/training-plans', () =>
@@ -96,5 +104,80 @@ describe('training plan service', () => {
     await expect(
       listGlobalTrainingPlans(1, 'list-error'),
     ).rejects.toMatchObject({ response: { status: 503 } });
+  });
+
+  it('uses ETag versions across editor mutations and uploads multipart files', async () => {
+    const workout = await getTrainingPlanWorkout(planId, workoutId, 'success');
+    expect(workout).toMatchObject({ id: workoutId, version: 0 });
+
+    const created = await createTrainingPlanExercise(
+      planId,
+      workoutId,
+      { type: 'image' },
+      0,
+      'success',
+    );
+    expect(created).toMatchObject({
+      data: { type: 'image', image: null },
+      version: 1,
+    });
+    const updated = await updateTrainingPlanExercise(
+      planId,
+      workoutId,
+      created.data.id,
+      { name: 'Imagem editada' },
+      1,
+      'success',
+    );
+    expect(updated).toMatchObject({
+      data: { name: 'Imagem editada' },
+      version: 2,
+    });
+
+    const ids = [
+      ...workout.exercises.map((exercise) => exercise.id),
+      created.data.id,
+    ];
+    await expect(
+      reorderTrainingPlanExercises(
+        planId,
+        workoutId,
+        { exerciseIds: ids },
+        2,
+        'success',
+      ),
+    ).resolves.toBe(2);
+    await expect(
+      removeTrainingPlanExerciseImage(
+        planId,
+        workoutId,
+        created.data.id,
+        2,
+        'success',
+      ),
+    ).resolves.toBe(2);
+
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValueOnce({
+      data: {
+        data: {
+          image: {
+            thumbnailUrl: 'https://blob.test/thumb.webp',
+            displayUrl: 'https://blob.test/display.webp',
+          },
+        },
+      },
+      headers: { etag: `"training-plan:${planId}:3"` },
+    });
+    const upload = await uploadTrainingPlanExerciseImage(
+      planId,
+      workoutId,
+      created.data.id,
+      new File(['image'], 'image.png', { type: 'image/png' }),
+      2,
+      'success',
+    );
+    expect(upload.version).toBe(3);
+    expect(put.mock.calls[0]?.[1]).toBeInstanceOf(FormData);
+    put.mockRestore();
   });
 });

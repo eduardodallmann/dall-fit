@@ -15,6 +15,7 @@ const plan: TrainingPlanEntity = {
   ownerPersonId: null,
   name: 'Plano global',
   description: 'Descrição global',
+  version: 2,
   workouts: [
     {
       exerciseCount: 0,
@@ -80,6 +81,7 @@ describe('training plan commands', () => {
       id: plan.id,
       name: plan.name,
       description: plan.description,
+      version: plan.version,
       workouts: plan.workouts,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
@@ -88,12 +90,12 @@ describe('training plan commands', () => {
 
   it('wraps the updated plan summary', async () => {
     const service = createServiceMock();
-    service.updateGlobal.mockResolvedValue(plan);
+    service.updateGlobal.mockResolvedValue({ data: plan, version: 3 });
     const command = new UpdateGlobalTrainingPlanCommand(service);
 
     await expect(
-      command.execute(plan.id, { name: plan.name }),
-    ).resolves.toEqual({ data: plan });
+      command.execute(plan.id, 2, { name: plan.name }),
+    ).resolves.toEqual({ response: { data: plan }, version: 3 });
   });
 
   it('waits for plan deletion', async () => {
@@ -101,30 +103,34 @@ describe('training plan commands', () => {
     service.deleteGlobal.mockResolvedValue(undefined);
     const command = new DeleteGlobalTrainingPlanCommand(service);
 
-    await command.execute(plan.id);
+    await command.execute(plan.id, 2);
 
-    expect(service.deleteGlobal.mock.calls).toEqual([[plan.id]]);
+    expect(service.deleteGlobal.mock.calls).toEqual([[plan.id, 2]]);
   });
 
   it('wraps the workout created by the service', async () => {
     const service = createServiceMock();
-    service.createWorkout.mockResolvedValue(plan.workouts[0]);
+    service.createWorkout.mockResolvedValue({
+      data: plan.workouts[0],
+      version: 3,
+    });
     const command = new CreateTrainingPlanWorkoutCommand(service);
 
-    await expect(command.execute(plan.id)).resolves.toEqual({
-      data: plan.workouts[0],
+    await expect(command.execute(plan.id, 2)).resolves.toEqual({
+      response: { data: plan.workouts[0] },
+      version: 3,
     });
   });
 
   it('waits for workout deletion', async () => {
     const service = createServiceMock();
-    service.deleteWorkout.mockResolvedValue(undefined);
+    service.deleteWorkout.mockResolvedValue(3);
     const command = new DeleteTrainingPlanWorkoutCommand(service);
 
-    await command.execute(plan.id, plan.workouts[0].id);
+    await command.execute(plan.id, plan.workouts[0].id, 2);
 
     expect(service.deleteWorkout.mock.calls).toEqual([
-      [plan.id, plan.workouts[0].id],
+      [plan.id, plan.workouts[0].id, 2],
     ]);
   });
 });

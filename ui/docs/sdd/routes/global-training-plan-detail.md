@@ -24,7 +24,7 @@ somente de MSW.
    mutation; falha restaura o cache sem reabrir o editor.
 4. Tabela mostra nome e `exerciseCount` de cada treino.
 5. `Novo treino` envia body vazio, aguarda o ID real, acrescenta o resumo ao cache
-   e navega para a rota técnica do workout.
+   usando `If-Match`, incorpora o novo ETag e navega para a rota técnica do workout.
 6. O dropdown de treino abre confirmação; DELETE remove otimisticamente e faz
    rollback em falha.
 
@@ -49,6 +49,9 @@ Nome e descrição seguem trim e limites 1–120/1–1000. Integrações:
 - `GET/PATCH /global/training-plans/:trainingPlanId`;
 - `POST /global/training-plans/:trainingPlanId/workouts`;
 - `DELETE /global/training-plans/:trainingPlanId/workouts/:workoutId`.
+
+O detalhe conserva `version`; todas as mutações enviam a tag atual e atualizam os
+caches com a versão resultante. `412` não é repetido nem sobrescreve o servidor.
 
 POST, PATCH e DELETE dependem do bootstrap CSRF do layout autenticado. O client
 Axios único injeta o header em memória; falha `403` não dispara retry automático e

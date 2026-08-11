@@ -699,7 +699,7 @@ describe('Authentication (e2e)', () => {
     );
     expect(response.headers['access-control-allow-credentials']).toBe('true');
     expect(response.headers['access-control-expose-headers']).toBe(
-      'X-Request-Id',
+      'ETag,X-Request-Id',
     );
     expect(response.headers.vary).toContain('Origin');
   });

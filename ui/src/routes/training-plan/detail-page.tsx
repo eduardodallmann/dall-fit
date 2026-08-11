@@ -62,6 +62,7 @@ export function TrainingPlanDetailPage({
     const promise = updateMutation.mutateAsync({
       changes: input,
       trainingPlanId,
+      version: plan?.version ?? 0,
     });
     toast.promise(promise, {
       error: 'Não foi possível salvar o plano.',
@@ -95,14 +96,18 @@ export function TrainingPlanDetailPage({
       operation: 'workout_create',
       surface: 'training_plan_detail',
     });
-    const promise = createWorkoutMutation.mutateAsync(trainingPlanId);
+    if (plan === undefined) return;
+    const promise = createWorkoutMutation.mutateAsync({
+      trainingPlanId,
+      version: plan.version,
+    });
     toast.promise(promise, {
       error: 'Não foi possível criar o treino.',
       loading: 'Criando treino…',
       success: 'Treino criado.',
     });
     try {
-      const workout = await promise;
+      const workout = (await promise).data;
       trackUiEvent({
         control: 'new_workout',
         eventName: 'ui_operation_completed',
@@ -136,6 +141,7 @@ export function TrainingPlanDetailPage({
     const promise = deleteWorkoutMutation.mutateAsync({
       trainingPlanId,
       workoutId: deleteWorkoutId,
+      version: plan?.version ?? 0,
     });
     toast.promise(promise, {
       error: 'Não foi possível excluir o treino.',

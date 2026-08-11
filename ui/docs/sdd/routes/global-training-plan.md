@@ -13,7 +13,7 @@
 
 - Entrada: item administrativo `Planos de treino` ou retorno do detalhe.
 - Query: `page` inteiro positivo, normalizado para 1 quando ausente/inválido na
-  URL; `mockAuth` e `mockTrainingPlans` existem apenas com MSW.
+  URL e limitado a 100; `mockAuth` e `mockTrainingPlans` existem apenas com MSW.
 - Estado: cache TanStack Query por página e cenário.
 - Permissão: filha de `adminRoute`; pessoa comum retorna a `/dash` e sessão ausente
   segue a proteção para `/`.
@@ -42,7 +42,7 @@ A tabela e seus cabeçalhos permanecem presentes em todos esses estados.
 3. Criar fecha o modal no disparo, navega à página 1, insere resumo temporário,
    envia o POST, substitui pelo resumo real e invalida listas.
 4. Editar fecha o modal no disparo, atualiza todas as listas/detalhes conhecidos,
-   confirma pela response e invalida queries.
+   envia `If-Match` da versão em cache, confirma pela response/ETag e invalida queries.
 5. Excluir fecha o dialog no disparo, remove o plano e decrementa o total; se era o
    único item de página maior que 1, antecipa retorno à anterior.
 
@@ -88,6 +88,9 @@ informa a falha.
 - Criar: `POST /global/training-plans` com nome/descrição.
 - Editar: `PATCH /global/training-plans/:id`.
 - Excluir: `DELETE /global/training-plans/:id`.
+
+Resumos carregam `version`; PATCH/DELETE enviam o ETag forte correspondente.
+Conflito `412` não é repetido e passa pelo rollback seguro da mutation.
 
 Todas as mutações só ficam disponíveis depois do bootstrap autenticado de CSRF.
 O Axios compartilhado injeta `X-CSRF-Token` em memória e envia o cookie; `403` não

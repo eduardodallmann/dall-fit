@@ -2,6 +2,7 @@ import type {
   GlobalTrainingPlanCollectionResponse,
   TrainingPlanDetails,
   TrainingPlanSummary,
+  TrainingPlanWorkoutDetails,
 } from '@dall-fit/types';
 
 const baseDate = new Date('2026-08-01T12:00:00.000Z');
@@ -20,6 +21,7 @@ export const trainingPlanFixtures: readonly TrainingPlanSummary[] = Array.from(
         number === 1
           ? 'Plano global para uma rotina inicial de hipertrofia.'
           : `Descrição do plano global ${number}.`,
+      version: 0,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -42,6 +44,55 @@ export const trainingPlanDetailFixture: TrainingPlanDetails = {
       name: 'Treino B',
     },
   ],
+};
+
+export const trainingPlanWorkoutFixture: TrainingPlanWorkoutDetails = {
+  id: '64b000000000000000000101',
+  name: 'Treino A',
+  version: trainingPlanDetailFixture.version,
+  trainingPlan: {
+    id: trainingPlanDetailFixture.id,
+    name: trainingPlanDetailFixture.name,
+  },
+  exercises: [
+    {
+      id: '64b000000000000000000201',
+      type: 'youtube-short',
+      name: 'Agachamento',
+      youtubeId: 'ZA8gs8XP2bs',
+      bodyArea: 'quadriceps',
+      restSeconds: 60,
+      sets: 3,
+      repetitions: 12,
+    },
+    {
+      id: '64b000000000000000000202',
+      type: 'image',
+      name: 'Supino',
+      image: null,
+      bodyArea: 'chest',
+      restSeconds: 60,
+      sets: 3,
+      repetitions: 12,
+    },
+    {
+      id: '64b000000000000000000203',
+      type: 'youtube-long',
+      name: 'Mobilidade',
+      youtubeId: '2isq0vuKruE',
+      bodyArea: 'mobility',
+    },
+    { id: '64b000000000000000000204', type: 'pause', restSeconds: 60 },
+    {
+      id: '64b000000000000000000205',
+      type: 'duration',
+      name: 'Corrida',
+      bodyArea: 'cardio',
+      durationMinutes: 15,
+    },
+  ],
+  createdAt: '2026-08-01T12:00:00.000Z',
+  updatedAt: '2026-08-01T12:00:00.000Z',
 };
 
 export function trainingPlanCollectionFixture(

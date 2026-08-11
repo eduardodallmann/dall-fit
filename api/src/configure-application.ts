@@ -23,10 +23,15 @@ export function configureApplication(app: INestApplication): void {
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'If-Match',
+      'X-CSRF-Token',
+      'X-Request-Id',
+    ],
     credentials: true,
-    exposedHeaders: ['X-Request-Id'],
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['ETag', 'X-Request-Id'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: corsOrigin,
   });
   app.useGlobalPipes(
