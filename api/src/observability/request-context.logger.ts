@@ -1,4 +1,10 @@
-import { ConsoleLogger, Inject, Injectable } from '@nestjs/common';
+import {
+  ConsoleLogger,
+  Inject,
+  Injectable,
+  type LogLevel,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import {
   REQUEST_CONTEXT_STORAGE,
@@ -10,8 +16,11 @@ export class RequestContextLogger extends ConsoleLogger {
   constructor(
     @Inject(REQUEST_CONTEXT_STORAGE)
     private readonly storage: RequestContextStorage,
+    configService: ConfigService,
   ) {
-    super();
+    super({
+      logLevels: [configService.getOrThrow<LogLevel>('LOG_LEVEL')],
+    });
   }
 
   override log(message: unknown, ...optionalParams: unknown[]): void {

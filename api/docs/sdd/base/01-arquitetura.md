@@ -175,7 +175,10 @@ Antes de Helmet, CORS e das rotas, `RequestContextMiddleware` valida ou cria
 header da response. `RequestContextLogger`, instalado como logger global injetado,
 acrescenta esse identificador aos metadados estruturados de todos os níveis sem
 alterar mensagem, argumentos, contexto ou stack. O bootstrap usa buffering até o
-logger estar disponível.
+logger estar disponível. A variável validada `LOG_LEVEL` configura nesse singleton
+o nível mínimo de emissão e delega ao `ConsoleLogger` do NestJS sua cascata nativa;
+o código continua chamando os níveis definidos pela política independentemente do
+limiar operacional escolhido.
 
 `GlobalExceptionFilter`, registrado por `APP_FILTER`, é a única fronteira pública
 para erros HTTP e falhas não tratadas. Ele aplica o contrato descrito em
@@ -296,6 +299,8 @@ Vite da UI.
   expor seus valores e preserva variáveis predefinidas não pertencentes ao schema;
 - `api/.env.example` declara:
   - `PORT`, porta HTTP, com padrão local `4000`;
+  - `LOG_LEVEL`, nível mínimo dos logs, com padrão `log` e valores nativos
+    `verbose`, `debug`, `log`, `warn`, `error` ou `fatal`;
   - `TRUST_PROXY_HOPS`, quantidade explícita de proxies confiáveis para cálculo do
     IP usado em rate limit;
   - `CORS_ORIGIN`, origem permitida, com padrão local
