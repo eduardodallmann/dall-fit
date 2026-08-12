@@ -30,6 +30,19 @@ export const trainingPlanFixtures: readonly TrainingPlanSummary[] = Array.from(
   },
 );
 
+export const largeTrainingPlanFixtures: readonly TrainingPlanSummary[] =
+  Array.from({ length: 2021 }, (_, index) => {
+    const base = trainingPlanFixtures[index % trainingPlanFixtures.length];
+    if (base === undefined)
+      throw new Error('Training plan fixture base is unavailable.');
+    const number = index + 1;
+    return {
+      ...base,
+      id: `large-training-plan-${number}`,
+      name: `Plano global ${number}`,
+    };
+  });
+
 export const trainingPlanDetailFixture: TrainingPlanDetails = {
   ...trainingPlanFixtures[0],
   workouts: [

@@ -205,6 +205,41 @@ test.describe('Rotas administrativas de planos de treino', () => {
     );
   });
 
+  test('propaga a versão entre duas adições consecutivas após a fila ficar ociosa', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    const addButton = page.getByRole('button', { name: 'Adicionar' });
+    await expect(list.getByRole('listitem')).toHaveCount(5);
+
+    const firstRequestPromise = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().endsWith('/exercises'),
+    );
+    await addButton.click();
+    await page.getByRole('menuitem', { name: 'YouTube Short' }).click();
+    const firstRequest = await firstRequestPromise;
+    expect(firstRequest.headers()['x-resource-version']).toBe('0');
+    await expect(list.getByRole('listitem')).toHaveCount(6);
+    await expect(addButton).toBeEnabled();
+
+    const secondRequestPromise = page.waitForRequest(
+      (request) =>
+        request.method() === 'POST' && request.url().endsWith('/exercises'),
+    );
+    await addButton.click();
+    await page.getByRole('menuitem', { name: 'Imagem' }).click();
+    const secondRequest = await secondRequestPromise;
+    expect(secondRequest.headers()['x-resource-version']).toBe('1');
+    await expect(list.getByRole('listitem')).toHaveCount(7);
+    await expect(
+      page.getByText('Este plano foi alterado em outro lugar.'),
+    ).not.toBeVisible();
+  });
+
   test('preserva o rascunho e pausa a fila quando há conflito', async ({
     page,
   }) => {
@@ -255,6 +290,44 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(page.getByRole('button', { name: 'Adicionar' })).toBeEnabled();
   });
 
+  test('restaura draft sem PATCH oculto quando excluir falha durante debounce', async ({
+    page,
+  }) => {
+    const patchRequests: string[] = [];
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PATCH' &&
+        request.url().includes('/exercises/64b000000000000000000201')
+      )
+        patchRequests.push(request.url());
+    });
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=delete-exercise-error`,
+    );
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    const youtubeShort = list.getByRole('listitem').first();
+
+    await youtubeShort.getByLabel('Nome').fill('Draft antes da exclusão');
+    await youtubeShort
+      .getByRole('button', { name: 'Excluir YouTube Short' })
+      .click();
+    await page
+      .getByRole('dialog', { name: 'Excluir exercício?' })
+      .getByRole('button', { name: 'Excluir', exact: true })
+      .click();
+
+    await expect(
+      list.getByRole('listitem').first().getByLabel('Nome'),
+    ).toHaveValue('Draft antes da exclusão');
+    await expect(
+      list.getByRole('listitem').first().getByRole('button', {
+        name: 'Tentar novamente',
+      }),
+    ).toBeVisible();
+    await page.waitForTimeout(3_200);
+    expect(patchRequests).toHaveLength(0);
+  });
+
   test('confirma navegação quando há autosave ainda não enviado', async ({
     page,
   }) => {
@@ -270,17 +343,15 @@ test.describe('Rotas administrativas de planos de treino', () => {
       .getByRole('list', { name: 'Navegação estrutural' })
       .getByRole('link', { name: 'Planos de treino' });
 
-    page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('alterações ainda não enviadas');
-      await dialog.dismiss();
-    });
     await plansLink.click();
+    await expect(
+      page.getByRole('alertdialog', { name: 'Descartar alterações locais?' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Permanecer' }).click();
     await expect(page).toHaveURL(new RegExp(`/workout/${workoutId}`));
 
-    page.once('dialog', async (dialog) => {
-      await dialog.accept();
-    });
     await plansLink.click();
+    await page.getByRole('button', { name: 'Sair e descartar' }).click();
     await expect(page).toHaveURL(/\/global\/training-plan\?/);
   });
 
@@ -312,5 +383,33 @@ test.describe('Rotas administrativas de planos de treino', () => {
       ],
     });
     await expect(handle).toBeFocused();
+  });
+
+  test('rollback de ordem preserva o draft editado durante a requisição', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=reorder-error`,
+    );
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    const handle = page.getByRole('button', { name: 'Mover Duração' });
+    await handle.focus();
+    await handle.press('Space');
+    await handle.press('ArrowUp');
+    await handle.press('Space');
+    await list
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome')
+      .fill('Draft durante reordenação');
+
+    await expect(
+      page.getByText('Não foi possível reordenar os exercícios.'),
+    ).toBeVisible();
+    await expect(list.getByRole('listitem').nth(3)).toContainText('Pausa');
+    await expect(list.getByRole('listitem').nth(4)).toContainText('Duração');
+    await expect(
+      list.getByRole('listitem').first().getByLabel('Nome'),
+    ).toHaveValue('Draft durante reordenação');
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Alert, Button, Pagination, Table, toast } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
@@ -12,10 +12,12 @@ import type {
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent } from '~/core/analytics';
+import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
   TrainingPlanBreadcrumbs,
+  TrainingPlanConflictAlert,
   TrainingPlanFormModal,
   TrainingPlanTableState,
 } from '~/routes/training-plan/components';
@@ -26,6 +28,10 @@ import {
   useDeleteTrainingPlanMutation,
   useUpdateTrainingPlanMutation,
 } from '~/routes/training-plan/training-plan-mutations';
+import {
+  trainingPlanLastPage,
+  trainingPlanPaginationItems,
+} from '~/routes/training-plan/training-plan-pagination';
 import { trainingPlanListQueryOptions } from '~/routes/training-plan/training-plan-queries';
 import {
   trainingPlanMockSearch,
@@ -55,34 +61,63 @@ export function TrainingPlanListPage({
     TrainingPlanSummary | null | undefined
   >(null);
   const [deletePlan, setDeletePlan] = useState<TrainingPlanSummary>();
-  const rows = query.data?.data ?? [];
-  const pageCount = Math.max(
-    1,
-    Math.ceil((query.data?.total ?? 0) / (query.data?.pageSize ?? 20)),
+  const currentPage = useRef(page);
+  useEffect(() => {
+    currentPage.current = page;
+  }, [page]);
+  const activePlan =
+    formPlan !== null && formPlan !== undefined ? formPlan : deletePlan;
+  const aggregate = useAggregateMutationCoordinator(
+    activePlan?.id,
+    activePlan?.version,
   );
-  const navigateToPage = (nextPage: number) =>
-    navigate({
-      search: { mockAuth, ...mockSearch, page: nextPage },
-      to: '/global/training-plan',
+  const rows = query.data?.data ?? [];
+  const pageCount =
+    query.data === undefined
+      ? 1
+      : trainingPlanLastPage(query.data.total, query.data.pageSize);
+  const isCorrectingPage = query.data !== undefined && page > pageCount;
+  const paginationItems =
+    query.data === undefined || isCorrectingPage
+      ? []
+      : trainingPlanPaginationItems(page, pageCount);
+  const navigateToPage = useCallback(
+    (nextPage: number, replace = false) =>
+      navigate({
+        replace,
+        search: {
+          mockAuth,
+          ...trainingPlanMockSearch(mockTrainingPlans),
+          ...(nextPage === 1 ? {} : { page: nextPage }),
+        },
+        to: '/global/training-plan',
+      }),
+    [mockAuth, mockTrainingPlans, navigate],
+  );
+  useEffect(() => {
+    if (!isCorrectingPage) return;
+    void navigateToPage(pageCount, true).catch(() => {
+      toast.danger('Não foi possível corrigir a página da listagem.');
     });
+  }, [isCorrectingPage, navigateToPage, pageCount]);
   const submitPlan = async (input: CreateTrainingPlanRequest) => {
     if (formPlan === null) return;
     if (formPlan === undefined) {
       const previousPage = page;
-      await navigateToPage(1);
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_started',
         operation: 'training_plan_create',
         surface: 'training_plan_form',
       });
-      const promise = createMutation.mutateAsync(input);
-      toast.promise(promise, {
-        error: 'Não foi possível criar o plano.',
-        loading: 'Criando plano…',
-        success: 'Plano criado.',
-      });
       try {
+        await navigateToPage(1);
+        const promise = createMutation.mutateAsync(input);
+        toast.promise(promise, {
+          error: 'Não foi possível criar o plano.',
+          loading: 'Criando plano…',
+          success: 'Plano criado.',
+        });
         await promise;
         trackUiEvent({
           control: 'submit',
@@ -91,7 +126,6 @@ export function TrainingPlanListPage({
           outcome: 'success',
           surface: 'training_plan_form',
         });
-        setFormPlan(null);
       } catch {
         trackUiEvent({
           control: 'submit',
@@ -100,7 +134,8 @@ export function TrainingPlanListPage({
           outcome: 'error',
           surface: 'training_plan_form',
         });
-        await navigateToPage(previousPage);
+        if (currentPage.current === 1) await navigateToPage(previousPage);
+        throw new Error('Training plan creation failed.');
       }
 
       return;
@@ -131,7 +166,7 @@ export function TrainingPlanListPage({
         outcome: 'success',
         surface: 'training_plan_form',
       });
-    } catch {
+    } catch (error) {
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -139,7 +174,7 @@ export function TrainingPlanListPage({
         outcome: 'error',
         surface: 'training_plan_form',
       });
-      return;
+      throw error;
     }
   };
   const confirmDelete = async () => {
@@ -152,17 +187,17 @@ export function TrainingPlanListPage({
     });
     const previousPage = page;
     const shouldReturnPage = rows.length === 1 && page > 1;
-    if (shouldReturnPage) await navigateToPage(page - 1);
-    const promise = deleteMutation.mutateAsync({
-      trainingPlanId: deletePlan.id,
-      version: deletePlan.version,
-    });
-    toast.promise(promise, {
-      error: 'Não foi possível excluir o plano.',
-      loading: 'Excluindo plano…',
-      success: 'Plano excluído.',
-    });
     try {
+      if (shouldReturnPage) await navigateToPage(page - 1);
+      const promise = deleteMutation.mutateAsync({
+        trainingPlanId: deletePlan.id,
+        version: deletePlan.version,
+      });
+      toast.promise(promise, {
+        error: 'Não foi possível excluir o plano.',
+        loading: 'Excluindo plano…',
+        success: 'Plano excluído.',
+      });
       await promise;
       trackUiEvent({
         control: 'delete_confirmation',
@@ -171,7 +206,7 @@ export function TrainingPlanListPage({
         outcome: 'success',
         surface: 'training_plan_list',
       });
-    } catch {
+    } catch (error) {
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -179,8 +214,26 @@ export function TrainingPlanListPage({
         outcome: 'error',
         surface: 'training_plan_list',
       });
-      if (shouldReturnPage) await navigateToPage(previousPage);
+      if (shouldReturnPage && currentPage.current === page - 1)
+        await navigateToPage(previousPage);
+      throw error;
     }
+  };
+  const reloadConflict = async () => {
+    if (activePlan === undefined) return;
+    trackUiEvent({
+      control: 'retry',
+      eventName: 'ui_retry_requested',
+      resource: 'training_plans',
+      surface: 'training_plan_list',
+    });
+    const result = await query.refetch();
+    const latest = result.data?.data.find((plan) => plan.id === activePlan.id);
+    if (!result.isSuccess || latest === undefined)
+      throw result.error ?? new Error('Training plan reload failed.');
+    await aggregate.reset(latest.version);
+    setFormPlan(null);
+    setDeletePlan(undefined);
   };
   let emptyState = (
     <TrainingPlanTableState
@@ -189,7 +242,7 @@ export function TrainingPlanListPage({
       title="Nenhum plano de treino"
     />
   );
-  if (query.isLoading) {
+  if (query.isLoading || isCorrectingPage) {
     emptyState = (
       <TrainingPlanTableLoading columnCount={4} label="Carregando planos" />
     );
@@ -266,6 +319,9 @@ export function TrainingPlanListPage({
             Tentar novamente
           </Button>
         </Alert>
+      ) : null}
+      {aggregate.paused ? (
+        <TrainingPlanConflictAlert onReload={reloadConflict} />
       ) : null}
       <section aria-label="Planos globais" className={styles.section()}>
         <Table>
@@ -344,7 +400,10 @@ export function TrainingPlanListPage({
             </Table.Content>
           </Table.ScrollContainer>
         </Table>
-        {query.data === undefined || query.data.total === 0 ? null : (
+        {query.data === undefined ||
+        query.data.total === 0 ||
+        pageCount <= 1 ||
+        isCorrectingPage ? null : (
           <Pagination aria-label="Paginação dos planos">
             <Pagination.Summary>
               Página {page} de {pageCount}
@@ -361,17 +420,25 @@ export function TrainingPlanListPage({
                       navigationKind: 'pagination',
                       surface: 'training_plan_list',
                     });
-                    void navigateToPage(page - 1);
+                    void navigateToPage(page - 1).catch(() => {
+                      toast.danger(
+                        'Não foi possível mudar a página da listagem.',
+                      );
+                    });
                   }}
                 >
                   Anterior
                 </Pagination.Previous>
               </Pagination.Item>
-              {Array.from({ length: pageCount }, (_, index) => index + 1).map(
-                (pageNumber) => (
-                  <Pagination.Item key={pageNumber}>
+              {paginationItems.map((item, index) =>
+                item === 'ellipsis' ? (
+                  <Pagination.Item key={`ellipsis-${index}`}>
+                    <Pagination.Ellipsis />
+                  </Pagination.Item>
+                ) : (
+                  <Pagination.Item key={item}>
                     <Pagination.Link
-                      isActive={pageNumber === page}
+                      isActive={item === page}
                       onPress={() => {
                         trackUiEvent({
                           control: 'pagination_page',
@@ -380,10 +447,14 @@ export function TrainingPlanListPage({
                           navigationKind: 'pagination',
                           surface: 'training_plan_list',
                         });
-                        void navigateToPage(pageNumber);
+                        void navigateToPage(item).catch(() => {
+                          toast.danger(
+                            'Não foi possível mudar a página da listagem.',
+                          );
+                        });
                       }}
                     >
-                      {pageNumber}
+                      {item}
                     </Pagination.Link>
                   </Pagination.Item>
                 ),
@@ -399,7 +470,11 @@ export function TrainingPlanListPage({
                       navigationKind: 'pagination',
                       surface: 'training_plan_list',
                     });
-                    void navigateToPage(page + 1);
+                    void navigateToPage(page + 1).catch(() => {
+                      toast.danger(
+                        'Não foi possível mudar a página da listagem.',
+                      );
+                    });
                   }}
                 >
                   Próxima
@@ -411,6 +486,7 @@ export function TrainingPlanListPage({
       </section>
       {formPlan === null ? null : (
         <TrainingPlanFormModal
+          isWritePaused={aggregate.paused}
           key={formPlan?.id ?? 'new'}
           onOpenChange={(open) => {
             if (!open) setFormPlan(null);
@@ -426,6 +502,7 @@ export function TrainingPlanListPage({
             ? ''
             : `O plano “${deletePlan.name}” e todos os seus treinos serão removidos.`
         }
+        isWritePaused={aggregate.paused}
         onConfirm={confirmDelete}
         onOpenChange={(open) => {
           if (!open) setDeletePlan(undefined);

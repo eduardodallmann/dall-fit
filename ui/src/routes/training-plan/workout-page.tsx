@@ -5,7 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent } from '~/core/analytics';
-import { TrainingPlanBreadcrumbs } from '~/routes/training-plan/components';
+import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
+import {
+  TrainingPlanBreadcrumbs,
+  TrainingPlanConflictAlert,
+} from '~/routes/training-plan/components';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import { trainingPlanWorkoutQueryOptions } from '~/routes/training-plan/training-plan-queries';
@@ -34,10 +38,13 @@ export function TrainingPlanWorkoutPage({
       mockTrainingPlans,
     ),
   );
-  const [conflict, setConflict] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const workout = query.data;
   const plan = workout?.trainingPlan;
+  const aggregate = useAggregateMutationCoordinator(
+    trainingPlanId,
+    workout?.version,
+  );
 
   const trackRetry = () =>
     trackUiEvent({
@@ -53,14 +60,12 @@ export function TrainingPlanWorkoutPage({
   };
 
   const reload = async () => {
-    if (!window.confirm('Recarregar os dados e descartar os rascunhos locais?'))
-      return;
     trackRetry();
     const result = await query.refetch();
-    if (result.isSuccess) {
-      setConflict(false);
-      setReloadKey((current) => current + 1);
-    }
+    if (!result.isSuccess || result.data === undefined)
+      throw result.error ?? new Error('Workout reload failed.');
+    await aggregate.reset(result.data.version);
+    setReloadKey((current) => current + 1);
   };
 
   return (
@@ -100,25 +105,15 @@ export function TrainingPlanWorkoutPage({
           </Alert.Content>
         </Alert>
       ) : null}
-      {conflict ? (
-        <Alert status="danger">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Este plano foi alterado em outro lugar.</Alert.Title>
-            <Alert.Description>
-              Seus rascunhos permanecem visíveis, mas novas gravações estão
-              pausadas.
-            </Alert.Description>
-          </Alert.Content>
-          <Button onPress={() => void reload()}>Recarregar dados</Button>
-        </Alert>
+      {aggregate.paused ? (
+        <TrainingPlanConflictAlert onReload={reload} />
       ) : null}
       {workout === undefined ? null : (
         <WorkoutEditor
           data={workout}
           key={`${workout.id}:${reloadKey}`}
           mockScenario={mockTrainingPlans}
-          onConflict={() => setConflict(true)}
+          onConflict={() => undefined}
         />
       )}
     </div>

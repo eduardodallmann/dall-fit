@@ -29,23 +29,31 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 |     7 | associa ou remove imagem       | PUT multipart ou DELETE image                    |
 
 1. A listagem ordena globalmente por criação e `_id`, usa 20 itens e limita a URL
-   às páginas 1–100.
-2. Criação de treino aguarda o ID real antes de navegar. Lista/detalhe carregam e
-   conservam `version`; toda mutação de aggregate existente envia a versão
-   canônica em `X-Resource-Version` e incorpora o valor retornado no mesmo header
-   ao próximo write.
+   às páginas 1–100. Página 1 omite `page`; formas inválidas são substituídas antes
+   da consulta. A janela visual possui no máximo sete posições com primeira,
+   última, vizinhança e elipses. Se o total revelar página excedente, a rota usa
+   `replace` para consultar a última página sem apresentar vazio incoerente.
+2. Formulários inline/modais e confirmações permanecem durante pending e falha,
+   preservam draft e fecham somente após sucesso. Criação de treino aguarda o ID
+   real antes de navegar. Lista/detalhe carregam e conservam `version`; toda mutação
+   de aggregate existente entra no coordenador FIFO compartilhado pelo
+   `QueryClient`, recebe a versão na cabeça da fila e incorpora o header retornado
+   ao próximo write. Planos diferentes não se bloqueiam.
 3. A rota de workout faz uma leitura projetada com plano mínimo, nome, timestamps
    e até 50 exercícios. O breadcrumb é
    `Home / Planos de treino / <plano> / <treino>` apenas quando esses nomes foram
    resolvidos; falhas nunca mostram IDs.
-4. O nome do treino usa edição inline otimista. Cada linha mantém draft e debounce
+4. O nome do treino separa confirmado e draft e só fecha após sucesso. Cada linha
+   mantém confirmado, draft, patch dirty, revisão por campo, erro e debounce
    independente de três segundos, enviando somente campos alterados.
-5. Todos os timers, adições, exclusões, reordenação e mídia convergem numa fila
-   FIFO por aggregate. A fila injeta a última versão, não faz retry de mutation e
-   mantém outras linhas editáveis.
-6. A criação recebe só o tipo e a API aplica defaults. Drag por ponteiro, toque ou
-   teclado só persiste ao soltar e envia a ordem final completa. Exclusão usa
-   confirmação e snapshot para rollback.
+5. Autosaves, nome, adições, exclusões, reordenação e mídia convergem no mesmo
+   coordenador FIFO do aggregate. Ele injeta a última versão, não faz retry de
+   mutation e mantém outras linhas editáveis.
+6. A criação recebe só o tipo e a API aplica defaults; a linha temporária não
+   aceita edição, mídia, exclusão ou ordem. No máximo uma operação estrutural fica
+   pendente. Drag por ponteiro, toque ou teclado só persiste ao soltar e envia a
+   ordem final completa. Exclusão durante debounce cancela o timer e captura draft,
+   dirty e posição para rollback localizado.
 7. YouTube aceita ID/URLs permitidas, mas a API chama somente
    `img.youtube.com`; a UI deriva a miniatura do ID. Imagens JPEG/PNG/WebP são
    enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
@@ -58,14 +66,20 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
   mostra alerta persistente. Um `412` externo sem esse código é falha genérica,
   não pausa a fila e não é interpretado como conflito. `Recarregar dados` pede
   confirmação antes de descartar o trabalho local; não há reenvio automático.
+- rollbacks de plano, workout ou exercício alteram somente entidade, token, delta
+  de total ou posição daquela operação; mudanças concorrentes posteriores não são
+  substituídas e detalhe de plano só é removido do cache após DELETE bem-sucedido;
 - falha de autosave conserva texto e miniatura confirmada, encerra o status de
-  saving e anuncia erro sem toast de sucesso;
+  saving, mantém patch dirty e oferece retry explícito sem toast de sucesso;
 - falha de criação remove somente a linha temporária; falha de ordem/exclusão
-  restaura posição, item e draft;
+  restaura ordem relativa ou item/posição/draft corrente sem PATCH oculto;
 - upload/substituição conserva a imagem anterior até o CAS; remoção de imagem nula
   e ordem já idêntica são no-op sem nova versão;
 - primeira falha de leitura mostra estado persistente com retry; refetch falho com
   cache mantém o editor e usa alerta não bloqueante;
+- navegação no editor usa `AlertDialog` enquanto houver draft, debounce, fila,
+  estrutura ou erro recuperável; sair cancela timers locais, enquanto
+  `beforeunload` permanece somente como aviso nativo;
 - `401` limpa CSRF/cache e volta à raiz; `403` e mutations não têm retry.
 
 ## Dados e privacidade
@@ -84,15 +98,23 @@ no drop e recarga de conflito é retry.
 3. Falha de autosave: acrescentar `mockTrainingPlans=update-exercise-error`.
 4. Conflito preservado: acrescentar `mockTrainingPlans=version-conflict`.
 5. Falha de imagem: acrescentar `mockTrainingPlans=image-error`.
-6. Proteção administrativa: remover `mockAuth=admin` e confirmar redirect.
+6. Paginação grande: usar `large-pagination&page=50`; página acima do total:
+   `two-pages&page=100`.
+7. Exclusão durante debounce: acrescentar
+   `mockTrainingPlans=delete-exercise-error`; rollback de ordem:
+   `mockTrainingPlans=reorder-error`.
+8. Proteção administrativa: remover `mockAuth=admin` e confirmar redirect.
 
 ## Cobertura automatizada
 
 - E2E Nest/MongoDB/Redis: `api/test/training-plan.e2e-spec.ts`, incluindo versões
   de recurso, discriminadores, limites, ordem, fronteira BSON e ownership.
-- Vitest UI: services HTTP, fila FIFO/conflito, componentes e Analytics.
+- Vitest UI: services HTTP, paginação pura, coordenador FIFO/conflito, rollbacks,
+  propagação da versão após a fila ficar ociosa, merge/restauração de draft,
+  componentes e Analytics.
 - Playwright: `ui/tests/integration/routes/training-plan.spec.ts` e
   `ui/tests/integration/flows/gestao-planos-treino.spec.ts`, sempre com Vite,
-  Chromium e MSW Browser, sem API real nem `page.route`.
+  Chromium e MSW Browser, incluindo adições consecutivas sem regressão de versão e
+  sem API real nem `page.route`.
 - Não há regressão visual porque as pastas de assets das rotas não contêm
   screenshots.

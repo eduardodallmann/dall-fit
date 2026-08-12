@@ -27,6 +27,7 @@ import {
 } from '~/routes/route-components';
 import { TrainingPlanDetailPage } from '~/routes/training-plan/detail-page';
 import { TrainingPlanListPage } from '~/routes/training-plan/list-page';
+import { canonicalTrainingPlanPage } from '~/routes/training-plan/training-plan-pagination';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
 import { TrainingPlanWorkoutPage } from '~/routes/training-plan/workout-page';
 
@@ -128,6 +129,21 @@ const dashRoute = createRoute({
 const trainingPlanListRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/global/training-plan',
+  beforeLoad: ({ location }) => {
+    const rawSearch = new URLSearchParams(location.searchStr);
+    const canonicalPage = canonicalTrainingPlanPage(rawSearch.get('page'));
+    if (!canonicalPage.shouldReplace) return;
+
+    const common = parseTrainingPlanSearch(
+      Object.fromEntries(rawSearch.entries()),
+    );
+    redirect({
+      replace: true,
+      search: common,
+      throw: true,
+      to: '/global/training-plan',
+    });
+  },
   validateSearch: (search: Record<string, unknown>): TrainingPlanListSearch => {
     const common = parseTrainingPlanSearch(search);
     const numericPage = Number(search.page);
@@ -237,6 +253,7 @@ function parseTrainingPlanSearch(
     'detail-error',
     'empty',
     'list-error',
+    'large-pagination',
     'loading',
     'not-found',
     'success',
@@ -245,6 +262,8 @@ function parseTrainingPlanSearch(
     'update-exercise-error',
     'delete-exercise-error',
     'image-error',
+    'reorder-error',
+    'two-pages',
     'version-conflict',
   ];
   const mockTrainingPlans = scenarios.find(

@@ -1,6 +1,7 @@
-import type { FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import {
+  Alert,
   AlertDialog,
   Button,
   Dropdown,
@@ -175,6 +176,8 @@ interface TrainingPlanFormProps {
   onCancel?: () => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
   submitLabel: string;
+  submissionError?: string;
+  isWritePaused?: boolean;
 }
 
 export function TrainingPlanForm({
@@ -184,7 +187,11 @@ export function TrainingPlanForm({
   onCancel,
   onSubmit,
   submitLabel,
+  submissionError = 'Não foi possível enviar o formulário.',
+  isWritePaused = false,
 }: Readonly<TrainingPlanFormProps>) {
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionFailed, setSubmissionFailed] = useState(false);
   const { trackFieldCompletion, trackFieldFocus } =
     useTrainingPlanFieldAnalytics(defaultValues);
   const form = useForm({
@@ -197,16 +204,25 @@ export function TrainingPlanForm({
         mode,
         surface: 'training_plan_form',
       });
-      await onSubmit({
-        description: value.description.trim(),
-        name: value.name.trim(),
-      });
+      setSubmitting(true);
+      setSubmissionFailed(false);
+      try {
+        await onSubmit({
+          description: value.description.trim(),
+          name: value.name.trim(),
+        });
+      } catch (error) {
+        setSubmissionFailed(true);
+        throw error;
+      } finally {
+        setSubmitting(false);
+      }
     },
   });
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    void form.handleSubmit();
+    void form.handleSubmit().catch(() => undefined);
   };
 
   return (
@@ -223,6 +239,7 @@ export function TrainingPlanForm({
           >
             {(field) => (
               <TextField
+                isDisabled={submitting || isWritePaused}
                 isInvalid={field.state.meta.errors.length > 0}
                 isRequired
                 name={field.name}
@@ -253,6 +270,7 @@ export function TrainingPlanForm({
           >
             {(field) => (
               <TextField
+                isDisabled={submitting || isWritePaused}
                 isInvalid={field.state.meta.errors.length > 0}
                 isRequired
                 name={field.name}
@@ -277,6 +295,17 @@ export function TrainingPlanForm({
           </form.Field>
         </Fieldset.Group>
       </Fieldset>
+      {submissionFailed ? (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>{submissionError}</Alert.Title>
+            <Alert.Description>
+              Seus dados foram preservados. Corrija-os ou tente novamente.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       <form.Subscribe
         selector={(state) => [state.canSubmit, state.isSubmitting]}
       >
@@ -284,7 +313,7 @@ export function TrainingPlanForm({
           <div className={styles.actions()}>
             {onCancel === undefined ? null : (
               <Button
-                isDisabled={isSubmitting}
+                isDisabled={isSubmitting || isWritePaused}
                 onPress={onCancel}
                 type="button"
                 variant="secondary"
@@ -293,7 +322,7 @@ export function TrainingPlanForm({
               </Button>
             )}
             <Button
-              isDisabled={!canSubmit}
+              isDisabled={!canSubmit || isWritePaused}
               isPending={isSubmitting}
               type="submit"
             >
@@ -307,6 +336,7 @@ export function TrainingPlanForm({
 }
 
 interface FormModalProps {
+  isWritePaused?: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
   open: boolean;
@@ -314,11 +344,13 @@ interface FormModalProps {
 }
 
 export function TrainingPlanFormModal({
+  isWritePaused = false,
   onOpenChange,
   onSubmit,
   open,
   plan,
 }: Readonly<FormModalProps>) {
+  const [submitting, setSubmitting] = useState(false);
   const editing = plan !== undefined;
   const mode = editing ? 'edit' : 'create';
   const close = (reason: 'cancel' | 'close_trigger' | 'escape' | 'submit') => {
@@ -336,10 +368,13 @@ export function TrainingPlanFormModal({
     <Modal
       isOpen={open}
       onOpenChange={(isOpen) => {
-        if (!isOpen) close('escape');
+        if (!isOpen && !submitting) close('escape');
       }}
     >
-      <Modal.Backdrop isDismissable={false}>
+      <Modal.Backdrop
+        isDismissable={false}
+        isKeyboardDismissDisabled={submitting}
+      >
         <Modal.Container>
           <Modal.Dialog>
             <Modal.Header>
@@ -355,13 +390,24 @@ export function TrainingPlanFormModal({
                     : { description: plan.description, name: plan.name }
                 }
                 legend="Identificação do plano"
+                isWritePaused={isWritePaused || submitting}
                 mode={mode}
                 onCancel={() => close('cancel')}
                 onSubmit={async (input) => {
-                  close('submit');
-                  await onSubmit(input);
+                  setSubmitting(true);
+                  try {
+                    await onSubmit(input);
+                    close('submit');
+                  } finally {
+                    setSubmitting(false);
+                  }
                 }}
                 submitLabel={editing ? 'Salvar alterações' : 'Criar plano'}
+                submissionError={
+                  editing
+                    ? 'Não foi possível salvar o plano.'
+                    : 'Não foi possível criar o plano.'
+                }
               />
             </Modal.Body>
           </Modal.Dialog>
@@ -381,6 +427,7 @@ interface DeleteDialogProps {
     'training_plan_detail' | 'training_plan_list'
   >;
   title: string;
+  isWritePaused?: boolean;
 }
 
 export function DeleteConfirmationDialog({
@@ -390,8 +437,12 @@ export function DeleteConfirmationDialog({
   open,
   surface,
   title,
+  isWritePaused = false,
 }: Readonly<DeleteDialogProps>) {
+  const [error, setError] = useState(false);
+  const [pending, setPending] = useState(false);
   const close = (reason: 'cancel' | 'close_trigger' | 'confirm') => {
+    setError(false);
     trackUiEvent({
       control: 'delete_confirmation',
       eventName: 'ui_overlay_closed',
@@ -406,7 +457,7 @@ export function DeleteConfirmationDialog({
     <AlertDialog
       isOpen={open}
       onOpenChange={(isOpen) => {
-        if (!isOpen) close('close_trigger');
+        if (!isOpen && !pending) close('close_trigger');
       }}
     >
       <AlertDialog.Backdrop>
@@ -415,15 +466,39 @@ export function DeleteConfirmationDialog({
             <AlertDialog.Header>
               <AlertDialog.Heading>{title}</AlertDialog.Heading>
             </AlertDialog.Header>
-            <AlertDialog.Body>{description}</AlertDialog.Body>
+            <AlertDialog.Body>
+              <p>{description}</p>
+              {error ? (
+                <Alert status="danger">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Não foi possível excluir.</Alert.Title>
+                    <Alert.Description>
+                      O item foi restaurado. Você pode tentar novamente ou
+                      cancelar.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              ) : null}
+            </AlertDialog.Body>
             <AlertDialog.Footer>
-              <Button onPress={() => close('cancel')} variant="secondary">
+              <Button
+                isDisabled={pending}
+                onPress={() => close('cancel')}
+                variant="secondary"
+              >
                 Cancelar
               </Button>
               <Button
+                isDisabled={isWritePaused}
+                isPending={pending}
                 onPress={() => {
-                  close('confirm');
-                  void onConfirm();
+                  setError(false);
+                  setPending(true);
+                  void onConfirm()
+                    .then(() => close('confirm'))
+                    .catch(() => setError(true))
+                    .finally(() => setPending(false));
                 }}
                 variant="danger"
               >
@@ -434,6 +509,93 @@ export function DeleteConfirmationDialog({
         </AlertDialog.Container>
       </AlertDialog.Backdrop>
     </AlertDialog>
+  );
+}
+
+interface ConflictAlertProps {
+  onReload: () => Promise<void>;
+}
+
+export function TrainingPlanConflictAlert({
+  onReload,
+}: Readonly<ConflictAlertProps>) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [reloadError, setReloadError] = useState(false);
+
+  return (
+    <>
+      <Alert status="danger">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Este plano foi alterado em outro lugar.</Alert.Title>
+          <Alert.Description>
+            Seus rascunhos permanecem visíveis, mas novas gravações estão
+            pausadas.
+          </Alert.Description>
+        </Alert.Content>
+        <Button onPress={() => setConfirming(true)}>Recarregar dados</Button>
+      </Alert>
+      <AlertDialog
+        isOpen={confirming}
+        onOpenChange={(open) => {
+          if (!open && !pending) setConfirming(false);
+        }}
+      >
+        <AlertDialog.Backdrop>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  Descartar alterações locais?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <p>
+                  A versão mais recente será carregada. Rascunhos locais serão
+                  descartados somente se a leitura for concluída.
+                </p>
+                {reloadError ? (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Não foi possível recarregar.</Alert.Title>
+                      <Alert.Description>
+                        Os rascunhos foram preservados e as gravações continuam
+                        pausadas.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert>
+                ) : null}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button
+                  isDisabled={pending}
+                  onPress={() => setConfirming(false)}
+                  variant="secondary"
+                >
+                  Manter rascunhos
+                </Button>
+                <Button
+                  isPending={pending}
+                  onPress={() => {
+                    setPending(true);
+                    setReloadError(false);
+                    void onReload()
+                      .then(() => setConfirming(false))
+                      .catch(() => setReloadError(true))
+                      .finally(() => setPending(false));
+                  }}
+                  variant="danger"
+                >
+                  Descartar e recarregar
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+    </>
   );
 }
 

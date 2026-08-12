@@ -20,14 +20,16 @@ somente de MSW.
    esta tela não oferece exclusão do plano.
 3. O lápis substitui nome e descrição, exatamente na região em que eram exibidos,
    por `Input` e `TextArea` do TanStack Form. Salvar e cancelar são botões
-   icon-only à direita do input de nome. Salvar encerra a edição no disparo da
-   mutation; falha restaura o cache sem reabrir o editor.
+   icon-only à direita do input de nome. Durante o PATCH, campos e ações do draft
+   ficam bloqueados e o modo inline permanece visível. Somente o sucesso aplica a
+   response canônica e encerra a edição.
 4. Tabela mostra nome e `exerciseCount` de cada treino.
 5. `Novo treino` envia body vazio, aguarda o ID real, acrescenta o resumo ao cache
    usando `X-Resource-Version`, incorpora a versão devolvida no mesmo header e
    navega para a rota técnica do workout.
-6. O dropdown de treino abre confirmação; DELETE remove otimisticamente e faz
-   rollback em falha.
+6. O dropdown de treino abre confirmação; o `AlertDialog` permanece aberto e
+   bloqueado durante o DELETE. A remoção otimista afeta só o treino alvo e o
+   sucesso fecha a confirmação.
 
 ## Estados e erros
 
@@ -39,9 +41,15 @@ somente de MSW.
   sem usar ID ou placeholder.
 - Falha em background: conserva plano e treinos em cache, mantém o nome no
   breadcrumb e mostra `Alert` não bloqueante.
-- Falha de update ou exclusão de treino: snapshot restaurado e toast de erro; o
-  editor/dialog já fechado não reabre.
+- Falha de update: restaura apenas os campos confirmados do plano, mantém o draft
+  exato no formulário inline e mostra erro persistente para retry/cancelamento.
+- Falha de exclusão de treino: reinsere apenas o treino e sua posição, sem
+  substituir nome, descrição, versão ou outros treinos; dialog permanece aberto
+  com erro persistente.
 - Criação de treino não é otimista, porque a UI não fabrica ID.
+- Conflito de domínio: mantém formulário ou confirmação, pausa todas as gravações
+  do plano e mostra alerta com recarga confirmada. Falha da leitura mantém drafts e
+  pausa; sucesso atualiza a versão, descarta o trabalho confirmado e libera a fila.
 
 ## Validações e integrações
 
@@ -51,9 +59,11 @@ Nome e descrição seguem trim e limites 1–120/1–1000. Integrações:
 - `POST /global/training-plans/:trainingPlanId/workouts`;
 - `DELETE /global/training-plans/:trainingPlanId/workouts/:workoutId`.
 
-O detalhe conserva `version`; todas as mutações enviam o inteiro atual em
-`X-Resource-Version` e atualizam os caches com a versão resultante devolvida nesse
-header. `412` não é repetido nem sobrescreve o servidor.
+O detalhe conserva `version`; update do plano, criação e exclusão de treino usam o
+coordenador compartilhado por `trainingPlanId`. A versão é obtida quando a tarefa
+chega à cabeça FIFO, enviada em `X-Resource-Version` e substituída pelo header do
+sucesso. Somente `412 TRAINING_PLAN_VERSION_CONFLICT` pausa a fila; não há retry ou
+merge automático.
 
 POST, PATCH e DELETE dependem do bootstrap CSRF do layout autenticado. O client
 Axios único injeta o header em memória; falha `403` não dispara retry automático e
@@ -66,9 +76,10 @@ Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 Breadcrumb e nomes de treino usam navegação SPA pelo TanStack Router. O último
 segmento do detalhe é atual e não conduz a outra página. Lápis, salvar e cancelar
 possuem nomes acessíveis apesar de serem icon-only; dialogs de treino descrevem a
-exclusão e exigem ação explícita. O browser voltar preserva o cache enquanto
-válido. A interface usa somente `treino`/`treinos`; `workout` permanece restrito a
-identificadores técnicos, paths e contratos.
+exclusão, exigem ação explícita e não aceitam dismiss durante pending. Erros de
+formulário e dialog são persistentes, não dependem do toast. O browser voltar
+preserva o cache enquanto válido. A interface usa somente `treino`/`treinos`;
+`workout` permanece restrito a identificadores técnicos, paths e contratos.
 
 ## Analytics
 
@@ -96,8 +107,10 @@ Não se aplica — não existem imagens em
 - Erro sem cache: acrescentar `mockTrainingPlans=detail-error`; breadcrumb omite o
   plano e oferece retry.
 - Edição inline: `mockTrainingPlans=update-success` troca os textos por campos e
-  ações icon-only; `update-error` fecha e restaura o cache sem reabrir o editor.
-- Treino: o flow Playwright cria com ID real e exclui com atualização otimista.
+  ações icon-only; `update-error` preserva modo, draft e erro persistente.
+- Treino: o flow Playwright cria com ID real e exclui com atualização otimista;
+  falha conserva a confirmação e restaura somente o treino alvo.
+- Conflito: `version-conflict` preserva o trabalho e exige recarga confirmada.
 - Arquivos: `detail-page.tsx`, `components.tsx`, queries/mutations/service e
   handlers/fixtures `training-plans.ts`.
 - Specs: rota `training-plan.spec.ts`, flow `gestao-planos-treino.spec.ts` e E2E

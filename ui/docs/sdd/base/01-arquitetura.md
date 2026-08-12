@@ -113,6 +113,85 @@ Validação, erros por campo, submissão, estado disabled e erros da API devem s
 observáveis e documentados na rota. Submissões assíncronas usam mutations do
 TanStack Query quando atravessarem a fronteira HTTP.
 
+### Mutações recuperáveis
+
+Toda mutation nova ou alterada segue um ciclo de vida recuperável. Estado
+confirmado pelo servidor e intenção local ainda não confirmada são representados
+separadamente sempre que a pessoa puder continuar editando antes da resposta. Um
+draft não é promovido silenciosamente a dado confirmado, e uma resposta tardia só
+pode atualizar campos cuja intenção local não mudou desde o início daquela
+request. Revisão, token da operação ou mecanismo equivalente deve impedir que uma
+resposta antiga sobrescreva uma edição ou uma resposta mais nova.
+
+Formulário, edição inline, `Modal` e `AlertDialog` permanecem no contexto até o
+resultado terminal da operação. Enquanto a request estiver pendente, a UI impede
+submissão duplicada e ações que descartariam o mesmo trabalho. Sucesso aplica a
+response canônica e só então fecha ou encerra o contexto; falha encerra o loading,
+mantém o draft e apresenta erro persistente com retry e cancelamento quando essas
+ações forem seguras. Fechamento antecipado é exceção e precisa estar justificado no
+SDD da rota por não haver estado recuperável ou por existir outro mecanismo
+explícito de acompanhamento e recuperação.
+
+Uma atualização otimista antecipa somente o efeito visual ou de cache que possui
+rollback seguro. Ela não transforma uma request pendente em sucesso nem exige que
+o contexto de edição seja fechado antes da confirmação. Quando o benefício não
+compensar a complexidade, ou o rollback não puder ser localizado, a UI aguarda a
+response canônica antes de alterar o dado de servidor apresentado.
+
+Rollback otimista registra a menor informação suficiente — entidade, campo,
+posição, item temporário e token da mutation — e reverte somente se o alvo ainda
+contiver o efeito daquela operação. Não restaurar snapshots amplos de coleção ou
+detalhe que possam apagar mudanças posteriores. IDs temporários existem somente
+no estado da UI: não atravessam contratos persistentes, não viram parâmetros de
+outra mutation e são substituídos ou removidos pelo resultado terminal da operação
+que os criou.
+
+Decisões de erro usam a combinação de status HTTP e `ApiError.code`, nunca
+`message`, `details` ou `requestId`. Retry automático só é permitido quando a
+operação for comprovadamente idempotente, a política estiver documentada e não
+existir risco de duplicar intenção. Caso contrário, retry nasce de ação explícita
+e reutiliza o draft atual, não um payload obsoleto.
+
+Toda promise iniciada por formulário, confirmação, retry, navegação, refetch ou
+ação do editor possui tratamento terminal explícito. `toast.promise` é feedback
+complementar e não substitui fechamento, rollback, persistência de erro nem consumo
+da rejeição. Trabalho assíncrono só pode ser deliberadamente independente da
+interação quando tratar sua própria falha e essa independência estiver documentada.
+
+Se sair da rota puder perder draft, debounce, operação enfileirada ou em execução,
+ou falha ainda recuperável, a navegação é protegida por confirmação acessível.
+Operações de fundo sem trabalho recuperável não bloqueiam navegação apenas por
+estarem pendentes. Estados de espera, erro, retry, cancelamento e bloqueio usam
+nomes acessíveis, foco previsível, anúncio apropriado e controles disabled de forma
+coerente com sua semântica.
+
+### Mutações de aggregates versionados
+
+Quando a API exigir uma precondição de versão e múltiplas mutations puderem alterar
+o mesmo aggregate, elas compartilham um coordenador por ID do aggregate. O
+coordenador vive em um escopo que sobreviva aos componentes e rotas consumidoras,
+serializa em FIFO apenas o mesmo aggregate e permite paralelismo entre aggregates
+diferentes. A versão é injetada quando a tarefa chega à cabeça da fila; capturá-la
+no clique ou no agendamento não é suficiente.
+
+A versão corrente do coordenador é monotônica. Leituras canônicas podem criar o
+estado ou avançar uma fila ociosa, mas uma leitura ou montagem atrasada nunca
+regride a versão produzida por mutation. Depois de um sucesso, inclusive quando a
+fila já voltou a ficar ociosa, a próxima operação usa a versão resultante anterior.
+Reinicializar uma fila pausada exige uma leitura canônica bem-sucedida no fluxo
+explícito de recuperação.
+
+O efeito otimista começa somente na cabeça da fila, para que snapshot e versão
+representem o estado que será efetivamente enviado. Conflito de versão não recebe
+retry ou merge silencioso: a fila do aggregate é pausada, o trabalho recuperável é
+preservado e a pessoa decide quando recarregar a representação canônica. Outros
+status ou códigos não são promovidos a conflito por semelhança de mensagem.
+
+Esse coordenador é condicional, não uma abstração obrigatória para todo domínio.
+Recursos sem versão, mutations independentes ou contratos intencionalmente
+last-write-wins seguem o ciclo recuperável geral e documentam que coordenação por
+aggregate não se aplica.
+
 Quando um formulário for dividido em componentes menores, usar a composição
 oficial com `createFormHook`, `createFormHookContexts` e `withForm`. O tipo da
 instância deve ser inferido por essa composição; não declarar `AnyFormApi`, não
@@ -128,14 +207,29 @@ MSW está configurado para autenticação e planos globais, seguindo
 `05-mocks-de-api.md`. Playwright cobre as rotas e jornadas desses domínios,
 seguindo `07-testes-integrados-playwright.md`.
 
-### Coordenação do editor de workout
+### Aplicação vigente nas mutações de planos
 
-O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação do
-mesmo plano passa por uma fila FIFO local que conserva o valor retornado em
-`X-Resource-Version`; debounces de três segundos continuam independentes por
-linha. Não há retry de
-mutation. Um `412` pausa a fila, mantém drafts e exige recarga confirmada. Resposta
-de autosave é mesclada apenas nos campos que não receberam edição posterior.
+O editor consulta `TrainingPlanWorkoutDetails` por query própria. Toda mutação de
+um plano existente, seja iniciada na lista, detalhe ou editor, passa pelo mesmo
+coordenador FIFO por `trainingPlanId`. O coordenador pertence ao `QueryClient`,
+preserva-se entre rotas, injeta a versão somente quando a tarefa chega à cabeça da
+fila e conserva o valor retornado em `X-Resource-Version`. Planos diferentes
+mantêm filas independentes; a criação de plano, ainda sem ID, permanece fora
+delas. Essa aplicação concreta segue o padrão condicional de aggregates
+versionados acima; o efeito otimista também só começa na cabeça da fila.
+
+A versão proveniente de uma leitura cria um estado que ainda não existe ou avança
+uma fila ociosa sem conflito; nunca regride a versão já produzida por uma mutation.
+Depois do primeiro sucesso, novas mutations usam a versão interna produzida pela
+fila mesmo quando começam após um período ocioso e a tela ainda conserva a versão
+da leitura original. Somente uma leitura canônica confirmada pela recuperação de
+conflito reinicializa e libera explicitamente uma fila pausada.
+
+Debounces de três segundos continuam independentes por linha. Não há retry
+automático de mutation. Somente `412 TRAINING_PLAN_VERSION_CONFLICT` pausa a fila,
+mantém drafts e exige recarga confirmada; outro `412` é falha genérica. Resposta de
+autosave é mesclada apenas nos campos que não receberam edição posterior. O reload
+só libera a fila e descarta os drafts depois de uma leitura canônica bem-sucedida.
 
 Reordenação usa dnd kit com sensores de ponteiro e teclado e só envia a ordem no
 drop. O seletor transversal `core/components/image-file-picker` valida
@@ -308,12 +402,18 @@ planos e a ausência da chave redireciona com substituição de histórico para
 `/dash`. Lista, detalhe e workout são filhos desse layout, cuja branch faz parte da
 `routeTree`. A proteção visual não substitui `AdminOnly` na API.
 
-O módulo `src/routes/training-plan/` possui services Axios, query keys, queries e
-mutations. Criação/edição/exclusão de plano e exclusão de workout usam snapshot,
-atualização otimista e rollback; overlays de edição/exclusão fecham ao disparar a
-mutation e não reabrem no rollback. Criar workout espera o ID real. Toda mutation
-usa `toast.promise` e invalida o cache proprietário ao terminar. Falha de refetch
-preserva dado válido e é comunicada sem apagar conteúdo.
+O módulo `src/routes/training-plan/` possui services Axios, query keys, queries,
+coordenador e mutations. Atualizações otimistas registram tokens, entidades,
+posições e campos mínimos; o rollback altera somente o alvo que ainda contém o
+efeito daquela mutation, sem restaurar snapshots amplos. Detalhes de plano só são
+removidos do cache depois de DELETE bem-sucedido.
+
+Modal, formulário inline e confirmação permanecem no contexto durante pending e
+falha, bloqueiam dismiss ou duplicidade durante a request e fecham somente após
+sucesso. Erro persistente preserva o draft e permite retry ou cancelamento. Criar
+workout espera o ID real. Toda mutation usa `toast.promise` como feedback
+complementar e invalida apenas as famílias proprietárias; falha de refetch preserva
+dado válido sem apagar conteúdo.
 
 ## Ambiente local
 

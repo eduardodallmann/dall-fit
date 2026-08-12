@@ -13,6 +13,7 @@ import type {
 } from '@dall-fit/types';
 
 import {
+  largeTrainingPlanFixtures,
   trainingPlanCollectionFixture,
   trainingPlanDetailFixture,
   trainingPlanFixtures,
@@ -180,11 +181,10 @@ export const trainingPlanHandlers = [
       return apiError('SERVICE_UNAVAILABLE', 'Service unavailable.', 503);
     const page = Number(new URL(request.url).searchParams.get('page') ?? 1);
     const state = getState(scenario);
+    const plans =
+      scenario === 'large-pagination' ? largeTrainingPlanFixtures : state.plans;
     return HttpResponse.json(
-      trainingPlanCollectionFixture(
-        scenario === 'empty' ? [] : state.plans,
-        page,
-      ),
+      trainingPlanCollectionFixture(scenario === 'empty' ? [] : plans, page),
       createMockResponseInit(),
     );
   }),
@@ -282,6 +282,10 @@ export const trainingPlanHandlers = [
     '*/global/training-plans/:trainingPlanId/workouts/:workoutId/exercises/order',
     async ({ request }) => {
       const scenario = getScenario(request);
+      if (scenario === 'reorder-error') {
+        await delay(300);
+        return apiError('SERVICE_UNAVAILABLE', 'Service unavailable.', 503);
+      }
       const state = getState(scenario);
       const invalid = validateMutation(request, state, scenario);
       if (invalid !== null) return invalid;

@@ -9,10 +9,12 @@ import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent } from '~/core/analytics';
+import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
   TrainingPlanBreadcrumbs,
+  TrainingPlanConflictAlert,
   TrainingPlanTableState,
 } from '~/routes/training-plan/components';
 import { TrainingPlanInlineForm } from '~/routes/training-plan/inline-form';
@@ -55,8 +57,11 @@ export function TrainingPlanDetailPage({
   const [editing, setEditing] = useState(false);
   const [deleteWorkoutId, setDeleteWorkoutId] = useState<string>();
   const plan = query.data;
+  const aggregate = useAggregateMutationCoordinator(
+    trainingPlanId,
+    plan?.version,
+  );
   const submitChanges = async (input: CreateTrainingPlanRequest) => {
-    setEditing(false);
     trackUiEvent({
       control: 'submit',
       eventName: 'ui_operation_started',
@@ -82,7 +87,8 @@ export function TrainingPlanDetailPage({
         outcome: 'success',
         surface: 'training_plan_form',
       });
-    } catch {
+      setEditing(false);
+    } catch (error) {
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -90,7 +96,7 @@ export function TrainingPlanDetailPage({
         outcome: 'error',
         surface: 'training_plan_form',
       });
-      return;
+      throw error;
     }
   };
   const createWorkout = async () => {
@@ -112,17 +118,17 @@ export function TrainingPlanDetailPage({
     });
     try {
       const workout = (await promise).data;
+      await navigate({
+        params: { trainingPlanId, workoutId: workout.id },
+        search: { mockAuth, ...mockSearch },
+        to: '/global/training-plan/$trainingPlanId/workout/$workoutId',
+      });
       trackUiEvent({
         control: 'new_workout',
         eventName: 'ui_operation_completed',
         operation: 'workout_create',
         outcome: 'success',
         surface: 'training_plan_detail',
-      });
-      await navigate({
-        params: { trainingPlanId, workoutId: workout.id },
-        search: { mockAuth, ...mockSearch },
-        to: '/global/training-plan/$trainingPlanId/workout/$workoutId',
       });
     } catch {
       trackUiEvent({
@@ -161,7 +167,7 @@ export function TrainingPlanDetailPage({
         outcome: 'success',
         surface: 'training_plan_detail',
       });
-    } catch {
+    } catch (error) {
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -169,8 +175,22 @@ export function TrainingPlanDetailPage({
         outcome: 'error',
         surface: 'training_plan_detail',
       });
-      return;
+      throw error;
     }
+  };
+  const reloadConflict = async () => {
+    trackUiEvent({
+      control: 'retry',
+      eventName: 'ui_retry_requested',
+      resource: 'training_plan',
+      surface: 'training_plan_detail',
+    });
+    const result = await query.refetch();
+    if (!result.isSuccess || result.data === undefined)
+      throw result.error ?? new Error('Training plan reload failed.');
+    await aggregate.reset(result.data.version);
+    setEditing(false);
+    setDeleteWorkoutId(undefined);
   };
 
   if (query.isLoading && plan === undefined) {
@@ -243,6 +263,9 @@ export function TrainingPlanDetailPage({
           </Alert.Content>
         </Alert>
       ) : null}
+      {aggregate.paused ? (
+        <TrainingPlanConflictAlert onReload={reloadConflict} />
+      ) : null}
       <header className={styles.pageHeader()}>
         {editing ? (
           <TrainingPlanInlineForm
@@ -250,6 +273,7 @@ export function TrainingPlanDetailPage({
               description: plan.description,
               name: plan.name,
             }}
+            isWritePaused={aggregate.paused}
             onCancel={() => setEditing(false)}
             onSubmit={submitChanges}
           />
@@ -288,6 +312,7 @@ export function TrainingPlanDetailPage({
             </p>
           </div>
           <Button
+            isDisabled={aggregate.paused}
             isPending={createWorkoutMutation.isPending}
             onPress={() => void createWorkout()}
           >
@@ -358,6 +383,7 @@ export function TrainingPlanDetailPage({
       </section>
       <DeleteConfirmationDialog
         description="Este treino será removido do plano."
+        isWritePaused={aggregate.paused}
         onConfirm={deleteWorkout}
         onOpenChange={(open) => {
           if (!open) setDeleteWorkoutId(undefined);

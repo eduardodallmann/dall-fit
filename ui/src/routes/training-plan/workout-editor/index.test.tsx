@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +13,7 @@ const { trackUiEventMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-router', () => ({
-  useBlocker: vi.fn(),
+  useBlocker: vi.fn(() => ({ status: 'idle' })),
 }));
 
 vi.mock('~/core/analytics', () => ({
@@ -57,12 +58,15 @@ describe('WorkoutEditor workout name', () => {
         version: 1,
       })
       .mockRejectedValueOnce(new Error('save failed'));
+    const queryClient = new QueryClient();
     render(
-      <WorkoutEditor
-        data={workout}
-        mockScenario="success"
-        onConflict={vi.fn()}
-      />,
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={workout}
+          mockScenario="success"
+          onConflict={vi.fn()}
+        />
+      </QueryClientProvider>,
     );
 
     await user.click(

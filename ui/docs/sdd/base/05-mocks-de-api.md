@@ -82,6 +82,27 @@ Cobrir, quando aplicável:
 - latência para comportamento de loading;
 - variações determinadas naturalmente por path, query, headers ou body.
 
+Uma mutation recuperável precisa de respostas determinísticas suficientes para
+exercitar sucesso, falha antes da confirmação, retry e latência. Os erros preservam
+a combinação real de status e `code`, inclusive quando dois erros compartilham o
+mesmo status, para impedir classificação por `message`. O cenário mantém estado
+somente quando isso for necessário para observar a sequência e o reinicia entre
+testes.
+
+Quando houver atualização otimista, o mock permite provocar falha depois do efeito
+local para validar rollback restrito e preservação de mudanças posteriores. Quando
+o contrato usar versão por aggregate, o estado do handler valida a precondição,
+incrementa a versão somente em sucesso e oferece sequências controláveis para:
+
+- mutations concorrentes na mesma fila;
+- nova mutation depois que a fila ficou ociosa;
+- leitura atrasada com versão anterior;
+- conflito de domínio exato e recuperação por leitura canônica;
+- aggregates diferentes sem estado compartilhado.
+
+Seletores e fixtures continuam mínimos: não criar um cenário separado quando um
+override local do teste expressar melhor uma falha isolada.
+
 Não alterar o contrato de produção apenas para selecionar um cenário mockado. Quando
 a própria request não permitir a seleção, documentar um seletor exclusivo de
 desenvolvimento que não seja enviado em produção.
@@ -186,7 +207,9 @@ not-found, loading prolongado para validar skeletons e falhas relevantes com
 latência; a proteção sentinela continua por último. O estado conserva `version`,
 valida `X-Resource-Version`, devolve o valor resultante no mesmo header, incrementa
 a versão por mutação efetiva e mantém ordem/imagem. O header legado `If-Match` não
-satisfaz a precondição. `version-conflict`, `update-exercise-error`,
-`delete-exercise-error` e
-`image-error` cobrem falhas do editor. IDs criados são determinísticos; multipart
-exige um `File` no campo `file` e nunca é convertido em JSON/base64.
+satisfaz a precondição. `large-pagination` disponibiliza mais de 2000 itens e
+`two-pages` permite consultar uma página HTTP válida acima do total.
+`version-conflict`, `update-exercise-error`, `delete-exercise-error`,
+`reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor.
+IDs criados são determinísticos; multipart exige um `File` no campo `file` e nunca
+é convertido em JSON/base64.

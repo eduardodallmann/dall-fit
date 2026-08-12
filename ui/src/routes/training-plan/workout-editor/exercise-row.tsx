@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
-
 import { useSortable } from '@dnd-kit/sortable';
 import {
   Button,
@@ -13,7 +11,7 @@ import {
   Spinner,
   TextField,
 } from '@heroui/react';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { GripVertical, RotateCcw, Trash2 } from 'lucide-react';
 
 import {
   BODY_AREAS,
@@ -24,6 +22,7 @@ import {
 
 import { ImageFilePicker } from '~/core/components/image-file-picker';
 
+import type { ExerciseSaveStatus } from './editor-state';
 import { workoutEditorStyles } from './styles';
 
 const styles = workoutEditorStyles();
@@ -57,166 +56,80 @@ const typeLabels: Record<Exercise['type'], string> = {
 
 interface ExerciseRowProps {
   exercise: Exercise;
-  isSaving: boolean;
+  isDisabled: boolean;
+  isSavingImage: boolean;
+  isStructureDisabled: boolean;
+  onChange: (changes: UpdateExerciseRequest) => void;
   onDelete: () => void;
-  onDraftPendingChange: (pending: boolean) => void;
   onImageError: (message: string) => void;
   onRemoveImage: () => void;
-  onSave: (changes: UpdateExerciseRequest) => void;
+  onRetry: () => void;
   onUploadImage: (file: File) => void;
+  status: ExerciseSaveStatus;
 }
 
 export function ExerciseRow({
   exercise,
-  isSaving,
+  isDisabled,
+  isSavingImage,
+  isStructureDisabled,
+  onChange,
   onDelete,
-  onDraftPendingChange,
   onImageError,
   onRemoveImage,
-  onSave,
+  onRetry,
   onUploadImage,
+  status,
 }: Readonly<ExerciseRowProps>) {
-  const [draft, setDraft] = useState(exercise);
-  const pending = useRef<UpdateExerciseRequest>({});
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const isSaving = status === 'queued' || status === 'saving';
   const { attributes, listeners, setNodeRef } = useSortable({
+    disabled: isDisabled || isStructureDisabled,
     id: exercise.id,
   });
-
-  useEffect(() => {
-    setDraft((current) =>
-      exercise.type === current.type
-        ? { ...exercise, ...pending.current }
-        : exercise,
-    );
-  }, [exercise]);
-  useEffect(
-    () => () => {
-      if (timer.current !== undefined) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const schedule = (changes: UpdateExerciseRequest, next: Exercise) => {
-    setDraft(next);
-    pending.current = { ...pending.current, ...changes };
-    onDraftPendingChange(true);
-    if (timer.current !== undefined) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      timer.current = undefined;
-      const payload = pending.current;
-      pending.current = {};
-      onDraftPendingChange(false);
-      onSave(payload);
-    }, 3000);
-  };
 
   return (
     <li className={styles.exerciseItem()} ref={setNodeRef}>
       <button
-        aria-label={`Mover ${typeLabels[draft.type]}`}
+        aria-label={`Mover ${typeLabels[exercise.type]}`}
         className={styles.handle()}
+        data-exercise-drag-handle={exercise.id}
+        disabled={isDisabled || isStructureDisabled}
         type="button"
         {...attributes}
         {...listeners}
       >
         <GripVertical aria-hidden="true" />
       </button>
-      <div className={styles.exerciseFields()}>
-        {'name' in draft ? (
-          <TextInput
-            label="Nome"
-            maxLength={40}
-            value={draft.name}
-            onChange={(name) => schedule({ name }, { ...draft, name })}
-          />
-        ) : null}
-        {'youtubeId' in draft ? (
-          <TextInput
-            label="Vídeo"
-            maxLength={2048}
-            value={draft.youtubeId}
-            onChange={(youtubeId) =>
-              schedule({ youtubeId }, { ...draft, youtubeId })
-            }
-          />
-        ) : null}
-        {'youtubeId' in draft ? (
-          <img
-            alt={`Miniatura de ${draft.name}`}
-            className={styles.youtubeThumbnail()}
-            src={`https://img.youtube.com/vi/${draft.youtubeId}/default.jpg`}
-          />
-        ) : null}
-        {draft.type === 'image' ? (
-          <ImageFilePicker
-            imageUrl={draft.image?.thumbnailUrl}
-            isPending={isSaving}
-            label={`Imagem de ${draft.name}`}
-            onError={onImageError}
-            onRemove={draft.image === null ? undefined : onRemoveImage}
-            onSelect={onUploadImage}
-          />
-        ) : null}
-        {'bodyArea' in draft ? (
-          <BodyAreaSelect
-            value={draft.bodyArea}
-            onChange={(bodyArea) =>
-              schedule({ bodyArea }, { ...draft, bodyArea })
-            }
-          />
-        ) : null}
-        {'restSeconds' in draft ? (
-          <NumericInput
-            label="Descanso (s)"
-            max={3600}
-            min={draft.type === 'pause' ? 1 : 0}
-            value={draft.restSeconds}
-            onChange={(restSeconds) =>
-              schedule({ restSeconds }, { ...draft, restSeconds })
-            }
-          />
-        ) : null}
-        {'sets' in draft ? (
-          <NumericInput
-            label="Séries"
-            max={100}
-            min={1}
-            value={draft.sets}
-            onChange={(sets) => schedule({ sets }, { ...draft, sets })}
-          />
-        ) : null}
-        {'repetitions' in draft ? (
-          <NumericInput
-            label="Repetições"
-            max={1000}
-            min={1}
-            value={draft.repetitions}
-            onChange={(repetitions) =>
-              schedule({ repetitions }, { ...draft, repetitions })
-            }
-          />
-        ) : null}
-        {'durationMinutes' in draft ? (
-          <NumericInput
-            label="Duração (min)"
-            max={1440}
-            min={1}
-            value={draft.durationMinutes}
-            onChange={(durationMinutes) =>
-              schedule({ durationMinutes }, { ...draft, durationMinutes })
-            }
-          />
-        ) : null}
-      </div>
+      <ExerciseFields
+        exercise={exercise}
+        isDisabled={isDisabled}
+        isSavingImage={isSavingImage}
+        isStructureDisabled={isStructureDisabled}
+        onChange={onChange}
+        onImageError={onImageError}
+        onRemoveImage={onRemoveImage}
+        onUploadImage={onUploadImage}
+      />
       <div className={styles.exerciseActions()}>
-        <Chip>{typeLabels[draft.type]}</Chip>
-        {isSaving ? (
+        <Chip>{typeLabels[exercise.type]}</Chip>
+        {status === 'error' ? (
+          <Button
+            isDisabled={isDisabled || isStructureDisabled}
+            onPress={onRetry}
+            size="sm"
+            variant="secondary"
+          >
+            <RotateCcw aria-hidden="true" />
+            Tentar novamente
+          </Button>
+        ) : null}
+        {isSaving || isSavingImage ? (
           <Spinner aria-label="Salvando exercício" size="sm" />
         ) : (
           <Popover>
             <Button
-              aria-label={`Excluir ${typeLabels[draft.type]}`}
+              aria-label={`Excluir ${typeLabels[exercise.type]}`}
+              isDisabled={isDisabled || isStructureDisabled}
               isIconOnly
               size="sm"
               variant="ghost"
@@ -234,23 +147,143 @@ export function ExerciseRow({
           </Popover>
         )}
       </div>
+      {status === 'debouncing' ? (
+        <p className={styles.status()}>Alterações aguardando autosave.</p>
+      ) : null}
+      {status === 'error' ? (
+        <p className={styles.status()} role="alert">
+          Não foi possível salvar. O rascunho foi preservado.
+        </p>
+      ) : null}
     </li>
   );
 }
 
+function ExerciseFields({
+  exercise,
+  isDisabled,
+  isSavingImage,
+  isStructureDisabled,
+  onChange,
+  onImageError,
+  onRemoveImage,
+  onUploadImage,
+}: Readonly<
+  Pick<
+    ExerciseRowProps,
+    | 'exercise'
+    | 'isDisabled'
+    | 'isSavingImage'
+    | 'isStructureDisabled'
+    | 'onChange'
+    | 'onImageError'
+    | 'onRemoveImage'
+    | 'onUploadImage'
+  >
+>) {
+  return (
+    <div className={styles.exerciseFields()}>
+      {'name' in exercise ? (
+        <TextInput
+          isDisabled={isDisabled}
+          label="Nome"
+          maxLength={40}
+          onChange={(name) => onChange({ name })}
+          value={exercise.name}
+        />
+      ) : null}
+      {'youtubeId' in exercise ? (
+        <TextInput
+          isDisabled={isDisabled}
+          label="Vídeo"
+          maxLength={2048}
+          onChange={(youtubeId) => onChange({ youtubeId })}
+          value={exercise.youtubeId}
+        />
+      ) : null}
+      {'youtubeId' in exercise ? (
+        <img
+          alt={`Miniatura de ${exercise.name}`}
+          className={styles.youtubeThumbnail()}
+          src={`https://img.youtube.com/vi/${exercise.youtubeId}/default.jpg`}
+        />
+      ) : null}
+      {exercise.type === 'image' ? (
+        <ImageFilePicker
+          imageUrl={exercise.image?.thumbnailUrl}
+          isPending={isDisabled || isSavingImage || isStructureDisabled}
+          label={`Imagem de ${exercise.name}`}
+          onError={onImageError}
+          onRemove={exercise.image === null ? undefined : onRemoveImage}
+          onSelect={onUploadImage}
+        />
+      ) : null}
+      {'bodyArea' in exercise ? (
+        <BodyAreaSelect
+          isDisabled={isDisabled}
+          onChange={(bodyArea) => onChange({ bodyArea })}
+          value={exercise.bodyArea}
+        />
+      ) : null}
+      {'restSeconds' in exercise ? (
+        <NumericInput
+          isDisabled={isDisabled}
+          label="Descanso (s)"
+          max={3600}
+          min={exercise.type === 'pause' ? 1 : 0}
+          onChange={(restSeconds) => onChange({ restSeconds })}
+          value={exercise.restSeconds}
+        />
+      ) : null}
+      {'sets' in exercise ? (
+        <NumericInput
+          isDisabled={isDisabled}
+          label="Séries"
+          max={100}
+          min={1}
+          onChange={(sets) => onChange({ sets })}
+          value={exercise.sets}
+        />
+      ) : null}
+      {'repetitions' in exercise ? (
+        <NumericInput
+          isDisabled={isDisabled}
+          label="Repetições"
+          max={1000}
+          min={1}
+          onChange={(repetitions) => onChange({ repetitions })}
+          value={exercise.repetitions}
+        />
+      ) : null}
+      {'durationMinutes' in exercise ? (
+        <NumericInput
+          isDisabled={isDisabled}
+          label="Duração (min)"
+          max={1440}
+          min={1}
+          onChange={(durationMinutes) => onChange({ durationMinutes })}
+          value={exercise.durationMinutes}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function TextInput({
+  isDisabled,
   label,
   maxLength,
   onChange,
   value,
 }: Readonly<{
+  isDisabled: boolean;
   label: string;
   maxLength: number;
   onChange: (value: string) => void;
   value: string;
 }>) {
   return (
-    <TextField>
+    <TextField isDisabled={isDisabled}>
       <Label>{label}</Label>
       <Input
         maxLength={maxLength}
@@ -262,12 +295,14 @@ function TextInput({
 }
 
 function NumericInput({
+  isDisabled,
   label,
   max,
   min,
   onChange,
   value,
 }: Readonly<{
+  isDisabled: boolean;
   label: string;
   max: number;
   min: number;
@@ -276,6 +311,7 @@ function NumericInput({
 }>) {
   return (
     <NumberField
+      isDisabled={isDisabled}
       maxValue={max}
       minValue={min}
       onChange={onChange}
@@ -292,11 +328,17 @@ function NumericInput({
 }
 
 function BodyAreaSelect({
+  isDisabled,
   onChange,
   value,
-}: Readonly<{ onChange: (value: BodyArea) => void; value: BodyArea }>) {
+}: Readonly<{
+  isDisabled: boolean;
+  onChange: (value: BodyArea) => void;
+  value: BodyArea;
+}>) {
   return (
     <Select
+      isDisabled={isDisabled}
       onChange={(key) => {
         if (typeof key === 'string') onChange(key as BodyArea);
       }}

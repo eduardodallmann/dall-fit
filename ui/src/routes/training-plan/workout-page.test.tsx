@@ -20,6 +20,14 @@ vi.mock('~/core/analytics', () => ({
   trackUiEvent: trackUiEventMock,
 }));
 
+vi.mock('~/routes/training-plan/aggregate-mutation-coordinator', () => ({
+  useAggregateMutationCoordinator: () => ({
+    isPending: false,
+    paused: false,
+    reset: vi.fn(),
+  }),
+}));
+
 vi.mock('~/routes/training-plan/components', () => ({
   TrainingPlanBreadcrumbs: () => null,
 }));

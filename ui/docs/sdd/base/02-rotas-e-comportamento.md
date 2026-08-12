@@ -7,6 +7,14 @@ TanStack Router é o roteador oficial. A árvore é declarada manualmente em
 tipagem de paths, parâmetros, links e navegação. Não usar roteamento por arquivos,
 strings de URL espalhadas em componentes nem acesso direto a `window.history`.
 
+Search params com representação canônica são validados antes da consulta. Quando
+uma forma inválida ou não canônica precisa ser corrigida, a navegação usa
+`replace`, preserva os demais params válidos e não deixa a URL descartada no
+histórico. A listagem de planos aplica essa regra a `page`: ausência representa 1,
+a página 1 é omitida e somente inteiros decimais canônicos de 2 a 100 permanecem.
+Depois da response, uma página acima do último resultado é substituída pela última
+página existente antes de apresentar o conteúdo.
+
 Todo segmento estático de um path navegável usa inglês, letras minúsculas e
 `kebab-case`, conforme a
 [convenção transversal de paths públicos](../../../../docs/sdd/base/01-arquitetura-do-monorepo.md#convenção-de-paths-públicos).
@@ -30,6 +38,12 @@ Registrar:
 - loading, vazio, sucesso, erro e indisponibilidade;
 - navegação de entrada, avanço, retorno e retomada;
 - integrações e comportamento por status;
+- para cada mutation, estado confirmado e draft, estratégia otimista ou confirmada,
+  duração do pending, momento de fechamento e prevenção de duplicidade;
+- rollback localizado, tratamento de resposta tardia, erro persistente, retry,
+  cancelamento e proteção de navegação aplicáveis;
+- idempotência e concorrência, incluindo precondição, versão, fila e recuperação de
+  conflito quando o recurso for um aggregate versionado;
 - acessibilidade, foco e teclado;
 - cenários Given/When/Then e casos limite.
 

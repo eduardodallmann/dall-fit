@@ -84,6 +84,48 @@ aplicável:
 - respostas relevantes da API;
 - regressões descritas no SDD da rota.
 
+Toda mutation nova ou alterada seleciona, conforme o risco documentado, cenários
+que comprovem:
+
+- caminho feliz, estado pending observável e prevenção de submissão duplicada;
+- aplicação da response canônica e encerramento do formulário, edição ou
+  confirmação somente depois do sucesso;
+- falha genérica com loading encerrado, draft preservado, erro persistente e retry
+  ou cancelamento seguro;
+- classificação funcional pela combinação de status e `code`, sem decisão por
+  texto de mensagem;
+- rollback restrito ao efeito da própria operação, preservando mudanças posteriores
+  e alvos não relacionados;
+- resposta tardia incapaz de sobrescrever intenção ou resposta mais nova;
+- término explícito de promises, inclusive nos caminhos rejeitados;
+- acessibilidade de espera, erro, bloqueio, foco e proteção de navegação quando
+  houver trabalho recuperável.
+
+Para aggregates versionados com fila compartilhada, a cobertura inclui ainda:
+
+- duas operações enfileiradas enquanto a primeira está pendente, em ordem FIFO;
+- uma segunda operação iniciada depois que a primeira concluiu e a fila ficou
+  ociosa, usando a versão resultante da primeira;
+- leitura ou remontagem atrasada incapaz de regredir a versão corrente;
+- aggregates diferentes executando de forma independente;
+- conflito exato pausando somente o aggregate afetado, sem retry ou merge
+  silencioso, e liberação apenas após recuperação canônica;
+- falha não classificada como conflito sem avanço indevido da versão e com a
+  continuidade segura definida pelo domínio.
+
+Esses cenários não precisam existir todos no Playwright. Funções puras, hooks e
+componentes cobrem a matriz combinatória; Playwright preserva os caminhos
+observáveis de maior risco e a integração real entre tela, cliente e MSW.
+
+Na gestão de planos, funções puras cobrem canonicalização e janela limitada de
+paginação, merge por revisão de draft, reinserção e restauração de ordem. Testes de
+hooks cobrem FIFO e versão por aggregate, independência entre planos, propagação da
+versão entre mutations concorrentes e sequenciais separadas por um período ocioso,
+classificação exata de conflito e rollback localizado. Playwright cobre overlays
+recuperáveis, página acima do total, paginação grande, duas adições consecutivas,
+autosave/conflito, exclusão durante debounce, ordem por teclado e proteção
+acessível da navegação.
+
 ## Comandos
 
 ```bash

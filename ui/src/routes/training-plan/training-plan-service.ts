@@ -34,6 +34,7 @@ export type MockTrainingPlansScenario =
   | 'detail-error'
   | 'empty'
   | 'list-error'
+  | 'large-pagination'
   | 'loading'
   | 'not-found'
   | 'success'
@@ -42,6 +43,8 @@ export type MockTrainingPlansScenario =
   | 'update-exercise-error'
   | 'delete-exercise-error'
   | 'image-error'
+  | 'reorder-error'
+  | 'two-pages'
   | 'version-conflict';
 
 export function trainingPlanMockSearch(
@@ -106,6 +109,14 @@ export async function listGlobalTrainingPlans(
     { ...requestConfig(mockScenario), params: { page } },
   );
   const result = response.data;
+  if (
+    !Array.isArray(result.data) ||
+    result.page !== page ||
+    result.pageSize !== 20 ||
+    !Number.isSafeInteger(result.total) ||
+    result.total < 0
+  )
+    throw new Error('API response has invalid training plan pagination.');
 
   return result;
 }
