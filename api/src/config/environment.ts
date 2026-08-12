@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { LOG_LEVELS } from '@nestjs/common';
 import { z } from 'zod';
 
 const booleanString = z
@@ -25,6 +26,7 @@ const environmentSchema = z.looseObject({
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   VERCEL_URL: optionalNonEmptyString,
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default('log'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   CORS_ORIGIN: z.url().default('http://localhost:3000'),
   UI_URL: z.url().default('http://localhost:3000'),

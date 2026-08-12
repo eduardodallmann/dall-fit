@@ -1,3 +1,4 @@
+import { LOG_LEVELS } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
 import { validateEnvironment } from '~/config/environment';
@@ -22,6 +23,7 @@ describe('validateEnvironment', () => {
 
     expect(result).toMatchObject({
       PORT: 4000,
+      LOG_LEVEL: 'log',
       CORS_ORIGIN: 'http://localhost:3000',
       UI_URL: 'http://localhost:3000',
       MONGODB_URI: 'mongodb://127.0.0.1:27017/dall-fit',
@@ -55,6 +57,36 @@ describe('validateEnvironment', () => {
     expect(result.AUTH_COOKIE_SECURE).toBe(true);
     expect(result.SYSTEM_VARIABLE).toBe('preserved');
   });
+
+  it.each(LOG_LEVELS)('accepts the native %s log level', (logLevel) => {
+    const result = validateEnvironment({
+      ...validEnvironment,
+      LOG_LEVEL: logLevel,
+    });
+
+    expect(result.LOG_LEVEL).toBe(logLevel);
+  });
+
+  it.each(['', 'WARN', 'warn,error', 'silent'])(
+    'rejects the invalid log level %j without exposing it',
+    (logLevel) => {
+      const execute = () =>
+        validateEnvironment({
+          ...validEnvironment,
+          LOG_LEVEL: logLevel,
+        });
+
+      expect(execute).toThrow('LOG_LEVEL');
+
+      if (logLevel !== '') {
+        try {
+          execute();
+        } catch (error: unknown) {
+          expect((error as Error).message).not.toContain(logLevel);
+        }
+      }
+    },
+  );
 
   it('reports invalid variables without exposing their values', () => {
     expect(() =>

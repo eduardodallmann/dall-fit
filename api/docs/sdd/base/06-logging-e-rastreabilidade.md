@@ -27,6 +27,38 @@ contexto e stack. Logs de bootstrap fora de uma request não inventam correlaç�
 O identificador pode ser pesquisado, mas não autoriza registrar dados que esta
 política proíbe.
 
+## Nível mínimo de emissão
+
+`LOG_LEVEL` seleciona o nível menos severo que o logger global pode emitir. A
+configuração aceita exatamente `verbose`, `debug`, `log`, `warn`, `error` ou
+`fatal`, usa `log` quando ausente e impede o bootstrap quando contém outro valor.
+Ela é lida ao iniciar a instância; uma alteração no `.env` local ou em um ambiente
+Development, Preview ou Production da Vercel exige reinício ou novo deployment.
+
+O `RequestContextLogger` entrega ao `ConsoleLogger` somente o limiar em um array
+unitário. A hierarquia pertence ao NestJS e não é repetida em comparação ou mapa
+próprio da aplicação:
+
+| `LOG_LEVEL` | Níveis emitidos                                     |
+| ----------- | --------------------------------------------------- |
+| `verbose`   | `verbose`, `debug`, `log`, `warn`, `error`, `fatal` |
+| `debug`     | `debug`, `log`, `warn`, `error`, `fatal`            |
+| `log`       | `log`, `warn`, `error`, `fatal`                     |
+| `warn`      | `warn`, `error`, `fatal`                            |
+| `error`     | `error`, `fatal`                                    |
+| `fatal`     | `fatal`                                             |
+
+O limiar filtra a escrita, não a classificação. Controllers, commands, services,
+repositories e adapters continuam chamando `log`, `warn` e `error` conforme esta
+política, e níveis emitidos preservam mensagem, metadados sanitizados, contexto,
+stack e `requestId`. O filtro reduz o volume e o I/O do console, mas não promete
+eliminar o custo de preparar resumos seguros antes da chamada ao logger.
+
+Falhas anteriores à instalação do logger injetado podem ser impressas pelo
+fallback de bootstrap do NestJS para que configuração ou composição inválida não
+termine silenciosamente. Não existem valor `off`, lista configurável, alteração
+dinâmica, amostragem ou transporte externo nesta política.
+
 ## Formato da mensagem
 
 Toda mensagem começa com:
