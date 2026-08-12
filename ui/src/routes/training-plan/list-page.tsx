@@ -11,6 +11,7 @@ import type {
 } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { requireActiveSessionGeneration } from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
 import { isExpectedCancellation } from '~/core/http/http-error';
 import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
@@ -103,6 +104,7 @@ export function TrainingPlanListPage({
   }, [isCorrectingPage, navigateToPage, pageCount]);
   const submitPlan = async (input: CreateTrainingPlanRequest) => {
     if (formPlan === null) return;
+    const generation = requireActiveSessionGeneration();
     if (formPlan === undefined) {
       const previousPage = page;
       trackUiEvent({
@@ -113,7 +115,7 @@ export function TrainingPlanListPage({
       });
       try {
         await navigateToPage(1);
-        await createMutation.mutateAsync(input);
+        await createMutation.mutateAsync({ generation, input });
         toast.success('Plano criado.');
         trackUiEvent({
           control: 'submit',
@@ -147,6 +149,7 @@ export function TrainingPlanListPage({
     try {
       await updateMutation.mutateAsync({
         changes: input,
+        generation,
         trainingPlanId: formPlan.id,
         version: formPlan.version,
       });
@@ -172,6 +175,7 @@ export function TrainingPlanListPage({
   };
   const confirmDelete = async () => {
     if (deletePlan === undefined) return;
+    const generation = requireActiveSessionGeneration();
     trackUiEvent({
       control: 'delete_confirmation',
       eventName: 'ui_operation_started',
@@ -183,6 +187,7 @@ export function TrainingPlanListPage({
     try {
       if (shouldReturnPage) await navigateToPage(page - 1);
       await deleteMutation.mutateAsync({
+        generation,
         trainingPlanId: deletePlan.id,
         version: deletePlan.version,
       });

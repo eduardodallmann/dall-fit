@@ -21,6 +21,8 @@ export function getApiErrorCode(error: unknown): string | undefined {
 }
 
 export function classifyHttpFailure(error: unknown): ClassifiedHttpFailure {
+  if (error instanceof DOMException && error.name === 'AbortError')
+    return { kind: 'cancelled' };
   if (axios.isCancel(error)) return { kind: 'cancelled' };
   if (!axios.isAxiosError(error)) return { kind: 'unknown' };
   if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT')

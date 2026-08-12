@@ -1,6 +1,7 @@
 let csrfToken: string | undefined;
 let csrfTokenPromise: Promise<string> | undefined;
 let csrfTokenFetcher: (() => Promise<string>) | undefined;
+let csrfTokenGeneration = 0;
 
 export function configureCsrfTokenFetcher(
   fetcher: () => Promise<string>,
@@ -26,15 +27,17 @@ export function ensureConfiguredCsrfToken(): Promise<string> {
   if (csrfTokenFetcher === undefined)
     return Promise.reject(new Error('CSRF token fetcher is unavailable.'));
 
-  csrfTokenPromise = csrfTokenFetcher()
+  const generation = csrfTokenGeneration;
+  const pending = csrfTokenFetcher()
     .then((token) => {
-      csrfToken = token;
+      if (generation === csrfTokenGeneration) csrfToken = token;
       return token;
     })
     .finally(() => {
-      csrfTokenPromise = undefined;
+      if (csrfTokenPromise === pending) csrfTokenPromise = undefined;
     });
-  return csrfTokenPromise;
+  csrfTokenPromise = pending;
+  return pending;
 }
 
 export function refreshCsrfToken(): Promise<string> {
@@ -43,6 +46,8 @@ export function refreshCsrfToken(): Promise<string> {
 }
 
 export function resetCsrfTokenForTests(): void {
+  csrfTokenGeneration += 1;
   csrfToken = undefined;
   csrfTokenPromise = undefined;
+  csrfTokenFetcher = undefined;
 }

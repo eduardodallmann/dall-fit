@@ -29,6 +29,9 @@ describe('HTTP failure policy', () => {
       kind: 'cancelled',
     });
     expect(
+      classifyHttpFailure(new DOMException('Session ended.', 'AbortError')),
+    ).toEqual({ kind: 'cancelled' });
+    expect(
       classifyHttpFailure(new axios.AxiosError('timeout', 'ETIMEDOUT')),
     ).toEqual({ kind: 'timeout' });
     expect(

@@ -62,6 +62,13 @@ export function getActiveSessionGeneration(): number | undefined {
     : undefined;
 }
 
+export function requireActiveSessionGeneration(): number {
+  const generation = getActiveSessionGeneration();
+  if (generation === undefined)
+    throw new DOMException('Session ended.', 'AbortError');
+  return generation;
+}
+
 export function getActiveSessionMockAuth(): string | undefined {
   return activeSession?.status === 'active'
     ? activeSession.mockAuth

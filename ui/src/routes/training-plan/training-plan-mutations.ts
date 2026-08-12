@@ -13,10 +13,7 @@ import type {
   UpdateTrainingPlanRequest,
 } from '@dall-fit/types';
 
-import {
-  getActiveSessionGeneration,
-  isSessionGenerationActive,
-} from '~/auth/session-lifecycle';
+import { isSessionGenerationActive } from '~/auth/session-lifecycle';
 import { isAmbiguousMutationFailure } from '~/core/http/http-error';
 
 import {
@@ -36,14 +33,16 @@ import {
 const optimisticTokens = '__dallFitOptimisticTokens';
 const optimisticPlanToken = '__dallFitOptimisticMutation';
 
-function isCurrentGeneration(generation: number | undefined): boolean {
-  return generation === undefined || isSessionGenerationActive(generation);
+function isCurrentGeneration(generation: number): boolean {
+  return isSessionGenerationActive(generation);
 }
 
-function canRollbackMutation(
-  generation: number | undefined,
-  error: unknown,
-): boolean {
+function assertCurrentGeneration(generation: number): void {
+  if (!isCurrentGeneration(generation))
+    throw new DOMException('Session ended.', 'AbortError');
+}
+
+function canRollbackMutation(generation: number, error: unknown): boolean {
   return isCurrentGeneration(generation) && !isAmbiguousMutationFailure(error);
 }
 
@@ -81,6 +80,29 @@ interface RemovedPlanEntry {
   previousIndex: number;
   previousPlan?: TrainingPlanSummary;
   queryKey: QueryKey;
+}
+
+interface SessionMutationVariables {
+  generation: number;
+}
+
+interface CreateTrainingPlanVariables extends SessionMutationVariables {
+  input: CreateTrainingPlanRequest;
+}
+
+interface UpdateTrainingPlanVariables extends SessionMutationVariables {
+  changes: UpdateTrainingPlanRequest;
+  trainingPlanId: string;
+  version: number;
+}
+
+interface DeleteTrainingPlanVariables extends SessionMutationVariables {
+  trainingPlanId: string;
+  version: number;
+}
+
+interface DeleteTrainingPlanWorkoutVariables extends DeleteTrainingPlanVariables {
+  workoutId: string;
 }
 
 function createTemporaryPlan(input: CreateTrainingPlanRequest) {
@@ -181,13 +203,15 @@ export function useCreateTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
-  const generation = getActiveSessionGeneration();
   const result = useMutation({
-    mutationFn: (input: CreateTrainingPlanRequest) =>
-      createGlobalTrainingPlan(input, scenario),
-    onMutate: async (input) => {
-      if (!isCurrentGeneration(generation)) return undefined;
+    mutationFn: ({ generation, input }: CreateTrainingPlanVariables) => {
+      assertCurrentGeneration(generation);
+      return createGlobalTrainingPlan(input, scenario);
+    },
+    onMutate: async ({ generation, input }) => {
+      assertCurrentGeneration(generation);
       await queryClient.cancelQueries({ queryKey: trainingPlanKeys.lists() });
+      assertCurrentGeneration(generation);
       const temporary = createTemporaryPlan(input);
       const token = `create-${crypto.randomUUID()}`;
       const queryKeys = queryClient
@@ -217,7 +241,7 @@ export function useCreateTrainingPlanMutation(
       }
       return { queryKeys, temporaryId: temporary.id, token };
     },
-    onError: (error, _input, context) => {
+    onError: (error, { generation }, context) => {
       if (!isCurrentGeneration(generation)) return;
       if (isAmbiguousMutationFailure(error)) return;
       if (context === undefined) return;
@@ -237,7 +261,7 @@ export function useCreateTrainingPlanMutation(
         );
       }
     },
-    onSuccess: (created, _input, context) => {
+    onSuccess: (created, { generation }, context) => {
       if (!isCurrentGeneration(generation)) return;
       if (context === undefined) return;
       for (const queryKey of context.queryKeys) {
@@ -256,7 +280,7 @@ export function useCreateTrainingPlanMutation(
         );
       }
     },
-    onSettled: async () => {
+    onSettled: async (_data, _error, { generation }) => {
       if (!isCurrentGeneration(generation)) return;
       await queryClient.invalidateQueries({
         queryKey: trainingPlanKeys.lists(),
@@ -271,20 +295,19 @@ export function useUpdateTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
-  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
       changes,
+      generation,
       version,
       trainingPlanId,
-    }: {
-      changes: UpdateTrainingPlanRequest;
-      version: number;
-      trainingPlanId: string;
-    }) =>
+    }: UpdateTrainingPlanVariables) => (
+      assertCurrentGeneration(generation),
       coordinator.enqueue(trainingPlanId, version, async (currentVersion) => {
+        assertCurrentGeneration(generation);
         await cancelTrainingPlanQueries(queryClient, trainingPlanId);
+        assertCurrentGeneration(generation);
         const updatedAt = new Date().toISOString();
         const token = `update-${crypto.randomUUID()}`;
         const lists: OptimisticPlanEntry[] = [];
@@ -344,6 +367,7 @@ export function useUpdateTrainingPlanMutation(
             currentVersion,
             scenario,
           );
+          assertCurrentGeneration(generation);
           for (const { queryKey } of lists) {
             queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
               queryKey,
@@ -401,9 +425,10 @@ export function useUpdateTrainingPlanMutation(
           }
           throw error;
         }
-      }),
+      })
+    ),
     onSettled: async (_data, error, variables) => {
-      if (!isCurrentGeneration(generation)) return;
+      if (!isCurrentGeneration(variables.generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -423,18 +448,18 @@ export function useDeleteTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
-  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
+      generation,
       trainingPlanId,
       version,
-    }: {
-      trainingPlanId: string;
-      version: number;
-    }) =>
+    }: DeleteTrainingPlanVariables) => (
+      assertCurrentGeneration(generation),
       coordinator.enqueue(trainingPlanId, version, async (currentVersion) => {
+        assertCurrentGeneration(generation);
         await cancelTrainingPlanQueries(queryClient, trainingPlanId);
+        assertCurrentGeneration(generation);
         const token = `delete-${crypto.randomUUID()}`;
         const entries: RemovedPlanEntry[] = [];
         for (const [
@@ -468,6 +493,7 @@ export function useDeleteTrainingPlanMutation(
             currentVersion,
             scenario,
           );
+          assertCurrentGeneration(generation);
           for (const { queryKey } of entries) {
             queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
               queryKey,
@@ -504,9 +530,10 @@ export function useDeleteTrainingPlanMutation(
           }
           throw error;
         }
-      }),
+      })
+    ),
     onSettled: async (_data, error, variables) => {
-      if (!isCurrentGeneration(generation)) return;
+      if (!isCurrentGeneration(variables.generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -530,22 +557,22 @@ export function useCreateTrainingPlanWorkoutMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
-  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
+      generation,
       trainingPlanId,
       version,
-    }: {
-      trainingPlanId: string;
-      version: number;
-    }) =>
+    }: DeleteTrainingPlanVariables) => (
+      assertCurrentGeneration(generation),
       coordinator.enqueue(trainingPlanId, version, async (currentVersion) => {
+        assertCurrentGeneration(generation);
         const created = await createTrainingPlanWorkout(
           trainingPlanId,
           currentVersion,
           scenario,
         );
+        assertCurrentGeneration(generation);
         for (const [queryKey] of queryClient.getQueriesData({
           queryKey: trainingPlanKeys.details(),
         })) {
@@ -560,9 +587,10 @@ export function useCreateTrainingPlanWorkoutMutation(
           );
         }
         return { data: created, version: created.version };
-      }),
+      })
+    ),
     onSettled: async (_data, error, variables) => {
-      if (!isCurrentGeneration(generation)) return;
+      if (!isCurrentGeneration(variables.generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -582,23 +610,22 @@ export function useDeleteTrainingPlanWorkoutMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
-  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
+      generation,
       trainingPlanId,
       workoutId,
       version,
-    }: {
-      trainingPlanId: string;
-      workoutId: string;
-      version: number;
-    }) =>
+    }: DeleteTrainingPlanWorkoutVariables) => (
+      assertCurrentGeneration(generation),
       coordinator.enqueue(trainingPlanId, version, async (currentVersion) => {
+        assertCurrentGeneration(generation);
         await queryClient.cancelQueries({
           predicate: (query) =>
             detailMatchesTrainingPlan(query.queryKey, trainingPlanId),
         });
+        assertCurrentGeneration(generation);
         const removed: RemovedWorkoutEntry[] = [];
         for (const [
           queryKey,
@@ -628,6 +655,7 @@ export function useDeleteTrainingPlanWorkoutMutation(
             currentVersion,
             scenario,
           );
+          assertCurrentGeneration(generation);
           for (const { queryKey } of removed) {
             queryClient.setQueryData<TrainingPlanDetails>(queryKey, (cached) =>
               cached?.id === trainingPlanId
@@ -654,9 +682,10 @@ export function useDeleteTrainingPlanWorkoutMutation(
           }
           throw error;
         }
-      }),
+      })
+    ),
     onSettled: async (_data, error, variables) => {
-      if (!isCurrentGeneration(generation)) return;
+      if (!isCurrentGeneration(variables.generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused

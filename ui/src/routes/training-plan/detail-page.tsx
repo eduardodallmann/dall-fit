@@ -8,6 +8,7 @@ import { Pencil, Plus } from 'lucide-react';
 import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { requireActiveSessionGeneration } from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
 import { isExpectedCancellation } from '~/core/http/http-error';
 import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
@@ -63,6 +64,7 @@ export function TrainingPlanDetailPage({
     plan?.version,
   );
   const submitChanges = async (input: CreateTrainingPlanRequest) => {
+    const generation = requireActiveSessionGeneration();
     trackUiEvent({
       control: 'submit',
       eventName: 'ui_operation_started',
@@ -72,6 +74,7 @@ export function TrainingPlanDetailPage({
     try {
       await updateMutation.mutateAsync({
         changes: input,
+        generation,
         trainingPlanId,
         version: plan?.version ?? 0,
       });
@@ -97,16 +100,18 @@ export function TrainingPlanDetailPage({
     }
   };
   const createWorkout = async () => {
+    if (plan === undefined) return;
+    const generation = requireActiveSessionGeneration();
     trackUiEvent({
       control: 'new_workout',
       eventName: 'ui_operation_started',
       operation: 'workout_create',
       surface: 'training_plan_detail',
     });
-    if (plan === undefined) return;
     try {
       const workout = (
         await createWorkoutMutation.mutateAsync({
+          generation,
           trainingPlanId,
           version: plan.version,
         })
@@ -138,6 +143,7 @@ export function TrainingPlanDetailPage({
   };
   const deleteWorkout = async () => {
     if (deleteWorkoutId === undefined) return;
+    const generation = requireActiveSessionGeneration();
     trackUiEvent({
       control: 'delete_confirmation',
       eventName: 'ui_operation_started',
@@ -146,6 +152,7 @@ export function TrainingPlanDetailPage({
     });
     try {
       await deleteWorkoutMutation.mutateAsync({
+        generation,
         trainingPlanId,
         workoutId: deleteWorkoutId,
         version: plan?.version ?? 0,
