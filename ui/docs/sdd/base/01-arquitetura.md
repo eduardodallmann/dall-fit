@@ -16,9 +16,11 @@ A fundação de aplicação usa:
 - Vitest para testes unitários e de componentes;
 - Playwright para testes integrados no navegador.
 
-`src/main.tsx` aguarda a ativação opcional do MSW, realiza o bootstrap e aplica
-`AppProviders`. `src/app.tsx` monta o `RouterProvider`, e a árvore tipada vive em
-`src/routes/routes.tsx`.
+`src/main.tsx` cria o root antes das etapas assíncronas, aguarda a ativação opcional
+do MSW, realiza o bootstrap e aplica uma `ApplicationErrorBoundary` acima de
+`AppProviders`. Rejeição do bootstrap ou erro de renderização apresenta fallback
+global com recarga, em vez de deixar a tela vazia. `src/app.tsx` monta o
+`RouterProvider`, e a árvore tipada vive em `src/routes/routes.tsx`.
 
 ## Estrutura alvo
 
@@ -85,9 +87,10 @@ ancestrais. Imagens de exercícios são servidas pelo prefixo público
 - estado local fica próximo do componente proprietário;
 - estado de servidor usa TanStack Query, com query keys estáveis e loading, erro,
   cache e invalidação explícitos;
-- o `QueryClient` global desabilita refetch ao focar a janela, tenta novamente uma
-  vez e usa `staleTime` de 30 segundos por padrão; exceções ficam na query
-  proprietária;
+- o `QueryClient` global desabilita refetch ao focar a janela e usa `staleTime` de
+  30 segundos por padrão; retry usa uma tentativa após um segundo somente para
+  timeout, rede sem response, `408`, `500`, `502`, `503` ou `504` de leitura;
+  exceções ficam explícitas na query proprietária;
 - chamadas HTTP passam por uma única instância Axios central e serviços tipados;
 - componentes não chamam `fetch` diretamente;
 - payloads compartilhados usam `@dall-fit/types`;
@@ -96,16 +99,39 @@ ancestrais. Imagens de exercícios são servidas pelo prefixo público
 - credenciais e dados pessoais não aparecem em logs ou fixtures.
 
 O client Axios vigente está em `src/core/http/api-client.ts`, usa `VITE_API_URL`
-como `baseURL` e `withCredentials=true` para enviar a sessão `HttpOnly` à API. Não
-criar instâncias paralelas nem usar Axios diretamente em componentes. Services HTTP
-pertencem ao domínio ou à rota proprietária; hooks TanStack Query consomem esses
-services.
+como `baseURL`, `withCredentials=true`, timeout default de 15 segundos e erros de
+timeout discrimináveis. Upload de imagem usa override finito de 60 segundos. Não
+criar instâncias paralelas, request ilimitada nem usar Axios diretamente em
+componentes. Services HTTP pertencem ao domínio ou à rota proprietária; hooks
+TanStack Query consomem esses services e encaminham seu `AbortSignal` até o Axios.
+Requests autenticadas combinam esse signal com o signal da geração de sessão;
+cancelar a query, trocar de rota ou encerrar a sessão aborta também o transporte.
+
+Cancelamento esperado é classificado antes de timeout, rede e response HTTP. Ele
+não produz retry, toast, alerta, Analytics, diagnóstico sistêmico nem rollback que
+recrie estado privado. Mutations usam retry zero. `400`, `401`, `403`, `404`, `409`,
+`412`, `422`, `428`, `429`, erro de contrato e conflito nunca recebem retry
+automático.
 
 O mesmo client injeta `X-CSRF-Token` em POST, PUT, PATCH e DELETE a partir de um
 store exclusivamente em memória. O token é obtido por `GET /auth/csrf` depois de
 `GET /auth/me`; nunca entra em localStorage, sessionStorage, cookie legível ou
-cache persistido. Resposta `401` limpa imediatamente o token. Mutations não fazem
-retry automático de `403`.
+cache persistido. Obtenção concorrente é single-flight. Resposta `401` encerra a
+geração de sessão; `403 CSRF_VALIDATION_FAILED` descarta e renova o token sem
+repetir a mutation; `403 ADMIN_ACCESS_REQUIRED` revalida a pessoa e retira a UI da
+branch administrativa sem logout. Outro `403` permanece com o fluxo proprietário.
+Se a renovação CSRF falhar, a sessão continua ativa e mutations aguardam uma nova
+obtenção single-flight na próxima ação explícita; a operação rejeitada não é
+recriada pelo interceptor.
+
+`src/auth/session-lifecycle.ts` mantém uma geração monotônica, um
+`AbortController` e um registro mínimo de recursos privados. O primeiro `401`, o
+logout ou a troca de identidade inicia um teardown idempotente; ocorrências
+concorrentes compartilham a mesma Promise. O ciclo aborta requests, cancela e limpa
+o QueryClient, limpa CSRF, reseta recursos registrados e trata terminalmente a
+navegação. Callbacks de mutation capturam a geração e não escrevem cache, tema,
+draft, toast ou Analytics depois que ela termina. Domínios futuros registram apenas
+seus recursos externos ao QueryClient, sem serem importados por `core`.
 
 Formulários usam TanStack Form. A composição tipada permanece próxima da rota;
 helpers migram para `src/core/form/` somente quando houver reutilização real.
@@ -192,6 +218,11 @@ Recursos sem versão, mutations independentes ou contratos intencionalmente
 last-write-wins seguem o ciclo recuperável geral e documentam que coordenação por
 aggregate não se aplica.
 
+Todo coordenador ou recurso privado que sobreviva às rotas registra um reset no
+ciclo de sessão. O coordenador de planos permanece no domínio `training-plan`, mas
+seu reset cancela como operação esperada tarefas em execução/espera e remove IDs,
+versões e pausas antes de uma nova pessoa usar o documento.
+
 Quando um formulário for dividido em componentes menores, usar a composição
 oficial com `createFormHook`, `createFormHookContexts` e `withForm`. O tipo da
 instância deve ser inferido por essa composição; não declarar `AnyFormApi`, não
@@ -272,6 +303,7 @@ completa e valores concretos dos segmentos nunca são propriedades.
 | `ui_operation_completed`  | `operation`, `outcome` (`success`, `error`, `dismissed`, `unavailable`)                                                |
 | `ui_retry_requested`      | `resource` (`training_plans`, `training_plan`, `workout`)                                                              |
 | `ui_disclosure_toggled`   | `disclosure`, `state` (`open`, `closed`)                                                                               |
+| `ui_system_failure`       | `category` (`bootstrap`, `render`, `pwa_registration`)                                                                 |
 
 Eventos nunca recebem nome, e-mail, foto, token, payload HTTP, texto de plano ou
 treino, ID de domínio, valor/tamanho/erro de campo, texto visível arbitrário ou
@@ -336,9 +368,12 @@ desktop e móvel do menu coexistam no DOM, e observa:
 - nova versão do service worker para mostrar um aviso global e só ativá-la e
   recarregar após `Atualizar agora`.
 
-`Agora não` dispensa o aviso apenas no documento corrente. A aplicação não exibe
-mensagem de cache pronto, não solicita instalação automaticamente e continua
-utilizável quando o registro, a instalação ou a atualização falham.
+`Agora não` dispensa o aviso apenas no documento corrente. Falha de atualização
+mantém o aviso, informa erro genérico e oferece `Tentar atualizar`; falha de
+registro é diagnosticada somente pela categoria sanitizada `pwa_registration`.
+A aplicação não exibe mensagem de cache pronto, não solicita instalação
+automaticamente e continua utilizável quando registro, instalação ou atualização
+falham.
 
 O precache contém somente o app shell, bundles versionados, fontes e ativos locais
 necessários. Requests da API, autenticação, imagens remotas, avatares, respostas
@@ -362,22 +397,27 @@ zoom por políticas de acessibilidade mantêm sua própria decisão.
 ## Proteção de rotas
 
 A árvore manual possui um layout sem path para rotas autenticadas. Seu
-`beforeLoad` usa o `QueryClient` recebido pelo router context para garantir
-`GET /auth/me` e depois `GET /auth/csrf` antes de carregar qualquer filho.
+`beforeLoad` usa o `QueryClient` recebido pelo router context para aguardar
+`GET /auth/me` quando ausente ou stale e depois `GET /auth/csrf` antes de carregar
+qualquer filho. A query da pessoa permanece observada no shell, com `staleTime` de
+30 segundos, refetch em foco/reconexão e intervalo de cinco minutos somente com o
+documento visível.
 
 - `401` limpa CSRF/cache privado e lança redirect tipado para `/`;
 - falha exclusiva do bootstrap CSRF permanece recuperável e não transforma uma
   pessoa autenticada em anônima;
 - outros erros permanecem erros da rota e são apresentados pelo componente de erro;
-- o contexto autenticado entrega `Person` aos filhos sem uma segunda request;
+- o contexto autenticado entrega a `Person` inicial aos guards; o shell observa a
+  mesma key sem duplicar o request fresco do `beforeLoad`;
 - a proteção da UI é navegação e privacidade visual, nunca substitui o guard da API.
 
 Novas rotas privadas são adicionadas como filhas desse layout. Rotas públicas
 continuam filhas diretas da root route.
 
-Depois da proteção, o componente do layout autenticado renderiza um shell visual
-compartilhado e o `Outlet`. O shell recebe a `Person` do contexto, sem consultar a
-API novamente, e apresenta:
+Depois da proteção, o componente do layout autenticado mantém a query ativa,
+reconcilia pessoa/tema e renderiza um shell visual compartilhado com o `Outlet`.
+Revogação de `isAdmin` invalida o Router e substitui a branch por `/dash`; mudança
+de ID encerra a geração anterior antes de expor outra identidade. O shell apresenta:
 
 - um `aside` persistente a partir do breakpoint `md` de `768px`;
 - um botão icon-only e um `Drawer` HeroUI dispensável abaixo de `768px`;
@@ -385,8 +425,8 @@ API novamente, e apresenta:
 - a mesma ação icon-only de tema e o mesmo estado de gravação nas duas
   apresentações;
 - uma única mutation compartilhada de logout nas duas apresentações, com botão
-  pending; sucesso revoga, limpa CSRF/cache e navega com replace para `/`, enquanto
-  falha mantém o shell e anuncia toast acessível;
+  pending; sucesso ou falha remota termina a geração local, limpa estado privado e
+  navega com replace para `/`; falha também anuncia toast acessível;
 - a região `main` reservada ao conteúdo da rota filha.
 
 Os componentes reutilizáveis do shell e do menu vivem em
@@ -411,9 +451,9 @@ removidos do cache depois de DELETE bem-sucedido.
 Modal, formulário inline e confirmação permanecem no contexto durante pending e
 falha, bloqueiam dismiss ou duplicidade durante a request e fecham somente após
 sucesso. Erro persistente preserva o draft e permite retry ou cancelamento. Criar
-workout espera o ID real. Toda mutation usa `toast.promise` como feedback
-complementar e invalida apenas as famílias proprietárias; falha de refetch preserva
-dado válido sem apagar conteúdo.
+workout espera o ID real. Mutations usam feedback visual complementar apenas em
+resultados não cancelados e invalidam somente as famílias proprietárias; falha de
+refetch preserva dado válido sem apagar conteúdo.
 
 ## Ambiente local
 

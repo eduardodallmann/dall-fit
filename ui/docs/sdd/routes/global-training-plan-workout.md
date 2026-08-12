@@ -13,9 +13,9 @@ viram labels. Sem cache, skeleton estrutural precede o editor; refetch falho man
 dado e alerta. Not-found/falha inicial mostra Alert com retorno/retry aplicável.
 
 O cabeçalho mostra `Treino`, nome e lápis icon-only. A edição inline valida trim
-1–120, mantém valor confirmado separado do draft, entra na fila e usa
-`toast.promise`. Salvar conserva o modo inline até o sucesso; falha mantém texto,
-erro e retry. Cancelar restaura o confirmado. Somente
+1–120, mantém valor confirmado separado do draft e entra na fila. Salvar conserva
+o modo inline até o sucesso e só apresenta toast para resultado não cancelado;
+falha mantém texto, erro e retry. Cancelar restaura o confirmado. Somente
 `412 TRAINING_PLAN_VERSION_CONFLICT` mostra alerta persistente, bloqueia novas
 gravações e oferece `Recarregar dados`, com confirmação antes de descartar drafts. Refetches
 normais não remontam o editor nem reinicializam sua fila; somente o reload
@@ -67,6 +67,11 @@ somente a ordem anterior aos objetos/drafts atuais. Excluir cancela debounce ain
 não disparado, captura linha, dirty, erro e posição, remove otimisticamente e, em
 falha, reinsere esse estado sem PATCH oculto. Nenhuma mutation tem retry automático.
 
+As leituras encaminham o `AbortSignal` ao Axios e usam timeout de 15 segundos;
+upload usa 60 segundos. `CSRF_VALIDATION_FAILED` preserva draft, renova o token e
+só repete o write pelo botão da linha. Timeout de mutation não presume o resultado
+e exige reconciliação da query antes de nova tentativa.
+
 Upload/substituição/remover imagem são imediatos, mas usam a mesma fila. A UI
 valida JPEG/PNG/WebP e 10 MiB antes de FormData, conserva a imagem anterior durante
 loading e nunca lê base64. As URLs públicas pertencem ao host
@@ -94,6 +99,11 @@ editáveis localmente. Navegação interna é bloqueada por `AlertDialog` enquan
 existirem draft, debounce, tarefa, estrutura pendente, linha temporária ou erro
 recuperável; `Permanecer` conserva foco e dados, e `Sair e descartar` cancela timers
 locais. `beforeunload` oferece somente o aviso nativo para saída do documento.
+
+O coordenador pertence ao domínio, mas registra reset no ciclo transversal de
+sessão. Logout, `401` ou troca de pessoa aborta request, cancela tarefas ainda não
+iniciadas e remove versão/pausa; callbacks antigos não atualizam editor, cache,
+toast ou Analytics.
 
 ## Analytics e privacidade
 

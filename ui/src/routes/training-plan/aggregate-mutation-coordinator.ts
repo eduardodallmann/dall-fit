@@ -3,16 +3,21 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
+import { registerSessionResource } from '~/auth/session-lifecycle';
+import { isAmbiguousMutationFailure } from '~/core/http/http-error';
+
 import type { VersionedMutationResult } from './training-plan-service';
 
 interface AggregateMutationSnapshot {
   isPending: boolean;
+  pauseReason?: 'conflict' | 'uncertain';
   paused: boolean;
 }
 
 interface AggregateMutationState {
   chain: Promise<void>;
   listeners: Set<() => void>;
+  pauseReason?: 'conflict' | 'uncertain';
   paused: boolean;
   pendingCount: number;
   snapshot: AggregateMutationSnapshot;
@@ -36,6 +41,7 @@ export function isTrainingPlanVersionConflict(error: unknown): boolean {
 }
 
 export class AggregateMutationCoordinator {
+  private epoch = 0;
   private readonly states = new Map<string, AggregateMutationState>();
 
   seed(trainingPlanId: string, version: number): void {
@@ -56,6 +62,7 @@ export class AggregateMutationCoordinator {
   ): Promise<T> {
     const state =
       this.states.get(trainingPlanId) ?? this.createState(initialVersion);
+    const taskEpoch = this.epoch;
     this.states.set(trainingPlanId, state);
     if (state.paused)
       return Promise.reject(new Error('Aggregate mutation queue is paused.'));
@@ -63,14 +70,23 @@ export class AggregateMutationCoordinator {
     state.pendingCount += 1;
     this.publish(state);
     const task = state.chain.then(async () => {
+      if (taskEpoch !== this.epoch)
+        throw new axios.CanceledError('Session ended.');
       if (state.paused) throw new Error('Aggregate mutation queue is paused.');
       try {
         const result = await operation(state.version);
+        if (taskEpoch !== this.epoch)
+          throw new axios.CanceledError('Session ended.');
         state.version = result.version;
         return result.data;
       } catch (error) {
         if (isTrainingPlanVersionConflict(error)) {
           state.paused = true;
+          state.pauseReason = 'conflict';
+          this.publish(state);
+        } else if (isAmbiguousMutationFailure(error)) {
+          state.paused = true;
+          state.pauseReason = 'uncertain';
           this.publish(state);
         }
         throw error;
@@ -97,7 +113,19 @@ export class AggregateMutationCoordinator {
     await state.chain;
     state.version = version;
     state.paused = false;
+    state.pauseReason = undefined;
     this.publish(state);
+  }
+
+  clear(): void {
+    this.epoch += 1;
+    for (const state of this.states.values()) {
+      state.paused = false;
+      state.pauseReason = undefined;
+      state.pendingCount = 0;
+      this.publish(state);
+    }
+    this.states.clear();
   }
 
   snapshot(trainingPlanId: string | undefined): AggregateMutationSnapshot {
@@ -120,6 +148,7 @@ export class AggregateMutationCoordinator {
     return {
       chain: Promise.resolve(),
       listeners: new Set(),
+      pauseReason: undefined,
       paused: false,
       pendingCount: 0,
       snapshot: idleSnapshot,
@@ -130,6 +159,9 @@ export class AggregateMutationCoordinator {
   private publish(state: AggregateMutationState): void {
     state.snapshot = {
       isPending: state.pendingCount > 0,
+      ...(state.pauseReason === undefined
+        ? {}
+        : { pauseReason: state.pauseReason }),
       paused: state.paused,
     };
     for (const listener of state.listeners) listener();
@@ -145,6 +177,7 @@ export function getAggregateMutationCoordinator(
   if (existing !== undefined) return existing;
   const result = new AggregateMutationCoordinator();
   coordinators.set(queryClient, result);
+  registerSessionResource({ reset: () => result.clear() });
   return result;
 }
 

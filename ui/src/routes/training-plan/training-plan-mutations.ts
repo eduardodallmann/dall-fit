@@ -14,6 +14,12 @@ import type {
 } from '@dall-fit/types';
 
 import {
+  getActiveSessionGeneration,
+  isSessionGenerationActive,
+} from '~/auth/session-lifecycle';
+import { isAmbiguousMutationFailure } from '~/core/http/http-error';
+
+import {
   getAggregateMutationCoordinator,
   isTrainingPlanVersionConflict,
 } from './aggregate-mutation-coordinator';
@@ -29,6 +35,17 @@ import {
 
 const optimisticTokens = '__dallFitOptimisticTokens';
 const optimisticPlanToken = '__dallFitOptimisticMutation';
+
+function isCurrentGeneration(generation: number | undefined): boolean {
+  return generation === undefined || isSessionGenerationActive(generation);
+}
+
+function canRollbackMutation(
+  generation: number | undefined,
+  error: unknown,
+): boolean {
+  return isCurrentGeneration(generation) && !isAmbiguousMutationFailure(error);
+}
 
 type InternalCollectionResponse = GlobalTrainingPlanCollectionResponse & {
   [optimisticTokens]?: readonly string[];
@@ -164,10 +181,12 @@ export function useCreateTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
+  const generation = getActiveSessionGeneration();
   const result = useMutation({
     mutationFn: (input: CreateTrainingPlanRequest) =>
       createGlobalTrainingPlan(input, scenario),
     onMutate: async (input) => {
+      if (!isCurrentGeneration(generation)) return undefined;
       await queryClient.cancelQueries({ queryKey: trainingPlanKeys.lists() });
       const temporary = createTemporaryPlan(input);
       const token = `create-${crypto.randomUUID()}`;
@@ -198,7 +217,9 @@ export function useCreateTrainingPlanMutation(
       }
       return { queryKeys, temporaryId: temporary.id, token };
     },
-    onError: (_error, _input, context) => {
+    onError: (error, _input, context) => {
+      if (!isCurrentGeneration(generation)) return;
+      if (isAmbiguousMutationFailure(error)) return;
       if (context === undefined) return;
       for (const queryKey of context.queryKeys) {
         queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
@@ -217,6 +238,7 @@ export function useCreateTrainingPlanMutation(
       }
     },
     onSuccess: (created, _input, context) => {
+      if (!isCurrentGeneration(generation)) return;
       if (context === undefined) return;
       for (const queryKey of context.queryKeys) {
         queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
@@ -235,6 +257,7 @@ export function useCreateTrainingPlanMutation(
       }
     },
     onSettled: async () => {
+      if (!isCurrentGeneration(generation)) return;
       await queryClient.invalidateQueries({
         queryKey: trainingPlanKeys.lists(),
       });
@@ -248,6 +271,7 @@ export function useUpdateTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
+  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
@@ -345,6 +369,7 @@ export function useUpdateTrainingPlanMutation(
           }
           return { data: updated, version: updated.version };
         } catch (error) {
+          if (!canRollbackMutation(generation, error)) throw error;
           for (const { previous, queryKey, token: entryToken } of lists) {
             queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
               queryKey,
@@ -378,6 +403,7 @@ export function useUpdateTrainingPlanMutation(
         }
       }),
     onSettled: async (_data, error, variables) => {
+      if (!isCurrentGeneration(generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -397,6 +423,7 @@ export function useDeleteTrainingPlanMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
+  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
@@ -456,6 +483,7 @@ export function useDeleteTrainingPlanMutation(
           });
           return { data: undefined, version: currentVersion };
         } catch (error) {
+          if (!canRollbackMutation(generation, error)) throw error;
           for (const { previousIndex, previousPlan, queryKey } of entries) {
             queryClient.setQueryData<GlobalTrainingPlanCollectionResponse>(
               queryKey,
@@ -478,6 +506,7 @@ export function useDeleteTrainingPlanMutation(
         }
       }),
     onSettled: async (_data, error, variables) => {
+      if (!isCurrentGeneration(generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -501,6 +530,7 @@ export function useCreateTrainingPlanWorkoutMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
+  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
@@ -532,6 +562,7 @@ export function useCreateTrainingPlanWorkoutMutation(
         return { data: created, version: created.version };
       }),
     onSettled: async (_data, error, variables) => {
+      if (!isCurrentGeneration(generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused
@@ -551,6 +582,7 @@ export function useDeleteTrainingPlanWorkoutMutation(
   scenario: MockTrainingPlansScenario,
 ) {
   const queryClient = useQueryClient();
+  const generation = getActiveSessionGeneration();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   const result = useMutation({
     mutationFn: async ({
@@ -605,6 +637,7 @@ export function useDeleteTrainingPlanWorkoutMutation(
           }
           return { data: undefined, version: nextVersion };
         } catch (error) {
+          if (!canRollbackMutation(generation, error)) throw error;
           for (const { previousIndex, previousWorkout, queryKey } of removed) {
             queryClient.setQueryData<TrainingPlanDetails>(queryKey, (cached) =>
               cached?.id === trainingPlanId
@@ -623,6 +656,7 @@ export function useDeleteTrainingPlanWorkoutMutation(
         }
       }),
     onSettled: async (_data, error, variables) => {
+      if (!isCurrentGeneration(generation)) return;
       if (
         isTrainingPlanVersionConflict(error) ||
         coordinator.snapshot(variables.trainingPlanId).paused

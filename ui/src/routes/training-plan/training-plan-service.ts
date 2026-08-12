@@ -21,7 +21,7 @@ import type {
   UpdateTrainingPlanResponse,
 } from '@dall-fit/types';
 
-import { apiClient } from '~/core/http/api-client';
+import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
 
 export type MockTrainingPlansScenario =
   | 'create-error'
@@ -45,6 +45,8 @@ export type MockTrainingPlansScenario =
   | 'image-error'
   | 'reorder-error'
   | 'two-pages'
+  | 'timeout'
+  | 'csrf-refresh'
   | 'version-conflict';
 
 export function trainingPlanMockSearch(
@@ -91,11 +93,15 @@ function responseVersion(headers: Record<string, unknown>): number {
   return result;
 }
 
-function requestConfig(mockScenario: MockTrainingPlansScenario) {
-  const result =
+function requestConfig(
+  mockScenario: MockTrainingPlansScenario,
+  signal?: AbortSignal,
+) {
+  const headers =
     import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
-      ? { headers: { 'x-dall-fit-mock-training-plans': mockScenario } }
+      ? { 'x-dall-fit-mock-training-plans': mockScenario }
       : undefined;
+  const result = { headers, signal };
 
   return result;
 }
@@ -103,10 +109,11 @@ function requestConfig(mockScenario: MockTrainingPlansScenario) {
 export async function listGlobalTrainingPlans(
   page: number,
   mockScenario: MockTrainingPlansScenario,
+  signal?: AbortSignal,
 ): Promise<GlobalTrainingPlanCollectionResponse> {
   const response = await apiClient.get<GlobalTrainingPlanCollectionResponse>(
     '/global/training-plans',
-    { ...requestConfig(mockScenario), params: { page } },
+    { ...requestConfig(mockScenario, signal), params: { page } },
   );
   const result = response.data;
   if (
@@ -124,10 +131,11 @@ export async function listGlobalTrainingPlans(
 export async function getGlobalTrainingPlan(
   trainingPlanId: string,
   mockScenario: MockTrainingPlansScenario,
+  signal?: AbortSignal,
 ): Promise<TrainingPlanDetails> {
   const response = await apiClient.get<TrainingPlanDetailsResponse>(
     `/global/training-plans/${trainingPlanId}`,
-    requestConfig(mockScenario),
+    requestConfig(mockScenario, signal),
   );
   const result = response.data.data;
 
@@ -213,10 +221,11 @@ export async function getTrainingPlanWorkout(
   trainingPlanId: string,
   workoutId: string,
   mockScenario: MockTrainingPlansScenario,
+  signal?: AbortSignal,
 ): Promise<TrainingPlanWorkoutDetails> {
   const response = await apiClient.get<TrainingPlanWorkoutDetailsResponse>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
-    requestConfig(mockScenario),
+    requestConfig(mockScenario, signal),
   );
   return response.data.data;
 }
@@ -322,7 +331,10 @@ export async function uploadTrainingPlanExerciseImage(
   const response = await apiClient.put<UpdateExerciseImageResponse>(
     `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}/image`,
     form,
-    mutationConfig(mockScenario, version),
+    {
+      ...mutationConfig(mockScenario, version),
+      timeout: UPLOAD_REQUEST_TIMEOUT,
+    },
   );
   return {
     data: response.data.data.image,

@@ -175,6 +175,8 @@ type AnalyticsProperties = Record<
 
 const pendingEventFingerprints = new Set<string>();
 
+export type SystemFailureCategory = 'bootstrap' | 'pwa_registration' | 'render';
+
 export function normalizeAnalyticsRoute(pathname: string): string | undefined {
   if (pathname === '/' || pathname === '/dash') {
     return pathname;
@@ -310,5 +312,17 @@ export function trackUiEvent(event: UiAnalyticsEvent): void {
     track(event.eventName, properties);
   } catch {
     // Analytics is optional and must never block a product interaction.
+  }
+}
+
+export function reportSystemFailure(category: SystemFailureCategory): void {
+  const fingerprint = JSON.stringify(['ui_system_failure', category]);
+  if (pendingEventFingerprints.has(fingerprint)) return;
+  pendingEventFingerprints.add(fingerprint);
+  queueMicrotask(() => pendingEventFingerprints.delete(fingerprint));
+  try {
+    track('ui_system_failure', { category });
+  } catch {
+    // Operational diagnostics are optional and never block recovery.
   }
 }

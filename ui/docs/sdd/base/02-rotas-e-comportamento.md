@@ -42,6 +42,9 @@ Registrar:
   duração do pending, momento de fechamento e prevenção de duplicidade;
 - rollback localizado, tratamento de resposta tardia, erro persistente, retry,
   cancelamento e proteção de navegação aplicáveis;
+- participação no ciclo transversal de sessão: queries encaminham `AbortSignal`,
+  callbacks não escrevem depois da geração e recursos privados externos ao
+  QueryClient registram reset sem mover regras do domínio para `core`;
 - idempotência e concorrência, incluindo precondição, versão, fila e recuperação de
   conflito quando o recurso for um aggregate versionado;
 - acessibilidade, foco e teclado;

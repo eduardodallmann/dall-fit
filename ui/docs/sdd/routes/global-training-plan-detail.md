@@ -66,8 +66,13 @@ sucesso. Somente `412 TRAINING_PLAN_VERSION_CONFLICT` pausa a fila; não há ret
 merge automático.
 
 POST, PATCH e DELETE dependem do bootstrap CSRF do layout autenticado. O client
-Axios único injeta o header em memória; falha `403` não dispara retry automático e
-usa o mesmo rollback/feedback documentado para a operação.
+Axios único injeta o header em memória; falha CSRF renova o token sem repetir a
+mutation, perda de admin retorna a `/dash`, outro `403` não dispara retry automático
+e usa o mesmo rollback/feedback documentado para a operação.
+
+Leituras encaminham `AbortSignal` e usam timeout/retry transversal. Teardown da
+sessão aborta o transporte e reseta a fila sem aplicar rollback ou response tardia
+na geração seguinte.
 
 Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 

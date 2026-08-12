@@ -234,6 +234,26 @@ test.describe('Rota /dash', () => {
       }),
     ).toBeVisible();
     await expect(page).toHaveURL(/mockAuth=csrf-error/);
+    await expect(
+      page.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeVisible();
+  });
+
+  test('Sessão expirada depois do mount executa uma única saída', async ({
+    page,
+  }) => {
+    await page.goto('/dash?mockAuth=session-expired');
+    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event('visibilitychange')),
+    );
+
+    await expect(page).toHaveURL('/');
+    await expect(
+      page.getByRole('heading', { name: 'Entre para continuar' }),
+    ).toBeVisible();
+    await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
   });
 
   test('fecha o Drawer ao entrar no breakpoint desktop', async ({ page }) => {

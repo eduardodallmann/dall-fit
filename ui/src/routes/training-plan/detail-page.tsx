@@ -9,6 +9,7 @@ import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent } from '~/core/analytics';
+import { isExpectedCancellation } from '~/core/http/http-error';
 import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
 import {
   ActionsMenu,
@@ -68,18 +69,13 @@ export function TrainingPlanDetailPage({
       operation: 'training_plan_update',
       surface: 'training_plan_form',
     });
-    const promise = updateMutation.mutateAsync({
-      changes: input,
-      trainingPlanId,
-      version: plan?.version ?? 0,
-    });
-    toast.promise(promise, {
-      error: 'Não foi possível salvar o plano.',
-      loading: 'Salvando alterações…',
-      success: 'Plano atualizado.',
-    });
     try {
-      await promise;
+      await updateMutation.mutateAsync({
+        changes: input,
+        trainingPlanId,
+        version: plan?.version ?? 0,
+      });
+      toast.success('Plano atualizado.');
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -89,6 +85,7 @@ export function TrainingPlanDetailPage({
       });
       setEditing(false);
     } catch (error) {
+      if (isExpectedCancellation(error)) throw error;
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -107,17 +104,14 @@ export function TrainingPlanDetailPage({
       surface: 'training_plan_detail',
     });
     if (plan === undefined) return;
-    const promise = createWorkoutMutation.mutateAsync({
-      trainingPlanId,
-      version: plan.version,
-    });
-    toast.promise(promise, {
-      error: 'Não foi possível criar o treino.',
-      loading: 'Criando treino…',
-      success: 'Treino criado.',
-    });
     try {
-      const workout = (await promise).data;
+      const workout = (
+        await createWorkoutMutation.mutateAsync({
+          trainingPlanId,
+          version: plan.version,
+        })
+      ).data;
+      toast.success('Treino criado.');
       await navigate({
         params: { trainingPlanId, workoutId: workout.id },
         search: { mockAuth, ...mockSearch },
@@ -130,7 +124,9 @@ export function TrainingPlanDetailPage({
         outcome: 'success',
         surface: 'training_plan_detail',
       });
-    } catch {
+    } catch (error) {
+      if (isExpectedCancellation(error)) return;
+      toast.danger('Não foi possível criar o treino.');
       trackUiEvent({
         control: 'new_workout',
         eventName: 'ui_operation_completed',
@@ -148,18 +144,13 @@ export function TrainingPlanDetailPage({
       operation: 'workout_delete',
       surface: 'training_plan_detail',
     });
-    const promise = deleteWorkoutMutation.mutateAsync({
-      trainingPlanId,
-      workoutId: deleteWorkoutId,
-      version: plan?.version ?? 0,
-    });
-    toast.promise(promise, {
-      error: 'Não foi possível excluir o treino.',
-      loading: 'Excluindo treino…',
-      success: 'Treino excluído.',
-    });
     try {
-      await promise;
+      await deleteWorkoutMutation.mutateAsync({
+        trainingPlanId,
+        workoutId: deleteWorkoutId,
+        version: plan?.version ?? 0,
+      });
+      toast.success('Treino excluído.');
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -168,6 +159,8 @@ export function TrainingPlanDetailPage({
         surface: 'training_plan_detail',
       });
     } catch (error) {
+      if (isExpectedCancellation(error)) throw error;
+      toast.danger('Não foi possível excluir o treino.');
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -189,8 +182,10 @@ export function TrainingPlanDetailPage({
     if (!result.isSuccess || result.data === undefined)
       throw result.error ?? new Error('Training plan reload failed.');
     await aggregate.reset(result.data.version);
-    setEditing(false);
-    setDeleteWorkoutId(undefined);
+    if (aggregate.pauseReason === 'conflict') {
+      setEditing(false);
+      setDeleteWorkoutId(undefined);
+    }
   };
 
   if (query.isLoading && plan === undefined) {
@@ -231,7 +226,7 @@ export function TrainingPlanDetailPage({
                 resource: 'training_plan',
                 surface: 'training_plan_detail',
               });
-              void query.refetch();
+              query.refetch().catch(() => undefined);
             }}
             variant="secondary"
           >
@@ -264,7 +259,10 @@ export function TrainingPlanDetailPage({
         </Alert>
       ) : null}
       {aggregate.paused ? (
-        <TrainingPlanConflictAlert onReload={reloadConflict} />
+        <TrainingPlanConflictAlert
+          onReload={reloadConflict}
+          reason={aggregate.pauseReason}
+        />
       ) : null}
       <header className={styles.pageHeader()}>
         {editing ? (

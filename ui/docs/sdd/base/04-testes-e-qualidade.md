@@ -33,8 +33,10 @@ restaurados após cada teste.
 Fluxos autenticados cobrem a confirmação da pessoa seguida pelo bootstrap do token
 CSRF, mantido somente em memória. Testes de mutation validam o header aplicado pelo
 client Axios único; cenários de `401`, falha técnica do CSRF e logout verificam
-respectivamente limpeza privada, recuperação sem logout simulado e preservação da
-rota quando a revogação falha.
+respectivamente limpeza privada, recuperação sem logout simulado e teardown local
+mesmo quando a revogação remota falha. A matriz também cobre query ativa,
+revalidação, `401` concorrentes, perda de `isAdmin`, CSRF single-flight/renovado e
+geração nova sem estado privado antigo.
 
 Vercel Analytics é isolado nos testes: a composição global substitui o componente
 oficial para confirmar uma única montagem sem carregar coleta externa; testes da
@@ -42,6 +44,9 @@ fronteira substituem apenas `track` e validam schema, normalização, deduplica�
 privacidade e no-op em falha. Componentes e providers substituem a fronteira
 interna para verificar os eventos produzidos por interações acessíveis. Valores de
 campos, IDs, query e mensagens de erro não podem aparecer nos asserts de emissão.
+Diagnósticos sistêmicos testam somente as categorias `bootstrap`, `render` e
+`pwa_registration`; objetos `Error`, stacks e conteúdo técnico nunca entram no
+mock do transporte.
 
 Playwright mantém a integração real entre componentes e navegação, mas não cria
 handler MSW, `page.route` ou implementação paralela para Analytics. Recebimento de
@@ -112,6 +117,14 @@ Para aggregates versionados com fila compartilhada, a cobertura inclui ainda:
   silencioso, e liberação apenas após recuperação canônica;
 - falha não classificada como conflito sem avanço indevido da versão e com a
   continuidade segura definida pelo domínio.
+- teardown de sessão cancelando trabalho em execução/espera e removendo versão,
+  pausa e ID antes de uma geração nova.
+
+Políticas HTTP transversais possuem testes parametrizados para timeout, rede,
+cancelamento e status permanentes/transitórios. Queries comprovam propagação de
+`AbortSignal`; cancelamento não emite feedback de erro; mutations não fazem retry;
+upload valida seu timeout específico. Bootstrap, Error Boundary e PWA comprovam
+fallback acionável e recuperação sem tela vazia ou bloqueio do web app.
 
 Esses cenários não precisam existir todos no Playwright. Funções puras, hooks e
 componentes cobrem a matriz combinatória; Playwright preserva os caminhos

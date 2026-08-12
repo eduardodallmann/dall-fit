@@ -31,7 +31,7 @@
   primeira, última, vizinhança da atual e elipses não interativas;
 - `Modal`, `Fieldset`, TanStack Form e campos HeroUI para criar/editar;
 - `AlertDialog` antes de excluir;
-- `Toast.Provider` global e `toast.promise` em todas as mutations.
+- `Toast.Provider` global e feedback de sucesso/erro nas mutations não canceladas.
 
 O corpo da tabela renderiza skeletons de linhas durante o loading. Coleção vazia e
 falha do primeiro carregamento usam `EmptyState` centralizado; o vazio possui ícone
@@ -119,8 +119,14 @@ Resumos carregam `version`; PATCH/DELETE entram no coordenador compartilhado por
 domínio não é repetido e passa pelo rollback localizado.
 
 Todas as mutações só ficam disponíveis depois do bootstrap autenticado de CSRF.
-O Axios compartilhado injeta `X-CSRF-Token` em memória e envia o cookie; `403` não
-é repetido automaticamente e segue o rollback/feedback da mutation proprietária.
+O Axios compartilhado injeta `X-CSRF-Token` em memória e envia o cookie;
+`CSRF_VALIDATION_FAILED` renova o token sem repetir a mutation e
+`ADMIN_ACCESS_REQUIRED` revalida a pessoa e volta a `/dash`; outro `403` não é
+repetido automaticamente e segue o rollback/feedback proprietário.
+
+Queries encaminham `AbortSignal` e usam timeout de 15 segundos. O coordenador
+continua específico de planos, registra reset no ciclo da sessão e não conserva
+ID, versão ou pausa depois de logout, `401` ou troca de pessoa.
 
 - Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 - Retry: política TanStack Query; mutations não são repetidas automaticamente.

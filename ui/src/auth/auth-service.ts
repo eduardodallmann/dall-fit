@@ -6,12 +6,17 @@ import type {
   UpdateCurrentPersonConfigsResponse,
 } from '@dall-fit/types';
 
-import { getCsrfToken, setCsrfToken } from '~/auth/csrf-token';
+import {
+  configureCsrfTokenFetcher,
+  ensureConfiguredCsrfToken,
+} from '~/auth/csrf-token';
 import { apiClient } from '~/core/http/api-client';
 
 export type MockAuthScenario =
   | 'admin'
+  | 'admin-revoked'
   | 'authenticated'
+  | 'csrf-refresh'
   | 'csrf-error'
   | 'error'
   | 'logout-error'
@@ -20,6 +25,7 @@ export type MockAuthScenario =
   | 'theme-save-error'
   | 'theme-save-error-unset'
   | 'theme-unset'
+  | 'session-expired'
   | 'unauthenticated';
 
 function getMockHeaders(mockScenario: MockAuthScenario) {
@@ -40,9 +46,11 @@ export function getGoogleLoginUrl(): string {
 
 export async function getCurrentPerson(
   mockScenario: MockAuthScenario = 'authenticated',
+  signal?: AbortSignal,
 ): Promise<Person> {
   const response = await apiClient.get<CurrentPersonResponse>('/auth/me', {
     headers: getMockHeaders(mockScenario),
+    signal,
   });
   const result = response.data.data;
 
@@ -52,17 +60,16 @@ export async function getCurrentPerson(
 export async function ensureCsrfToken(
   mockScenario: MockAuthScenario = 'authenticated',
 ): Promise<string> {
-  const currentToken = getCsrfToken();
-  if (currentToken !== undefined) {
-    return currentToken;
-  }
+  configureCsrfTokenFetcher(() => fetchCsrfToken(mockScenario));
+  const result = await ensureConfiguredCsrfToken();
+  return result;
+}
 
+async function fetchCsrfToken(mockScenario: MockAuthScenario): Promise<string> {
   const response = await apiClient.get<CsrfTokenResponse>('/auth/csrf', {
     headers: getMockHeaders(mockScenario),
   });
   const result = response.data.data.token;
-  setCsrfToken(result);
-
   return result;
 }
 

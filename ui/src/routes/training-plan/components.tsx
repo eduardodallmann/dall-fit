@@ -514,14 +514,46 @@ export function DeleteConfirmationDialog({
 
 interface ConflictAlertProps {
   onReload: () => Promise<void>;
+  reason?: 'conflict' | 'uncertain';
 }
 
 export function TrainingPlanConflictAlert({
   onReload,
+  reason = 'conflict',
 }: Readonly<ConflictAlertProps>) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [reloadError, setReloadError] = useState(false);
+
+  if (reason === 'uncertain') {
+    return (
+      <Alert status="warning">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Confirme o estado antes de continuar.</Alert.Title>
+          <Alert.Description>
+            A resposta da última gravação não chegou. Recarregue os dados antes
+            de tentar novamente; seus rascunhos serão preservados.
+          </Alert.Description>
+          {reloadError ? (
+            <p>Não foi possível verificar os dados. Tente novamente.</p>
+          ) : null}
+        </Alert.Content>
+        <Button
+          isPending={pending}
+          onPress={() => {
+            setPending(true);
+            setReloadError(false);
+            onReload()
+              .catch(() => setReloadError(true))
+              .finally(() => setPending(false));
+          }}
+        >
+          Verificar dados
+        </Button>
+      </Alert>
+    );
+  }
 
   return (
     <>

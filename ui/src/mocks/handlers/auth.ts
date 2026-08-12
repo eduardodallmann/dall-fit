@@ -2,7 +2,7 @@ import { delay, http, HttpResponse } from 'msw';
 
 import type { Person, Theme } from '@dall-fit/types';
 
-import { clearCsrfToken } from '~/auth/csrf-token';
+import { resetCsrfTokenForTests } from '~/auth/csrf-token';
 import {
   adminPersonFixture,
   authenticatedPersonFixture,
@@ -15,10 +15,24 @@ import {
 } from '~/mocks/mock-response';
 
 const personState = new Map<string, Person>();
+const authRequestCount = new Map<string, number>();
 const mockCsrfToken = 'mock-csrf-token';
+const staleCsrfToken = 'mock-stale-csrf-token';
+export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
+
+function nextRequestCount(key: string): number {
+  const count = (authRequestCount.get(key) ?? 0) + 1;
+  authRequestCount.set(key, count);
+  return count;
+}
 
 function getInitialPerson(scenario: string | null): Person {
-  if (scenario === 'admin') {
+  if (
+    scenario === 'admin' ||
+    scenario === 'admin-revoked' ||
+    scenario === 'csrf-refresh' ||
+    scenario === 'session-expired'
+  ) {
     return adminPersonFixture;
   }
 
@@ -60,7 +74,8 @@ function isThemeBody(value: unknown): value is { theme: Theme } {
 
 export function resetAuthScenarioStates(): void {
   personState.clear();
-  clearCsrfToken();
+  authRequestCount.clear();
+  resetCsrfTokenForTests();
 }
 
 export const authHandlers = [
@@ -95,6 +110,17 @@ export const authHandlers = [
           'Authentication is temporarily unavailable.',
         ),
         createMockResponseInit({ status: 503 }),
+      );
+    }
+    if (scenario === 'csrf-refresh') {
+      const count = nextRequestCount('csrf-refresh:csrf');
+      return HttpResponse.json(
+        {
+          data: {
+            token: count === 1 ? staleCsrfToken : refreshedMockCsrfToken,
+          },
+        },
+        createMockResponseInit({ headers: { 'Cache-Control': 'no-store' } }),
       );
     }
     return HttpResponse.json(
@@ -142,6 +168,23 @@ export const authHandlers = [
       );
 
       return result;
+    }
+
+    const requestCount = nextRequestCount(`${scenario ?? 'authenticated'}:me`);
+    if (scenario === 'session-expired' && requestCount > 1) {
+      return HttpResponse.json(
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
+      );
+    }
+    if (scenario === 'admin-revoked' && requestCount > 1) {
+      return HttpResponse.json(
+        { data: authenticatedPersonFixture },
+        createMockResponseInit(),
+      );
     }
 
     const result = HttpResponse.json(

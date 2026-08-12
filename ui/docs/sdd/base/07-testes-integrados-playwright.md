@@ -33,6 +33,9 @@ VITE_ENABLE_API_MOCKS=true
 ```
 
 O bootstrap da UI deve aguardar o Service Worker do MSW antes do primeiro render.
+Se o worker não iniciar, a aplicação apresenta o fallback global e não prossegue
+para a API real. Falha desse bootstrap e falhas do PWA real ficam em Vitest porque
+o Workbox permanece desabilitado no servidor Playwright.
 O cliente HTTP, services, hooks e componentes usados em produção permanecem reais;
 somente a resposta da fronteira de rede é interceptada.
 
@@ -227,6 +230,8 @@ versionados.
   forem parte do comportamento relevante;
 - usar dados mínimos, fictícios e determinísticos;
 - cobrir caminho feliz, branches, erros e navegação conforme risco;
+- para sessão, cobrir expiração após mount, revogação de privilégio, recuperação
+  CSRF sem reenvio automático e ausência de estado privado da geração anterior;
 - não duplicar no Playwright toda combinação já protegida em nível unitário.
 
 ## Layout e screenshots

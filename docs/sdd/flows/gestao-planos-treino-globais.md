@@ -80,7 +80,17 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 - navegação no editor usa `AlertDialog` enquanto houver draft, debounce, fila,
   estrutura ou erro recuperável; sair cancela timers locais, enquanto
   `beforeunload` permanece somente como aviso nativo;
-- `401` limpa CSRF/cache e volta à raiz; `403` e mutations não têm retry.
+- `401` encerra uma única geração, aborta requests, limpa CSRF/cache e reseta o
+  coordenador antes de voltar à raiz; respostas concorrentes não duplicam a
+  transição;
+- `403 CSRF_VALIDATION_FAILED` renova o token sem reenviar a mutation e preserva o
+  draft para retry explícito; `403 ADMIN_ACCESS_REQUIRED` revalida a pessoa e volta
+  a `/dash` sem logout; outros `403` permanecem proprietários;
+- queries encaminham `AbortSignal` ao Axios e usam timeout/retry transversal;
+  upload usa 60 segundos, mutations não têm retry e timeout de write exige
+  reconciliação antes de nova tentativa;
+- o coordenador continua específico de planos, mas registra seu reset no ciclo
+  transversal de sessão; nova pessoa não herda ID, versão, pausa, fila ou draft.
 
 ## Dados e privacidade
 
@@ -104,6 +114,8 @@ no drop e recarga de conflito é retry.
    `mockTrainingPlans=delete-exercise-error`; rollback de ordem:
    `mockTrainingPlans=reorder-error`.
 8. Proteção administrativa: remover `mockAuth=admin` e confirmar redirect.
+9. CSRF renovável: usar `mockAuth=csrf-refresh&mockTrainingPlans=csrf-refresh`.
+10. Revogação administrativa: usar `mockAuth=admin-revoked` e revalidar por foco.
 
 ## Cobertura automatizada
 
