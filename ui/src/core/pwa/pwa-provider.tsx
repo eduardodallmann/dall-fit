@@ -9,7 +9,7 @@ import {
 
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
-import { trackUiEvent } from '~/core/analytics';
+import { reportSystemFailure, trackUiEvent } from '~/core/analytics';
 import {
   PwaContext,
   type PwaContextValue,
@@ -43,12 +43,13 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
   const [installed, setInstalled] = useState(isStandalone);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updateFailed, setUpdateFailed] = useState(false);
   const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisterError: () => undefined,
+    onRegisterError: () => reportSystemFailure('pwa_registration'),
   });
 
   useEffect(() => {
@@ -144,6 +145,7 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       surface: 'pwa_update',
     });
     setIsUpdating(true);
+    setUpdateFailed(false);
 
     try {
       await updateServiceWorker(true);
@@ -155,7 +157,7 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
         surface: 'pwa_update',
       });
     } catch {
-      setIsUpdating(false);
+      setUpdateFailed(true);
       trackUiEvent({
         control: 'pwa_update',
         eventName: 'ui_operation_completed',
@@ -163,6 +165,8 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
         outcome: 'error',
         surface: 'pwa_update',
       });
+    } finally {
+      setIsUpdating(false);
     }
   }, [isUpdating, updateServiceWorker]);
 
@@ -198,6 +202,7 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       isInstalling,
       isUpdating,
       needRefresh,
+      updateFailed,
       update,
     }),
     [
@@ -207,6 +212,7 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       isInstalling,
       isUpdating,
       needRefresh,
+      updateFailed,
       update,
     ],
   );

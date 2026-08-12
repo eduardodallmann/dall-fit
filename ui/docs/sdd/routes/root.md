@@ -58,8 +58,20 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Resultado: a atualização depende de confirmação e falhas não expõem detalhe
   técnico nem impedem a autenticação. O aviso não corta conteúdo nem cria rolagem
   horizontal.
+- Falha de registro mantém a aplicação como web app comum e registra somente a
+  categoria sanitizada `pwa_registration`. Falha de atualização mantém o aviso,
+  informa erro genérico e oferece `Tentar atualizar`.
 
-### Alternativa 3 — Preferência de tema inválida ou indisponível
+### Alternativa 3 — Falha global de bootstrap ou renderização
+
+- Condição: MSW habilitado não inicia, provider não pode ser preparado ou erro de
+  renderização escapa dos boundaries de rota.
+- Comportamento: `ApplicationFallback` substitui a árvore por heading, mensagem
+  genérica e `Tentar novamente`, que recarrega o documento.
+- Resultado: o diagnóstico usa somente `bootstrap` ou `render`; erro, stack, URL,
+  sessão e pessoa não são transportados.
+
+### Alternativa 4 — Preferência de tema inválida ou indisponível
 
 - Condição: `dall-fit:theme` não contém `light | dark` ou o navegador bloqueia o
   armazenamento.
@@ -201,7 +213,8 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Arquivo da rota: `src/routes/home/index.tsx`
 - Componentes HeroUI utilizados: `Alert`, `Button` e `Card`
 - Componentes core: `pwa-update-notice`, aplicado pelos providers globais
-- Infraestrutura core: `ThemeProvider` e `theme-storage`
+- Infraestrutura core: `ThemeProvider`, `theme-storage`,
+  `ApplicationErrorBoundary` e `ApplicationFallback`
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
 - Hooks e serviços: `getGoogleLoginUrl`, sem mutation ou contrato JSON
 - Tipos compartilhados: nenhum para iniciar OAuth

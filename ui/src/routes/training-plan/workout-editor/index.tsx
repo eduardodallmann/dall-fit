@@ -35,6 +35,7 @@ import type {
 } from '@dall-fit/types';
 
 import { trackUiEvent, type AnalyticsControl } from '~/core/analytics';
+import { isExpectedCancellation } from '~/core/http/http-error';
 import {
   createTrainingPlanExercise,
   deleteTrainingPlanExercise,
@@ -279,7 +280,8 @@ export function WorkoutEditor({
             scheduleTimer(exerciseId);
           trackCompleted('exercise_update', 'exercise_field', 'success');
         })
-        .catch(() => {
+        .catch((error: unknown) => {
+          if (isExpectedCancellation(error)) return;
           setItems((current) =>
             updateEditorItem(current, exerciseId, (candidate) => ({
               ...candidate,
@@ -355,20 +357,18 @@ export function WorkoutEditor({
         mockScenario,
       );
     });
-    toast.promise(promise, {
-      loading: 'Salvando nome…',
-      success: 'Nome atualizado.',
-      error: 'Não foi possível salvar o nome.',
-    });
     void promise
       .then((saved) => {
+        toast.success('Nome atualizado.');
         setWorkoutName(saved.name);
         setNameDraft(saved.name);
         setNameStatus('idle');
         setEditingName(false);
         trackCompleted('workout_update', 'workout_name', 'success');
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
+        toast.danger('Não foi possível salvar o nome.');
         setNameStatus('error');
         setEditingName(true);
         trackCompleted('workout_update', 'workout_name', 'error');
@@ -420,7 +420,8 @@ export function WorkoutEditor({
         );
         trackCompleted('exercise_create', 'add_exercise', 'success');
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
         setItems((current) =>
           current.filter((item) => item.draft.id !== temporaryId),
         );
@@ -469,7 +470,8 @@ export function WorkoutEditor({
         removed.current.delete(exerciseId);
         trackCompleted('exercise_delete', 'delete_exercise', 'success');
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
         const rollback = removed.current.get(exerciseId);
         if (rollback !== undefined) {
           const recoverable =
@@ -528,7 +530,8 @@ export function WorkoutEditor({
       .then(() =>
         trackCompleted('exercise_reorder', 'reorder_handle', 'success'),
       )
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
         if (previousIds !== undefined)
           setItems((current) => orderEditorItems(current, previousIds ?? []));
         trackCompleted('exercise_reorder', 'reorder_handle', 'error');
@@ -576,7 +579,8 @@ export function WorkoutEditor({
         );
         trackCompleted(operation, control, 'success');
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
         trackCompleted(operation, control, 'error');
         toast.danger('Não foi possível processar a imagem.');
       })
@@ -612,7 +616,8 @@ export function WorkoutEditor({
         );
         trackCompleted('exercise_image_remove', 'image_remove', 'success');
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (isExpectedCancellation(error)) return;
         trackCompleted('exercise_image_remove', 'image_remove', 'error');
         toast.danger('Não foi possível remover a imagem.');
       })

@@ -35,15 +35,15 @@ test.describe('Fluxo Login com Google', () => {
     ).toBeVisible();
   });
 
-  test('Cenário 5 — Falha de logout preserva a área autenticada', async ({
+  test('Cenário 5 — Falha remota de logout ainda encerra o estado local', async ({
     page,
   }) => {
     await page.goto('/dash?mockAuth=logout-error');
 
     await page.getByRole('button', { name: 'Sair' }).click();
 
-    await expect(page).toHaveURL(/\/dash/);
-    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+    await expect(page).toHaveURL('/');
+    await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
     await expect(
       page.getByText('Não foi possível sair. Tente novamente.'),
     ).toBeVisible();

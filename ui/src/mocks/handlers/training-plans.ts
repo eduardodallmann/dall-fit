@@ -19,6 +19,7 @@ import {
   trainingPlanFixtures,
   trainingPlanWorkoutFixture,
 } from '~/mocks/fixtures/training-plans';
+import { refreshedMockCsrfToken } from '~/mocks/handlers/auth';
 import {
   createMockApiError,
   createMockResponseInit,
@@ -79,6 +80,11 @@ function validateMutation(
   state: ScenarioState,
   scenario: string,
 ): Response | null {
+  if (
+    scenario === 'csrf-refresh' &&
+    request.headers.get('x-csrf-token') !== refreshedMockCsrfToken
+  )
+    return apiError('CSRF_VALIDATION_FAILED', 'CSRF token is invalid.', 403);
   if (scenario === 'version-conflict')
     return apiError(
       'TRAINING_PLAN_VERSION_CONFLICT',
@@ -176,7 +182,10 @@ function defaultExercise(
 export const trainingPlanHandlers = [
   http.get('*/global/training-plans', async ({ request }) => {
     const scenario = getScenario(request);
-    await delay(scenario === 'loading' ? 600 : 75);
+    let responseDelay: number | 'infinite' = 75;
+    if (scenario === 'loading') responseDelay = 600;
+    if (scenario === 'timeout') responseDelay = 'infinite';
+    await delay(responseDelay);
     if (scenario === 'list-error')
       return apiError('SERVICE_UNAVAILABLE', 'Service unavailable.', 503);
     const page = Number(new URL(request.url).searchParams.get('page') ?? 1);

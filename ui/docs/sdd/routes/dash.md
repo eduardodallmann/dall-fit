@@ -17,8 +17,8 @@
   plataforma.
 - Path e query params: `/dash`; a query `mockAuth` existe somente com MSW e aceita
   os cenários `admin`, `unauthenticated`, `error`, `theme-light`, `theme-dark`,
-  `theme-unset`, `theme-save-error`, `theme-save-error-unset`, `csrf-error` e
-  `logout-error`.
+  `theme-unset`, `theme-save-error`, `theme-save-error-unset`, `csrf-error`,
+  `csrf-refresh`, `session-expired`, `admin-revoked` e `logout-error`.
 - Contexto e estado persistido: cookie de sessão gerenciado pelo browser, cache
   TanStack Query, preferência opcional `dall-fit:theme` e estado local temporário
   do `Drawer` móvel.
@@ -151,10 +151,11 @@ enquanto o dashboard permanece intencionalmente vazio.
 ### Alternativa 9 — Falha ao sair
 
 - Condição: `POST /auth/logout` falha.
-- Comportamento: a área autenticada permanece visível, o botão deixa o pending e
-  um toast acessível informa a falha.
-- Resultado: a pessoa pode tentar novamente; cache e CSRF não são apagados sem
-  confirmação do endpoint.
+- Comportamento: o teardown local ainda aborta requests, limpa cache/CSRF e
+  recursos da geração e navega com replace para `/`; um toast acessível informa
+  que a revogação remota falhou.
+- Resultado: nenhum dado privado permanece no documento, mesmo sem confirmação do
+  endpoint.
 
 ## Validações
 
@@ -187,7 +188,9 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Sucesso: pessoa entregue ao shell e ao contexto; a presença de `isAdmin: true`
   mostra o indicador e a ausência representa pessoa comum.
 - Erros: `401` redireciona; demais erros acionam o error component.
-- Retry, timeout e idempotência: política global de uma tentativa e cache por 30s.
+- Retry, timeout e idempotência: `staleTime` de 30s, query ativa, foco/reconexão e
+  intervalo visível de cinco minutos; uma tentativa apenas para falha transitória
+  permitida e timeout Axios de 15s.
 
 ### Bootstrap anti-CSRF
 
@@ -216,6 +219,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Momento: ativação de `Sair` em qualquer apresentação do menu.
 - Endpoint documentado: `api/docs/sdd/endpoints/auth.md`.
 - Dados enviados: body vazio, cookie automático e CSRF em memória.
+- Resultado local: sucesso ou falha remota executa o mesmo teardown idempotente,
+  aborta requests, limpa cache/CSRF/recursos privados e navega com replace para `/`.
 - Sucesso: limpa token e cache privado, emite resultado de analytics e navega com
   replace para `/`.
 - Erro: mantém rota, identidade e caches; reabilita o botão e mostra
@@ -469,7 +474,7 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 - Link para testar: `http://localhost:3000/dash?mockAuth=logout-error` com MSW
 - Given: a pessoa está no shell autenticado
 - When: ativa `Sair` e o endpoint falha
-- Then: permanece no dashboard com identidade visível e toast acessível
+- Then: mostra toast acessível, encerra o estado local e substitui a URL por `/`
 
 ## Estrutura técnica relevante
 

@@ -6,7 +6,8 @@ import { usePwa } from '~/core/pwa/pwa-context';
 const styles = pwaUpdateNoticeStyles();
 
 export function PwaUpdateNotice() {
-  const { dismissUpdate, isUpdating, needRefresh, update } = usePwa();
+  const { dismissUpdate, isUpdating, needRefresh, update, updateFailed } =
+    usePwa();
 
   if (!needRefresh) {
     return null;
@@ -22,18 +23,26 @@ export function PwaUpdateNotice() {
       <Alert.Indicator />
       <Alert.Content className={styles.content()}>
         <div className={styles.message()}>
-          <Alert.Title>Nova versão disponível</Alert.Title>
+          <Alert.Title>
+            {updateFailed
+              ? 'Não foi possível atualizar'
+              : 'Nova versão disponível'}
+          </Alert.Title>
           <Alert.Description>
-            Atualize para usar a versão mais recente.
+            {updateFailed
+              ? 'Continue usando esta versão e tente novamente.'
+              : 'Atualize para usar a versão mais recente.'}
           </Alert.Description>
         </div>
         <div className={styles.actions()}>
           <Button
             isPending={isUpdating}
-            onPress={() => void update()}
+            onPress={() => {
+              update().catch(() => undefined);
+            }}
             variant="primary"
           >
-            Atualizar agora
+            {updateFailed ? 'Tentar atualizar' : 'Atualizar agora'}
           </Button>
           <Button
             isDisabled={isUpdating}

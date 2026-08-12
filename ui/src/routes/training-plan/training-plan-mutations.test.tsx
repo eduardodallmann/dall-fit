@@ -2,12 +2,18 @@ import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   GlobalTrainingPlanCollectionResponse,
   TrainingPlanSummary,
 } from '@dall-fit/types';
+
+import {
+  activateSession,
+  endSession,
+  resetSessionLifecycleForTests,
+} from '~/auth/session-lifecycle';
 
 import {
   useDeleteTrainingPlanMutation,
@@ -31,8 +37,18 @@ vi.mock('./training-plan-service', async (importOriginal) => {
 
 const planA = createPlan('plan-a', 'Plano A');
 const planB = createPlan('plan-b', 'Plano B');
+let generation: number;
 
 describe('training plan mutations', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    generation = await activateSession('person-1', 'success');
+  });
+
+  afterEach(() => {
+    resetSessionLifecycleForTests();
+  });
+
   it('rolls back only the failed plan while preserving another plan success', async () => {
     const queryClient = createQueryClient();
     seedList(queryClient);
@@ -62,11 +78,13 @@ describe('training plan mutations', () => {
     act(() => {
       failed = result.current.mutateAsync({
         changes: { name: 'Plano A otimista' },
+        generation,
         trainingPlanId: planA.id,
         version: 0,
       });
       succeeded = result.current.mutateAsync({
         changes: { name: 'Plano B salvo' },
+        generation,
         trainingPlanId: planB.id,
         version: 0,
       });
@@ -106,6 +124,7 @@ describe('training plan mutations', () => {
     let deletion: Promise<void> | undefined;
     act(() => {
       deletion = result.current.mutateAsync({
+        generation,
         trainingPlanId: planA.id,
         version: 0,
       });
@@ -128,6 +147,40 @@ describe('training plan mutations', () => {
         );
       expect(collection?.data).toEqual([planA, planB]);
       expect(collection?.total).toBe(2);
+    });
+  });
+
+  it('rejects a mutation from an ended session before touching the service or cache', async () => {
+    const queryClient = createQueryClient();
+    seedList(queryClient);
+    const { result } = renderHook(
+      () => useUpdateTrainingPlanMutation('success'),
+      { wrapper: wrapper(queryClient) },
+    );
+    const endedGeneration = generation;
+    await endSession('logout');
+
+    let mutation: Promise<TrainingPlanSummary> | undefined;
+    act(() => {
+      mutation = result.current.mutateAsync({
+        changes: { name: 'Plano A obsoleto' },
+        generation: endedGeneration,
+        trainingPlanId: planA.id,
+        version: 0,
+      });
+    });
+
+    await expect(mutation).rejects.toMatchObject({ name: 'AbortError' });
+    expect(updateGlobalTrainingPlan).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData<GlobalTrainingPlanCollectionResponse>(
+        trainingPlanKeys.list(1, 'success'),
+      ),
+    ).toEqual({
+      data: [planA, planB],
+      page: 1,
+      pageSize: 20,
+      total: 2,
     });
   });
 });

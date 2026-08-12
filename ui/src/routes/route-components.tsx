@@ -1,18 +1,47 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 
-import { Outlet, useRouteContext, useSearch } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Outlet,
+  useRouteContext,
+  useRouter,
+  useSearch,
+} from '@tanstack/react-router';
 
+import { currentPersonQueryOptions } from '~/auth/current-person-query';
+import { endSession } from '~/auth/session-lifecycle';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { useTheme } from '~/core/theme/theme-context';
 import { HomePage } from '~/routes/home';
 
 export function AuthenticatedRouteComponent() {
-  const { mockAuth, person } = useRouteContext({ from: '/_authenticated' });
+  const { mockAuth, person: routePerson } = useRouteContext({
+    from: '/_authenticated',
+  });
+  const personQuery = useQuery(currentPersonQueryOptions(mockAuth));
+  const router = useRouter();
   const { reconcileAuthenticated } = useTheme();
+  const person = personQuery.data;
 
   useLayoutEffect(() => {
-    reconcileAuthenticated(person, mockAuth);
-  }, [mockAuth, person, reconcileAuthenticated]);
+    if (person?.id === routePerson.id) reconcileAuthenticated(person, mockAuth);
+  }, [mockAuth, person, reconcileAuthenticated, routePerson.id]);
+
+  useEffect(() => {
+    if (person === undefined) return;
+    if (person.id !== routePerson.id) {
+      endSession('identity_changed').catch(() => undefined);
+      return;
+    }
+    if (routePerson.isAdmin === true && person.isAdmin !== true) {
+      router
+        .invalidate({ sync: true })
+        .then(() => router.navigate({ replace: true, to: '/dash' }))
+        .catch(() => undefined);
+    }
+  }, [person, routePerson.id, routePerson.isAdmin, router]);
+
+  if (person === undefined || person.id !== routePerson.id) return null;
 
   const result = (
     <AuthenticatedShell mockAuth={mockAuth} person={person}>

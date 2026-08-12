@@ -11,7 +11,9 @@ import type {
 } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { requireActiveSessionGeneration } from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
+import { isExpectedCancellation } from '~/core/http/http-error';
 import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
 import {
   ActionsMenu,
@@ -102,6 +104,7 @@ export function TrainingPlanListPage({
   }, [isCorrectingPage, navigateToPage, pageCount]);
   const submitPlan = async (input: CreateTrainingPlanRequest) => {
     if (formPlan === null) return;
+    const generation = requireActiveSessionGeneration();
     if (formPlan === undefined) {
       const previousPage = page;
       trackUiEvent({
@@ -112,13 +115,8 @@ export function TrainingPlanListPage({
       });
       try {
         await navigateToPage(1);
-        const promise = createMutation.mutateAsync(input);
-        toast.promise(promise, {
-          error: 'Não foi possível criar o plano.',
-          loading: 'Criando plano…',
-          success: 'Plano criado.',
-        });
-        await promise;
+        await createMutation.mutateAsync({ generation, input });
+        toast.success('Plano criado.');
         trackUiEvent({
           control: 'submit',
           eventName: 'ui_operation_completed',
@@ -126,7 +124,8 @@ export function TrainingPlanListPage({
           outcome: 'success',
           surface: 'training_plan_form',
         });
-      } catch {
+      } catch (error) {
+        if (isExpectedCancellation(error)) throw error;
         trackUiEvent({
           control: 'submit',
           eventName: 'ui_operation_completed',
@@ -135,7 +134,7 @@ export function TrainingPlanListPage({
           surface: 'training_plan_form',
         });
         if (currentPage.current === 1) await navigateToPage(previousPage);
-        throw new Error('Training plan creation failed.');
+        throw error;
       }
 
       return;
@@ -147,18 +146,14 @@ export function TrainingPlanListPage({
       operation: 'training_plan_update',
       surface: 'training_plan_form',
     });
-    const promise = updateMutation.mutateAsync({
-      changes: input,
-      trainingPlanId: formPlan.id,
-      version: formPlan.version,
-    });
-    toast.promise(promise, {
-      error: 'Não foi possível salvar o plano.',
-      loading: 'Salvando alterações…',
-      success: 'Plano atualizado.',
-    });
     try {
-      await promise;
+      await updateMutation.mutateAsync({
+        changes: input,
+        generation,
+        trainingPlanId: formPlan.id,
+        version: formPlan.version,
+      });
+      toast.success('Plano atualizado.');
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -167,6 +162,7 @@ export function TrainingPlanListPage({
         surface: 'training_plan_form',
       });
     } catch (error) {
+      if (isExpectedCancellation(error)) throw error;
       trackUiEvent({
         control: 'submit',
         eventName: 'ui_operation_completed',
@@ -179,6 +175,7 @@ export function TrainingPlanListPage({
   };
   const confirmDelete = async () => {
     if (deletePlan === undefined) return;
+    const generation = requireActiveSessionGeneration();
     trackUiEvent({
       control: 'delete_confirmation',
       eventName: 'ui_operation_started',
@@ -189,16 +186,12 @@ export function TrainingPlanListPage({
     const shouldReturnPage = rows.length === 1 && page > 1;
     try {
       if (shouldReturnPage) await navigateToPage(page - 1);
-      const promise = deleteMutation.mutateAsync({
+      await deleteMutation.mutateAsync({
+        generation,
         trainingPlanId: deletePlan.id,
         version: deletePlan.version,
       });
-      toast.promise(promise, {
-        error: 'Não foi possível excluir o plano.',
-        loading: 'Excluindo plano…',
-        success: 'Plano excluído.',
-      });
-      await promise;
+      toast.success('Plano excluído.');
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -207,6 +200,8 @@ export function TrainingPlanListPage({
         surface: 'training_plan_list',
       });
     } catch (error) {
+      if (isExpectedCancellation(error)) throw error;
+      toast.danger('Não foi possível excluir o plano.');
       trackUiEvent({
         control: 'delete_confirmation',
         eventName: 'ui_operation_completed',
@@ -232,8 +227,10 @@ export function TrainingPlanListPage({
     if (!result.isSuccess || latest === undefined)
       throw result.error ?? new Error('Training plan reload failed.');
     await aggregate.reset(latest.version);
-    setFormPlan(null);
-    setDeletePlan(undefined);
+    if (aggregate.pauseReason === 'conflict') {
+      setFormPlan(null);
+      setDeletePlan(undefined);
+    }
   };
   let emptyState = (
     <TrainingPlanTableState
@@ -258,7 +255,7 @@ export function TrainingPlanListPage({
             resource: 'training_plans',
             surface: 'training_plan_list',
           });
-          void query.refetch();
+          query.refetch().catch(() => undefined);
         }}
         title="Não foi possível carregar os planos"
       />
@@ -312,7 +309,7 @@ export function TrainingPlanListPage({
                 resource: 'training_plans',
                 surface: 'training_plan_list',
               });
-              void query.refetch();
+              query.refetch().catch(() => undefined);
             }}
             variant="ghost"
           >
@@ -321,7 +318,10 @@ export function TrainingPlanListPage({
         </Alert>
       ) : null}
       {aggregate.paused ? (
-        <TrainingPlanConflictAlert onReload={reloadConflict} />
+        <TrainingPlanConflictAlert
+          onReload={reloadConflict}
+          reason={aggregate.pauseReason}
+        />
       ) : null}
       <section aria-label="Planos globais" className={styles.section()}>
         <Table>

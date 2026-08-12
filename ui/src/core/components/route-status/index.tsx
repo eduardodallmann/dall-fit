@@ -1,4 +1,7 @@
-import { Card, Skeleton } from '@heroui/react';
+import { useState } from 'react';
+
+import { Button, Card, Skeleton } from '@heroui/react';
+import { useRouter } from '@tanstack/react-router';
 
 import { routeStatusStyles } from '~/core/components/route-status/styles';
 
@@ -29,6 +32,18 @@ export function ProtectedRoutePending() {
 }
 
 export function ProtectedRouteError() {
+  const router = useRouter();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retry = async () => {
+    if (isRetrying) return;
+    setIsRetrying(true);
+    try {
+      await router.invalidate({ sync: true });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   return (
     <main className={styles.page()}>
       <div className={styles.pageContent()}>
@@ -38,9 +53,19 @@ export function ProtectedRouteError() {
               Não foi possível carregar sua conta
             </h1>
             <p className={styles.description()}>
-              Recarregue a página para tentar novamente.
+              Verifique sua conexão e tente novamente.
             </p>
           </Card.Header>
+          <Card.Footer>
+            <Button
+              isPending={isRetrying}
+              onPress={() => {
+                retry().catch(() => undefined);
+              }}
+            >
+              Tentar novamente
+            </Button>
+          </Card.Footer>
         </Card>
       </div>
     </main>

@@ -36,6 +36,22 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(page.getByText('Página 1 de 2')).toBeVisible();
   });
 
+  test('retira a pessoa da branch administrativa após revogação', async ({
+    page,
+  }) => {
+    await page.goto('/global/training-plan?mockAuth=admin-revoked');
+    await expect(
+      page.getByRole('heading', { name: 'Planos de treino' }),
+    ).toBeVisible();
+
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event('visibilitychange')),
+    );
+
+    await expect(page).toHaveURL('/dash');
+    await expect(page.getByText('Admin')).not.toBeVisible();
+  });
+
   test('mostra retry no EmptyState que pertence ao corpo da tabela', async ({
     page,
   }) => {
@@ -203,6 +219,44 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(firstExercise.getByLabel('Nome')).toHaveValue(
       'Agachamento atualizado',
     );
+  });
+
+  test('renova CSRF sem repetir o autosave automaticamente', async ({
+    page,
+  }) => {
+    let patchCount = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PATCH' &&
+        request.url().includes('/exercises/64b000000000000000000201')
+      )
+        patchCount += 1;
+    });
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=csrf-refresh&mockTrainingPlans=csrf-refresh`,
+    );
+    const firstExercise = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first();
+    await firstExercise.getByLabel('Nome').fill('Rascunho protegido');
+
+    await expect(
+      firstExercise.getByText(
+        'Não foi possível salvar. O rascunho foi preservado.',
+      ),
+    ).toBeVisible({ timeout: 5_000 });
+    expect(patchCount).toBe(1);
+    await firstExercise
+      .getByRole('button', { name: 'Tentar novamente' })
+      .click();
+
+    await expect(
+      firstExercise.getByText(
+        'Não foi possível salvar. O rascunho foi preservado.',
+      ),
+    ).not.toBeVisible();
+    expect(patchCount).toBe(2);
   });
 
   test('propaga a versão entre duas adições consecutivas após a fila ficar ociosa', async ({

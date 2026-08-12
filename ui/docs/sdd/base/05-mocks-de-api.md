@@ -190,7 +190,9 @@ reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercitam
 dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o body e
 devolve a `Person` atualizada ou a falha selecionada. `GET /auth/csrf` devolve
 token fictício no-store e `POST /auth/logout` valida seu header, com cenários
-`csrf-error` e `logout-error`. O estado de autenticação é
+`csrf-error` e `logout-error`. `session-expired` responde a primeira pessoa e
+depois `401`; `admin-revoked` remove `isAdmin` na revalidação; `csrf-refresh`
+entrega um token obsoleto e depois outro token para recuperação single-flight. O estado de autenticação é
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 
@@ -211,5 +213,8 @@ satisfaz a precondição. `large-pagination` disponibiliza mais de 2000 itens e
 `two-pages` permite consultar uma página HTTP válida acima do total.
 `version-conflict`, `update-exercise-error`, `delete-exercise-error`,
 `reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor.
+`csrf-refresh` rejeita o primeiro write protegido e aceita somente a repetição
+explícita com o token renovado; `timeout` mantém a leitura indefinida para testes
+com relógio/abort controlados.
 IDs criados são determinísticos; multipart exige um `File` no campo `file` e nunca
 é convertido em JSON/base64.

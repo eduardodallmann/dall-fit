@@ -8,12 +8,16 @@ import {
 } from '@tanstack/react-router';
 import axios from 'axios';
 
+import { configureAdminAccessHandler } from '~/auth/admin-access-lifecycle';
 import { ensureCsrfToken, type MockAuthScenario } from '~/auth/auth-service';
-import {
-  AUTHENTICATION_REQUIRED_EVENT,
-  clearCsrfToken,
-} from '~/auth/csrf-token';
+import { clearCsrfToken } from '~/auth/csrf-token';
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
+import {
+  activateSession,
+  configureSessionEndHandler,
+  endSession,
+  getActiveSessionMockAuth,
+} from '~/auth/session-lifecycle';
 import { queryClient } from '~/context/query-client';
 import {
   ProtectedRouteError,
@@ -76,8 +80,13 @@ const authenticatedRoute = createRoute({
     const mockAuth = parseMockAuthScenario(location.searchStr);
 
     try {
-      const person = await context.queryClient.ensureQueryData(
+      const person = await context.queryClient.fetchQuery(
         currentPersonQueryOptions(mockAuth),
+      );
+      await activateSession(person.id, mockAuth);
+      context.queryClient.setQueryData(
+        currentPersonQueryOptions(mockAuth).queryKey,
+        person,
       );
       await ensureCsrfToken(mockAuth);
       const result = { mockAuth, person };
@@ -85,8 +94,7 @@ const authenticatedRoute = createRoute({
       return result;
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
-        clearCsrfToken();
-        context.queryClient.clear();
+        await endSession('expired');
         redirect({ replace: true, throw: true, to: '/' });
       }
 
@@ -190,25 +198,26 @@ export const router = createRouter({
   routeTree,
 });
 
-function handleAuthenticationRequired(): void {
+configureSessionEndHandler(async (reason, generation) => {
   clearCsrfToken();
+  if (generation === undefined) return;
+  await queryClient.cancelQueries(undefined, { silent: true });
   queryClient.clear();
-  void router.navigate({ replace: true, to: '/' });
-}
+  if (reason !== 'identity_changed')
+    await router.navigate({ replace: true, to: '/' });
+});
 
-window.addEventListener(
-  AUTHENTICATION_REQUIRED_EVENT,
-  handleAuthenticationRequired,
-);
-
-if (import.meta.hot !== undefined) {
-  import.meta.hot.dispose(() => {
-    window.removeEventListener(
-      AUTHENTICATION_REQUIRED_EVENT,
-      handleAuthenticationRequired,
-    );
+configureAdminAccessHandler(async () => {
+  const mockAuth = (getActiveSessionMockAuth() ??
+    'authenticated') as MockAuthScenario;
+  const person = await queryClient.fetchQuery({
+    ...currentPersonQueryOptions(mockAuth),
+    staleTime: 0,
   });
-}
+  await router.invalidate({ sync: true });
+  if (person.isAdmin !== true)
+    await router.navigate({ replace: true, to: '/dash' });
+});
 
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');
@@ -220,7 +229,9 @@ function parseMockAuthScenario(search: string): MockAuthScenario {
 function isMockAuthScenario(value: unknown): value is MockAuthScenario {
   const result =
     value === 'admin' ||
+    value === 'admin-revoked' ||
     value === 'authenticated' ||
+    value === 'csrf-refresh' ||
     value === 'csrf-error' ||
     value === 'error' ||
     value === 'logout-error' ||
@@ -229,6 +240,7 @@ function isMockAuthScenario(value: unknown): value is MockAuthScenario {
     value === 'theme-save-error' ||
     value === 'theme-save-error-unset' ||
     value === 'theme-unset' ||
+    value === 'session-expired' ||
     value === 'unauthenticated';
 
   return result;
@@ -263,6 +275,8 @@ function parseTrainingPlanSearch(
     'delete-exercise-error',
     'image-error',
     'reorder-error',
+    'csrf-refresh',
+    'timeout',
     'two-pages',
     'version-conflict',
   ];

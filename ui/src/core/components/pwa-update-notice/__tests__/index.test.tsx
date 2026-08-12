@@ -81,4 +81,17 @@ describe('PwaUpdateNotice', () => {
     expect(context.update).not.toHaveBeenCalled();
     expect(context.dismissUpdate).not.toHaveBeenCalled();
   });
+
+  it('keeps the notice actionable after an update failure', async () => {
+    const user = userEvent.setup();
+    const context = renderNotice({ updateFailed: true });
+
+    expect(screen.getByText('Não foi possível atualizar')).toBeInTheDocument();
+    expect(
+      screen.getByText('Continue usando esta versão e tente novamente.'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Tentar atualizar' }));
+
+    expect(context.update).toHaveBeenCalledOnce();
+  });
 });

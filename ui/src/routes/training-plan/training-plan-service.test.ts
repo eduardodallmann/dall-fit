@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 
-import { apiClient } from '~/core/http/api-client';
+import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import {
   createMockApiError,
@@ -195,6 +195,9 @@ describe('training plan service', () => {
     );
     expect(upload.version).toBe(3);
     expect(put.mock.calls[0]?.[1]).toBeInstanceOf(FormData);
+    expect(put.mock.calls[0]?.[2]).toMatchObject({
+      timeout: UPLOAD_REQUEST_TIMEOUT,
+    });
     put.mockRestore();
   });
 

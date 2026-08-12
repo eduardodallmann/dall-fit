@@ -16,7 +16,12 @@ import {
   updateCurrentPersonConfigs,
   type MockAuthScenario,
 } from '~/auth/auth-service';
+import {
+  getActiveSessionGeneration,
+  isSessionGenerationActive,
+} from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
+import { isExpectedCancellation } from '~/core/http/http-error';
 import {
   ThemeContext,
   type ThemeContextValue,
@@ -40,6 +45,7 @@ interface AuthenticatedThemeOwner {
 }
 
 interface UpdateThemeVariables {
+  generation?: number;
   mockScenario: MockAuthScenario;
   rollback: ConfirmedTheme;
   theme: Theme;
@@ -67,7 +73,13 @@ export function ThemeProvider({
   const mutation = useMutation({
     mutationFn: ({ mockScenario, theme }: UpdateThemeVariables) =>
       updateCurrentPersonConfigs(theme, mockScenario),
-    onError: (_error, variables) => {
+    onError: (error, variables) => {
+      if (
+        isExpectedCancellation(error) ||
+        (variables.generation !== undefined &&
+          !isSessionGenerationActive(variables.generation))
+      )
+        return;
       if (variables.rollback.theme === undefined) {
         removeStoredTheme();
         applyThemeState({ source: 'system', theme: getSystemTheme() });
@@ -88,7 +100,12 @@ export function ThemeProvider({
         surface: 'application_menu',
       });
     },
-    onSuccess: (person) => {
+    onSuccess: (person, variables) => {
+      if (
+        variables.generation !== undefined &&
+        !isSessionGenerationActive(variables.generation)
+      )
+        return;
       const confirmedTheme = person.configs.theme;
 
       if (confirmedTheme !== undefined) {
@@ -161,6 +178,7 @@ export function ThemeProvider({
     writeStoredTheme(nextTheme);
     applyThemeState({ source: 'explicit', theme: nextTheme });
     mutation.mutate({
+      generation: getActiveSessionGeneration(),
       mockScenario: authenticatedOwner.mockScenario,
       rollback,
       theme: nextTheme,

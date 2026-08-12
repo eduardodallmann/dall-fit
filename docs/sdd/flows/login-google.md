@@ -63,13 +63,21 @@ controlada pelo middleware de teste do Vite, sem acessar a API real.
    O layout autenticado mostra avatar, nome, e-mail, toggle de tema, navegação
    `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
    de `/dash` permanece vazia.
-9. Ainda antes do shell, a UI consulta `GET /auth/csrf`, mantém o token apenas em
+9. Ainda antes do shell, a UI consulta `GET /auth/csrf` em single-flight, mantém o token apenas em
    memória e habilita mutações somente após os dois bootstraps. Falha de CSRF é
    recuperável e não apaga a autenticação; `401` limpa CSRF/cache privado e
-   redireciona a `/`.
+   redireciona a `/`. O shell mantém `GET /auth/me` observado, revalida em foco,
+   reconexão e a cada cinco minutos enquanto visível, refletindo expiração, pessoa
+   removida ou mudança de privilégio sem cache indefinido.
 10. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
-    CSRF. Em sucesso limpa caches e navega com replace para `/`; em falha mantém a
-    tela e mostra feedback acessível.
+    CSRF. Sucesso ou falha remota encerra localmente uma única geração: aborta
+    requests, reseta recursos privados, limpa CSRF/cache e navega com replace para
+    `/`; a falha também mostra feedback acessível.
+
+`401` concorrentes compartilham a mesma transição. `CSRF_VALIDATION_FAILED` renova
+o token sem repetir a mutation; `ADMIN_ACCESS_REQUIRED` revalida a pessoa, atualiza
+o Router e volta a `/dash` sem logout. Resultado tardio da geração encerrada não
+altera a sessão seguinte.
 
 Analytics permanece uma observação exclusiva da UI: não acrescenta etapa HTTP da
 API, cookie, identificador ou alteração na sequência. O evento de login contém

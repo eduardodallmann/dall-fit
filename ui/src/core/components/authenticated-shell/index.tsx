@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 
 import { Button, Drawer, toast, useOverlayState } from '@heroui/react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
+import { useMutation } from '@tanstack/react-query';
 import { Menu } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
@@ -11,7 +10,7 @@ import {
   logout as logoutSession,
   type MockAuthScenario,
 } from '~/auth/auth-service';
-import { clearCsrfToken } from '~/auth/csrf-token';
+import { endSession } from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { authenticatedShellStyles } from '~/core/components/authenticated-shell/styles';
@@ -31,8 +30,6 @@ export function AuthenticatedShell({
   person,
 }: Readonly<AuthenticatedShellProps>) {
   const drawerOpenRef = useRef(false);
-  const queryClient = useQueryClient();
-  const router = useRouter();
   const logoutMutation = useMutation({
     mutationFn: () => logoutSession(mockAuth),
     onMutate: () => {
@@ -43,7 +40,7 @@ export function AuthenticatedShell({
         surface: 'application_menu',
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       trackUiEvent({
         control: 'logout',
         eventName: 'ui_operation_completed',
@@ -51,11 +48,9 @@ export function AuthenticatedShell({
         outcome: 'success',
         surface: 'application_menu',
       });
-      clearCsrfToken();
-      queryClient.clear();
-      void router.navigate({ replace: true, to: '/' });
+      await endSession('logout');
     },
-    onError: () => {
+    onError: async () => {
       trackUiEvent({
         control: 'logout',
         eventName: 'ui_operation_completed',
@@ -64,6 +59,7 @@ export function AuthenticatedShell({
         surface: 'application_menu',
       });
       toast.danger('Não foi possível sair. Tente novamente.');
+      await endSession('logout');
     },
   });
   const closeReasonRef = useRef<

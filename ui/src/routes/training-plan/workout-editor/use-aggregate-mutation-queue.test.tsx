@@ -174,6 +174,33 @@ describe('useAggregateMutationQueue', () => {
     expect(result.current.paused).toBe(false);
   });
 
+  it('pauses for canonical reconciliation when a mutation response is unknown', async () => {
+    const coordinator = new AggregateMutationCoordinator();
+    const timeout = new AxiosError('timeout', 'ETIMEDOUT');
+
+    await expect(
+      coordinator.enqueue('plan-1', 3, () => Promise.reject(timeout)),
+    ).rejects.toBe(timeout);
+
+    expect(coordinator.snapshot('plan-1')).toEqual({
+      isPending: false,
+      pauseReason: 'uncertain',
+      paused: true,
+    });
+    await expect(
+      coordinator.enqueue('plan-1', 3, () =>
+        Promise.resolve({ data: 'unsafe', version: 4 }),
+      ),
+    ).rejects.toThrow('paused');
+
+    await coordinator.reset('plan-1', 4);
+    await expect(
+      coordinator.enqueue('plan-1', 3, () =>
+        Promise.resolve({ data: 'safe', version: 5 }),
+      ),
+    ).resolves.toBe('safe');
+  });
+
   it('keeps different training plans independent', async () => {
     const queryClient = new QueryClient();
     let finishPlanA:
@@ -217,5 +244,32 @@ describe('useAggregateMutationQueue', () => {
     await expect(firstTask).resolves.toBe('first-a');
     await expect(secondTask).resolves.toBe('second-a');
     expect(secondPlanA).toHaveBeenCalledWith(1);
+  });
+
+  it('cancels running and queued work when the session resource is cleared', async () => {
+    const coordinator = new AggregateMutationCoordinator();
+    let finish:
+      ((value: { data: string; version: number }) => void) | undefined;
+    const running = vi.fn(
+      () =>
+        new Promise<{ data: string; version: number }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const queued = vi.fn().mockResolvedValue({ data: 'queued', version: 2 });
+    const runningTask = coordinator.enqueue('plan-1', 0, running);
+    const queuedTask = coordinator.enqueue('plan-1', 0, queued);
+    await vi.waitFor(() => expect(running).toHaveBeenCalledOnce());
+
+    coordinator.clear();
+    finish?.({ data: 'running', version: 1 });
+
+    await expect(runningTask).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    await expect(queuedTask).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(queued).not.toHaveBeenCalled();
+    expect(coordinator.snapshot('plan-1')).toEqual({
+      isPending: false,
+      paused: false,
+    });
   });
 });

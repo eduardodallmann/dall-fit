@@ -9,12 +9,14 @@ import { PwaProvider } from '~/core/pwa/pwa-provider';
 const pwaMocks = vi.hoisted(() => ({
   needRefresh: false,
   onRegisterError: undefined as (() => void) | undefined,
+  reportSystemFailure: vi.fn(),
   setNeedRefresh: vi.fn(),
   trackUiEvent: vi.fn(),
   updateServiceWorker: vi.fn(),
 }));
 
 vi.mock('~/core/analytics', () => ({
+  reportSystemFailure: pwaMocks.reportSystemFailure,
   trackUiEvent: pwaMocks.trackUiEvent,
 }));
 
@@ -38,6 +40,7 @@ function PwaProbe() {
     isInstalling,
     isUpdating,
     needRefresh,
+    updateFailed,
     update,
   } = usePwa();
 
@@ -47,6 +50,7 @@ function PwaProbe() {
       <span>{isInstalling ? 'installing' : 'idle-install'}</span>
       <span>{isUpdating ? 'updating' : 'idle-update'}</span>
       <span>{needRefresh ? 'refresh-needed' : 'current'}</span>
+      <span>{updateFailed ? 'update-failed' : 'update-ready'}</span>
       <button onClick={() => void install()} type="button">
         install
       </button>
@@ -97,6 +101,7 @@ describe('PwaProvider', () => {
   beforeEach(() => {
     pwaMocks.needRefresh = false;
     pwaMocks.onRegisterError = undefined;
+    pwaMocks.reportSystemFailure.mockReset();
     pwaMocks.setNeedRefresh.mockReset();
     pwaMocks.trackUiEvent.mockReset();
     pwaMocks.updateServiceWorker.mockReset().mockResolvedValue(undefined);
@@ -129,6 +134,9 @@ describe('PwaProvider', () => {
 
     expect(screen.getByText('manual')).toBeInTheDocument();
     expect(() => pwaMocks.onRegisterError?.()).not.toThrow();
+    expect(pwaMocks.reportSystemFailure).toHaveBeenCalledWith(
+      'pwa_registration',
+    );
   });
 
   it('offers and consumes the native prompt only once when accepted', async () => {
@@ -487,6 +495,7 @@ describe('PwaProvider', () => {
     await waitFor(() =>
       expect(screen.getByText('idle-update')).toBeInTheDocument(),
     );
+    expect(screen.getByText('update-failed')).toBeInTheDocument();
     expect(pwaMocks.trackUiEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         eventName: 'ui_operation_completed',
@@ -494,5 +503,11 @@ describe('PwaProvider', () => {
         outcome: 'error',
       }),
     );
+
+    await user.click(screen.getByRole('button', { name: 'update' }));
+    await waitFor(() =>
+      expect(screen.getByText('update-ready')).toBeInTheDocument(),
+    );
+    expect(pwaMocks.updateServiceWorker).toHaveBeenCalledTimes(2);
   });
 });

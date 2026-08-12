@@ -35,7 +35,7 @@ export function trainingPlanListQueryOptions(
 ) {
   const result = queryOptions({
     queryKey: trainingPlanKeys.list(page, scenario),
-    queryFn: () => listGlobalTrainingPlans(page, scenario),
+    queryFn: ({ signal }) => listGlobalTrainingPlans(page, scenario, signal),
   });
 
   return result;
@@ -48,7 +48,8 @@ export function trainingPlanWorkoutQueryOptions(
 ) {
   return queryOptions({
     queryKey: trainingPlanKeys.workout(trainingPlanId, workoutId, scenario),
-    queryFn: () => getTrainingPlanWorkout(trainingPlanId, workoutId, scenario),
+    queryFn: ({ signal }) =>
+      getTrainingPlanWorkout(trainingPlanId, workoutId, scenario, signal),
   });
 }
 
@@ -58,7 +59,8 @@ export function trainingPlanDetailQueryOptions(
 ) {
   const result = queryOptions({
     queryKey: trainingPlanKeys.detail(trainingPlanId, scenario),
-    queryFn: () => getGlobalTrainingPlan(trainingPlanId, scenario),
+    queryFn: ({ signal }) =>
+      getGlobalTrainingPlan(trainingPlanId, scenario, signal),
   });
 
   return result;

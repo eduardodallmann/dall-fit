@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { normalizeAnalyticsRoute, trackUiEvent } from '~/core/analytics';
+import {
+  normalizeAnalyticsRoute,
+  reportSystemFailure,
+  trackUiEvent,
+} from '~/core/analytics';
 
 const { trackMock } = vi.hoisted(() => ({
   trackMock:
@@ -208,5 +212,16 @@ describe('analytics boundary', () => {
         surface: 'home',
       }),
     ).not.toThrow();
+  });
+
+  it('reports a system failure with only its enumerated category', () => {
+    window.history.replaceState({}, '', '/dash?sensitive=session-value');
+
+    reportSystemFailure('bootstrap');
+
+    expect(trackMock).toHaveBeenCalledWith('ui_system_failure', {
+      category: 'bootstrap',
+    });
+    expect(JSON.stringify(trackMock.mock.calls)).not.toContain('session-value');
   });
 });

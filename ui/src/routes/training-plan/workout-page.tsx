@@ -56,7 +56,7 @@ export function TrainingPlanWorkoutPage({
 
   const retryInitialLoad = () => {
     trackRetry();
-    void query.refetch();
+    query.refetch().catch(() => undefined);
   };
 
   const reload = async () => {
@@ -65,7 +65,8 @@ export function TrainingPlanWorkoutPage({
     if (!result.isSuccess || result.data === undefined)
       throw result.error ?? new Error('Workout reload failed.');
     await aggregate.reset(result.data.version);
-    setReloadKey((current) => current + 1);
+    if (aggregate.pauseReason === 'conflict')
+      setReloadKey((current) => current + 1);
   };
 
   return (
@@ -106,7 +107,10 @@ export function TrainingPlanWorkoutPage({
         </Alert>
       ) : null}
       {aggregate.paused ? (
-        <TrainingPlanConflictAlert onReload={reload} />
+        <TrainingPlanConflictAlert
+          onReload={reload}
+          reason={aggregate.pauseReason}
+        />
       ) : null}
       {workout === undefined ? null : (
         <WorkoutEditor
