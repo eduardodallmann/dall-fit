@@ -34,17 +34,33 @@ export function ApplicationMenu({
   return (
     <div className={styles.content()}>
       <section aria-label="Pessoa autenticada" className={styles.identity()}>
-        <Avatar
-          aria-label={person.name}
-          className={styles.avatar()}
-          role="img"
-          size="lg"
-        >
-          {person.photoUrl === null ? null : (
-            <Avatar.Image alt="" src={person.photoUrl} />
-          )}
-          <Avatar.Fallback>{initials}</Avatar.Fallback>
-        </Avatar>
+        <div className={styles.identityHeader()}>
+          <Avatar
+            aria-label={person.name}
+            className={styles.avatar()}
+            role="img"
+            size="lg"
+          >
+            {person.photoUrl === null ? null : (
+              <Avatar.Image alt="" src={person.photoUrl} />
+            )}
+            <Avatar.Fallback>{initials}</Avatar.Fallback>
+          </Avatar>
+          <div aria-label="Ações da conta" className={styles.accountActions()}>
+            <ThemeToggle />
+            <Button
+              aria-label={isLogoutPending ? 'Saindo' : 'Sair'}
+              className={styles.logout()}
+              isIconOnly
+              isPending={isLogoutPending}
+              onPress={onLogout}
+              size="sm"
+              variant="secondary"
+            >
+              <LogOut aria-hidden="true" focusable="false" />
+            </Button>
+          </div>
+        </div>
         <div className={styles.identityTextGroup()}>
           <Typography
             className={styles.identityText()}
@@ -68,9 +84,6 @@ export function ApplicationMenu({
             <Chip.Label>Admin</Chip.Label>
           </Chip>
         ) : null}
-      </section>
-      <section aria-label="Aparência" className={styles.appearance()}>
-        <ThemeToggle />
       </section>
       <nav aria-label="Navegação principal" className={styles.navigation()}>
         <Link
@@ -122,15 +135,6 @@ export function ApplicationMenu({
         ) : null}
       </nav>
       <PwaInstallAction />
-      <Button
-        className={styles.logout()}
-        isPending={isLogoutPending}
-        onPress={onLogout}
-        variant="secondary"
-      >
-        <LogOut aria-hidden="true" focusable="false" />
-        {isLogoutPending ? 'Saindo' : 'Sair'}
-      </Button>
     </div>
   );
 }

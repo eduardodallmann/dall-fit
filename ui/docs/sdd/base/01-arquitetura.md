@@ -184,6 +184,14 @@ complementar e não substitui fechamento, rollback, persistência de erro nem co
 da rejeição. Trabalho assíncrono só pode ser deliberadamente independente da
 interação quando tratar sua própria falha e essa independência estiver documentada.
 
+Depois do sucesso de uma mutation, toda query que represente a entidade alterada
+ou um resumo dela recebe a response canônica ou é invalidada de forma explícita.
+Ao alterar um workout, isso inclui sua query projetada, o resumo no detalhe do
+plano e a versão nas coleções já presentes do mesmo cenário. Navegar para um
+ancestral e retornar não pode reapresentar estado anterior confirmado. Falha,
+cancelamento, conflito ou callback de geração encerrada não publicam o draft como
+dado canônico.
+
 Se sair da rota puder perder draft, debounce, operação enfileirada ou em execução,
 ou falha ainda recuperável, a navegação é protegida por confirmação acessível.
 Operações de fundo sem trabalho recuperável não bloqueiam navegação apenas por

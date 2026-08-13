@@ -35,6 +35,8 @@ Depois da proteção, o layout autenticado apresenta:
 - `Drawer` HeroUI móvel aberto pela esquerda, com backdrop clicável e controle
   `Fechar menu`;
 - avatar com foto ou iniciais da primeira e última palavras do nome;
+- no topo do bloco de identidade, avatar à esquerda e grupo de ações à direita,
+  alinhados verticalmente ao centro; o toggle de tema precede o logout;
 - nome em uma linha;
 - e-mail em uma segunda linha, abaixo do nome e com menor destaque;
 - truncamento independente do nome e do e-mail com reticências, preservando os
@@ -49,7 +51,8 @@ Depois da proteção, o layout autenticado apresenta:
   `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
 - seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
   prompt ou orientação manual expansível quando ele não está disponível;
-- botão `Sair` compartilhado pelas apresentações persistente e móvel;
+- botão HeroUI icon-only de logout com ícone `LogOut` e nome acessível `Sair`, sem
+  texto visível, compartilhado pelas apresentações persistente e móvel;
 - região `main` sem conteúdo próprio, título, placeholder, card ou mensagem.
 
 A rota pública `/` não recebe nenhum desses elementos.
@@ -65,8 +68,8 @@ A rota pública `/` não recebe nenhum desses elementos.
 4. O layout entrega a mesma `Person` ao shell e ao contexto dos filhos, sem segunda
    request.
 5. A largura do viewport seleciona a apresentação persistente ou móvel.
-6. O menu exibe avatar, nome, e-mail, indicador administrativo condicional,
-   toggle de tema e `Home` ativo.
+6. O menu exibe avatar com tema/logout à direita, nome, e-mail, indicador
+   administrativo condicional e `Home` ativo.
 7. A rota filha `/dash` não acrescenta conteúdo à região principal.
 
 Resultado esperado: a pessoa reconhece sua sessão e possui navegação disponível,
@@ -171,10 +174,10 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro recuperável: mensagem `Não foi possível carregar sua conta` e orientação de
   recarga, sem shell.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: controles de tema, instalação e atualização indicam o
-  progresso e evitam ativações concorrentes. Os dois toggles de tema compartilham
-  exatamente o mesmo pending; os dois botões de logout compartilham outra única
-  mutation e o mesmo pending.
+- Ações desabilitadas: controles de tema, logout, instalação e atualização indicam
+  o progresso e evitam ativações concorrentes. Os dois toggles de tema compartilham
+  exatamente o mesmo pending; os dois botões icon-only de logout conservam seu
+  slot, compartilham outra única mutation e o mesmo pending.
 
 ## Integrações
 
@@ -216,7 +219,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 
 ### Encerrar sessão
 
-- Momento: ativação de `Sair` em qualquer apresentação do menu.
+- Momento: ativação do controle icon-only com nome acessível `Sair` em qualquer
+  apresentação do menu.
 - Endpoint documentado: `api/docs/sdd/endpoints/auth.md`.
 - Dados enviados: body vazio, cookie automático e CSRF em memória.
 - Resultado local: sucesso ou falha remota executa o mesmo teardown idempotente,
@@ -270,6 +274,8 @@ móvel não o reabre.
   decorativos e não duplicam labels;
 - o toggle icon-only possui nome dinâmico que descreve a ação; `Sun` e `Moon` são
   decorativos, e pending impede concorrência sem remover o controle;
+- o logout icon-only conserva o nome `Sair` ou `Saindo`, usa ícone decorativo e não
+  depende de texto visível nem de sua posição ao lado do avatar;
 - o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu`, contenção e
   restauração de foco e fechamento por `Escape`;
 - links do menu têm label visível, foco visível e `aria-current="page"` quando
