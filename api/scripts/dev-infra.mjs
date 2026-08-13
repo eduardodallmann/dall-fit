@@ -1,6 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import process from 'node:process';
-import { URL } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { RedisMemoryServer } from 'redis-memory-server';
@@ -9,6 +9,9 @@ const host = '127.0.0.1';
 const mongoPort = 27_017;
 const mongoDatabase = 'dall-fit';
 const redisPort = 6_379;
+const mongoDataPath = fileURLToPath(
+  new URL('../.data/mongodb/', import.meta.url),
+);
 const workspacePackagePath = new URL('../../package.json', import.meta.url);
 const workspacePackage = JSON.parse(
   await readFile(workspacePackagePath, 'utf8'),
@@ -35,7 +38,7 @@ function stopInfrastructure() {
     process.stdout.write('[dev:infra] Stopping MongoDB and Redis...\n');
 
     const results = await Promise.allSettled([
-      mongoServer?.stop(),
+      mongoServer?.stop({ doCleanup: false }),
       redisServer?.stop(),
     ]);
     const failure = results.find((result) => result.status === 'rejected');
@@ -62,6 +65,8 @@ process.once('SIGINT', () => handleSignal('SIGINT'));
 process.once('SIGTERM', () => handleSignal('SIGTERM'));
 
 try {
+  await mkdir(mongoDataPath, { recursive: true });
+
   redisServer = new RedisMemoryServer({
     binary: { version: redisVersion },
     instance: { ip: host, port: redisPort },
@@ -79,6 +84,7 @@ try {
     binary: { version: mongoVersion },
     instance: {
       dbName: mongoDatabase,
+      dbPath: mongoDataPath,
       ip: host,
       port: mongoPort,
       portGeneration: false,
@@ -87,13 +93,10 @@ try {
   });
 
   process.stdout.write(
-    `[dev:infra] Redis ${redisVersion} ready on ${host}:${redisPort}.\n`,
+    `[dev:infra] Redis ${redisVersion} ready on ${host}:${redisPort}; data is ephemeral.\n`,
   );
   process.stdout.write(
-    `[dev:infra] MongoDB ${mongoVersion} ready on ${host}:${mongoPort}/${mongoDatabase}.\n`,
-  );
-  process.stdout.write(
-    '[dev:infra] Data is ephemeral and will be discarded when this process stops.\n',
+    `[dev:infra] MongoDB ${mongoVersion} ready on ${host}:${mongoPort}/${mongoDatabase}; data persists in api/.data/mongodb.\n`,
   );
 } catch (error) {
   await stopInfrastructure().catch(() => undefined);
