@@ -269,8 +269,7 @@ está em
 
 ## Infraestrutura de desenvolvimento local
 
-O comando abaixo inicia MongoDB e Redis reais em processos locais efêmeros, sem
-Docker:
+O comando abaixo inicia MongoDB e Redis reais em processos locais, sem Docker:
 
 ```bash
 pnpm -C api dev:infra
@@ -280,14 +279,18 @@ O MongoDB usa `127.0.0.1:27017`, database `dall-fit`, e o Redis usa
 `127.0.0.1:6379`, em conformidade com `api/.env.example`. As versões dos binários
 são fixadas no `package.json` da raiz. As portas não são substituídas
 automaticamente: se estiverem ocupadas, o comando falha para evitar que a API se
-conecte a um processo ou endereço inesperado.
+conecte a um processo ou endereço inesperado. O MongoDB usa `wiredTiger` com
+`dbPath` fixo em `api/.data/mongodb/`; o diretório é criado pelo orquestrador,
+ignorado pelo Git e nunca limpo automaticamente no startup ou shutdown. Seeds
+continuam explícitos e não são executados ao subir a infraestrutura.
 
 `pnpm -C api dev` executa `dev:infra` e `start:dev` juntos. O orquestrador encerra o
 outro processo se infraestrutura ou API terminar, e sinais de encerramento fecham
-MongoDB e Redis. Reloads do Nest preservam os dados enquanto a sessão de
-desenvolvimento estiver ativa; encerrar a sessão descarta todos os dados. O comando
-`pnpm dev` da raiz mantém sua interface e inicia esse ciclo da API em paralelo ao
-Vite da UI.
+MongoDB e Redis. Reloads do Nest e novas sessões de desenvolvimento reutilizam os
+dados do MongoDB, enquanto o Redis continua efêmero e é descartado a cada
+encerramento. O comando `pnpm dev` da raiz mantém sua interface e inicia esse ciclo
+da API em paralelo ao Vite da UI. Unitários não iniciam bancos, e E2E permanecem
+isolados em instâncias temporárias próprias sem acessar o diretório persistente.
 
 ## Configuração e segurança
 

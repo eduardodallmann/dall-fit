@@ -22,7 +22,7 @@ pnpm dev
 
 A raiz usa a execução recursiva e paralela do pnpm, filtrada explicitamente pelos
 pacotes `dall-fit-api` e `dall-fit-app`. A UI inicia o Vite. O script `dev` da API
-inicia sua infraestrutura local efêmera e o NestJS em watch mode com processos
+inicia sua infraestrutura local e o NestJS em watch mode com processos
 coordenados. A saída mantém prefixos para identificar a origem de cada log, e
 encerrar o processo da raiz encerra UI, API, MongoDB e Redis.
 
@@ -30,7 +30,7 @@ No desenvolvimento local:
 
 - UI: `http://localhost:3000`;
 - API: `http://localhost:4000`.
-- MongoDB efêmero: `127.0.0.1:27017`, database `dall-fit`;
+- MongoDB persistente local: `127.0.0.1:27017`, database `dall-fit`;
 - Redis efêmero: `127.0.0.1:6379`.
 
 Também é possível iniciar apenas a infraestrutura da API:
@@ -40,10 +40,13 @@ pnpm -C api dev:infra
 ```
 
 MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
-`redis-memory-server`, sem Docker. Os dados permanecem durante os reloads do Nest na
-mesma sessão e são descartados quando o processo de desenvolvimento termina. As
-portas são fixas para corresponder ao `.env.example`; uma porta já ocupada faz o
-comando falhar, sem escolher silenciosamente outro endereço.
+`redis-memory-server`, sem Docker. O MongoDB usa `wiredTiger` e conserva seus dados
+entre sessões em `api/.data/mongodb/`, diretório local ignorado pelo Git; o Redis
+continua efêmero e é descartado quando o processo de desenvolvimento termina.
+Reloads do Nest não reiniciam nenhum dos bancos. As portas são fixas para
+corresponder ao `.env.example`; uma porta já ocupada faz o comando falhar, sem
+escolher silenciosamente outro endereço ou limpar o MongoDB persistente. Seeds
+continuam explícitos e não são executados automaticamente no startup.
 
 Cada aplicação possui um `.env.example` versionado com valores locais seguros. O
 arquivo `.env` correspondente é local, ignorado pelo Git e deve ser criado a partir

@@ -68,15 +68,19 @@ Os mesmos pacotes de processos locais também sustentam `pnpm -C api dev:infra`,
 o ciclo de vida de desenvolvimento não é compartilhado com os E2E:
 
 - desenvolvimento usa portas fixas compatíveis com `api/.env.example`;
-- os dados duram somente até o encerramento da sessão de desenvolvimento;
+- MongoDB de desenvolvimento usa `wiredTiger` com `dbPath` fixo em
+  `api/.data/mongodb/` e conserva dados entre sessões;
+- Redis de desenvolvimento permanece efêmero e é descartado ao encerrar a sessão;
 - reloads do Nest não reiniciam os bancos;
 - E2E continuam criando instâncias próprias em portas temporárias, com isolamento e
   limpeza por cenário;
-- um teste nunca reutiliza nem limpa os bancos iniciados por `dev:infra`.
+- um teste nunca reutiliza nem limpa os bancos iniciados por `dev:infra` nem acessa
+  `api/.data/mongodb/`.
 
 O uso comum dos binários reduz pré-requisitos locais e preserva a regra de não
 introduzir Docker, sem transformar os bancos de desenvolvimento em fixtures globais
-dos testes.
+dos testes. O diretório persistente é local, ignorado pelo Git e não recebe seed,
+migração, backup, restore ou limpeza automática no startup e no shutdown.
 
 ## Ciclo de vida E2E
 
