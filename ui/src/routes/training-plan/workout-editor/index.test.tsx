@@ -104,3 +104,124 @@ describe('WorkoutEditor workout name', () => {
     ).toBeVisible();
   });
 });
+
+describe('WorkoutEditor presentation', () => {
+  it('edits the workout name without a visible field label', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={workout}
+          mockScenario="success"
+          onConflict={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Editar nome do treino' }),
+    );
+
+    expect(
+      screen.getByRole('textbox', { name: 'Nome do treino' }),
+    ).toBeVisible();
+    expect(screen.queryByText('Nome do treino')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state above the informative add menu', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={workout}
+          mockScenario="success"
+          onConflict={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Nome inicial' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Exercícios' }),
+    ).toBeVisible();
+    expect(screen.getByText('Nenhum exercício')).toBeVisible();
+    const add = screen.getByRole('button', { name: 'Adicionar exercício' });
+    await user.click(add);
+
+    expect(
+      screen.getByRole('menuitem', { name: /YouTube Short/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Vídeo curto com descanso, séries e repetições.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Intervalo de descanso entre exercícios.'),
+    ).toBeVisible();
+  });
+
+  it('opens the delete confirmation below an icon-only trigger without a visible heading', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient();
+    const exercise = {
+      id: 'exercise-1',
+      type: 'pause' as const,
+      restSeconds: 60,
+    };
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={{ ...workout, exercises: [exercise] }}
+          mockScenario="success"
+          onConflict={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Excluir Pausa' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'Confirmar exclusão de Pausa' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Confirmar exclusão' }),
+    ).toBeVisible();
+    expect(screen.queryByText('Excluir exercício?')).not.toBeInTheDocument();
+  });
+
+  it('keeps a debouncing draft silent while preserving the edited value', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient();
+    const exercise = {
+      bodyArea: 'quadriceps' as const,
+      id: 'exercise-1',
+      name: 'Agachamento',
+      repetitions: 12,
+      restSeconds: 60,
+      sets: 3,
+      type: 'youtube-short' as const,
+      youtubeId: 'ZA8gs8XP2bs',
+    };
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={{ ...workout, exercises: [exercise] }}
+          mockScenario="success"
+          onConflict={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    const name = screen.getByRole('textbox', { name: 'Nome' });
+    await user.clear(name);
+    await user.type(name, 'Agachamento atualizado');
+
+    expect(name).toHaveValue('Agachamento atualizado');
+    expect(
+      screen.queryByText('Alterações aguardando autosave.'),
+    ).not.toBeInTheDocument();
+  });
+});

@@ -105,6 +105,10 @@ A fonte Inter Variable é fornecida localmente por `@fontsource-variable/inter`.
 
 Componentes consomem os tokens por nomes semânticos, como
 `bg-background`, `text-foreground`, `bg-surface`, `text-muted` e `border-border`.
+No tema escuro, `--field-background` e `--field-border` mantêm contraste semântico
+em relação a `--surface` e `--overlay`, para que campos em cards e modais não
+desapareçam visualmente no contêiner. O tema claro conserva sua relação própria de
+superfície e borda.
 Não copiar valores OKLCH ou raios do tema para `styles.ts`. Uma mudança global
 do Theme Builder substitui os tokens em `src/index.css`; exceções locais continuam
 expressas pelas variantes públicas do HeroUI ou por `tv`.

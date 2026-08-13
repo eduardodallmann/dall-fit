@@ -23,7 +23,9 @@ somente de MSW.
    icon-only à direita do input de nome. Durante o PATCH, campos e ações do draft
    ficam bloqueados e o modo inline permanece visível. Somente o sucesso aplica a
    response canônica e encerra a edição.
-4. Tabela mostra nome e `exerciseCount` de cada treino.
+4. Tabela mostra nome e `exerciseCount` de cada treino. O nome é link SPA com cor
+   de ação, sublinhado persistente e foco visível, seguindo o affordance dos nomes
+   de plano na listagem anterior.
 5. `Novo treino` envia body vazio, aguarda o ID real, acrescenta o resumo ao cache
    usando `X-Resource-Version`, incorpora a versão devolvida no mesmo header e
    navega para a rota técnica do workout.
@@ -78,8 +80,9 @@ Contrato: `api/docs/sdd/endpoints/global-training-plans.md`.
 
 ## Navegação e acessibilidade
 
-Breadcrumb e nomes de treino usam navegação SPA pelo TanStack Router. O último
-segmento do detalhe é atual e não conduz a outra página. Lápis, salvar e cancelar
+Breadcrumb e nomes de treino usam navegação SPA pelo TanStack Router; nomes de
+treino mantêm sublinhado e cor de ação mesmo sem hover. O último segmento do
+detalhe é atual e não conduz a outra página. Lápis, salvar e cancelar
 possuem nomes acessíveis apesar de serem icon-only; dialogs de treino descrevem a
 exclusão, exigem ação explícita e não aceitam dismiss durante pending. Erros de
 formulário e dialog são persistentes, não dependem do toast. O browser voltar

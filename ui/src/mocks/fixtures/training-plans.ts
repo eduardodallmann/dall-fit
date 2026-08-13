@@ -47,7 +47,7 @@ export const trainingPlanDetailFixture: TrainingPlanDetails = {
   ...trainingPlanFixtures[0],
   workouts: [
     {
-      exerciseCount: 3,
+      exerciseCount: 5,
       id: '64b000000000000000000101',
       name: 'Treino A',
     },

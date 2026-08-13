@@ -3,11 +3,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
+  type ScreenReaderInstructions,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -18,14 +24,29 @@ import {
 import {
   AlertDialog,
   Button,
+  Description,
   Dropdown,
   Input,
   Label,
+  Separator,
   TextField,
   toast,
 } from '@heroui/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useBlocker } from '@tanstack/react-router';
-import { Check, Pencil, Plus, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  CirclePause,
+  Clock,
+  FileImage,
+  ListPlus,
+  Pencil,
+  Plus,
+  TvMinimalPlay,
+  Video,
+  X,
+} from 'lucide-react';
 
 import type {
   Exercise,
@@ -58,18 +79,67 @@ import {
   type ExerciseSaveStatus,
   type RemovedExercise,
 } from './editor-state';
-import { ExerciseRow } from './exercise-row';
+import { ExerciseDragPreview, ExerciseRow } from './exercise-row';
 import { workoutEditorStyles } from './styles';
 import { useAggregateMutationQueue } from './use-aggregate-mutation-queue';
+import {
+  reorderCachedExercises,
+  replaceCachedExercise,
+  synchronizeWorkoutMutation,
+} from './workout-cache';
 
 const styles = workoutEditorStyles();
-const exerciseTypes: readonly { id: ExerciseType; label: string }[] = [
-  { id: 'youtube-short', label: 'YouTube Short' },
-  { id: 'youtube-long', label: 'YouTube Longo' },
-  { id: 'image', label: 'Imagem' },
-  { id: 'pause', label: 'Pausa' },
-  { id: 'duration', label: 'Duração' },
-];
+const exerciseTypes = [
+  {
+    description: 'Vídeo curto com descanso, séries e repetições.',
+    icon: Video,
+    id: 'youtube-short',
+    label: 'YouTube Short',
+  },
+  {
+    description: 'Vídeo longo para orientar a execução do exercício.',
+    icon: TvMinimalPlay,
+    id: 'youtube-long',
+    label: 'YouTube Longo',
+  },
+  {
+    description: 'Exercício ilustrado por uma imagem.',
+    icon: FileImage,
+    id: 'image',
+    label: 'Imagem',
+  },
+  {
+    description: 'Intervalo de descanso entre exercícios.',
+    icon: CirclePause,
+    id: 'pause',
+    label: 'Pausa',
+  },
+  {
+    description: 'Atividade controlada por tempo.',
+    icon: Clock,
+    id: 'duration',
+    label: 'Duração',
+  },
+] as const satisfies readonly {
+  description: string;
+  icon: typeof Video;
+  id: ExerciseType;
+  label: string;
+}[];
+
+const dragAnnouncements: Announcements = {
+  onDragCancel: () => 'Reordenação cancelada.',
+  onDragEnd: ({ over }) =>
+    over === null ? 'Reordenação cancelada.' : 'Reordenação finalizada.',
+  onDragOver: ({ over }) =>
+    over === null ? undefined : 'Nova posição de destino selecionada.',
+  onDragStart: () => 'Exercício selecionado para reordenação.',
+};
+
+const dragScreenReaderInstructions: ScreenReaderInstructions = {
+  draggable:
+    'Para iniciar a reordenação, pressione espaço. Use as setas para mover, espaço para confirmar e escape para cancelar.',
+};
 
 type EditorOperation =
   | 'workout_update'
@@ -118,6 +188,7 @@ export function WorkoutEditor({
   mockScenario,
   onConflict,
 }: Readonly<WorkoutEditorProps>) {
+  const queryClient = useQueryClient();
   const initialItems = data.exercises.map(createEditorExercise);
   const [items, setItemsState] =
     useState<readonly EditorExercise[]>(initialItems);
@@ -134,6 +205,8 @@ export function WorkoutEditor({
     new Set(),
   );
   const [structuralPending, setStructuralPending] = useState(false);
+  const [activeExerciseId, setActiveExerciseId] = useState<string>();
+  const dragDirection = useRef(0);
   const focusAfterReorder = useRef<string | undefined>(undefined);
   const queue = useAggregateMutationQueue(
     data.trainingPlan.id,
@@ -144,7 +217,13 @@ export function WorkoutEditor({
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+      coordinateGetter: (event, args) => {
+        if (event.code === 'ArrowUp' || event.code === 'ArrowLeft')
+          dragDirection.current = -1;
+        if (event.code === 'ArrowDown' || event.code === 'ArrowRight')
+          dragDirection.current = 1;
+        return sortableKeyboardCoordinates(event, args);
+      },
     }),
   );
 
@@ -235,15 +314,16 @@ export function WorkoutEditor({
         })),
       );
       trackStarted('exercise_update', 'exercise_field');
+      let confirmedVersion = data.version;
       void queueRef.current
-        .enqueue((version) => {
+        .enqueue(async (version) => {
           setItems((current) =>
             updateEditorItem(current, exerciseId, (candidate) => ({
               ...candidate,
               status: 'saving',
             })),
           );
-          return updateTrainingPlanExercise(
+          const result = await updateTrainingPlanExercise(
             data.trainingPlan.id,
             data.id,
             exerciseId,
@@ -251,6 +331,8 @@ export function WorkoutEditor({
             version,
             mockScenario,
           );
+          confirmedVersion = result.version;
+          return result;
         })
         .then((saved) => {
           let shouldSchedule = false;
@@ -278,6 +360,16 @@ export function WorkoutEditor({
           }
           if (shouldSchedule && !queueRef.current.paused)
             scheduleTimer(exerciseId);
+          synchronizeWorkoutMutation(queryClient, {
+            mockScenario,
+            trainingPlanId: data.trainingPlan.id,
+            updateWorkout: (workout) => ({
+              ...workout,
+              exercises: replaceCachedExercise(workout.exercises, saved),
+            }),
+            version: confirmedVersion,
+            workoutId: data.id,
+          });
           trackCompleted('exercise_update', 'exercise_field', 'success');
         })
         .catch((error: unknown) => {
@@ -305,7 +397,9 @@ export function WorkoutEditor({
       clearTimer,
       data.id,
       data.trainingPlan.id,
+      data.version,
       mockScenario,
+      queryClient,
       scheduleTimer,
       setItems,
     ],
@@ -347,15 +441,18 @@ export function WorkoutEditor({
       return;
     setNameStatus('queued');
     trackStarted('workout_update', 'workout_name');
-    const promise = queue.enqueue((version) => {
+    let confirmedVersion = data.version;
+    const promise = queue.enqueue(async (version) => {
       setNameStatus('saving');
-      return updateTrainingPlanWorkout(
+      const result = await updateTrainingPlanWorkout(
         data.trainingPlan.id,
         data.id,
         name,
         version,
         mockScenario,
       );
+      confirmedVersion = result.version;
+      return result;
     });
     void promise
       .then((saved) => {
@@ -364,6 +461,25 @@ export function WorkoutEditor({
         setNameDraft(saved.name);
         setNameStatus('idle');
         setEditingName(false);
+        synchronizeWorkoutMutation(queryClient, {
+          mockScenario,
+          trainingPlanId: data.trainingPlan.id,
+          updateDetail: (detail) => ({
+            ...detail,
+            workouts: detail.workouts.map((workout) =>
+              workout.id === data.id
+                ? { ...workout, name: saved.name }
+                : workout,
+            ),
+          }),
+          updateWorkout: (workout) => ({
+            ...workout,
+            name: saved.name,
+            updatedAt: saved.updatedAt,
+          }),
+          version: confirmedVersion,
+          workoutId: data.id,
+        });
         trackCompleted('workout_update', 'workout_name', 'success');
       })
       .catch((error: unknown) => {
@@ -389,8 +505,9 @@ export function WorkoutEditor({
     const temporary = createTemporaryExercise(type, temporaryId);
     setStructuralPending(true);
     trackStarted('exercise_create', 'add_exercise');
+    let confirmedVersion = data.version;
     void queue
-      .enqueue((version) => {
+      .enqueue(async (version) => {
         setItems((current) => [
           ...current,
           {
@@ -402,13 +519,15 @@ export function WorkoutEditor({
             temporary: true,
           },
         ]);
-        return createTrainingPlanExercise(
+        const result = await createTrainingPlanExercise(
           data.trainingPlan.id,
           data.id,
           { type },
           version,
           mockScenario,
         );
+        confirmedVersion = result.version;
+        return result;
       })
       .then((created) => {
         setItems((current) =>
@@ -418,6 +537,24 @@ export function WorkoutEditor({
               : item,
           ),
         );
+        synchronizeWorkoutMutation(queryClient, {
+          mockScenario,
+          trainingPlanId: data.trainingPlan.id,
+          updateDetail: (detail) => ({
+            ...detail,
+            workouts: detail.workouts.map((workout) =>
+              workout.id === data.id
+                ? { ...workout, exerciseCount: workout.exerciseCount + 1 }
+                : workout,
+            ),
+          }),
+          updateWorkout: (workout) => ({
+            ...workout,
+            exercises: [...workout.exercises, created],
+          }),
+          version: confirmedVersion,
+          workoutId: data.id,
+        });
         trackCompleted('exercise_create', 'add_exercise', 'success');
       })
       .catch((error: unknown) => {
@@ -441,6 +578,7 @@ export function WorkoutEditor({
     clearTimer(exerciseId);
     setStructuralPending(true);
     trackStarted('exercise_delete', 'delete_exercise');
+    let confirmedVersion = data.version;
     void queue
       .enqueue(async (version) => {
         clearTimer(exerciseId);
@@ -464,10 +602,34 @@ export function WorkoutEditor({
           version,
           mockScenario,
         );
+        confirmedVersion = nextVersion;
         return { data: undefined, version: nextVersion };
       })
       .then(() => {
         removed.current.delete(exerciseId);
+        synchronizeWorkoutMutation(queryClient, {
+          mockScenario,
+          trainingPlanId: data.trainingPlan.id,
+          updateDetail: (detail) => ({
+            ...detail,
+            workouts: detail.workouts.map((workout) =>
+              workout.id === data.id
+                ? {
+                    ...workout,
+                    exerciseCount: Math.max(0, workout.exerciseCount - 1),
+                  }
+                : workout,
+            ),
+          }),
+          updateWorkout: (workout) => ({
+            ...workout,
+            exercises: workout.exercises.filter(
+              (exercise) => exercise.id !== exerciseId,
+            ),
+          }),
+          version: confirmedVersion,
+          workoutId: data.id,
+        });
         trackCompleted('exercise_delete', 'delete_exercise', 'success');
       })
       .catch((error: unknown) => {
@@ -490,19 +652,56 @@ export function WorkoutEditor({
       .finally(() => setStructuralPending(false));
   };
 
+  const dragStart = (event: DragStartEvent) => {
+    dragDirection.current = 0;
+    setActiveExerciseId(String(event.active.id));
+  };
+
+  const dragMove = (event: DragMoveEvent) => {
+    const direction = Math.sign(event.delta.y);
+    if (direction !== 0) dragDirection.current = direction;
+  };
+
+  const dragCancel = (event: DragCancelEvent) => {
+    const exerciseId = String(event.active.id);
+    dragDirection.current = 0;
+    setActiveExerciseId(undefined);
+    requestAnimationFrame(() => {
+      const selector = `[data-exercise-drag-handle="${CSS.escape(exerciseId)}"]`;
+      document.querySelector<HTMLButtonElement>(selector)?.focus();
+    });
+  };
+
   const dragEnd = (event: DragEndEvent) => {
+    setActiveExerciseId(undefined);
     if (
       structuralPending ||
       queue.paused ||
       event.over === null ||
-      event.active.id === event.over.id ||
       itemsRef.current.some((item) => item.temporary)
     )
       return;
     focusAfterReorder.current = String(event.active.id);
     const activeId = String(event.active.id);
-    const overId = String(event.over.id);
+    const currentIds = itemsRef.current.map((item) => item.draft.id);
+    const activeIndex = currentIds.indexOf(activeId);
+    const collisionId = String(event.over.id);
+    const keyboardDirection = dragDirection.current;
+    dragDirection.current = 0;
+    const fallbackIndex = Math.min(
+      Math.max(activeIndex + keyboardDirection, 0),
+      currentIds.length - 1,
+    );
+    const overId =
+      collisionId === activeId &&
+      event.activatorEvent instanceof KeyboardEvent &&
+      keyboardDirection !== 0
+        ? (currentIds[fallbackIndex] ?? activeId)
+        : collisionId;
+    if (activeId === overId) return;
     let previousIds: readonly string[] | undefined;
+    let confirmedIds: readonly string[] | undefined;
+    let confirmedVersion = data.version;
     setStructuralPending(true);
     trackStarted('exercise_reorder', 'reorder_handle');
     void queue
@@ -517,6 +716,7 @@ export function WorkoutEditor({
           throw new Error('Exercise order target is unavailable.');
         const ordered = arrayMove([...currentItems], oldIndex, newIndex);
         const orderedIds = ordered.map((item) => item.draft.id);
+        confirmedIds = orderedIds;
         setItems(() => ordered);
         const nextVersion = await reorderTrainingPlanExercises(
           data.trainingPlan.id,
@@ -525,11 +725,26 @@ export function WorkoutEditor({
           version,
           mockScenario,
         );
+        confirmedVersion = nextVersion;
         return { data: undefined, version: nextVersion };
       })
-      .then(() =>
-        trackCompleted('exercise_reorder', 'reorder_handle', 'success'),
-      )
+      .then(() => {
+        if (confirmedIds !== undefined)
+          synchronizeWorkoutMutation(queryClient, {
+            mockScenario,
+            trainingPlanId: data.trainingPlan.id,
+            updateWorkout: (workout) => ({
+              ...workout,
+              exercises: reorderCachedExercises(
+                workout.exercises,
+                confirmedIds ?? [],
+              ),
+            }),
+            version: confirmedVersion,
+            workoutId: data.id,
+          });
+        trackCompleted('exercise_reorder', 'reorder_handle', 'success');
+      })
       .catch((error: unknown) => {
         if (isExpectedCancellation(error)) return;
         if (previousIds !== undefined)
@@ -554,17 +769,20 @@ export function WorkoutEditor({
       : 'exercise_image_upload';
     const control = replacing ? 'image_replace' : 'image_upload';
     trackStarted(operation, control);
+    let confirmedVersion = data.version;
     void queue
-      .enqueue((version) =>
-        uploadTrainingPlanExerciseImage(
+      .enqueue(async (version) => {
+        const result = await uploadTrainingPlanExerciseImage(
           data.trainingPlan.id,
           data.id,
           exerciseId,
           file,
           version,
           mockScenario,
-        ),
-      )
+        );
+        confirmedVersion = result.version;
+        return result;
+      })
       .then((image) => {
         setItems((current) =>
           updateEditorItem(current, exerciseId, (item) =>
@@ -577,6 +795,20 @@ export function WorkoutEditor({
               : item,
           ),
         );
+        synchronizeWorkoutMutation(queryClient, {
+          mockScenario,
+          trainingPlanId: data.trainingPlan.id,
+          updateWorkout: (workout) => ({
+            ...workout,
+            exercises: workout.exercises.map((exercise) =>
+              exercise.id === exerciseId && exercise.type === 'image'
+                ? { ...exercise, image }
+                : exercise,
+            ),
+          }),
+          version: confirmedVersion,
+          workoutId: data.id,
+        });
         trackCompleted(operation, control, 'success');
       })
       .catch((error: unknown) => {
@@ -591,17 +823,19 @@ export function WorkoutEditor({
     if (queue.paused) return;
     markSavingImage(exerciseId, true);
     trackStarted('exercise_image_remove', 'image_remove');
+    let confirmedVersion = data.version;
     void queue
-      .enqueue(async (version) => ({
-        data: undefined,
-        version: await removeTrainingPlanExerciseImage(
+      .enqueue(async (version) => {
+        const nextVersion = await removeTrainingPlanExerciseImage(
           data.trainingPlan.id,
           data.id,
           exerciseId,
           version,
           mockScenario,
-        ),
-      }))
+        );
+        confirmedVersion = nextVersion;
+        return { data: undefined, version: nextVersion };
+      })
       .then(() => {
         setItems((current) =>
           updateEditorItem(current, exerciseId, (item) =>
@@ -614,6 +848,20 @@ export function WorkoutEditor({
               : item,
           ),
         );
+        synchronizeWorkoutMutation(queryClient, {
+          mockScenario,
+          trainingPlanId: data.trainingPlan.id,
+          updateWorkout: (workout) => ({
+            ...workout,
+            exercises: workout.exercises.map((exercise) =>
+              exercise.id === exerciseId && exercise.type === 'image'
+                ? { ...exercise, image: null }
+                : exercise,
+            ),
+          }),
+          version: confirmedVersion,
+          workoutId: data.id,
+        });
         trackCompleted('exercise_image_remove', 'image_remove', 'success');
       })
       .catch((error: unknown) => {
@@ -644,108 +892,100 @@ export function WorkoutEditor({
 
   const structureDisabled = structuralPending || queue.paused;
   const namePending = nameStatus === 'queued' || nameStatus === 'saving';
+  const activeExercise = items.find(
+    (item) => item.draft.id === activeExerciseId,
+  )?.draft;
 
   return (
     <section aria-label="Exercícios" className={styles.editor()}>
-      <header className={styles.titleRow()}>
-        <div>
-          <h1>Treino</h1>
+      <header className={styles.titleGroup()}>
+        <p className={styles.contextLabel()}>Treino</p>
+        <div className={styles.titleRow()}>
           {editingName ? (
-            <TextField
-              isDisabled={namePending}
-              isInvalid={
-                nameDraft.trim().length === 0 || nameDraft.trim().length > 120
-              }
-            >
-              <Label>Nome do treino</Label>
-              <Input
-                autoFocus
-                maxLength={120}
-                onChange={(event) => {
-                  setNameDraft(event.target.value);
-                  if (nameStatus === 'error') setNameStatus('idle');
-                }}
-                value={nameDraft}
-              />
-            </TextField>
-          ) : (
-            <h2>{workoutName}</h2>
-          )}
-          {nameStatus === 'error' ? (
-            <p className={styles.status()} role="alert">
-              Não foi possível salvar o nome. O rascunho foi preservado.
-            </p>
-          ) : null}
-        </div>
-        <div className={styles.inlineActions()}>
-          {editingName ? (
-            <>
-              <Button
-                aria-label="Cancelar edição do nome"
+            <div className={styles.nameEditor()}>
+              <h1 className={styles.srOnly()}>{workoutName}</h1>
+              <TextField
+                aria-label="Nome do treino"
                 isDisabled={namePending}
+                isInvalid={
+                  nameDraft.trim().length === 0 || nameDraft.trim().length > 120
+                }
+              >
+                <Input
+                  aria-label="Nome do treino"
+                  autoFocus
+                  maxLength={120}
+                  onChange={(event) => {
+                    setNameDraft(event.target.value);
+                    if (nameStatus === 'error') setNameStatus('idle');
+                  }}
+                  value={nameDraft}
+                />
+              </TextField>
+            </div>
+          ) : (
+            <h1 className={styles.pageTitle()}>{workoutName}</h1>
+          )}
+          <div className={styles.inlineActions()}>
+            {editingName ? (
+              <>
+                <Button
+                  aria-label="Cancelar edição do nome"
+                  isDisabled={namePending}
+                  isIconOnly
+                  onPress={() => {
+                    setNameDraft(workoutName);
+                    setNameStatus('idle');
+                    setEditingName(false);
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <X aria-hidden="true" />
+                </Button>
+                <Button
+                  aria-label="Salvar nome do treino"
+                  isDisabled={queue.paused}
+                  isIconOnly
+                  isPending={namePending}
+                  onPress={saveName}
+                  size="sm"
+                >
+                  <Check aria-hidden="true" />
+                </Button>
+              </>
+            ) : (
+              <Button
+                aria-label="Editar nome do treino"
                 isIconOnly
-                onPress={() => {
-                  setNameDraft(workoutName);
-                  setNameStatus('idle');
-                  setEditingName(false);
-                }}
+                onPress={() => setEditingName(true)}
                 size="sm"
                 variant="ghost"
               >
-                <X aria-hidden="true" />
+                <Pencil aria-hidden="true" />
               </Button>
-              <Button
-                aria-label="Salvar nome do treino"
-                isDisabled={queue.paused}
-                isIconOnly
-                isPending={namePending}
-                onPress={saveName}
-                size="sm"
-              >
-                <Check aria-hidden="true" />
-              </Button>
-            </>
-          ) : (
-            <Button
-              aria-label="Editar nome do treino"
-              isIconOnly
-              onPress={() => setEditingName(true)}
-              size="sm"
-              variant="ghost"
-            >
-              <Pencil aria-hidden="true" />
-            </Button>
-          )}
+            )}
+          </div>
         </div>
+        {nameStatus === 'error' ? (
+          <p className={styles.status()} role="alert">
+            Não foi possível salvar o nome. O rascunho foi preservado.
+          </p>
+        ) : null}
       </header>
       <header className={styles.exerciseHeader()}>
-        <h2>Exercícios</h2>
-        <Dropdown>
-          <Dropdown.Trigger
-            className={styles.addTrigger()}
-            isDisabled={structureDisabled || items.length >= 50}
-          >
-            <Plus aria-hidden="true" />
-            Adicionar
-          </Dropdown.Trigger>
-          <Dropdown.Popover>
-            <Dropdown.Menu
-              aria-label="Tipo do exercício"
-              items={exerciseTypes}
-              onAction={(key) => addExercise(key as ExerciseType)}
-            >
-              {(item) => (
-                <Dropdown.Item id={item.id} textValue={item.label}>
-                  {item.label}
-                </Dropdown.Item>
-              )}
-            </Dropdown.Menu>
-          </Dropdown.Popover>
-        </Dropdown>
+        <h2 className={styles.sectionTitle()}>Exercícios</h2>
       </header>
       <DndContext
+        accessibility={{
+          announcements: dragAnnouncements,
+          screenReaderInstructions: dragScreenReaderInstructions,
+        }}
         collisionDetection={closestCenter}
+        onDragCancel={dragCancel}
         onDragEnd={dragEnd}
+        onDragMove={dragMove}
+        onDragStart={dragStart}
         sensors={sensors}
       >
         <SortableContext
@@ -774,11 +1014,61 @@ export function WorkoutEditor({
             ))}
           </ol>
         </SortableContext>
+        <DragOverlay dropAnimation={null}>
+          {activeExercise === undefined ? null : (
+            <ExerciseDragPreview exercise={activeExercise} />
+          )}
+        </DragOverlay>
       </DndContext>
+      {items.length === 0 ? (
+        <div aria-live="polite" className={styles.emptyState()}>
+          <ListPlus aria-hidden="true" className={styles.emptyIcon()} />
+          <div className={styles.emptyContent()}>
+            <h3 className={styles.emptyTitle()}>Nenhum exercício</h3>
+            <p className={styles.emptyDescription()}>
+              Adicione o primeiro exercício para começar a montar este treino.
+            </p>
+          </div>
+        </div>
+      ) : null}
+      <div className={styles.addExerciseRow()}>
+        <Separator className={styles.addSeparator()} />
+        <Dropdown>
+          <Dropdown.Trigger
+            className={styles.addTrigger()}
+            isDisabled={structureDisabled || items.length >= 50}
+          >
+            <Plus aria-hidden="true" />
+            Adicionar exercício
+            <ChevronDown aria-hidden="true" className={styles.addIndicator()} />
+          </Dropdown.Trigger>
+          <Dropdown.Popover placement="bottom">
+            <Dropdown.Menu
+              aria-label="Tipo do exercício"
+              items={exerciseTypes}
+              onAction={(key) => addExercise(key as ExerciseType)}
+            >
+              {(item) => {
+                const Icon = item.icon;
+                return (
+                  <Dropdown.Item id={item.id} textValue={item.label}>
+                    <Icon aria-hidden="true" className={styles.typeIcon()} />
+                    <div className={styles.typeDescription()}>
+                      <Label>{item.label}</Label>
+                      <Description>{item.description}</Description>
+                    </div>
+                  </Dropdown.Item>
+                );
+              }}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+        <Separator className={styles.addSeparator()} />
+      </div>
       {queue.isPending ? (
-        <p aria-live="polite" className={styles.status()}>
+        <span aria-live="polite" className={styles.srOnly()}>
           Alterações sendo salvas em ordem…
-        </p>
+        </span>
       ) : null}
       <AlertDialog
         isOpen={navigationBlocker.status === 'blocked'}

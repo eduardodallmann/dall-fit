@@ -174,6 +174,24 @@ test.describe('Rota /dash', () => {
     await expect(page.getByText('Alex Runner')).toBeVisible();
     await expect(page.getByText('alex.runner@example.test')).toBeVisible();
     await expect(page.getByText('Admin')).toBeVisible();
+    const avatar = page.getByRole('img', { name: 'Alex Runner' });
+    const theme = page.getByRole('button', { name: 'Ativar tema escuro' });
+    const logout = page.getByRole('button', { name: 'Sair' });
+    const avatarBox = await avatar.boundingBox();
+    const themeBox = await theme.boundingBox();
+    const logoutBox = await logout.boundingBox();
+    expect(avatarBox).not.toBeNull();
+    expect(themeBox).not.toBeNull();
+    expect(logoutBox).not.toBeNull();
+    expect(themeBox?.x).toBeLessThan(logoutBox?.x ?? 0);
+    expect(
+      Math.abs(
+        (avatarBox?.y ?? 0) +
+          (avatarBox?.height ?? 0) / 2 -
+          ((logoutBox?.y ?? 0) + (logoutBox?.height ?? 0) / 2),
+      ),
+    ).toBeLessThanOrEqual(2);
+    await expect(logout).toHaveText('');
   });
 
   test('Cenário 5 — Orientação manual de instalação no menu', async ({

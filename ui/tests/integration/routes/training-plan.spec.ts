@@ -36,6 +36,40 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(page.getByText('Página 1 de 2')).toBeVisible();
   });
 
+  test('distingue campos de modais e cards no tema escuro', async ({
+    page,
+  }) => {
+    await page.goto('/global/training-plan?mockAuth=admin');
+    await page.getByRole('button', { name: 'Ativar tema escuro' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    const modalName = page.getByRole('textbox', { name: 'Nome' });
+    const modalColors = await modalName.evaluate((element) => ({
+      field: getComputedStyle(element).backgroundColor,
+      surface: getComputedStyle(element.closest('[role="dialog"]') as Element)
+        .backgroundColor,
+    }));
+    expect(modalColors.field).not.toBe(modalColors.surface);
+    await page.keyboard.press('Escape');
+
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    await page.getByRole('button', { name: 'Ativar tema escuro' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const exerciseName = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome');
+    const editorColors = await exerciseName.evaluate((element) => ({
+      field: getComputedStyle(element).backgroundColor,
+      surface: getComputedStyle(element.closest('li') as Element)
+        .backgroundColor,
+    }));
+    expect(editorColors.field).not.toBe(editorColors.surface);
+  });
+
   test('retira a pessoa da branch administrativa após revogação', async ({
     page,
   }) => {
@@ -137,6 +171,8 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(
       page.getByRole('heading', { name: 'Hipertrofia iniciante' }),
     ).toBeVisible();
+    const workoutLink = page.getByRole('link', { name: 'Treino A' });
+    await expect(workoutLink).toHaveCSS('text-decoration-line', 'underline');
     await page.evaluate(() => {
       document.documentElement.dataset.breadcrumbMarker = 'preserved';
     });
@@ -219,6 +255,151 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(firstExercise.getByLabel('Nome')).toHaveValue(
       'Agachamento atualizado',
     );
+    await expect(
+      page.getByText('Alterações sendo salvas em ordem…'),
+    ).toBeHidden();
+    await expect(
+      firstExercise.getByText('Alterações aguardando autosave.'),
+    ).toHaveCount(0);
+    await page
+      .getByRole('list', { name: 'Navegação estrutural' })
+      .getByRole('link', { name: 'Hipertrofia iniciante' })
+      .click();
+    await page.getByRole('link', { name: 'Treino A' }).click();
+    await expect(
+      page
+        .getByRole('list', { name: 'Exercícios em ordem' })
+        .getByRole('listitem')
+        .first()
+        .getByLabel('Nome'),
+    ).toHaveValue('Agachamento atualizado');
+  });
+
+  test('exibe empty state, descreve os tipos e mantém a adição ao voltar para o treino', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=empty-workout`,
+    );
+    const emptyState = page.getByText('Nenhum exercício');
+    const addButton = page.getByRole('button', {
+      name: 'Adicionar exercício',
+    });
+    await expect(emptyState).toBeVisible();
+    const emptyBox = await emptyState.boundingBox();
+    const addBox = await addButton.boundingBox();
+    expect(emptyBox).not.toBeNull();
+    expect(addBox).not.toBeNull();
+    expect(emptyBox?.y).toBeLessThan(addBox?.y ?? 0);
+
+    await addButton.click();
+    await expect(
+      page.getByText('Vídeo curto com descanso, séries e repetições.'),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Intervalo de descanso entre exercícios.'),
+    ).toBeVisible();
+    await page.getByRole('menuitem', { name: /YouTube Short/ }).click();
+
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await expect(emptyState).toHaveCount(0);
+    await page
+      .getByRole('list', { name: 'Navegação estrutural' })
+      .getByRole('link', { name: 'Hipertrofia iniciante' })
+      .click();
+    const workoutRow = page
+      .getByRole('row')
+      .filter({ has: page.getByRole('link', { name: 'Treino A' }) });
+    await expect(workoutRow).toContainText('1');
+    await workoutRow.getByRole('link', { name: 'Treino A' }).click();
+    await expect(
+      page
+        .getByRole('list', { name: 'Exercícios em ordem' })
+        .getByRole('listitem'),
+    ).toHaveCount(1);
+  });
+
+  test('mantém hierarquia, layout responsivo e popover alinhado', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Treino A' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Exercícios' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Editar nome do treino' }).click();
+    await expect(
+      page.getByRole('textbox', { name: 'Nome do treino' }),
+    ).toBeVisible();
+    await expect(
+      page.locator('label').filter({ hasText: /^Nome do treino$/ }),
+    ).toHaveCount(0);
+    await page.getByRole('button', { name: 'Cancelar edição do nome' }).click();
+    const firstExercise = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first();
+    const nameBox = await firstExercise.getByLabel('Nome').boundingBox();
+    const restBox = await firstExercise
+      .getByRole('textbox', { name: 'Descanso (s)' })
+      .boundingBox();
+    expect(nameBox).not.toBeNull();
+    expect(restBox).not.toBeNull();
+    expect(restBox?.y).toBeGreaterThan(nameBox?.y ?? Number.MAX_SAFE_INTEGER);
+
+    const deleteButton = firstExercise.getByRole('button', {
+      name: 'Excluir YouTube Short',
+    });
+    await deleteButton.click();
+    const popover = page.getByRole('dialog', {
+      name: 'Confirmar exclusão de YouTube Short',
+    });
+    const deleteBox = await deleteButton.boundingBox();
+    const popoverBox = await popover.boundingBox();
+    expect(deleteBox).not.toBeNull();
+    expect(popoverBox).not.toBeNull();
+    expect(popoverBox?.y).toBeGreaterThanOrEqual(
+      (deleteBox?.y ?? 0) + (deleteBox?.height ?? 0) - 1,
+    );
+    expect(
+      Math.abs(
+        (popoverBox?.x ?? 0) +
+          (popoverBox?.width ?? 0) -
+          ((deleteBox?.x ?? 0) + (deleteBox?.width ?? 0)),
+      ),
+    ).toBeLessThanOrEqual(4);
+    await page.keyboard.press('Escape');
+    await expect(popover).toBeHidden();
+
+    await page.setViewportSize({ height: 844, width: 390 });
+    const restMobile = await firstExercise
+      .getByRole('textbox', { name: 'Descanso (s)' })
+      .boundingBox();
+    const setsMobile = await firstExercise
+      .getByRole('textbox', { name: 'Séries' })
+      .boundingBox();
+    const repetitionsMobile = await firstExercise
+      .getByRole('textbox', { name: 'Repetições' })
+      .boundingBox();
+    expect(restMobile?.y).toBeLessThan(setsMobile?.y ?? 0);
+    expect(setsMobile?.y).toBeLessThan(repetitionsMobile?.y ?? 0);
+    const overflowingElements = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('body *')]
+        .filter((element) => element.getBoundingClientRect().right > 390.5)
+        .map((element) => ({
+          className: element.className,
+          right: element.getBoundingClientRect().right,
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 40),
+        }))
+        .slice(0, 10),
+    );
+    expect(overflowingElements).toEqual([]);
   });
 
   test('renova CSRF sem repetir o autosave automaticamente', async ({
@@ -266,7 +447,9 @@ test.describe('Rotas administrativas de planos de treino', () => {
       `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
     );
     const list = page.getByRole('list', { name: 'Exercícios em ordem' });
-    const addButton = page.getByRole('button', { name: 'Adicionar' });
+    const addButton = page.getByRole('button', {
+      name: 'Adicionar exercício',
+    });
     await expect(list.getByRole('listitem')).toHaveCount(5);
 
     const firstRequestPromise = page.waitForRequest(
@@ -311,7 +494,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     ).toBeVisible({ timeout: 5_000 });
     await expect(name).toHaveValue('Rascunho concorrente');
     await expect(
-      page.getByRole('button', { name: 'Adicionar' }),
+      page.getByRole('button', { name: 'Adicionar exercício' }),
     ).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Recarregar dados' }),
@@ -341,7 +524,9 @@ test.describe('Rotas administrativas de planos de treino', () => {
       page.getByText('Este plano foi alterado em outro lugar.'),
     ).not.toBeVisible();
     await expect(name).toHaveValue('Rascunho preservado');
-    await expect(page.getByRole('button', { name: 'Adicionar' })).toBeEnabled();
+    await expect(
+      page.getByRole('button', { name: 'Adicionar exercício' }),
+    ).toBeEnabled();
   });
 
   test('restaura draft sem PATCH oculto quando excluir falha durante debounce', async ({
@@ -366,8 +551,8 @@ test.describe('Rotas administrativas de planos de treino', () => {
       .getByRole('button', { name: 'Excluir YouTube Short' })
       .click();
     await page
-      .getByRole('dialog', { name: 'Excluir exercício?' })
-      .getByRole('button', { name: 'Excluir', exact: true })
+      .getByRole('dialog', { name: 'Confirmar exclusão de YouTube Short' })
+      .getByRole('button', { name: 'Confirmar exclusão' })
       .click();
 
     await expect(
@@ -423,8 +608,10 @@ test.describe('Rotas administrativas de planos de treino', () => {
     const handle = page.getByRole('button', { name: 'Mover Duração' });
     await handle.focus();
     await handle.press('Space');
+    await expect(page.locator('[data-drag-preview="true"]')).toBeVisible();
     await handle.press('ArrowUp');
     await handle.press('Space');
+    expect(await page.locator('[data-drag-preview="true"]').count()).toBe(0);
     const request = await reorderRequest;
 
     expect(request.postDataJSON()).toEqual({
@@ -439,6 +626,36 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(handle).toBeFocused();
   });
 
+  test('cancela a reordenação pelo teclado sem enviar mutação', async ({
+    page,
+  }) => {
+    let reorderRequests = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PUT' &&
+        request.url().endsWith('/exercises/order')
+      )
+        reorderRequests += 1;
+    });
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    const list = page.getByRole('list', { name: 'Exercícios em ordem' });
+    const handle = page.getByRole('button', { name: 'Mover Duração' });
+    await handle.focus();
+    await handle.press('Space');
+    await expect(page.locator('[data-drag-preview="true"]')).toBeVisible();
+    await handle.press('ArrowUp');
+    await handle.press('Escape');
+
+    await expect(page.locator('[data-drag-preview="true"]')).toHaveCount(0);
+    await expect(page.getByText('Reordenação cancelada.')).toBeVisible();
+    await expect(list.getByRole('listitem').nth(3)).toContainText('Pausa');
+    await expect(list.getByRole('listitem').nth(4)).toContainText('Duração');
+    expect(reorderRequests).toBe(0);
+    await expect(handle).toBeFocused();
+  });
+
   test('rollback de ordem preserva o draft editado durante a requisição', async ({
     page,
   }) => {
@@ -449,6 +666,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     const handle = page.getByRole('button', { name: 'Mover Duração' });
     await handle.focus();
     await handle.press('Space');
+    await expect(page.locator('[data-drag-preview="true"]')).toBeVisible();
     await handle.press('ArrowUp');
     await handle.press('Space');
     await list

@@ -57,8 +57,30 @@ function getState(scenario: string): ScenarioState {
     },
     nextExerciseNumber: 30,
   };
+  if (scenario === 'empty-workout') {
+    result.workout = { ...result.workout, exercises: [] };
+    result.detail = {
+      ...result.detail,
+      workouts: result.detail.workouts.map((workout) =>
+        workout.id === result.workout.id
+          ? { ...workout, exerciseCount: 0 }
+          : workout,
+      ),
+    };
+  }
   scenarioStates.set(scenario, result);
   return result;
+}
+
+function synchronizeExerciseCount(state: ScenarioState): void {
+  state.detail = {
+    ...state.detail,
+    workouts: state.detail.workouts.map((workout) =>
+      workout.id === state.workout.id
+        ? { ...workout, exerciseCount: state.workout.exercises.length }
+        : workout,
+    ),
+  };
 }
 
 function apiError(code: string, message: string, status: number) {
@@ -283,6 +305,7 @@ export const trainingPlanHandlers = [
         ...state.workout,
         exercises: [...state.workout.exercises, exercise],
       };
+      synchronizeExerciseCount(state);
       const version = increment(state);
       return HttpResponse.json({ data: exercise }, responseInit(version, 201));
     },
@@ -372,6 +395,7 @@ export const trainingPlanHandlers = [
       if (exercises.length === state.workout.exercises.length)
         return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
       state.workout = { ...state.workout, exercises };
+      synchronizeExerciseCount(state);
       const version = increment(state);
       return new HttpResponse(null, responseInit(version, 204));
     },

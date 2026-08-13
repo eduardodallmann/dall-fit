@@ -30,6 +30,9 @@
 - `Pagination` HeroUI, fixa em 20 itens por página, com summary, anterior/próxima,
   primeira, última, vizinhança da atual e elipses não interativas;
 - `Modal`, `Fieldset`, TanStack Form e campos HeroUI para criar/editar;
+- no tema escuro, campos usam o token semântico de field com superfície e borda
+  distinguíveis da superfície do `Modal`; foco, erro e disabled continuam sob as
+  variantes HeroUI;
 - `AlertDialog` antes de excluir;
 - `Toast.Provider` global e feedback de sucesso/erro nas mutations não canceladas.
 

@@ -50,7 +50,7 @@ describe('training plan service', () => {
     expect(detail.id).toBe(planId);
     expect(detail.workouts).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: workoutId, exerciseCount: 3 }),
+        expect.objectContaining({ id: workoutId, exerciseCount: 5 }),
       ]),
     );
     expect(detail.workouts[0]).not.toHaveProperty('exercises');

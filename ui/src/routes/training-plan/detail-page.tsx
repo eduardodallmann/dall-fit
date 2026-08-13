@@ -347,6 +347,7 @@ export function TrainingPlanDetailPage({
                   <Table.Row id={workout.id}>
                     <Table.Cell>
                       <Link
+                        className={styles.planLink()}
                         onClick={() => {
                           trackUiEvent({
                             control: 'workout_link',

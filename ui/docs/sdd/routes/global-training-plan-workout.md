@@ -12,9 +12,12 @@ Breadcrumb resolvido: `Home / Planos de treino / <plano> / <treino>`. IDs nunca
 viram labels. Sem cache, skeleton estrutural precede o editor; refetch falho mantém
 dado e alerta. Not-found/falha inicial mostra Alert com retorno/retry aplicável.
 
-O cabeçalho mostra `Treino`, nome e lápis icon-only. A edição inline valida trim
+O cabeçalho usa `Treino` como contexto textual discreto, o nome do treino como
+único `h1`, `Exercícios` como `h2` e lápis icon-only centralizado na mesma linha do
+nome. A edição inline valida trim
 1–120, mantém valor confirmado separado do draft e entra na fila. Salvar conserva
-o modo inline até o sucesso e só apresenta toast para resultado não cancelado;
+o modo inline até o sucesso, mantém o campo sem label visível e fornece seu nome
+acessível diretamente ao input. Só apresenta toast para resultado não cancelado;
 falha mantém texto, erro e retry. Cancelar restaura o confirmado. Somente
 `412 TRAINING_PLAN_VERSION_CONFLICT` mostra alerta persistente, bloqueia novas
 gravações e oferece `Recarregar dados`, com confirmação antes de descartar drafts. Refetches
@@ -24,10 +27,29 @@ servidor.
 
 ## Lista e campos
 
-A composição é lista semântica responsiva, não Table. Cada item possui handle,
-campos com labels, Chip do tipo, status anunciado e exclusão em Popover. Em telas
-menores o grid empilha campos sem scroll horizontal. dnd kit aceita ponteiro,
-toque/teclado e persiste apenas no drop.
+A composição é lista semântica responsiva, não Table. Lista sem itens apresenta
+empty state `Nenhum exercício`, com orientação, imediatamente acima do acionador
+de adição; o estado desaparece ao existir uma linha. O acionador
+`Adicionar exercício` fica depois da lista, centralizado entre dois `Separator`,
+possui indicador de expansão e abre Dropdown no qual cada tipo combina ícone
+Lucide, nome e descrição.
+
+Cada card possui cabeçalho com handle e ícone do tipo à esquerda, `Chip` e ação de
+exclusão à direita. Identificação, mídia e body area ocupam a linha seguinte;
+campos numéricos ficam sempre em outra linha. Três números dividem essa linha em
+larguras iguais no desktop e empilham individualmente no viewport pequeno. Vídeo
+usa label `Vídeo (ID)`; imagem mantém prévia e ações de envio/substituição/remoção
+na região de mídia. Nenhuma largura produz scroll horizontal.
+
+O slot da exclusão possui dimensão fixa e recebe o `Spinner` sem deslocar o card.
+O Popover abre abaixo do icon button, com bordas direitas alinhadas, tem nome
+acessível contextual, omite título visível e oferece somente
+`Confirmar exclusão`. dnd kit aceita ponteiro, toque/teclado, mostra `DragOverlay`
+e deslocamento dos demais cards durante a operação e persiste apenas no drop.
+Ao confirmar o drop, o overlay desaparece imediatamente, sem animação de retorno à
+posição original, e a lista conserva visualmente o destino escolhido. `Escape` ou
+drop sem destino cancela, remove o overlay, restaura ordem/foco e não envia
+mutation.
 
 | Tipo          | Campos                                                                  |
 | ------------- | ----------------------------------------------------------------------- |
@@ -52,12 +74,26 @@ edição durante um request, somente campos sem revisão posterior recebem o val
 canônico; o draft mais novo permanece dirty e agenda outra passagem. Falha preserva
 patch/draft/miniatura, anuncia erro na linha e oferece `Tentar novamente` com os
 valores correntes. Sucesso de autosave não mostra toast.
+O estado `debouncing` não mostra a mensagem visual
+`Alterações aguardando autosave`; continua participando do anúncio global da fila,
+da proteção de saída e do disparo após três segundos.
+O estado pendente da fila também não mostra a mensagem visual
+`Alterações sendo salvas em ordem…`; o texto permanece somente como anúncio para
+tecnologia assistiva, enquanto controles e spinners contextuais representam o
+pending aplicável.
 
 A versão de leitura semeia uma fila ainda inexistente ou avança uma fila ociosa,
 mas nunca regride a versão já produzida por uma mutation. Depois de um sucesso, a
 versão devolvida permanece corrente mesmo quando a fila volta a ficar ociosa; uma
 ação posterior não reutiliza a versão antiga ainda presente nos dados de entrada
 do editor.
+
+Cada sucesso sincroniza a query projetada do workout e a versão do plano no cache.
+Renomear também atualiza o resumo do workout; adicionar/excluir atualiza
+`exerciseCount`; editar, ordenar e mídia atualizam a representação correspondente.
+Assim, breadcrumb para o detalhe seguido de retorno ao workout não exibe nome,
+campos, ordem, mídia ou contagem anteriores. Respostas falhas, canceladas,
+obsoletas ou conflitantes não são publicadas como canônicas.
 
 Adicionar escolhe um dos cinco tipos, põe linha temporária desabilitada no fim e
 troca pelo default/ID retornado. No máximo uma operação estrutural — adicionar,
@@ -89,9 +125,9 @@ loading e nunca lê base64. As URLs públicas pertencem ao host
 Not-found distingue plano/workout na API sem expor ownership. Somente o erro
 `412 TRAINING_PLAN_VERSION_CONFLICT` preserva trabalho e pausa a fila; um `412`
 externo sem esse código segue como falha genérica. Erros iniciais não dependem de
-toast; saving usa aria-live
-e spinner nomeado. Handles e botões icon-only têm nomes contextuais, miniaturas têm
-alt derivado do nome visível e drag possui instruções do sensor de teclado.
+toast; o pending usa anúncio `aria-live` não visual e spinners contextuais
+nomeados. Handles e botões icon-only têm nomes contextuais, miniaturas têm alt
+derivado do nome visível e drag possui instruções do sensor de teclado.
 
 Enquanto a fila estiver pausada, adicionar, handle, excluir, mídia, salvar nome e
 retry/dispatch de autosave ficam desabilitados; campos persistidos continuam
@@ -122,11 +158,13 @@ ou seletor mock.
 - rollback de ordem com draft posterior: `reorder-error`;
 - conflito: `version-conflict`;
 - imagem falha: `image-error`.
+- lista vazia: `empty-workout`.
 
 Vitest cobre services, coordenador, merge por revisão e restauração estrutural;
-Playwright cobre os cinco tipos, duas adições consecutivas com propagação de
-versão, autosave, conflito, exclusão durante debounce, ordem por teclado/rollback
-e proteção acessível. E2E separado cobre API/MongoDB. Não há referência visual em
+Playwright cobre os cinco tipos, empty state/menu informativo, layouts desktop e
+móvel, duas adições consecutivas com propagação de versão, retorno sem cache antigo,
+autosave, conflito, exclusão durante debounce, ordem por teclado/cancelamento/
+rollback e proteção acessível. E2E separado cobre API/MongoDB. Não há referência visual em
 `routes/assets/global-training-plan-workout/`.
 
 Arquivos: `workout-page.tsx`, `workout-editor/`, `training-plan-service.ts`,

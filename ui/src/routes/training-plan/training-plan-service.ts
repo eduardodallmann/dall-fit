@@ -33,6 +33,7 @@ export type MockTrainingPlansScenario =
   | 'delete-workout-success'
   | 'detail-error'
   | 'empty'
+  | 'empty-workout'
   | 'list-error'
   | 'large-pagination'
   | 'loading'

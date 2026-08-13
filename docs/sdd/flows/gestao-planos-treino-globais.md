@@ -48,17 +48,26 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
    independente de três segundos, enviando somente campos alterados.
 5. Autosaves, nome, adições, exclusões, reordenação e mídia convergem no mesmo
    coordenador FIFO do aggregate. Ele injeta a última versão, não faz retry de
-   mutation e mantém outras linhas editáveis.
+   mutation e mantém outras linhas editáveis. Os estados de espera do autosave e
+   de salvamento da fila não geram mensagens visuais globais; o pending continua
+   representado internamente e anunciado para tecnologia assistiva.
 6. A criação recebe só o tipo e a API aplica defaults; a linha temporária não
    aceita edição, mídia, exclusão ou ordem. No máximo uma operação estrutural fica
-   pendente. Drag por ponteiro, toque ou teclado só persiste ao soltar e envia a
-   ordem final completa. Exclusão durante debounce cancela o timer e captura draft,
-   dirty e posição para rollback localizado.
+   pendente. Lista vazia mostra orientação acima da adição. Drag por ponteiro,
+   toque ou teclado mostra item flutuante e destino, só persiste ao soltar e envia
+   a ordem final completa; ao soltar, o overlay desaparece sem retornar visualmente
+   à origem e a lista permanece no destino. `Escape` cancela sem request. Exclusão
+   durante debounce cancela o timer e captura draft, dirty e posição para rollback
+   localizado.
 7. YouTube aceita ID/URLs permitidas, mas a API chama somente
    `img.youtube.com`; a UI deriva a miniatura do ID. Imagens JPEG/PNG/WebP são
    enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
    thumbnail/display sob o prefixo público `exercise-images/`, sem base64 ou
    original persistido.
+8. Todo sucesso do editor atualiza a query do workout e os resumos afetados no
+   detalhe/listas do mesmo cenário. Voltar pelo breadcrumb e reabrir o treino usa
+   nome, exercícios, ordem, mídia, contagem e versão confirmados, sem refresh
+   manual; falha ou cancelamento não promove draft ao cache.
 
 ## Concorrência e falhas
 
