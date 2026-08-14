@@ -105,3 +105,9 @@ export const createImageUploadFailedException = () =>
     'IMAGE_UPLOAD_FAILED',
     'Image upload failed.',
   );
+export const createImageUrlSigningFailedException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'IMAGE_URL_SIGNING_FAILED',
+    'Image URL signing failed.',
+  );

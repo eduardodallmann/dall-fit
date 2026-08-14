@@ -180,6 +180,7 @@ describe('training plan service', () => {
           image: {
             thumbnailUrl: 'https://blob.test/thumb.webp',
             displayUrl: 'https://blob.test/display.webp',
+            signedUrlExpiresAt: '2026-08-14T12:15:00.000Z',
           },
         },
       },

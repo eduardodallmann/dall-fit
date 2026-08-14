@@ -58,7 +58,9 @@ GET do workout retorna plano mínimo, timestamps e exercícios na ordem física.
 tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
 25 workouts, 50 exercícios, números finitos, 16 body areas. Página 101 é inválida.
 YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Imagem
-pública expõe apenas URLs; keys, dimensões internas e original não atravessam HTTP.
+expõe `thumbnailUrl`, `displayUrl` assinadas e `signedUrlExpiresAt`; keys,
+dimensões internas, pathnames, delegation token e original não atravessam HTTP.
+Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-store`.
 
 ## Persistência e branches
 
@@ -76,9 +78,13 @@ Campos de outro discriminador são `INVALID_EXERCISE_TYPE`.
 No YouTube, allowlist aceita ID, youtu.be, watch e shorts HTTPS; resposta externa
 não bem-sucedida vira `INVALID_YOUTUBE_REFERENCE`, falha/timeout vira
 `YOUTUBE_VALIDATION_UNAVAILABLE`, sem write. No upload, Sharp valida bytes,
-10 MiB, 40 MP e ausência de animação, gera duas variantes e só então executa CAS.
-Falha pré-commit remove novas keys; sucesso remove variantes antigas depois do
-MongoDB. Exclusões coletam referências antes do CAS e limpam depois.
+10 MiB, 40 MP e ausência de animação e gera duas variantes privadas. O command
+solicita as duas URLs assinadas antes de executar o CAS. Falha de upload,
+assinatura ou commit remove as novas keys; sucesso persiste somente keys/dimensões
+e remove variantes antigas depois do MongoDB. Leitura do workout hidrata todas as
+imagens com concorrência limitada a oito emissões e falha integralmente se uma
+assinatura não puder ser produzida. Exclusões coletam referências antes do CAS e
+limpam depois.
 
 ## Erros estáveis
 
@@ -89,7 +95,8 @@ MongoDB. Exclusões coletam referências antes do CAS e limpam depois.
 `TRAINING_PLAN_SIZE_LIMIT_REACHED`, `TRAINING_PLAN_VERSION_CONFLICT`,
 `IMAGE_TOO_LARGE`, `UNSUPPORTED_IMAGE_TYPE`, `PRECONDITION_REQUIRED`,
 `YOUTUBE_VALIDATION_UNAVAILABLE` e `IMAGE_UPLOAD_FAILED`. Todo erro segue
-`ApiError` e `x-request-id`.
+`ApiError` e `x-request-id`. Falha de assinatura usa
+`503 IMAGE_URL_SIGNING_FAILED`.
 
 ## Cenários reproduzíveis
 
@@ -243,9 +250,11 @@ curl --request POST http://localhost:4000/auth/test-login \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit28.txt
 ```
 
-Requer o Blob público `gvi3tyf5ckqiqlak` configurado e arquivo fictício local. PUT
-grava as variantes sob `exercise-images/` e devolve somente duas URLs; DELETE
-preserva o exercício e remove a associação.
+Requer `BLOB_STORE_ID=store_8u9fq5re0OENMRtC`, OIDC local vigente da Vercel e
+arquivo fictício local. PUT grava variantes privadas sob `exercise-images/`,
+assina cada pathname para `get` antes do CAS e devolve duas URLs temporárias com
+`signedUrlExpiresAt`; DELETE preserva o exercício e remove a associação. A leitura
+do workout devolve outro par válido sem endpoint binário intermediário.
 
 ### Cenário 6 — limites, ownership e precondição
 

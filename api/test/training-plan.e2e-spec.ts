@@ -50,6 +50,11 @@ describe('Global training plans (e2e)', () => {
   const uploadedBlobs: Array<{ content: Buffer; key: string }> = [];
   const deletedBlobKeys: string[][] = [];
   const blobStorage = {
+    createSignedReadUrl: vi.fn((pathname: string, validUntil: number) =>
+      Promise.resolve(
+        `https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com/${pathname}?vercel-blob-delegation=fake&vercel-blob-signature=${validUntil}`,
+      ),
+    ),
     delete: vi.fn((keys: readonly string[]): Promise<void> => {
       deletedBlobKeys.push([...keys]);
       return Promise.resolve();
@@ -60,10 +65,7 @@ describe('Global training plans (e2e)', () => {
     upload: vi.fn((pathname: string, content: Buffer) => {
       const key = `${pathname.replace('.webp', '')}-${uploadedBlobs.length + 1}.webp`;
       uploadedBlobs.push({ content, key });
-      return Promise.resolve({
-        key,
-        url: `https://gvi3tyf5ckqiqlak.public.blob.vercel-storage.com/${key}`,
-      });
+      return Promise.resolve({ key });
     }),
   };
   const youtubeReference = {
@@ -712,15 +714,40 @@ describe('Global training plans (e2e)', () => {
     expect(uploadResponse.headers['x-resource-version']).toBe('1');
     const uploadBody = uploadResponse.body as {
       data: {
-        image: { displayUrl: string; thumbnailUrl: string };
+        image: {
+          displayUrl: string;
+          signedUrlExpiresAt: string;
+          thumbnailUrl: string;
+        };
       };
     };
+    expect(uploadResponse.headers['cache-control']).toBe('private, no-store');
     expect(uploadBody.data.image.displayUrl).toContain(
       '/exercise-images/display-',
     );
     expect(uploadBody.data.image.thumbnailUrl).toContain(
       '/exercise-images/thumbnail-',
     );
+    expect(uploadBody.data.image.displayUrl).toContain(
+      'vercel-blob-delegation=fake',
+    );
+    expect(
+      Date.parse(uploadBody.data.image.signedUrlExpiresAt),
+    ).toBeGreaterThan(Date.now());
+    const expectedExpiration = String(
+      Date.parse(uploadBody.data.image.signedUrlExpiresAt),
+    );
+    expect(
+      new URL(uploadBody.data.image.thumbnailUrl).searchParams.get(
+        'vercel-blob-signature',
+      ),
+    ).toBe(expectedExpiration);
+    expect(
+      new URL(uploadBody.data.image.displayUrl).searchParams.get(
+        'vercel-blob-signature',
+      ),
+    ).toBe(expectedExpiration);
+    expect(JSON.stringify(uploadBody)).not.toContain('"key"');
     expect(uploadedBlobs).toHaveLength(2);
     const [thumbnailMetadata, displayMetadata] = await Promise.all(
       uploadedBlobs.map(({ content }) => sharp(content).metadata()),
@@ -735,6 +762,33 @@ describe('Global training plans (e2e)', () => {
       height: 720,
       width: 1080,
     });
+    const storedAfterUpload = await trainingPlanModel
+      .findById(plan.id)
+      .lean()
+      .exec();
+    const persistedImage = (
+      storedAfterUpload?.workouts[0]?.exercises[0] as {
+        image?: {
+          display?: { height?: number; key?: string; width?: number };
+          thumbnail?: { height?: number; key?: string; width?: number };
+        };
+      }
+    )?.image;
+    expect(persistedImage?.display?.height).toBe(720);
+    expect(persistedImage?.display?.key).toContain('exercise-images/display-');
+    expect(persistedImage?.display?.width).toBe(1080);
+    expect(persistedImage?.thumbnail?.height).toBe(107);
+    expect(persistedImage?.thumbnail?.key).toContain(
+      'exercise-images/thumbnail-',
+    );
+    expect(persistedImage?.thumbnail?.width).toBe(160);
+    expect(JSON.stringify(persistedImage)).not.toContain('"url"');
+
+    const workoutResponse = await agent
+      .get(`/global/training-plans/${plan.id}/workouts/${workoutId.toString()}`)
+      .expect(200);
+    expect(workoutResponse.headers['cache-control']).toBe('private, no-store');
+    expect(JSON.stringify(workoutResponse.body)).not.toContain('"key"');
 
     const removeResponse = await authenticatedMutation(
       agent,
@@ -745,6 +799,62 @@ describe('Global training plans (e2e)', () => {
     expect(deletedBlobKeys).toEqual([uploadedBlobs.map(({ key }) => key)]);
     const stored = await trainingPlanModel.findById(plan.id).lean().exec();
     expect(stored?.workouts[0]?.exercises[0]).toMatchObject({ image: null });
+  });
+
+  it('authorizes workout image signing and fails the whole read when signing is unavailable', async () => {
+    const workoutId = new Types.ObjectId();
+    const exerciseId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      workouts: [
+        {
+          _id: workoutId,
+          name: 'Treino privado',
+          exercises: [
+            {
+              _id: exerciseId,
+              type: 'image',
+              name: 'Imagem privada',
+              bodyArea: 'other',
+              restSeconds: 60,
+              sets: 3,
+              repetitions: 12,
+              image: {
+                thumbnail: {
+                  height: 160,
+                  key: 'exercise-images/private-thumbnail.webp',
+                  width: 160,
+                },
+                display: {
+                  height: 640,
+                  key: 'exercise-images/private-display.webp',
+                  width: 320,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const path = `/global/training-plans/${plan.id}/workouts/${workoutId.toString()}`;
+    const callsBeforeAuthorization =
+      blobStorage.createSignedReadUrl.mock.calls.length;
+
+    await request(app.getHttpServer()).get(path).expect(401);
+    const regularAgent = await login(false);
+    await regularAgent.get(path).expect(403);
+    expect(blobStorage.createSignedReadUrl).toHaveBeenCalledTimes(
+      callsBeforeAuthorization,
+    );
+
+    blobStorage.createSignedReadUrl.mockRejectedValueOnce(
+      new Error('signing unavailable'),
+    );
+    const adminAgent = await login(true);
+    const response = await adminAgent.get(path).expect(503);
+    const body = response.body as { code?: string; data?: unknown };
+
+    expect(body.code).toBe('IMAGE_URL_SIGNING_FAILED');
+    expect(body).not.toHaveProperty('data');
   });
 
   it('persists the canonical YouTube id returned by the deterministic adapter', async () => {

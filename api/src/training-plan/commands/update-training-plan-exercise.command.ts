@@ -5,12 +5,16 @@ import type {
   UpdateExerciseResponse,
 } from '@dall-fit/types';
 
+import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 
 @Injectable()
 export class UpdateTrainingPlanExerciseCommand {
   private readonly logger = new Logger(UpdateTrainingPlanExerciseCommand.name);
-  constructor(private readonly service: TrainingPlanService) {}
+  constructor(
+    private readonly service: TrainingPlanService,
+    private readonly exerciseImageService: ExerciseImageService,
+  ) {}
   async execute(
     trainingPlanId: string,
     workoutId: string,
@@ -38,8 +42,15 @@ export class UpdateTrainingPlanExerciseCommand {
       'UpdateTrainingPlanExerciseCommand -> execute -> trainingPlanService return:',
       { data: { exerciseId, version: result.version } },
     );
+    const exercise = await this.exerciseImageService.toPublicExercise(
+      result.data,
+    );
+    this.logger.log(
+      'UpdateTrainingPlanExerciseCommand -> execute -> exerciseImageService return:',
+      { data: { exerciseId: exercise.id } },
+    );
     const response = {
-      response: { data: result.data },
+      response: { data: exercise },
       version: result.version,
     };
     return response;

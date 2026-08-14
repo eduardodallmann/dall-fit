@@ -31,7 +31,6 @@ export interface TrainingPlanPage {
 
 export interface StoredImageVariant {
   key: string;
-  url: string;
   width: number;
   height: number;
 }

@@ -24,7 +24,6 @@ import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan
 
 interface PlainImageVariant {
   key: string;
-  url: string;
   width: number;
   height: number;
 }

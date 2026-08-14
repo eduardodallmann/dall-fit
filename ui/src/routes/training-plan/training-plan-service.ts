@@ -44,6 +44,7 @@ export type MockTrainingPlansScenario =
   | 'update-exercise-error'
   | 'delete-exercise-error'
   | 'image-error'
+  | 'image-signed-url-expired'
   | 'reorder-error'
   | 'two-pages'
   | 'timeout'

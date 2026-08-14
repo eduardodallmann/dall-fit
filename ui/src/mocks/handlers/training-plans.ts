@@ -30,6 +30,27 @@ interface ScenarioState {
   plans: TrainingPlanSummary[];
   workout: TrainingPlanWorkoutDetails;
   nextExerciseNumber: number;
+  workoutReadCount: number;
+}
+
+const privateBlobOrigin =
+  'https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com';
+
+function signedExerciseImage(status: 'expired' | 'fresh') {
+  const expiresAt =
+    status === 'expired'
+      ? '2020-01-01T00:00:00.000Z'
+      : new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const query =
+    `vercel-blob-delegation=fake-${status}` +
+    `&vercel-blob-signature=fake-${status}` +
+    `&mock-status=${status}`;
+  const result = {
+    displayUrl: `${privateBlobOrigin}/exercise-images/display.webp?${query}`,
+    signedUrlExpiresAt: expiresAt,
+    thumbnailUrl: `${privateBlobOrigin}/exercise-images/thumbnail.webp?${query}`,
+  };
+  return result;
 }
 
 const scenarioStates = new Map<string, ScenarioState>();
@@ -56,6 +77,7 @@ function getState(scenario: string): ScenarioState {
       })),
     },
     nextExerciseNumber: 30,
+    workoutReadCount: 0,
   };
   if (scenario === 'empty-workout') {
     result.workout = { ...result.workout, exercises: [] };
@@ -65,6 +87,16 @@ function getState(scenario: string): ScenarioState {
         workout.id === result.workout.id
           ? { ...workout, exerciseCount: 0 }
           : workout,
+      ),
+    };
+  }
+  if (scenario === 'image-signed-url-expired') {
+    result.workout = {
+      ...result.workout,
+      exercises: result.workout.exercises.map((exercise) =>
+        exercise.type === 'image'
+          ? { ...exercise, image: signedExerciseImage('expired') }
+          : exercise,
       ),
     };
   }
@@ -202,6 +234,19 @@ function defaultExercise(
 }
 
 export const trainingPlanHandlers = [
+  http.get(`${privateBlobOrigin}/exercise-images/:variant`, ({ request }) => {
+    const status = new URL(request.url).searchParams.get('mock-status');
+    if (status === 'expired') return new HttpResponse(null, { status: 403 });
+    const transparentPixel = Uint8Array.from([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+      0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84,
+      8, 215, 99, 248, 207, 192, 240, 31, 0, 5, 0, 1, 255, 137, 153, 61, 29, 0,
+      0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ]);
+    return new HttpResponse(transparentPixel, {
+      headers: { 'Content-Type': 'image/png' },
+    });
+  }),
   http.get('*/global/training-plans', async ({ request }) => {
     const scenario = getScenario(request);
     let responseDelay: number | 'infinite' = 75;
@@ -252,8 +297,23 @@ export const trainingPlanHandlers = [
         );
       if (params.workoutId !== state.workout.id)
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
+      const workout = state.workout;
+      state.workoutReadCount += 1;
+      if (
+        scenario === 'image-signed-url-expired' &&
+        state.workoutReadCount === 1
+      ) {
+        state.workout = {
+          ...state.workout,
+          exercises: state.workout.exercises.map((exercise) =>
+            exercise.type === 'image'
+              ? { ...exercise, image: signedExerciseImage('fresh') }
+              : exercise,
+          ),
+        };
+      }
       return HttpResponse.json(
-        { data: state.workout },
+        { data: workout },
         responseInit(state.detail.version),
       );
     },
@@ -412,12 +472,7 @@ export const trainingPlanHandlers = [
       const form = await request.formData();
       if (!(form.get('file') instanceof File))
         return apiError('VALIDATION_ERROR', 'Request validation failed.', 400);
-      const image = {
-        thumbnailUrl:
-          'https://gvi3tyf5ckqiqlak.public.blob.vercel-storage.com/exercise-images/thumbnail.webp',
-        displayUrl:
-          'https://gvi3tyf5ckqiqlak.public.blob.vercel-storage.com/exercise-images/display.webp',
-      };
+      const image = signedExerciseImage('fresh');
       state.workout = {
         ...state.workout,
         exercises: state.workout.exercises.map((exercise) =>

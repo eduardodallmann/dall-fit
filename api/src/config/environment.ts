@@ -117,7 +117,6 @@ const environmentSchema = z.looseObject({
     .max(10_000)
     .default(2_000),
   BLOB_STORE_ID: optionalNonEmptyString,
-  BLOB_READ_WRITE_TOKEN: optionalNonEmptyString,
   GOOGLE_OAUTH_CREDENTIALS_BASE64: z.string().min(1),
   AUTH_SESSION_SECRET: z.string().min(32),
   AUTH_SESSION_ACTIVE_KEY_ID: z.string().min(1).default('active-v1'),
@@ -162,7 +161,6 @@ export type RuntimeEnvironment = 'local' | 'preview' | 'production' | 'test';
 
 type ParsedEnvironment = z.infer<typeof environmentSchema>;
 type EnvironmentVariables = ParsedEnvironment & {
-  BLOB_READ_WRITE_TOKEN: string;
   BLOB_STORE_ID: string;
   GOOGLE_OAUTH_CREDENTIALS: GoogleOAuthCredentials;
   REDIS_NAMESPACE: string;
@@ -204,19 +202,16 @@ export function validateEnvironment(
 function resolveBlobConfiguration(
   config: ParsedEnvironment,
   runtimeEnvironment: RuntimeEnvironment,
-): { BLOB_READ_WRITE_TOKEN: string; BLOB_STORE_ID: string } {
+): { BLOB_STORE_ID: string } {
   if (
     (runtimeEnvironment === 'preview' || runtimeEnvironment === 'production') &&
-    (config.BLOB_READ_WRITE_TOKEN === undefined ||
-      config.BLOB_STORE_ID === undefined)
+    config.BLOB_STORE_ID === undefined
   ) {
     throw new Error(
-      'Invalid environment variables: BLOB_READ_WRITE_TOKEN and BLOB_STORE_ID are required in production and preview',
+      'Invalid environment variables: BLOB_STORE_ID is required in production and preview',
     );
   }
   return {
-    BLOB_READ_WRITE_TOKEN:
-      config.BLOB_READ_WRITE_TOKEN ?? 'local-blob-token-not-configured',
     BLOB_STORE_ID: config.BLOB_STORE_ID ?? 'local-blob-store-not-configured',
   };
 }

@@ -87,6 +87,10 @@ mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
   exercício, ordem final completa e imagem. Respostas de mutação expõem o recurso
   público; leituras e sucessos que preservam o aggregate transportam a versão
   canônica no header `X-Resource-Version`.
+- `ExerciseImage` publica `thumbnailUrl`, `displayUrl` e
+  `signedUrlExpiresAt`. As duas URLs são capacidades privadas temporárias para
+  leitura do mesmo ciclo de quinze minutos; não são identificadores estáveis nem
+  podem ser persistidas pelo consumidor.
 - `ownerPersonId`, documentos Mongoose, keys/dimensões internas do Blob e o
   original da imagem são exclusivos da API.
 

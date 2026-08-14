@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Headers,
   HttpCode,
   Logger,
@@ -195,6 +196,7 @@ export class GlobalTrainingPlansController {
   }
 
   @Get(':trainingPlanId/workouts/:workoutId')
+  @Header('Cache-Control', 'private, no-store')
   async getWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,
     @Res({ passthrough: true }) response: Response,
@@ -266,6 +268,7 @@ export class GlobalTrainingPlansController {
 
   @Patch(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId')
   @EditorMutation()
+  @Header('Cache-Control', 'private, no-store')
   async updateExercise(
     @Param() params: TrainingPlanExerciseParamsDto,
     @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
@@ -306,6 +309,7 @@ export class GlobalTrainingPlansController {
 
   @Put(':trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image')
   @ImageMutation()
+  @Header('Cache-Control', 'private, no-store')
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024, files: 1 },

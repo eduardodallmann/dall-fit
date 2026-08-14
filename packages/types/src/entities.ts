@@ -78,6 +78,7 @@ export interface YoutubeShortExercise extends SetsExercise {
 export interface ExerciseImage {
   thumbnailUrl: string;
   displayUrl: string;
+  signedUrlExpiresAt: string;
 }
 
 export interface ImageExercise extends SetsExercise {

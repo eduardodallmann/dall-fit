@@ -77,10 +77,11 @@ Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras indivi
 `ui/vercel.json` também aplica CSP e headers defensivos a todas as respostas. A
 CSP permite scripts e endpoints do Vercel Analytics v2 pela própria origem,
 conexão somente com a própria origem e a origem exata da API vigente, imagem local,
-data URI, avatar Google, `img.youtube.com` e o host público exato
-`gvi3tyf5ckqiqlak.public.blob.vercel-storage.com`, e bloqueia objetos, frames e
-ancestrais. Imagens de exercícios são servidas pelo prefixo público
-`exercise-images/`; a política não usa wildcard de `vercel.app`.
+data URI, avatar Google, `img.youtube.com` e o host privado exato
+`8u9fq5re0oenmrtc.private.blob.vercel-storage.com`, e bloqueia objetos, frames e
+ancestrais. A API entrega signed URLs temporárias sob `exercise-images/`, e o
+navegador busca os bytes diretamente do Blob/CDN sem cookie da API. A política não
+usa wildcard de `vercel.app` nem conserva o host público excluído.
 
 ## Estado e integrações
 
@@ -274,6 +275,15 @@ Reordenação usa dnd kit com sensores de ponteiro e teclado e só envia a ordem
 drop. O seletor transversal `core/components/image-file-picker` valida
 preliminarmente tipo/tamanho e envia `FormData`; arquivo nunca vira base64. Campos,
 Select, NumberField, Dropdown, Popover, Alert, Chip e Spinner permanecem HeroUI.
+
+Imagens privadas chegam no contrato como `thumbnailUrl`, `displayUrl` e
+`signedUrlExpiresAt`. A query do workout agenda refetch dois minutos antes da
+primeira expiração e repete a verificação ao voltar à aba. A primeira falha de uma
+imagem perto do prazo renova uma vez por ciclo; depois disso o componente mostra
+fallback acessível e retry manual. A sincronização troca somente o objeto `image`
+da linha persistida e preserva drafts, dirty patches, revisões e estado da fila.
+Signed URLs são credenciais efêmeras: não entram em Analytics, logs, storage ou
+cache persistente da PWA, e o `<img>` usa `referrerPolicy="no-referrer"`.
 
 ### Analytics e privacidade
 

@@ -9,9 +9,9 @@ const prefix = 'exercise-images/';
 
 async function main(): Promise<void> {
   const mongodbUri = process.env.MONGODB_URI;
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (mongodbUri === undefined || token === undefined)
-    throw new Error('MONGODB_URI and BLOB_READ_WRITE_TOKEN are required.');
+  const blobStoreId = process.env.BLOB_STORE_ID;
+  if (mongodbUri === undefined || blobStoreId === undefined)
+    throw new Error('MONGODB_URI and BLOB_STORE_ID are required.');
   const execute = process.argv.includes('--execute');
   const connection = await connect(mongodbUri, { autoIndex: false });
   try {
@@ -43,12 +43,12 @@ async function main(): Promise<void> {
     const stored: string[] = [];
     let cursor: string | undefined;
     do {
-      const page = await list({ cursor, prefix, token });
+      const page = await list({ cursor, prefix });
       stored.push(...page.blobs.map((blob) => blob.pathname));
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor !== undefined);
     const orphaned = stored.filter((key) => !referenced.has(key));
-    if (execute && orphaned.length > 0) await del(orphaned, { token });
+    if (execute && orphaned.length > 0) await del(orphaned);
     process.stdout.write(
       `Image reconciliation ${execute ? 'executed' : 'dry-run'}: stored=${stored.length}, referenced=${referenced.size}, orphaned=${orphaned.length}.\n`,
     );

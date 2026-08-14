@@ -6,7 +6,6 @@ import { BODY_AREAS } from '@dall-fit/types';
 const imageVariantSchema = new MongooseSchema(
   {
     key: { maxlength: 512, required: true, type: String },
-    url: { maxlength: 2048, required: true, type: String },
     width: { min: 1, required: true, type: Number },
     height: { min: 1, required: true, type: Number },
   },
