@@ -112,15 +112,25 @@ e exige reconciliação da query antes de nova tentativa.
 
 Upload/substituição/remover imagem são imediatos, mas usam a mesma fila. A UI
 valida JPEG/PNG/WebP e 10 MiB antes de FormData, conserva a imagem anterior durante
-loading e nunca lê base64. As URLs públicas pertencem ao host
-`gvi3tyf5ckqiqlak.public.blob.vercel-storage.com` e ao prefixo
-`exercise-images/`. `image:null` não mostra placeholder de mídia.
+loading e nunca lê base64. A response usa signed URLs temporárias do host privado
+`8u9fq5re0oenmrtc.private.blob.vercel-storage.com` e informa uma expiração comum.
+O `<img>` acessa diretamente a URL, sem Axios, cookie da API ou endpoint binário.
+`image:null` não mostra placeholder de mídia.
+
+A query agenda uma renovação dois minutos antes da expiração mais próxima e
+verifica novamente quando o documento volta a ficar visível. Refetch atualiza
+somente o objeto de imagem nas linhas persistidas que não estejam salvando mídia;
+nome, campos dirty, revisões, linhas temporárias e fila não são reinicializados. A
+primeira falha de carregamento perto da expiração dispara no máximo um refetch por
+timestamp. Falha persistente ou fora dessa janela oculta o preview, anuncia
+`Imagem indisponível` e oferece `Tentar novamente`; nova URL remove o fallback.
 
 ## Integrações e falhas
 
 - GET/PATCH do workout;
 - POST/PATCH/DELETE de exercícios e PUT da ordem;
 - PUT multipart/DELETE da imagem;
+- download direto por signed URL `get` do Blob privado;
 - `X-Resource-Version` com inteiro canônico em toda mutation e em todo sucesso que
   preserva o aggregate.
 
@@ -148,7 +158,8 @@ toast ou Analytics.
 Nome, adicionar/tipo, campos, drop, exclusão, mídia e retry usam enums do catálogo.
 Cada operação aceita emite início e terminal; conflito é erro e recarga é retry.
 Não se enviam IDs, nomes, valores, URLs, arquivos, tamanhos, ordem, código externo
-ou seletor mock.
+ou seletor mock. Signed URL, pathname, query de assinatura e expiração também não
+entram em Analytics nem em storage persistente.
 
 ## Cenários e cobertura
 
@@ -160,10 +171,11 @@ ou seletor mock.
 - rollback de ordem com draft posterior: `reorder-error`;
 - conflito: `version-conflict`;
 - imagem falha: `image-error`.
+- URL assinada expirada/renovação: `image-signed-url-expired`;
 - lista vazia: `empty-workout`.
 
 Vitest cobre services, coordenador, merge por revisão e restauração estrutural;
-Playwright cobre os cinco tipos, empty state/menu informativo, layouts desktop e
+Playwright cobre os cinco tipos, mídia privada/renovação, empty state/menu informativo, layouts desktop e
 móvel, duas adições consecutivas com propagação de versão, retorno sem cache antigo,
 autosave, conflito, exclusão durante debounce, ordem por teclado/cancelamento/
 rollback e proteção acessível. E2E separado cobre API/MongoDB. Não há referência visual em

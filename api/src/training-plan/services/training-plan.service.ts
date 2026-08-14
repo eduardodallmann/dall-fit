@@ -4,11 +4,8 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   CreateTrainingPlanRequest,
-  Exercise,
-  ExerciseImage,
   ExerciseType,
   TrainingPlanSummary,
-  TrainingPlanWorkoutDetails,
   TrainingPlanWorkoutSummary,
   UpdateExerciseRequest,
   UpdateTrainingPlanRequest,
@@ -20,8 +17,8 @@ import type {
   TargetState,
   TrainingPlanEntity,
   TrainingPlanPage,
-  UploadedImageFile,
   VersionedResult,
+  WorkoutAggregate,
   WorkoutNameResult,
 } from '~/training-plan/domain/training-plan.entity';
 import {
@@ -249,7 +246,7 @@ export class TrainingPlanService {
   async getWorkout(
     trainingPlanId: string,
     workoutId: string,
-  ): Promise<TrainingPlanWorkoutDetails> {
+  ): Promise<WorkoutAggregate> {
     this.logger.log('TrainingPlanService -> getWorkout -> params:', {
       params: { trainingPlanId, workoutId },
     });
@@ -270,21 +267,15 @@ export class TrainingPlanService {
       workoutId,
     );
     this.warnIfAggregateNearLimit(trainingPlanId, metrics);
-    const response = {
-      ...result,
-      exercises: result.exercises.map((exercise) =>
-        this.toPublicExercise(exercise),
-      ),
-    };
     this.logger.log('TrainingPlanService -> getWorkout -> return:', {
       data: {
-        exerciseCount: response.exercises.length,
+        exerciseCount: result.exercises.length,
         trainingPlanId,
-        version: response.version,
+        version: result.version,
         workoutId,
       },
     });
-    return response;
+    return result;
   }
 
   async updateWorkoutName(
@@ -315,7 +306,7 @@ export class TrainingPlanService {
     workoutId: string,
     expectedVersion: number,
     type: ExerciseType,
-  ): Promise<VersionedResult<Exercise>> {
+  ): Promise<VersionedResult<StoredExercise>> {
     this.logger.log('TrainingPlanService -> createExercise -> params:', {
       params: { expectedVersion, trainingPlanId, type, workoutId },
     });
@@ -342,19 +333,15 @@ export class TrainingPlanService {
       );
       return failure;
     }
-    const result = {
-      data: this.toPublicExercise(repositoryResult.data),
-      version: repositoryResult.version,
-    };
     this.logger.log('TrainingPlanService -> createExercise -> return:', {
       data: {
-        exerciseId: result.data.id,
+        exerciseId: repositoryResult.data.id,
         trainingPlanId,
-        version: result.version,
+        version: repositoryResult.version,
         workoutId,
       },
     });
-    return result;
+    return repositoryResult;
   }
 
   async updateExercise(
@@ -363,7 +350,7 @@ export class TrainingPlanService {
     exerciseId: string,
     expectedVersion: number,
     changes: UpdateExerciseRequest,
-  ): Promise<VersionedResult<Exercise>> {
+  ): Promise<VersionedResult<StoredExercise>> {
     const definedChanges = Object.fromEntries(
       Object.entries(changes).filter(([, value]) => value !== undefined),
     ) as UpdateExerciseRequest;
@@ -419,14 +406,15 @@ export class TrainingPlanService {
       );
       return failure;
     }
-    const result = {
-      data: this.toPublicExercise(repositoryResult.data),
-      version: repositoryResult.version,
-    };
     this.logger.log('TrainingPlanService -> updateExercise -> return:', {
-      data: { exerciseId, trainingPlanId, version: result.version, workoutId },
+      data: {
+        exerciseId,
+        trainingPlanId,
+        version: repositoryResult.version,
+        workoutId,
+      },
     });
-    return result;
+    return repositoryResult;
   }
 
   async deleteExercise(
@@ -512,13 +500,18 @@ export class TrainingPlanService {
     return result.version;
   }
 
-  async uploadExerciseImage(
+  async validateExerciseImageUpload(
     trainingPlanId: string,
     workoutId: string,
     exerciseId: string,
     expectedVersion: number,
-    file: UploadedImageFile,
-  ): Promise<VersionedResult<ExerciseImage>> {
+  ): Promise<void> {
+    this.logger.log(
+      'TrainingPlanService -> validateExerciseImageUpload -> params:',
+      {
+        params: { exerciseId, expectedVersion, trainingPlanId, workoutId },
+      },
+    );
     const state = await this.trainingPlanRepository.inspectTarget(
       trainingPlanId,
       workoutId,
@@ -534,7 +527,22 @@ export class TrainingPlanService {
     this.assertAggregateCapacity(state);
     if (state.exerciseType !== 'image')
       throw createInvalidExerciseTypeException();
-    const image = await this.exerciseImageService.processAndUpload(file);
+    this.logger.log(
+      'TrainingPlanService -> validateExerciseImageUpload -> completed:',
+      { data: { exerciseId, trainingPlanId, workoutId } },
+    );
+  }
+
+  async commitExerciseImage(
+    trainingPlanId: string,
+    workoutId: string,
+    exerciseId: string,
+    expectedVersion: number,
+    image: StoredExerciseImage,
+  ): Promise<number> {
+    this.logger.log('TrainingPlanService -> commitExerciseImage -> params:', {
+      params: { exerciseId, expectedVersion, trainingPlanId, workoutId },
+    });
     const result = await this.trainingPlanRepository.updateExerciseImage(
       trainingPlanId,
       workoutId,
@@ -543,7 +551,6 @@ export class TrainingPlanService {
       { image },
     );
     if (result === null) {
-      await this.exerciseImageService.deleteImages([image]);
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
@@ -554,11 +561,10 @@ export class TrainingPlanService {
     }
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
-    const response = {
-      data: this.toPublicImage(image),
-      version: result.version,
-    };
-    return response;
+    this.logger.log('TrainingPlanService -> commitExerciseImage -> return:', {
+      data: { exerciseId, trainingPlanId, version: result.version, workoutId },
+    });
+    return result.version;
   }
 
   async removeExerciseImage(
@@ -741,27 +747,6 @@ export class TrainingPlanService {
       version: plan.version,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
-    };
-    return result;
-  }
-
-  private toPublicExercise(exercise: StoredExercise): Exercise {
-    if (exercise.type !== 'image') {
-      const result = exercise;
-      return result;
-    }
-    const result = {
-      ...exercise,
-      image:
-        exercise.image === null ? null : this.toPublicImage(exercise.image),
-    };
-    return result;
-  }
-
-  private toPublicImage(image: StoredExerciseImage): ExerciseImage {
-    const result = {
-      thumbnailUrl: image.thumbnail.url,
-      displayUrl: image.display.url,
     };
     return result;
   }

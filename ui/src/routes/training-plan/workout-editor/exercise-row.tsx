@@ -81,8 +81,10 @@ interface ExerciseRowProps {
   onChange: (changes: UpdateExerciseRequest) => void;
   onDelete: () => void;
   onImageError: (message: string) => void;
+  onImageLoadError: (signedUrlExpiresAt: string) => void;
   onRemoveImage: () => void;
   onRetry: () => void;
+  onRetryImage: () => void;
   onUploadImage: (file: File) => void;
   status: ExerciseSaveStatus;
 }
@@ -96,7 +98,9 @@ type ExerciseFieldProps = Readonly<
     | 'isStructureDisabled'
     | 'onChange'
     | 'onImageError'
+    | 'onImageLoadError'
     | 'onRemoveImage'
+    | 'onRetryImage'
     | 'onUploadImage'
   >
 >;
@@ -109,8 +113,10 @@ export function ExerciseRow({
   onChange,
   onDelete,
   onImageError,
+  onImageLoadError,
   onRemoveImage,
   onRetry,
+  onRetryImage,
   onUploadImage,
   status,
 }: Readonly<ExerciseRowProps>) {
@@ -214,7 +220,9 @@ export function ExerciseRow({
         isStructureDisabled={isStructureDisabled}
         onChange={onChange}
         onImageError={onImageError}
+        onImageLoadError={onImageLoadError}
         onRemoveImage={onRemoveImage}
+        onRetryImage={onRetryImage}
         onUploadImage={onUploadImage}
       />
       {status === 'error' ? (
@@ -280,7 +288,9 @@ function ExerciseFields({
   isStructureDisabled,
   onChange,
   onImageError,
+  onImageLoadError,
   onRemoveImage,
+  onRetryImage,
   onUploadImage,
 }: ExerciseFieldProps) {
   const hasInformationFields = 'name' in exercise;
@@ -297,7 +307,9 @@ function ExerciseFields({
           isStructureDisabled={isStructureDisabled}
           onChange={onChange}
           onImageError={onImageError}
+          onImageLoadError={onImageLoadError}
           onRemoveImage={onRemoveImage}
+          onRetryImage={onRetryImage}
           onUploadImage={onUploadImage}
         />
       ) : null}
@@ -319,7 +331,9 @@ function ExerciseInformationFields({
   isStructureDisabled,
   onChange,
   onImageError,
+  onImageLoadError,
   onRemoveImage,
+  onRetryImage,
   onUploadImage,
 }: ExerciseFieldProps) {
   if (!('name' in exercise)) return null;
@@ -358,8 +372,13 @@ function ExerciseInformationFields({
             imageUrl={exercise.image?.thumbnailUrl}
             isPending={isDisabled || isSavingImage || isStructureDisabled}
             label={`Imagem de ${exercise.name}`}
+            onImageLoadError={() => {
+              if (exercise.image !== null)
+                onImageLoadError(exercise.image.signedUrlExpiresAt);
+            }}
             onError={onImageError}
             onRemove={exercise.image === null ? undefined : onRemoveImage}
+            onRetry={onRetryImage}
             onSelect={onUploadImage}
           />
         </div>

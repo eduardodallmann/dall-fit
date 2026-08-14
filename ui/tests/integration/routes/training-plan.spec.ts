@@ -631,6 +631,38 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(handle).toBeFocused();
   });
 
+  test('renova URL assinada expirada e baixa a imagem direto do Blob', async ({
+    page,
+  }) => {
+    let workoutReads = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'GET' &&
+        request.url().includes(`/workouts/${workoutId}`)
+      )
+        workoutReads += 1;
+    });
+    const privateImageResponse = page.waitForResponse(
+      (response) =>
+        response.status() === 200 &&
+        response
+          .url()
+          .startsWith(
+            'https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com/',
+          ),
+    );
+
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=image-signed-url-expired`,
+    );
+
+    await privateImageResponse;
+    const image = page.getByRole('img', { name: 'Imagem de Supino' });
+    await expect(image).toBeVisible();
+    await expect(image).toHaveAttribute('src', /fake-fresh/);
+    await expect.poll(() => workoutReads).toBeGreaterThanOrEqual(2);
+  });
+
   test('cancela a reordenação pelo teclado sem enviar mutação', async ({
     page,
   }) => {

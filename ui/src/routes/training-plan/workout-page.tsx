@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Alert, Button } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +11,10 @@ import {
   TrainingPlanConflictAlert,
 } from '~/routes/training-plan/components';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
+import {
+  getSignedImageRefreshDelay,
+  isSignedImageNearExpiration,
+} from '~/routes/training-plan/signed-image-urls';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import { trainingPlanWorkoutQueryOptions } from '~/routes/training-plan/training-plan-queries';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
@@ -38,13 +42,52 @@ export function TrainingPlanWorkoutPage({
       mockTrainingPlans,
     ),
   );
+  const refetchWorkout = query.refetch;
   const [reloadKey, setReloadKey] = useState(0);
+  const automaticallyRetriedExpirations = useRef(new Set<string>());
   const workout = query.data;
   const plan = workout?.trainingPlan;
   const aggregate = useAggregateMutationCoordinator(
     trainingPlanId,
     workout?.version,
   );
+
+  const refreshSignedImageUrls = useCallback(() => {
+    refetchWorkout().catch(() => undefined);
+  }, [refetchWorkout]);
+
+  useEffect(() => {
+    if (workout === undefined) return;
+    const delay = getSignedImageRefreshDelay(workout.exercises);
+    if (delay === undefined) return;
+    const timer = window.setTimeout(refreshSignedImageUrls, delay);
+    return () => window.clearTimeout(timer);
+  }, [refreshSignedImageUrls, workout]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible' || workout === undefined)
+        return;
+      const delay = getSignedImageRefreshDelay(workout.exercises);
+      if (delay === 0) refreshSignedImageUrls();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [refreshSignedImageUrls, workout]);
+
+  const handleImageLoadError = (signedUrlExpiresAt: string) => {
+    if (
+      !isSignedImageNearExpiration(signedUrlExpiresAt) ||
+      automaticallyRetriedExpirations.current.has(signedUrlExpiresAt)
+    )
+      return;
+    automaticallyRetriedExpirations.current.add(signedUrlExpiresAt);
+    refreshSignedImageUrls();
+  };
 
   const trackRetry = () =>
     trackUiEvent({
@@ -118,6 +161,8 @@ export function TrainingPlanWorkoutPage({
           key={`${workout.id}:${reloadKey}`}
           mockScenario={mockTrainingPlans}
           onConflict={() => undefined}
+          onImageLoadError={handleImageLoadError}
+          onRetryImage={refreshSignedImageUrls}
         />
       )}
     </div>

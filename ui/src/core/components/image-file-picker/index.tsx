@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import { Button } from '@heroui/react';
 
@@ -12,7 +12,9 @@ interface ImageFilePickerProps {
   isPending: boolean;
   label: string;
   onError: (message: string) => void;
+  onImageLoadError: () => void;
   onRemove?: () => void;
+  onRetry: () => void;
   onSelect: (file: File) => void;
 }
 
@@ -21,16 +23,38 @@ export function ImageFilePicker({
   isPending,
   label,
   onError,
+  onImageLoadError,
   onRemove,
+  onRetry,
   onSelect,
 }: Readonly<ImageFilePickerProps>) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [failedImageUrl, setFailedImageUrl] = useState<string>();
+  const imageUnavailable =
+    imageUrl !== undefined && failedImageUrl === imageUrl;
   return (
     <div className={styles.root()}>
-      {imageUrl === undefined ? null : (
-        <img alt={label} className={styles.image()} src={imageUrl} />
+      {imageUrl === undefined || imageUnavailable ? null : (
+        <img
+          alt={label}
+          className={styles.image()}
+          onError={() => {
+            setFailedImageUrl(imageUrl);
+            onImageLoadError();
+          }}
+          referrerPolicy="no-referrer"
+          src={imageUrl}
+        />
       )}
+      {imageUrl !== undefined && imageUnavailable ? (
+        <div className={styles.fallback()} role="status">
+          <span>Imagem indisponível.</span>
+          <Button onPress={onRetry} size="sm" variant="secondary">
+            Tentar novamente
+          </Button>
+        </div>
+      ) : null}
       <div className={styles.actions()}>
         <Button
           isDisabled={isPending}

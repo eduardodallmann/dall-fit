@@ -62,12 +62,19 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 7. YouTube aceita ID/URLs permitidas, mas a API chama somente
    `img.youtube.com`; a UI deriva a miniatura do ID. Imagens JPEG/PNG/WebP são
    enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
-   thumbnail/display sob o prefixo público `exercise-images/`, sem base64 ou
-   original persistido.
+   thumbnail/display sob `exercise-images/` no Blob privado, sem base64 ou
+   original persistido. Depois da autorização, a API assina cada pathname exato
+   para `get` por quinze minutos e inclui as duas URLs e sua expiração no array de
+   exercícios. O navegador baixa os bytes diretamente do Blob/CDN.
 8. Todo sucesso do editor atualiza a query do workout e os resumos afetados no
    detalhe/listas do mesmo cenário. Voltar pelo breadcrumb e reabrir o treino usa
    nome, exercícios, ordem, mídia, contagem e versão confirmados, sem refresh
    manual; falha ou cancelamento não promove draft ao cache.
+9. A UI agenda a renovação dois minutos antes da primeira expiração e também a
+   verifica quando o documento volta a ficar visível. Refetch substitui somente a
+   mídia confirmada/draft correspondente e não remonta o editor. Falha da imagem
+   perto da expiração tenta uma renovação por ciclo; falha persistente mostra
+   fallback acessível e retry explícito.
 
 ## Concorrência e falhas
 
@@ -84,6 +91,9 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
   restaura ordem relativa ou item/posição/draft corrente sem PATCH oculto;
 - upload/substituição conserva a imagem anterior até o CAS; remoção de imagem nula
   e ordem já idêntica são no-op sem nova versão;
+- falha de assinatura antes do CAS compensa as novas variantes e devolve
+  `503 IMAGE_URL_SIGNING_FAILED`; uma leitura não devolve array parcialmente
+  assinado;
 - primeira falha de leitura mostra estado persistente com retry; refetch falho com
   cache mantém o editor e usa alerta não bloqueante;
 - navegação no editor usa `AlertDialog` enquanto houver draft, debounce, fila,
@@ -104,10 +114,11 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
 ## Dados e privacidade
 
 `TrainingPlanSummary`, detalhe e workout expõem `version`. `Exercise` é union dos
-cinco tipos e `BodyArea` tem 16 valores compartilhados. Keys de Blob, documento
-MongoDB, arquivo, URL informada, nomes, valores de campos e IDs nunca entram em
-Analytics. Operações emitem somente início/terminal enumerados; drag emite uma vez
-no drop e recarga de conflito é retry.
+cinco tipos e `BodyArea` tem 16 valores compartilhados. Keys de Blob, pathnames,
+signed URLs e seus parâmetros, documento MongoDB, arquivo, URL informada, nomes,
+valores de campos e IDs nunca entram em Analytics, logs ou armazenamento
+persistente da UI. Operações emitem somente início/terminal enumerados; drag emite
+uma vez no drop e recarga de conflito é retry.
 
 ## Cenários vivos
 
@@ -125,6 +136,8 @@ no drop e recarga de conflito é retry.
 8. Proteção administrativa: remover `mockAuth=admin` e confirmar redirect.
 9. CSRF renovável: usar `mockAuth=csrf-refresh&mockTrainingPlans=csrf-refresh`.
 10. Revogação administrativa: usar `mockAuth=admin-revoked` e revalidar por foco.
+11. URL expirada e renovação: acrescentar
+    `mockTrainingPlans=image-signed-url-expired`.
 
 ## Cobertura automatizada
 

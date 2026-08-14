@@ -181,12 +181,16 @@ interface WorkoutEditorProps {
   data: TrainingPlanWorkoutDetails;
   mockScenario: MockTrainingPlansScenario;
   onConflict: () => void;
+  onImageLoadError: (signedUrlExpiresAt: string) => void;
+  onRetryImage: () => void;
 }
 
 export function WorkoutEditor({
   data,
   mockScenario,
   onConflict,
+  onImageLoadError,
+  onRetryImage,
 }: Readonly<WorkoutEditorProps>) {
   const queryClient = useQueryClient();
   const initialItems = data.exercises.map(createEditorExercise);
@@ -256,6 +260,31 @@ export function WorkoutEditor({
     },
     [],
   );
+
+  useEffect(() => {
+    setItems((current) =>
+      current.map((item) => {
+        if (
+          item.temporary ||
+          item.draft.type !== 'image' ||
+          item.confirmed.type !== 'image' ||
+          savingImageIds.has(item.draft.id)
+        )
+          return item;
+        const refreshed = data.exercises.find(
+          (exercise) =>
+            exercise.id === item.draft.id && exercise.type === 'image',
+        );
+        if (refreshed?.type !== 'image') return item;
+        const result = {
+          ...item,
+          confirmed: { ...item.confirmed, image: refreshed.image },
+          draft: { ...item.draft, image: refreshed.image },
+        };
+        return result;
+      }),
+    );
+  }, [data.exercises, savingImageIds, setItems]);
 
   const clearTimer = useCallback((exerciseId: string) => {
     const timer = timers.current.get(exerciseId);
@@ -1006,8 +1035,10 @@ export function WorkoutEditor({
                 onChange={(changes) => changeExercise(item.draft.id, changes)}
                 onDelete={() => deleteExercise(item.draft.id)}
                 onImageError={(message) => toast.danger(message)}
+                onImageLoadError={onImageLoadError}
                 onRemoveImage={() => removeImage(item.draft.id)}
                 onRetry={() => saveExercise(item.draft.id)}
+                onRetryImage={onRetryImage}
                 onUploadImage={(file) => uploadImage(item.draft.id, file)}
                 status={item.status}
               />

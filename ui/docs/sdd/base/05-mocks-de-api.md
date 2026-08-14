@@ -213,8 +213,13 @@ satisfaz a precondição. `large-pagination` disponibiliza mais de 2000 itens e
 `two-pages` permite consultar uma página HTTP válida acima do total.
 `version-conflict`, `update-exercise-error`, `delete-exercise-error`,
 `reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor.
+`image-signed-url-expired` entrega primeiro URLs fictícias expiradas e depois um
+novo par, enquanto um handler da origem privada responde `403` ou imagem mínima de
+acordo com a query fictícia. Delegation/signature dos mocks são marcadores
+determinísticos, nunca credenciais reais, e nenhuma request escapa para a rede.
 `csrf-refresh` rejeita o primeiro write protegido e aceita somente a repetição
 explícita com o token renovado; `timeout` mantém a leitura indefinida para testes
 com relógio/abort controlados.
 IDs criados são determinísticos; multipart exige um `File` no campo `file` e nunca
-é convertido em JSON/base64.
+é convertido em JSON/base64. Upload devolve signed URLs fictícias e expiração ISO
+conforme `ExerciseImage`.

@@ -275,6 +275,7 @@ function parseTrainingPlanSearch(
     'update-exercise-error',
     'delete-exercise-error',
     'image-error',
+    'image-signed-url-expired',
     'reorder-error',
     'csrf-refresh',
     'timeout',

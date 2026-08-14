@@ -65,6 +65,8 @@ describe('WorkoutEditor workout name', () => {
           data={workout}
           mockScenario="success"
           onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
         />
       </QueryClientProvider>,
     );
@@ -115,6 +117,8 @@ describe('WorkoutEditor presentation', () => {
           data={workout}
           mockScenario="success"
           onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
         />
       </QueryClientProvider>,
     );
@@ -138,6 +142,8 @@ describe('WorkoutEditor presentation', () => {
           data={workout}
           mockScenario="success"
           onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
         />
       </QueryClientProvider>,
     );
@@ -177,6 +183,8 @@ describe('WorkoutEditor presentation', () => {
           data={{ ...workout, exercises: [exercise] }}
           mockScenario="success"
           onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
         />
       </QueryClientProvider>,
     );
@@ -211,6 +219,8 @@ describe('WorkoutEditor presentation', () => {
           data={{ ...workout, exercises: [exercise] }}
           mockScenario="success"
           onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
         />
       </QueryClientProvider>,
     );
@@ -223,5 +233,58 @@ describe('WorkoutEditor presentation', () => {
     expect(
       screen.queryByText('Alterações aguardando autosave.'),
     ).not.toBeInTheDocument();
+  });
+
+  it('refreshes a signed image without discarding a field draft', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient();
+    const expiresAt = '2026-08-14T12:15:00.000Z';
+    const exercise = {
+      bodyArea: 'chest' as const,
+      id: 'exercise-image-1',
+      image: {
+        displayUrl: 'https://private.blob.test/display-old?signed=fake',
+        signedUrlExpiresAt: expiresAt,
+        thumbnailUrl: 'https://private.blob.test/thumb-old?signed=fake',
+      },
+      name: 'Supino',
+      repetitions: 12,
+      restSeconds: 60,
+      sets: 3,
+      type: 'image' as const,
+    };
+    const renderEditor = (thumbnailUrl: string) => (
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={{
+            ...workout,
+            exercises: [
+              {
+                ...exercise,
+                image: { ...exercise.image, thumbnailUrl },
+              },
+            ],
+          }}
+          mockScenario="success"
+          onConflict={vi.fn()}
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const view = render(renderEditor(exercise.image.thumbnailUrl));
+    const name = screen.getByRole('textbox', { name: 'Nome' });
+    await user.clear(name);
+    await user.type(name, 'Supino com draft');
+
+    const refreshedUrl = 'https://private.blob.test/thumb-new?signed=fake-new';
+    view.rerender(renderEditor(refreshedUrl));
+
+    expect(screen.getByRole('textbox', { name: 'Nome' })).toHaveValue(
+      'Supino com draft',
+    );
+    expect(
+      screen.getByRole('img', { name: 'Imagem de Supino com draft' }),
+    ).toHaveAttribute('src', refreshedUrl);
   });
 });

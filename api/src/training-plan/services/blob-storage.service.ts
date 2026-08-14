@@ -1,79 +1,142 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { del, list, put } from '@vercel/blob';
+import {
+  BlobAccessError,
+  BlobRequestAbortedError,
+  BlobServiceNotAvailable,
+  BlobServiceRateLimited,
+  BlobStoreNotFoundError,
+  BlobStoreSuspendedError,
+  BlobUnknownError,
+  del,
+  issueSignedToken,
+  list,
+  presignUrl,
+  put,
+} from '@vercel/blob';
 
 const BLOB_OPERATION_TIMEOUT_MS = 10_000;
 
+export type BlobFailureCategory =
+  | 'aborted'
+  | 'access_denied'
+  | 'rate_limited'
+  | 'service_unavailable'
+  | 'store_not_found'
+  | 'store_suspended'
+  | 'unknown';
+
+export type BlobOperation = 'delete' | 'list' | 'sign' | 'upload';
+
+export class BlobStorageOperationError extends Error {
+  constructor(
+    readonly operation: BlobOperation,
+    readonly category: BlobFailureCategory,
+  ) {
+    super(`Blob ${operation} failed with category ${category}.`);
+    this.name = BlobStorageOperationError.name;
+  }
+}
+
 export interface StoredBlob {
   key: string;
-  url: string;
 }
 
 @Injectable()
 export class BlobStorageService {
   private readonly logger = new Logger(BlobStorageService.name);
-  constructor(private readonly configService: ConfigService) {}
 
   async upload(pathname: string, content: Buffer): Promise<StoredBlob> {
     this.logger.log('BlobStorageService -> upload -> params:', {
       params: { bytes: content.byteLength, prefix: 'exercise-images' },
     });
-    const token = this.configService.getOrThrow<string>(
-      'BLOB_READ_WRITE_TOKEN',
-    );
-    const storeId = this.configService.getOrThrow<string>('BLOB_STORE_ID');
-    const blob = await put(pathname, content, {
-      access: 'public',
-      addRandomSuffix: true,
-      abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
-      contentType: 'image/webp',
-      token,
-    });
-    let actualHostname: string | undefined;
     try {
-      actualHostname = new URL(blob.url).hostname;
-    } catch {
-      actualHostname = undefined;
+      const blob = await put(pathname, content, {
+        access: 'private',
+        addRandomSuffix: true,
+        abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+        contentType: 'image/webp',
+      });
+      this.logger.log('BlobStorageService -> upload -> put return:', {
+        data: { uploaded: true },
+      });
+      const result = { key: blob.pathname };
+      this.logger.log('BlobStorageService -> upload -> return:', {
+        data: { uploaded: true },
+      });
+      return result;
+    } catch (error: unknown) {
+      const failure = this.toOperationError('upload', error);
+      throw failure;
     }
-    const expectedHostname = `${storeId}.public.blob.vercel-storage.com`;
-    if (actualHostname !== expectedHostname) {
-      this.logger.warn(
-        'BlobStorageService -> upload -> unexpectedStore error:',
-        { data: { expectedStoreMatched: false } },
-      );
-      try {
-        await del(blob.pathname, {
-          abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
-          token,
-        });
-      } catch {
-        this.logger.warn(
-          'BlobStorageService -> upload -> cleanupPending branch:',
-          { data: { count: 1 } },
-        );
-      }
-      throw new Error('Blob storage returned an unexpected public hostname.');
-    }
-    const result = { key: blob.pathname, url: blob.url };
-    this.logger.log('BlobStorageService -> upload -> return:', {
-      data: { uploaded: true },
+  }
+
+  async createSignedReadUrl(
+    pathname: string,
+    validUntil: number,
+  ): Promise<string> {
+    this.logger.log('BlobStorageService -> createSignedReadUrl -> params:', {
+      params: { operation: 'get', pathnamePresent: pathname.length > 0 },
     });
-    return result;
+    try {
+      const signedToken = await issueSignedToken({
+        abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+        operations: ['get'],
+        pathname,
+        validUntil,
+      });
+      this.logger.log(
+        'BlobStorageService -> createSignedReadUrl -> issueSignedToken return:',
+        { data: { issued: true } },
+      );
+      const signed = await presignUrl(signedToken, {
+        access: 'private',
+        operation: 'get',
+        pathname,
+        useCache: true,
+        validUntil,
+      });
+      this.logger.log(
+        'BlobStorageService -> createSignedReadUrl -> presignUrl return:',
+        { data: { signed: true } },
+      );
+      const result = signed.presignedUrl;
+      this.logger.log('BlobStorageService -> createSignedReadUrl -> return:', {
+        data: { signed: true },
+      });
+      return result;
+    } catch (error: unknown) {
+      const failure = this.toOperationError('sign', error);
+      throw failure;
+    }
   }
 
   async delete(keys: readonly string[]): Promise<void> {
     this.logger.log('BlobStorageService -> delete -> params:', {
       params: { count: keys.length },
     });
-    if (keys.length > 0) {
+    if (keys.length === 0) {
+      this.logger.log('BlobStorageService -> delete -> empty branch:', {
+        data: { count: 0 },
+      });
+      this.logger.log('BlobStorageService -> delete -> completed:', {
+        data: { count: 0 },
+      });
+      return;
+    }
+    try {
       await del([...keys], {
         abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
-        token: this.configService.getOrThrow<string>('BLOB_READ_WRITE_TOKEN'),
       });
+      this.logger.log('BlobStorageService -> delete -> del completed:', {
+        data: { count: keys.length },
+      });
+      this.logger.log('BlobStorageService -> delete -> completed:', {
+        data: { count: keys.length },
+      });
+    } catch (error: unknown) {
+      const failure = this.toOperationError('delete', error);
+      throw failure;
     }
-    this.logger.log('BlobStorageService -> delete -> completed:', {
-      data: { count: keys.length },
-    });
   }
 
   async listExerciseKeys(): Promise<readonly string[]> {
@@ -82,19 +145,68 @@ export class BlobStorageService {
     });
     const keys: string[] = [];
     let cursor: string | undefined;
-    do {
-      const page = await list({
-        abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
-        cursor,
-        prefix: 'exercise-images/',
-        token: this.configService.getOrThrow<string>('BLOB_READ_WRITE_TOKEN'),
+    try {
+      do {
+        const page = await list({
+          abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+          cursor,
+          prefix: 'exercise-images/',
+        });
+        keys.push(...page.blobs.map((blob) => blob.pathname));
+        cursor = page.hasMore ? page.cursor : undefined;
+      } while (cursor !== undefined);
+      this.logger.log(
+        'BlobStorageService -> listExerciseKeys -> list completed:',
+        { data: { count: keys.length } },
+      );
+      const result = keys;
+      this.logger.log('BlobStorageService -> listExerciseKeys -> return:', {
+        data: { count: result.length },
       });
-      keys.push(...page.blobs.map((blob) => blob.pathname));
-      cursor = page.hasMore ? page.cursor : undefined;
-    } while (cursor !== undefined);
-    this.logger.log('BlobStorageService -> listExerciseKeys -> return:', {
-      data: { count: keys.length },
-    });
-    return keys;
+      return result;
+    } catch (error: unknown) {
+      const failure = this.toOperationError('list', error);
+      throw failure;
+    }
   }
+
+  private toOperationError(
+    operation: BlobOperation,
+    error: unknown,
+  ): BlobStorageOperationError {
+    const category = classifyBlobFailure(error);
+    this.logger.error('BlobStorageService -> toOperationError -> sdk error:', {
+      data: { category, operation },
+    });
+    const result = new BlobStorageOperationError(operation, category);
+    this.logger.log('BlobStorageService -> toOperationError -> return:', {
+      data: { category, operation },
+    });
+    return result;
+  }
+}
+
+function classifyBlobFailure(error: unknown): BlobFailureCategory {
+  let result: BlobFailureCategory;
+  if (
+    error instanceof BlobRequestAbortedError ||
+    (error instanceof DOMException && error.name === 'TimeoutError')
+  ) {
+    result = 'aborted';
+  } else if (error instanceof BlobAccessError) {
+    result = 'access_denied';
+  } else if (error instanceof BlobStoreNotFoundError) {
+    result = 'store_not_found';
+  } else if (error instanceof BlobStoreSuspendedError) {
+    result = 'store_suspended';
+  } else if (error instanceof BlobServiceRateLimited) {
+    result = 'rate_limited';
+  } else if (error instanceof BlobServiceNotAvailable) {
+    result = 'service_unavailable';
+  } else if (error instanceof BlobUnknownError) {
+    result = 'unknown';
+  } else {
+    result = 'unknown';
+  }
+  return result;
 }

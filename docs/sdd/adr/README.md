@@ -17,3 +17,10 @@ substituída permanece no histórico e aponta para a sucessora.
   planos por owner e árvore embutida.
 - [`ADR-0004`](ADR-0004-sessao-revogavel-redis-e-csrf.md): sessão revogável no
   Redis, defesa CSRF e proteção da fronteira cross-site.
+- [`ADR-0005`](ADR-0005-limites-concorrencia-e-midia-dos-planos.md): limites,
+  CAS e decisão histórica de mídia pública, parcialmente substituída pela
+  ADR-0007.
+- [`ADR-0006`](ADR-0006-versao-de-recurso-em-header-de-dominio.md): versão de
+  aggregate no header `X-Resource-Version`.
+- [`ADR-0007`](ADR-0007-blob-privado-oidc-e-urls-assinadas.md): Blob privado por
+  OIDC e entrega direta por signed URLs temporárias.

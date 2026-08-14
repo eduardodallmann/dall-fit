@@ -204,6 +204,28 @@ describe('validateEnvironment', () => {
     ).toThrow('REDIS_NAMESPACE: required in production');
   });
 
+  it('requires only the opaque Blob store id for a published runtime', () => {
+    const productionEnvironment = {
+      ...validEnvironment,
+      AUTH_COOKIE_SECURE: 'true',
+      BLOB_STORE_ID: 'store_8u9fq5re0OENMRtC',
+      NODE_ENV: 'production',
+      REDIS_NAMESPACE: 'dall-fit:production',
+      REDIS_URL: 'rediss://redis.example.test:6379',
+      TRUST_PROXY_HOPS: '1',
+    };
+
+    expect(validateEnvironment(productionEnvironment)).toMatchObject({
+      BLOB_STORE_ID: 'store_8u9fq5re0OENMRtC',
+    });
+    expect(() =>
+      validateEnvironment({
+        ...productionEnvironment,
+        BLOB_STORE_ID: undefined,
+      }),
+    ).toThrow('BLOB_STORE_ID is required in production and preview');
+  });
+
   it('rejects disabled or unbounded rate limit settings', () => {
     expect(() =>
       validateEnvironment({

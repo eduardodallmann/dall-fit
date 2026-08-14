@@ -31,13 +31,20 @@ listagem tem page máxima 100, ordem
 `YoutubeReferenceService` normaliza allowlist e consulta apenas o thumbnail do host
 fixo. `ExerciseImageService` valida até 10 MiB/40 MP, rejeita animação, remove
 metadata e gera WebP 160x160 e 1080x1920 sem ampliação. `BlobStorageService`
-encapsula o SDK público e grava apenas sob `exercise-images/` no store
-`gvi3tyf5ckqiqlak`. Cada upload confirma que o hostname público devolvido pertence
-ao `BLOB_STORE_ID` configurado; divergência tenta remover o blob recém-criado e
-falha sem persistir a referência. Token/key nunca cruzam a API HTTP. MongoDB é a verdade,
-uploads parciais são compensados e limpezas pós-commit podem ser retomadas por
-`pnpm -C api images:reconcile` (dry-run por padrão; `--execute` é explícito).
+encapsula `@vercel/blob` no store privado identificado pelo valor opaco de
+`BLOB_STORE_ID`. Produção/Preview usam OIDC gerenciado pela Vercel; a aplicação não
+recebe nem passa `BLOB_READ_WRITE_TOKEN`, não deriva hostname do ID e não configura
+uma URL paralela. `put` usa `access: 'private'`; `del` e `list` selecionam o mesmo
+store por OIDC.
 
+MongoDB persiste somente pathname/key e dimensões. Depois da autorização da
+request, `ExerciseImageService` emite um delegation token por pathname exato com
+`issueSignedToken`, operação `get` e validade de quinze minutos, e o converte com
+`presignUrl` privado e cache do Blob. As duas variantes compartilham a expiração;
+a hidratação limita-se a quatro imagens simultâneas, no máximo oito emissões. Token,
+pathname e signed URL nunca são registrados. Upload parcial, falha de assinatura
+ou falha pré-CAS compensam blobs novos; limpezas pós-commit podem ser retomadas por
+`pnpm -C api images:reconcile` (dry-run por padrão; `--execute` é explícito).
 `autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
 `pnpm -C api indexes:apply -- --execute` com
 `INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v1`. O comando cria primeiro
