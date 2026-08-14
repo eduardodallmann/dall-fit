@@ -90,12 +90,21 @@ function getState(scenario: string): ScenarioState {
       ),
     };
   }
-  if (scenario === 'image-signed-url-expired') {
+  if (
+    scenario === 'image-signed-url-expired' ||
+    scenario === 'image-ready' ||
+    scenario === 'image-error'
+  ) {
     result.workout = {
       ...result.workout,
       exercises: result.workout.exercises.map((exercise) =>
         exercise.type === 'image'
-          ? { ...exercise, image: signedExerciseImage('expired') }
+          ? {
+              ...exercise,
+              image: signedExerciseImage(
+                scenario === 'image-signed-url-expired' ? 'expired' : 'fresh',
+              ),
+            }
           : exercise,
       ),
     };
@@ -464,6 +473,7 @@ export const trainingPlanHandlers = [
     '*/global/training-plans/:trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image',
     async ({ params, request }) => {
       const scenario = getScenario(request);
+      await delay(300);
       if (scenario === 'image-error')
         return apiError('IMAGE_UPLOAD_FAILED', 'Image upload failed.', 503);
       const state = getState(scenario);
@@ -487,8 +497,11 @@ export const trainingPlanHandlers = [
   ),
   http.delete(
     '*/global/training-plans/:trainingPlanId/workouts/:workoutId/exercises/:exerciseId/image',
-    ({ params, request }) => {
+    async ({ params, request }) => {
       const scenario = getScenario(request);
+      await delay(300);
+      if (scenario === 'image-error')
+        return apiError('IMAGE_DELETE_FAILED', 'Image delete failed.', 503);
       const state = getState(scenario);
       const invalid = validateMutation(request, state, scenario);
       if (invalid !== null) return invalid;

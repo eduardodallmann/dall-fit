@@ -212,8 +212,10 @@ a versão por mutação efetiva e mantém ordem/imagem. O header legado `If-Matc
 satisfaz a precondição. `large-pagination` disponibiliza mais de 2000 itens e
 `two-pages` permite consultar uma página HTTP válida acima do total.
 `version-conflict`, `update-exercise-error`, `delete-exercise-error`,
-`reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor.
-`image-signed-url-expired` entrega primeiro URLs fictícias expiradas e depois um
+`reorder-error` e `image-error` cobrem concorrência, drafts e rollbacks do editor;
+as mutações de imagem esperam `300ms` para tornar o pending observável.
+`image-ready` entrega mídia existente e `image-signed-url-expired` entrega primeiro
+URLs fictícias expiradas e depois um
 novo par, enquanto um handler da origem privada responde `403` ou imagem mínima de
 acordo com a query fictícia. Delegation/signature dos mocks são marcadores
 determinísticos, nunca credenciais reais, e nenhuma request escapa para a rede.

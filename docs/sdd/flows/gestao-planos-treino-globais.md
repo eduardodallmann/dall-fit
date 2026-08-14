@@ -60,12 +60,19 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
    durante debounce cancela o timer e captura draft, dirty e posição para rollback
    localizado.
 7. YouTube aceita ID/URLs permitidas, mas a API chama somente
-   `img.youtube.com`; a UI deriva a miniatura do ID. Imagens JPEG/PNG/WebP são
+   `img.youtube.com`; a UI deriva a miniatura clicável do ID e abre o vídeo em
+   modal amplo com nome do exercício e player carregado sob demanda, sem som, sem
+   forçar legendas e desmontado ao fechar. Short preserva 9:16 e vídeo longo
+   preserva 16:9; os overlays de mídia encerram conteúdo e modal juntos, sem
+   animação de saída.
+   Imagens JPEG/PNG/WebP são
    enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
    thumbnail/display sob `exercise-images/` no Blob privado, sem base64 ou
    original persistido. Depois da autorização, a API assina cada pathname exato
    para `get` por quinze minutos e inclui as duas URLs e sua expiração no array de
-   exercícios. O navegador baixa os bytes diretamente do Blob/CDN.
+   exercícios. O navegador baixa os bytes diretamente do Blob/CDN. A miniatura
+   abre `displayUrl` em modal; sem imagem, clique, teclado ou drop de um arquivo
+   usam a mesma validação e operação.
 8. Todo sucesso do editor atualiza a query do workout e os resumos afetados no
    detalhe/listas do mesmo cenário. Voltar pelo breadcrumb e reabrir o treino usa
    nome, exercícios, ordem, mídia, contagem e versão confirmados, sem refresh
@@ -89,8 +96,11 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
   saving, mantém patch dirty e oferece retry explícito sem toast de sucesso;
 - falha de criação remove somente a linha temporária; falha de ordem/exclusão
   restaura ordem relativa ou item/posição/draft corrente sem PATCH oculto;
-- upload/substituição conserva a imagem anterior até o CAS; remoção de imagem nula
-  e ordem já idêntica são no-op sem nova versão;
+- upload/substituição conserva a imagem anterior até o CAS; enquanto uma operação
+  de mídia espera ou executa, área, preview e ações aplicáveis ficam desabilitados
+  com spinner contextual, sem mensagem visual redundante. Falha restaura o estado
+  interativo anterior. Remoção de imagem nula e ordem já idêntica são no-op sem
+  nova versão;
 - falha de assinatura antes do CAS compensa as novas variantes e devolve
   `503 IMAGE_URL_SIGNING_FAILED`; uma leitura não devolve array parcialmente
   assinado;

@@ -31,9 +31,11 @@ import {
   type UpdateExerciseRequest,
 } from '@dall-fit/types';
 
+import { trackUiEvent } from '~/core/analytics';
 import { ImageFilePicker } from '~/core/components/image-file-picker';
 
 import type { ExerciseSaveStatus } from './editor-state';
+import { ExerciseVideoPreview } from './exercise-video-preview';
 import { workoutEditorStyles } from './styles';
 
 const styles = workoutEditorStyles();
@@ -337,50 +339,80 @@ function ExerciseInformationFields({
   onUploadImage,
 }: ExerciseFieldProps) {
   if (!('name' in exercise)) return null;
+  const nameField = (
+    <TextInput
+      className={styles.flexibleField()}
+      isDisabled={isDisabled}
+      label="Nome"
+      maxLength={40}
+      onChange={(name) => onChange({ name })}
+      value={exercise.name}
+    />
+  );
   return (
     <div className={styles.informationFields()}>
-      <TextInput
-        className={styles.flexibleField()}
-        isDisabled={isDisabled}
-        label="Nome"
-        maxLength={40}
-        onChange={(name) => onChange({ name })}
-        value={exercise.name}
-      />
-      {'youtubeId' in exercise ? (
-        <TextInput
-          className={styles.flexibleField()}
-          isDisabled={isDisabled}
-          label="Vídeo (ID)"
-          maxLength={2048}
-          onChange={(youtubeId) => onChange({ youtubeId })}
-          value={exercise.youtubeId}
-        />
-      ) : null}
-      {'youtubeId' in exercise ? (
-        <div className={styles.mediaRegion()}>
-          <img
-            alt={`Miniatura de ${exercise.name}`}
-            className={styles.youtubeThumbnail()}
-            src={`https://img.youtube.com/vi/${exercise.youtubeId}/default.jpg`}
-          />
-        </div>
-      ) : null}
       {exercise.type === 'image' ? (
-        <div className={styles.mediaRegion()}>
-          <ImageFilePicker
-            imageUrl={exercise.image?.thumbnailUrl}
-            isPending={isDisabled || isSavingImage || isStructureDisabled}
-            label={`Imagem de ${exercise.name}`}
-            onImageLoadError={() => {
-              if (exercise.image !== null)
-                onImageLoadError(exercise.image.signedUrlExpiresAt);
-            }}
-            onError={onImageError}
-            onRemove={exercise.image === null ? undefined : onRemoveImage}
-            onRetry={onRetryImage}
-            onSelect={onUploadImage}
+        <div className={styles.nameMediaGroup()}>
+          {nameField}
+          <div className={styles.mediaRegion()}>
+            <ImageFilePicker
+              displayImageUrl={exercise.image?.displayUrl}
+              imageUrl={exercise.image?.thumbnailUrl}
+              isDisabled={isDisabled || isStructureDisabled}
+              isPending={isSavingImage}
+              label={`Imagem de ${exercise.name}`}
+              onImageLoadError={() => {
+                if (exercise.image !== null)
+                  onImageLoadError(exercise.image.signedUrlExpiresAt);
+              }}
+              onError={onImageError}
+              onPreviewClose={(reason) => {
+                trackUiEvent({
+                  control: 'image_preview',
+                  eventName: 'ui_overlay_closed',
+                  overlay: 'exercise_image_preview',
+                  reason,
+                  surface: 'workout',
+                });
+              }}
+              onPreviewOpen={() => {
+                trackUiEvent({
+                  control: 'image_preview',
+                  eventName: 'ui_overlay_opened',
+                  overlay: 'exercise_image_preview',
+                  surface: 'workout',
+                });
+              }}
+              onRemove={exercise.image === null ? undefined : onRemoveImage}
+              onRetry={onRetryImage}
+              onSelect={onUploadImage}
+              previewTitle={exercise.name}
+            />
+          </div>
+        </div>
+      ) : (
+        nameField
+      )}
+      {'youtubeId' in exercise ? (
+        <div className={styles.videoMediaGroup()}>
+          <TextInput
+            className={styles.flexibleField()}
+            isDisabled={isDisabled}
+            label="Vídeo (ID)"
+            maxLength={2048}
+            onChange={(youtubeId) => onChange({ youtubeId })}
+            value={exercise.youtubeId}
           />
+          <div className={styles.videoMediaRegion()}>
+            <ExerciseVideoPreview
+              exerciseName={exercise.name}
+              isDisabled={isDisabled || isStructureDisabled}
+              orientation={
+                exercise.type === 'youtube-short' ? 'vertical' : 'horizontal'
+              }
+              youtubeId={exercise.youtubeId}
+            />
+          </div>
         </div>
       ) : null}
       <BodyAreaSelect

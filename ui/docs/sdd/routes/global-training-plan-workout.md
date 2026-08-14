@@ -38,8 +38,25 @@ Cada card possui cabeçalho com handle e ícone do tipo à esquerda, `Chip` e a�
 exclusão à direita. Identificação, mídia e body area ocupam a linha seguinte;
 campos numéricos ficam sempre em outra linha. Três números dividem essa linha em
 larguras iguais no desktop e empilham individualmente no viewport pequeno. Vídeo
-usa label `Vídeo (ID)`; imagem mantém prévia e ações de envio/substituição/remoção
-na região de mídia. Nenhuma largura produz scroll horizontal.
+usa label `Vídeo (ID)` e mantém ao lado uma miniatura proporcional com a mesma
+altura do conjunto label/input em todas as larguras. A miniatura inteira é um
+controle com ícone `Play` discreto, centralizado e de 18 px; sua ativação abre um
+`Modal` HeroUI amplo com header separado, nome do exercício e fechar sempre acima
+da mídia. O `react-player` é carregado sob demanda, reproduz automaticamente sem
+som e inline, sem forçar legendas. O corpo conserva 9:16 para YouTube Short e 16:9
+para YouTube Longo, cresce até os limites do viewport sem scroll horizontal e não
+deforma o vídeo. O player só permanece montado enquanto o modal está aberto. O
+fechamento não anima a saída: player, diálogo e backdrop desaparecem juntos,
+interrompem a reprodução e restauram o foco.
+
+No exercício de imagem, nome e região de mídia formam o mesmo grupo. Quando existe
+mídia, `thumbnailUrl` tem a altura do conjunto label/input de `Nome`, conserva a
+proporção e funciona inteira como preview com `Eye` centralizado. `Substituir
+imagem` e `Remover imagem` são botões icon-only empilhados à direita e não excedem
+a altura da miniatura. O modal usa `displayUrl`; uma renovação da query substitui
+as URLs sem fechar o overlay. Ele possui header separado com o nome do exercício,
+mantém o fechar acima da mídia, ocupa até 90% da largura e 78% da altura útil do
+viewport e fecha sem animação de saída. Nenhuma largura produz scroll horizontal.
 
 O slot da exclusão possui dimensão fixa e recebe o `Spinner` sem deslocar o card.
 O Popover abre abaixo do icon button, com bordas direitas alinhadas, tem nome
@@ -62,8 +79,9 @@ e emita `pointercancel`; o restante do card e da página continua rolável.
 | Duração       | nome, body area, minutos                                                |
 
 TextField/Input, NumberField, Select/ListBox, Chip, Spinner, Dropdown, Popover,
-Button e Alert são HeroUI. `ImageFilePicker` é a única composição transversal
-própria e usa input file nativo acessível.
+Button, Modal e Alert são HeroUI. `ImageFilePicker` é a composição transversal
+própria para imagem e usa input file nativo acessível. `ExerciseVideoPreview` é
+exclusivo da rota e encapsula miniatura, modal e `react-player`.
 
 ## Autosave e mutações
 
@@ -112,10 +130,15 @@ e exige reconciliação da query antes de nova tentativa.
 
 Upload/substituição/remover imagem são imediatos, mas usam a mesma fila. A UI
 valida JPEG/PNG/WebP e 10 MiB antes de FormData, conserva a imagem anterior durante
-loading e nunca lê base64. A response usa signed URLs temporárias do host privado
+loading e nunca lê base64. Sem imagem, uma área tracejada com `Plus` aceita clique,
+teclado ou o drop de exatamente um arquivo. Durante upload ela fica desabilitada,
+troca o `Plus` por `Spinner` e mantém `Processando imagem` apenas em região viva.
+Durante substituição ou remoção, ambos os botões e o preview ficam desabilitados,
+a miniatura fica em escala de cinza e o `Eye` dá lugar ao `Spinner`; erro restaura
+a mídia anterior e reabilita os controles. A response usa signed URLs temporárias do host privado
 `8u9fq5re0oenmrtc.private.blob.vercel-storage.com` e informa uma expiração comum.
 O `<img>` acessa diretamente a URL, sem Axios, cookie da API ou endpoint binário.
-`image:null` não mostra placeholder de mídia.
+`image:null` mostra somente a área de envio, sem inventar conteúdo de mídia.
 
 A query agenda uma renovação dois minutos antes da expiração mais próxima e
 verifica novamente quando o documento volta a ficar visível. Refetch atualiza
@@ -139,7 +162,9 @@ Not-found distingue plano/workout na API sem expor ownership. Somente o erro
 externo sem esse código segue como falha genérica. Erros iniciais não dependem de
 toast; o pending usa anúncio `aria-live` não visual e spinners contextuais
 nomeados. Handles e botões icon-only têm nomes contextuais, miniaturas têm alt
-derivado do nome visível e drag possui instruções do sensor de teclado.
+derivado do nome visível, controles de preview nomeiam a ação e drag possui
+instruções do sensor de teclado. Modais fecham por `Escape`, backdrop e controle
+explícito, contêm o foco e o devolvem ao preview que os abriu.
 
 Enquanto a fila estiver pausada, adicionar, handle, excluir, mídia, salvar nome e
 retry/dispatch de autosave ficam desabilitados; campos persistidos continuam
@@ -155,7 +180,7 @@ toast ou Analytics.
 
 ## Analytics e privacidade
 
-Nome, adicionar/tipo, campos, drop, exclusão, mídia e retry usam enums do catálogo.
+Nome, adicionar/tipo, campos, drop, exclusão, mídia, previews e retry usam enums do catálogo.
 Cada operação aceita emite início e terminal; conflito é erro e recarga é retry.
 Não se enviam IDs, nomes, valores, URLs, arquivos, tamanhos, ordem, código externo
 ou seletor mock. Signed URL, pathname, query de assinatura e expiração também não
@@ -171,11 +196,13 @@ entram em Analytics nem em storage persistente.
 - rollback de ordem com draft posterior: `reorder-error`;
 - conflito: `version-conflict`;
 - imagem falha: `image-error`.
+- imagem existente: `image-ready`;
 - URL assinada expirada/renovação: `image-signed-url-expired`;
 - lista vazia: `empty-workout`.
 
-Vitest cobre services, coordenador, merge por revisão e restauração estrutural;
-Playwright cobre os cinco tipos, mídia privada/renovação, empty state/menu informativo, layouts desktop e
+Vitest cobre services, coordenador, merge por revisão, restauração estrutural,
+upload/drop, estados pendentes e ciclo de montagem dos modais de mídia;
+Playwright cobre os cinco tipos, mídia privada/renovação/pending/rollback, empty state/menu informativo, layouts desktop e
 móvel, duas adições consecutivas com propagação de versão, retorno sem cache antigo,
 autosave, conflito, exclusão durante debounce, ordem por teclado/cancelamento/
 rollback e proteção acessível. E2E separado cobre API/MongoDB. Não há referência visual em

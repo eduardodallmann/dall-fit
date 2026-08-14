@@ -663,6 +663,199 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect.poll(() => workoutReads).toBeGreaterThanOrEqual(2);
   });
 
+  test('alinha previews e abre modais de mídia amplos com header', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=image-ready`,
+    );
+    const exerciseList = page.getByRole('list', {
+      name: 'Exercícios em ordem',
+    });
+    const youtubeExercise = exerciseList.getByRole('listitem').first();
+    const imageExercise = exerciseList.getByRole('listitem').nth(1);
+    const assertAlignedMedia = async () => {
+      const videoField = youtubeExercise
+        .getByLabel('Vídeo (ID)')
+        .locator('xpath=ancestor::*[@data-slot="textfield"][1]');
+      const videoLabel = videoField.locator('[data-slot="label"]');
+      const videoInput = videoField.locator('[data-slot="input"]');
+      const videoPreview = youtubeExercise.getByRole('button', {
+        name: 'Reproduzir vídeo de Agachamento',
+      });
+      const nameField = imageExercise
+        .getByLabel('Nome')
+        .locator('xpath=ancestor::*[@data-slot="textfield"][1]');
+      const imagePreview = imageExercise.getByRole('button', {
+        name: 'Visualizar imagem de supino',
+      });
+      const [
+        videoLabelBox,
+        videoInputBox,
+        videoPreviewBox,
+        nameFieldBox,
+        imagePreviewBox,
+      ] = await Promise.all([
+        videoLabel.boundingBox(),
+        videoInput.boundingBox(),
+        videoPreview.boundingBox(),
+        nameField.boundingBox(),
+        imagePreview.boundingBox(),
+      ]);
+      expect(videoLabelBox).not.toBeNull();
+      expect(videoInputBox).not.toBeNull();
+      expect(videoPreviewBox).not.toBeNull();
+      expect(nameFieldBox).not.toBeNull();
+      expect(imagePreviewBox).not.toBeNull();
+      expect(
+        Math.abs((videoLabelBox?.y ?? 0) - (videoPreviewBox?.y ?? 0)),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          (videoInputBox?.y ?? 0) +
+            (videoInputBox?.height ?? 0) -
+            ((videoPreviewBox?.y ?? 0) + (videoPreviewBox?.height ?? 0)),
+        ),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs((nameFieldBox?.height ?? 0) - (imagePreviewBox?.height ?? 0)),
+      ).toBeLessThanOrEqual(1);
+    };
+
+    await assertAlignedMedia();
+    const imagePreview = imageExercise.getByRole('button', {
+      name: 'Visualizar imagem de supino',
+    });
+    await imagePreview.click();
+    const dialog = page.getByRole('dialog', { name: 'Imagem de Supino' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Supino' })).toBeVisible();
+    await expect(
+      dialog.getByRole('img', { name: 'Imagem de Supino' }),
+    ).toHaveAttribute('src', /display\.webp.*fake-fresh/);
+    const imageDialogBox = await dialog.boundingBox();
+    const imageBodyBox = await dialog
+      .locator('[data-slot="modal-body"]')
+      .boundingBox();
+    expect(imageDialogBox).not.toBeNull();
+    expect(imageBodyBox).not.toBeNull();
+    expect(imageDialogBox?.width ?? 0).toBeGreaterThanOrEqual(
+      page.viewportSize()?.width ? (page.viewportSize()?.width ?? 0) * 0.8 : 0,
+    );
+    expect(imageBodyBox?.height ?? 0).toBeGreaterThanOrEqual(
+      page.viewportSize()?.height
+        ? (page.viewportSize()?.height ?? 0) * 0.7
+        : 0,
+    );
+    const closeImage = page.getByRole('button', { name: 'Fechar imagem' });
+    const closeImageBox = await closeImage.boundingBox();
+    expect(closeImageBox).not.toBeNull();
+    expect(
+      (closeImageBox?.y ?? 0) + (closeImageBox?.height ?? 0),
+    ).toBeLessThanOrEqual(imageBodyBox?.y ?? 0);
+    await closeImage.click();
+    await expect(imagePreview).toBeFocused();
+
+    const assertVideoModal = async (
+      exerciseIndex: number,
+      exerciseName: string,
+      expectedAspectRatio: number,
+    ) => {
+      const exercise = exerciseList.getByRole('listitem').nth(exerciseIndex);
+      const preview = exercise.getByRole('button', {
+        name: `Reproduzir vídeo de ${exerciseName}`,
+      });
+      await preview.click();
+      const videoDialog = page.getByRole('dialog', {
+        name: `Vídeo de ${exerciseName}`,
+      });
+      await expect(videoDialog).toBeVisible();
+      await expect(
+        videoDialog.getByRole('heading', { name: exerciseName }),
+      ).toBeVisible();
+      const videoBodyBox = await videoDialog
+        .locator('[data-slot="modal-body"]')
+        .boundingBox();
+      expect(videoBodyBox).not.toBeNull();
+      expect(
+        (videoBodyBox?.width ?? 0) / (videoBodyBox?.height ?? 1),
+      ).toBeCloseTo(expectedAspectRatio, 2);
+      const closeVideo = page.getByRole('button', { name: 'Fechar vídeo' });
+      const closeVideoBox = await closeVideo.boundingBox();
+      expect(closeVideoBox).not.toBeNull();
+      expect(
+        (closeVideoBox?.y ?? 0) + (closeVideoBox?.height ?? 0),
+      ).toBeLessThanOrEqual(videoBodyBox?.y ?? 0);
+      await closeVideo.click();
+      await expect(videoDialog).toHaveCount(0);
+      await expect(preview).toBeFocused();
+    };
+
+    await assertVideoModal(0, 'Agachamento', 9 / 16);
+    await assertVideoModal(2, 'Mobilidade', 16 / 9);
+
+    await page.setViewportSize({ height: 844, width: 390 });
+    await assertAlignedMedia();
+  });
+
+  test('envia imagem pela área vazia e expõe pending sem texto visual', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin`,
+    );
+    const imageExercise = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Imagem' });
+    const emptyArea = imageExercise.getByRole('button', {
+      name: 'Enviar imagem de supino',
+    });
+    const fileChooser = page.waitForEvent('filechooser');
+    await emptyArea.click();
+    const chooser = await fileChooser;
+    await chooser.setFiles('tests/fixtures/mock-image.webp');
+
+    await expect(emptyArea).toBeDisabled();
+    await expect(imageExercise.getByText('Processando imagem')).toBeHidden();
+    await expect(
+      imageExercise.getByRole('button', { name: 'Substituir imagem' }),
+    ).toBeVisible();
+    await expect(
+      imageExercise.getByRole('button', { name: 'Remover imagem' }),
+    ).toBeEnabled();
+  });
+
+  test('preserva a imagem e reabilita ações quando a remoção falha', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=image-error`,
+    );
+    const imageExercise = page
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Imagem' });
+    const remove = imageExercise.getByRole('button', {
+      name: 'Remover imagem',
+    });
+    await remove.click();
+
+    await expect(remove).toBeDisabled();
+    await expect(
+      imageExercise.getByRole('button', {
+        name: 'Visualizar imagem de supino',
+      }),
+    ).toBeDisabled();
+    await expect(
+      page.getByText('Não foi possível remover a imagem.'),
+    ).toBeVisible();
+    await expect(remove).toBeEnabled();
+    await expect(
+      imageExercise.getByRole('img', { name: 'Imagem de Supino' }),
+    ).toBeVisible();
+  });
+
   test('cancela a reordenação pelo teclado sem enviar mutação', async ({
     page,
   }) => {

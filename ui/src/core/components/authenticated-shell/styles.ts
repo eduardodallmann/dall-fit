@@ -6,7 +6,9 @@ export const authenticatedShellStyles = tv({
     desktopMenu:
       'sticky top-0 hidden h-svh w-72 shrink-0 border-r border-border md:block',
     drawerBody: 'p-0',
-    drawerDialog: 'p-0',
+    drawerCloseTrigger:
+      '-right-12 top-4 rounded-full bg-surface text-foreground shadow-overlay',
+    drawerDialog: 'relative p-0',
     menuIcon: 'size-5',
     mobileTrigger: 'fixed top-4 left-4 z-40 md:hidden',
     shell: 'flex min-h-svh min-w-0 bg-background text-foreground',
