@@ -724,6 +724,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
       expect(imagePreviewBox).not.toBeNull();
       expect(replaceImageBox).not.toBeNull();
       expect(removeImageBox).not.toBeNull();
+      expect(imagePreviewBox?.height ?? 0).toBeLessThanOrEqual(64);
       expect(
         Math.abs((videoLabelBox?.y ?? 0) - (videoPreviewBox?.y ?? 0)),
       ).toBeLessThanOrEqual(1);
@@ -749,9 +750,13 @@ test.describe('Rotas administrativas de planos de treino', () => {
           (removeImageBox?.y ?? 0) +
             (removeImageBox?.height ?? 0) -
             (replaceImageBox?.y ?? 0) -
-            (imagePreviewBox?.height ?? 0),
+            60,
         ),
       ).toBeLessThanOrEqual(1);
+      expect((replaceImageBox?.y ?? 0) - (imagePreviewBox?.y ?? 0)).toBeCloseTo(
+        ((imagePreviewBox?.height ?? 0) - 60) / 2,
+        0,
+      );
     };
 
     await assertAlignedMedia();
@@ -843,12 +848,27 @@ test.describe('Rotas administrativas de planos de treino', () => {
     const emptyArea = imageExercise.getByRole('button', {
       name: 'Enviar imagem de supino',
     });
+    const colorsWithoutHover = await emptyArea.evaluate((element) => {
+      const computedStyle = window.getComputedStyle(element);
+      return {
+        borderColor: computedStyle.borderColor,
+        color: computedStyle.color,
+      };
+    });
     const fileChooser = page.waitForEvent('filechooser');
     await emptyArea.click();
     const chooser = await fileChooser;
     await chooser.setFiles('tests/fixtures/mock-image.webp');
 
     await expect(emptyArea).toBeDisabled();
+    const colorsWhilePending = await emptyArea.evaluate((element) => {
+      const computedStyle = window.getComputedStyle(element);
+      return {
+        borderColor: computedStyle.borderColor,
+        color: computedStyle.color,
+      };
+    });
+    expect(colorsWhilePending).toEqual(colorsWithoutHover);
     await expect(imageExercise.getByText('Processando imagem')).toBeHidden();
     await expect(
       imageExercise.getByRole('button', { name: 'Substituir imagem' }),

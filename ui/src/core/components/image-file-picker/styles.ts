@@ -4,12 +4,12 @@ export const imageFilePickerStyles = tv({
   slots: {
     actionButton: 'size-7 min-h-7 min-w-7',
     actionIcon: 'size-4',
-    actions: 'flex h-full flex-col justify-between gap-1',
+    actions: 'flex h-full flex-col justify-center gap-1',
     displayFallback:
       'flex h-[min(78svh,60rem)] items-center justify-center text-sm text-muted',
     displayImage: 'h-[min(78svh,60rem)] w-full object-contain',
     dropZone:
-      'flex aspect-square h-full items-center justify-center rounded-lg border border-dashed border-border bg-surface-secondary text-muted outline-none transition-colors hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60',
+      'flex aspect-square h-full items-center justify-center rounded-lg border border-dashed border-border bg-surface-secondary text-muted outline-none transition-colors enabled:hover:border-accent enabled:hover:text-accent focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60 disabled:transition-none',
     fallback:
       'flex h-full max-w-48 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted',
     image: 'h-full w-auto max-w-32 object-cover',
@@ -26,7 +26,7 @@ export const imageFilePickerStyles = tv({
       'absolute inset-0 flex items-center justify-center bg-black/35 text-white transition-colors group-hover:bg-black/45',
     previewTrigger:
       'group relative h-full min-w-0 overflow-hidden rounded-lg border border-border bg-black p-0 outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed',
-    root: 'flex h-full items-stretch gap-2',
+    root: 'flex h-16 items-stretch gap-2 md:h-[3.75rem]',
     status: 'sr-only',
   },
   variants: {

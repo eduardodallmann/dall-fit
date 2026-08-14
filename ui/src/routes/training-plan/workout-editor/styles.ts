@@ -36,9 +36,9 @@ export const workoutEditorStyles = tv({
       'flex size-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus active:cursor-grabbing',
     informationFields: 'flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end',
     inlineActions: 'flex shrink-0 items-center gap-1',
-    mediaRegion: 'shrink-0 self-stretch',
+    mediaRegion: 'shrink-0',
     nameMediaGroup:
-      'grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-stretch gap-3 lg:flex-1',
+      'grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3 lg:flex-1',
     nameEditor: 'min-w-0 flex-1',
     numericField: 'min-w-0 flex-1',
     numericFields: 'flex min-w-0 flex-col gap-3 sm:flex-row',

@@ -232,7 +232,9 @@ export function ImageFilePicker({
       {imageUrl === undefined ? (
         <button
           aria-label={`Enviar ${label.toLocaleLowerCase('pt-BR')}`}
-          className={styles.dropZone({ isDragging })}
+          className={styles.dropZone({
+            isDragging: isDragging && !disabled,
+          })}
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
           onDragEnter={(event) => {
