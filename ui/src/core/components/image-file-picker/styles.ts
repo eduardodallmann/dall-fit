@@ -2,8 +2,9 @@ import { tv } from '@heroui/styles';
 
 export const imageFilePickerStyles = tv({
   slots: {
+    actionButton: 'size-7 min-h-7 min-w-7',
     actionIcon: 'size-4',
-    actions: 'flex h-full flex-col justify-between gap-2',
+    actions: 'flex h-full flex-col justify-between gap-1',
     displayFallback:
       'flex h-[min(78svh,60rem)] items-center justify-center text-sm text-muted',
     displayImage: 'h-[min(78svh,60rem)] w-full object-contain',

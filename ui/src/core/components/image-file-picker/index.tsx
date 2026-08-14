@@ -274,6 +274,7 @@ export function ImageFilePicker({
         <div className={styles.actions()}>
           <Button
             aria-label="Substituir imagem"
+            className={styles.actionButton()}
             isDisabled={disabled}
             isIconOnly
             onPress={() => inputRef.current?.click()}
@@ -285,6 +286,7 @@ export function ImageFilePicker({
           {onRemove === undefined ? null : (
             <Button
               aria-label="Remover imagem"
+              className={styles.actionButton()}
               isDisabled={disabled}
               isIconOnly
               onPress={onRemove}

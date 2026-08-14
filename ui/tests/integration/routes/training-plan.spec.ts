@@ -686,27 +686,44 @@ test.describe('Rotas administrativas de planos de treino', () => {
       const nameField = imageExercise
         .getByLabel('Nome')
         .locator('xpath=ancestor::*[@data-slot="textfield"][1]');
+      const nameLabel = nameField.locator('[data-slot="label"]');
+      const nameInput = nameField.locator('[data-slot="input"]');
       const imagePreview = imageExercise.getByRole('button', {
         name: 'Visualizar imagem de supino',
+      });
+      const replaceImage = imageExercise.getByRole('button', {
+        name: 'Substituir imagem',
+      });
+      const removeImage = imageExercise.getByRole('button', {
+        name: 'Remover imagem',
       });
       const [
         videoLabelBox,
         videoInputBox,
         videoPreviewBox,
-        nameFieldBox,
+        nameLabelBox,
+        nameInputBox,
         imagePreviewBox,
+        replaceImageBox,
+        removeImageBox,
       ] = await Promise.all([
         videoLabel.boundingBox(),
         videoInput.boundingBox(),
         videoPreview.boundingBox(),
-        nameField.boundingBox(),
+        nameLabel.boundingBox(),
+        nameInput.boundingBox(),
         imagePreview.boundingBox(),
+        replaceImage.boundingBox(),
+        removeImage.boundingBox(),
       ]);
       expect(videoLabelBox).not.toBeNull();
       expect(videoInputBox).not.toBeNull();
       expect(videoPreviewBox).not.toBeNull();
-      expect(nameFieldBox).not.toBeNull();
+      expect(nameLabelBox).not.toBeNull();
+      expect(nameInputBox).not.toBeNull();
       expect(imagePreviewBox).not.toBeNull();
+      expect(replaceImageBox).not.toBeNull();
+      expect(removeImageBox).not.toBeNull();
       expect(
         Math.abs((videoLabelBox?.y ?? 0) - (videoPreviewBox?.y ?? 0)),
       ).toBeLessThanOrEqual(1);
@@ -718,7 +735,22 @@ test.describe('Rotas administrativas de planos de treino', () => {
         ),
       ).toBeLessThanOrEqual(1);
       expect(
-        Math.abs((nameFieldBox?.height ?? 0) - (imagePreviewBox?.height ?? 0)),
+        Math.abs((nameLabelBox?.y ?? 0) - (imagePreviewBox?.y ?? 0)),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          (nameInputBox?.y ?? 0) +
+            (nameInputBox?.height ?? 0) -
+            ((imagePreviewBox?.y ?? 0) + (imagePreviewBox?.height ?? 0)),
+        ),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          (removeImageBox?.y ?? 0) +
+            (removeImageBox?.height ?? 0) -
+            (replaceImageBox?.y ?? 0) -
+            (imagePreviewBox?.height ?? 0),
+        ),
       ).toBeLessThanOrEqual(1);
     };
 
