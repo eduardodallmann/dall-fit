@@ -7,7 +7,8 @@ A UI usa:
 - Tailwind CSS 4 para utilities, tokens e responsividade;
 - HeroUI como design system e primeira fonte de componentes;
 - `@heroui/styles`, construído sobre Tailwind Variants, para estilização própria,
-  variantes e wrappers tipados.
+  variantes e wrappers tipados;
+- `react-player` v3 somente na composição de preview de vídeo do editor de workout.
 
 O projeto não mantém uma dependência direta de `tailwind-variants`. `tv`,
 `VariantProps` e as funções de variantes do HeroUI são importados de

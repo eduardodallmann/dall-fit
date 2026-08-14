@@ -239,8 +239,10 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 2. `Abrir menu` fica visível.
 3. A ativação abre o `Drawer` pela esquerda e bloqueia a rolagem externa.
 4. O foco permanece contido no diálogo enquanto ele está aberto.
-5. Backdrop, `Escape`, `Fechar menu` ou ativação de `Home` fecham o overlay.
-6. Ao fechar sem navegação, o foco retorna a `Abrir menu`.
+5. `Fechar menu` aparece visualmente sobre o backdrop, imediatamente à direita da
+   borda do drawer; tema e logout permanecem dentro do menu.
+6. Backdrop, `Escape`, `Fechar menu` ou ativação de `Home` fecham o overlay.
+7. Ao fechar sem navegação, o foco retorna a `Abrir menu`.
 
 Se o viewport alcançar `768px` com o `Drawer` aberto, ele fecha. Voltar ao viewport
 móvel não o reabre.
@@ -276,8 +278,9 @@ móvel não o reabre.
   decorativos, e pending impede concorrência sem remover o controle;
 - o logout icon-only conserva o nome `Sair` ou `Saindo`, usa ícone decorativo e não
   depende de texto visível nem de sua posição ao lado do avatar;
-- o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu`, contenção e
-  restauração de foco e fechamento por `Escape`;
+- o `Drawer` possui nome `Menu da aplicação`, controle `Fechar menu` semanticamente
+  preservado e posicionado sobre o backdrop, contenção e restauração de foco e
+  fechamento por `Escape`;
 - links do menu têm label visível, foco visível e `aria-current="page"` quando
   ativos;
 - a instalação manual usa `Disclosure` com trigger nomeado, conteúdo inline e

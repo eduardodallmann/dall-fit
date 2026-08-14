@@ -25,6 +25,7 @@ export type AnalyticsControl =
   | 'exercise_field'
   | 'image_remove'
   | 'image_replace'
+  | 'image_preview'
   | 'image_upload'
   | 'home_link'
   | 'mobile_menu'
@@ -47,6 +48,7 @@ export type AnalyticsControl =
   | 'submit'
   | 'theme_toggle'
   | 'training_plans_link'
+  | 'video_preview'
   | 'workout_link'
   | 'workout_name';
 
@@ -82,11 +84,21 @@ type UiAnalyticsEvent =
   | (CommonEvent & {
       eventName: 'ui_overlay_opened';
       mode?: 'create' | 'edit';
-      overlay: 'application_menu' | 'delete_confirmation' | 'plan_form';
+      overlay:
+        | 'application_menu'
+        | 'delete_confirmation'
+        | 'exercise_image_preview'
+        | 'exercise_video_preview'
+        | 'plan_form';
     })
   | (CommonEvent & {
       eventName: 'ui_overlay_closed';
-      overlay: 'application_menu' | 'delete_confirmation' | 'plan_form';
+      overlay:
+        | 'application_menu'
+        | 'delete_confirmation'
+        | 'exercise_image_preview'
+        | 'exercise_video_preview'
+        | 'plan_form';
       reason:
         | 'backdrop'
         | 'breakpoint'

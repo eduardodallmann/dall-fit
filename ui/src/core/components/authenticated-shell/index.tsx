@@ -171,6 +171,7 @@ export function AuthenticatedShell({
               >
                 <Drawer.CloseTrigger
                   aria-label="Fechar menu"
+                  className={styles.drawerCloseTrigger()}
                   onPressStart={() => {
                     closeReasonRef.current = 'close_trigger';
                   }}

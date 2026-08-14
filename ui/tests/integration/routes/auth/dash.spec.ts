@@ -128,6 +128,17 @@ test.describe('Rota /dash', () => {
     await expect(
       page.getByRole('dialog', { name: 'Menu da aplicação' }),
     ).toBeVisible();
+    const dialogBox = await page
+      .getByRole('dialog', { name: 'Menu da aplicação' })
+      .boundingBox();
+    const closeBox = await page
+      .getByRole('button', { name: 'Fechar menu' })
+      .boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(closeBox).not.toBeNull();
+    expect(closeBox?.x).toBeGreaterThanOrEqual(
+      (dialogBox?.x ?? 0) + (dialogBox?.width ?? 0),
+    );
 
     await page
       .locator('[data-slot="drawer-backdrop"]')

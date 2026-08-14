@@ -78,7 +78,8 @@ Novas rotas da SPA são cobertas pelo mesmo fallback e não exigem regras indivi
 CSP permite scripts e endpoints do Vercel Analytics v2 pela própria origem,
 conexão somente com a própria origem e a origem exata da API vigente, imagem local,
 data URI, avatar Google, `img.youtube.com` e o host privado exato
-`8u9fq5re0oenmrtc.private.blob.vercel-storage.com`, e bloqueia objetos, frames e
+`8u9fq5re0oenmrtc.private.blob.vercel-storage.com`. Para o player de vídeo, permite
+script e frame somente de `https://www.youtube.com`; continua bloqueando objetos e
 ancestrais. A API entrega signed URLs temporárias sob `exercise-images/`, e o
 navegador busca os bytes diretamente do Blob/CDN sem cookie da API. A política não
 usa wildcard de `vercel.app` nem conserva o host público excluído.
@@ -284,6 +285,12 @@ fallback acessível e retry manual. A sincronização troca somente o objeto `im
 da linha persistida e preserva drafts, dirty patches, revisões e estado da fila.
 Signed URLs são credenciais efêmeras: não entram em Analytics, logs, storage ou
 cache persistente da PWA, e o `<img>` usa `referrerPolicy="no-referrer"`.
+O preview de vídeo usa `react-player` v3 em um `Modal` HeroUI. O módulo e o player
+só são carregados/montados com o overlay aberto; `playing`, `muted` e `playsInline`
+definem a reprodução, `cc_load_policy: 0` não força legendas e desmontar o
+componente ao fechar interrompe o vídeo. Os modais de mídia removem a animação de
+saída para que conteúdo e overlay desapareçam juntos, sem um estado intermediário
+de redimensionamento.
 
 ### Analytics e privacidade
 
@@ -327,6 +334,9 @@ Eventos nunca recebem nome, e-mail, foto, token, payload HTTP, texto de plano ou
 treino, ID de domínio, valor/tamanho/erro de campo, texto visível arbitrário ou
 seletor `mock*`. Campos emitem o primeiro foco de cada montagem e um término apenas
 quando o valor mudou desde o término anterior, sempre como estado enumerado.
+Os overlays enumerados incluem `exercise_image_preview` e
+`exercise_video_preview`; seus controles são `image_preview` e `video_preview` e
+nunca enviam ID, nome, URL ou metadado da mídia.
 
 O catálogo do workout inclui nome, tipo/adicionar, campo, handle/drop, exclusão,
 upload/substituição/remoção, conflito e retry. Operações de workout/exercício/mídia
