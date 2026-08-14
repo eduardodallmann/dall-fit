@@ -33,7 +33,7 @@ export const workoutEditorStyles = tv({
     exerciseTypeIcon: 'size-5 shrink-0 text-muted',
     flexibleField: 'min-w-0 flex-1',
     handle:
-      'flex size-9 shrink-0 cursor-grab items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus active:cursor-grabbing',
+      'flex size-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus active:cursor-grabbing',
     informationFields: 'flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end',
     inlineActions: 'flex shrink-0 items-center gap-1',
     mediaRegion: 'w-full shrink-0 lg:w-auto',

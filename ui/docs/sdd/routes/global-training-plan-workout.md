@@ -49,7 +49,9 @@ e deslocamento dos demais cards durante a operação e persiste apenas no drop.
 Ao confirmar o drop, o overlay desaparece imediatamente, sem animação de retorno à
 posição original, e a lista conserva visualmente o destino escolhido. `Escape` ou
 drop sem destino cancela, remove o overlay, restaura ordem/foco e não envia
-mutation.
+mutation. Em dispositivos por toque, somente o handle declara `touch-action: none`
+antes do início do gesto, evitando que o navegador converta o movimento em scroll
+e emita `pointercancel`; o restante do card e da página continua rolável.
 
 | Tipo          | Campos                                                                  |
 | ------------- | ----------------------------------------------------------------------- |

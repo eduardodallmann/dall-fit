@@ -377,6 +377,11 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(popover).toBeHidden();
 
     await page.setViewportSize({ height: 844, width: 390 });
+    const dragHandle = firstExercise.getByRole('button', {
+      name: 'Mover YouTube Short',
+    });
+    await expect(dragHandle).toHaveCSS('touch-action', 'none');
+    await expect(firstExercise).toHaveCSS('touch-action', 'auto');
     const restMobile = await firstExercise
       .getByRole('textbox', { name: 'Descanso (s)' })
       .boundingBox();
