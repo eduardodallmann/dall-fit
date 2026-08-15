@@ -21,6 +21,10 @@ import {
 } from '~/mocks/fixtures/training-plans';
 import { refreshedMockCsrfToken } from '~/mocks/handlers/auth';
 import {
+  publishMockRealtimeInvalidation,
+  registerMockRealtimeReplication,
+} from '~/mocks/handlers/realtime';
+import {
   createMockApiError,
   createMockResponseInit,
 } from '~/mocks/mock-response';
@@ -113,6 +117,11 @@ function getState(scenario: string): ScenarioState {
   return result;
 }
 
+registerMockRealtimeReplication(({ scenario, state }) => {
+  if (scenario === undefined || state === undefined) return;
+  scenarioStates.set(scenario, structuredClone(state));
+});
+
 function synchronizeExerciseCount(state: ScenarioState): void {
   state.detail = {
     ...state.detail,
@@ -172,7 +181,11 @@ function validateMutation(
   return null;
 }
 
-function increment(state: ScenarioState): number {
+function increment(
+  state: ScenarioState,
+  request: Request,
+  publish = true,
+): number {
   const version = state.detail.version + 1;
   state.detail = {
     ...state.detail,
@@ -189,6 +202,19 @@ function increment(state: ScenarioState): number {
       ? { ...plan, version, updatedAt: state.detail.updatedAt }
       : plan,
   );
+  if (publish)
+    queueMicrotask(() => {
+      publishMockRealtimeInvalidation(
+        request,
+        {
+          resource: 'global-training-plan',
+          resourceId: state.detail.id,
+          state: 'present',
+          version,
+        },
+        { scenario: getScenario(request), state: structuredClone(state) },
+      );
+    });
   return version;
 }
 
@@ -288,6 +314,16 @@ export const trainingPlanHandlers = [
       updatedAt: now,
     };
     getState(scenario).plans.unshift(created);
+    publishMockRealtimeInvalidation(
+      request,
+      {
+        resource: 'global-training-plan',
+        resourceId: created.id,
+        state: 'present',
+        version: created.version,
+      },
+      { scenario, state: structuredClone(getState(scenario)) },
+    );
     return HttpResponse.json({ data: created }, responseInit(0, 201));
   }),
   http.get(
@@ -298,13 +334,21 @@ export const trainingPlanHandlers = [
       if (scenario === 'detail-error')
         return apiError('SERVICE_UNAVAILABLE', 'Service unavailable.', 503);
       const state = getState(scenario);
-      if (params.trainingPlanId !== state.detail.id)
+      if (
+        params.trainingPlanId !== state.detail.id ||
+        !state.plans.some((plan) => plan.id === params.trainingPlanId)
+      )
         return apiError(
           'TRAINING_PLAN_NOT_FOUND',
           'Training plan not found.',
           404,
         );
-      if (params.workoutId !== state.workout.id)
+      if (
+        params.workoutId !== state.workout.id ||
+        !state.detail.workouts.some(
+          (workout) => workout.id === params.workoutId,
+        )
+      )
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
       const workout = state.workout;
       state.workoutReadCount += 1;
@@ -335,7 +379,7 @@ export const trainingPlanHandlers = [
       const invalid = validateMutation(request, state, scenario);
       if (invalid !== null) return invalid;
       const { name } = (await request.json()) as { name: string };
-      const version = increment(state);
+      const version = increment(state, request);
       state.workout = { ...state.workout, name };
       state.detail = {
         ...state.detail,
@@ -375,7 +419,7 @@ export const trainingPlanHandlers = [
         exercises: [...state.workout.exercises, exercise],
       };
       synchronizeExerciseCount(state);
-      const version = increment(state);
+      const version = increment(state, request);
       return HttpResponse.json({ data: exercise }, responseInit(version, 201));
     },
   ),
@@ -411,7 +455,7 @@ export const trainingPlanHandlers = [
           ...state.workout,
           exercises: input.exerciseIds.map((id) => byId.get(id) as Exercise),
         };
-        increment(state);
+        increment(state, request);
       }
       return new HttpResponse(null, responseInit(state.detail.version, 204));
     },
@@ -445,7 +489,7 @@ export const trainingPlanHandlers = [
           itemIndex === index ? updated : exercise,
         ),
       };
-      const version = increment(state);
+      const version = increment(state, request);
       return HttpResponse.json({ data: updated }, responseInit(version));
     },
   ),
@@ -465,7 +509,7 @@ export const trainingPlanHandlers = [
         return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
       state.workout = { ...state.workout, exercises };
       synchronizeExerciseCount(state);
-      const version = increment(state);
+      const version = increment(state, request);
       return new HttpResponse(null, responseInit(version, 204));
     },
   ),
@@ -491,7 +535,7 @@ export const trainingPlanHandlers = [
             : exercise,
         ),
       };
-      const version = increment(state);
+      const version = increment(state, request);
       return HttpResponse.json({ data: { image } }, responseInit(version));
     },
   ),
@@ -523,7 +567,7 @@ export const trainingPlanHandlers = [
               : exercise,
           ),
         };
-        increment(state);
+        increment(state, request);
       }
       return new HttpResponse(null, responseInit(state.detail.version, 204));
     },
@@ -578,7 +622,7 @@ export const trainingPlanHandlers = [
           'Training plan not found.',
           404,
         );
-      const version = increment(state);
+      const version = increment(state, request, false);
       const updated = {
         ...state.plans[index],
         ...changes,
@@ -591,6 +635,16 @@ export const trainingPlanHandlers = [
         ...state.workout,
         trainingPlan: { id: updated.id, name: updated.name },
       };
+      publishMockRealtimeInvalidation(
+        request,
+        {
+          resource: 'global-training-plan',
+          resourceId: updated.id,
+          state: 'present',
+          version,
+        },
+        { scenario, state: structuredClone(state) },
+      );
       return HttpResponse.json({ data: updated }, responseInit(version));
     },
   ),
@@ -613,6 +667,15 @@ export const trainingPlanHandlers = [
           'Training plan not found.',
           404,
         );
+      publishMockRealtimeInvalidation(
+        request,
+        {
+          resource: 'global-training-plan',
+          resourceId: String(params.trainingPlanId),
+          state: 'deleted',
+        },
+        { scenario, state: structuredClone(state) },
+      );
       return new HttpResponse(null, createMockResponseInit({ status: 204 }));
     },
   ),
@@ -649,7 +712,7 @@ export const trainingPlanHandlers = [
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      const version = increment(state);
+      const version = increment(state, request);
       return HttpResponse.json({ data: workout }, responseInit(version, 201));
     },
   ),
@@ -668,7 +731,7 @@ export const trainingPlanHandlers = [
       if (workouts.length === state.detail.workouts.length)
         return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
       state.detail = { ...state.detail, workouts };
-      const version = increment(state);
+      const version = increment(state, request);
       return new HttpResponse(null, responseInit(version, 204));
     },
   ),

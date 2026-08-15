@@ -64,7 +64,6 @@ describe('WorkoutEditor workout name', () => {
         <WorkoutEditor
           data={workout}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />
@@ -116,7 +115,6 @@ describe('WorkoutEditor presentation', () => {
         <WorkoutEditor
           data={workout}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />
@@ -141,7 +139,6 @@ describe('WorkoutEditor presentation', () => {
         <WorkoutEditor
           data={workout}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />
@@ -182,7 +179,6 @@ describe('WorkoutEditor presentation', () => {
         <WorkoutEditor
           data={{ ...workout, exercises: [exercise] }}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />
@@ -218,7 +214,6 @@ describe('WorkoutEditor presentation', () => {
         <WorkoutEditor
           data={{ ...workout, exercises: [exercise] }}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />
@@ -266,7 +261,6 @@ describe('WorkoutEditor presentation', () => {
             ],
           }}
           mockScenario="success"
-          onConflict={vi.fn()}
           onImageLoadError={vi.fn()}
           onRetryImage={vi.fn()}
         />

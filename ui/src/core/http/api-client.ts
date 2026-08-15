@@ -9,6 +9,7 @@ import {
 } from '~/auth/csrf-token';
 import { endSession, getActiveSessionSignal } from '~/auth/session-lifecycle';
 import { getApiErrorCode } from '~/core/http/http-error';
+import { getClientInstanceId } from '~/core/realtime/client-instance';
 
 export const DEFAULT_REQUEST_TIMEOUT = 15_000;
 export const UPLOAD_REQUEST_TIMEOUT = 60_000;
@@ -34,6 +35,8 @@ apiClient.interceptors.request.use(async (config) => {
   if (isMutation && csrfToken !== undefined) {
     config.headers.set('X-CSRF-Token', csrfToken);
   }
+  if (isMutation)
+    config.headers.set('X-Client-Instance-Id', getClientInstanceId());
   if (sessionSignal !== undefined) {
     config.signal =
       config.signal === undefined || config.signal === sessionSignal

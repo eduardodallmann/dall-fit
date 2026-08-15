@@ -205,6 +205,57 @@ describe('Global training plans (e2e)', () => {
     return result;
   }
 
+  it('protects and validates the realtime stream before opening it', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/realtime/events?clientInstanceId=123e4567-e89b-42d3-a456-426614174000',
+      )
+      .set('Accept', 'text/event-stream')
+      .expect(401);
+
+    const admin = await login(true);
+    const invalid = await admin
+      .get('/realtime/events?clientInstanceId=invalid')
+      .set('Accept', 'text/event-stream')
+      .expect(400);
+    expect(invalid.body).toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+
+  it('publishes a committed mutation with its document origin', async () => {
+    const subscriber = new Redis(process.env.REDIS_URL!);
+    const messagePromise = new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error('Realtime event was not published.')),
+        3_000,
+      );
+      subscriber.once('message', (_channel, message) => {
+        clearTimeout(timeout);
+        resolve(message);
+      });
+    });
+    await subscriber.subscribe('dall-fit-training-e2e:test:realtime:events');
+    const admin = await login(true);
+    await authenticatedMutation(
+      admin,
+      admin
+        .post('/global/training-plans')
+        .set('X-Client-Instance-Id', '123e4567-e89b-42d3-a456-426614174000')
+        .send({ name: 'Plano SSE', description: 'Publicação pós-commit.' }),
+    ).expect(201);
+
+    const event = JSON.parse(await messagePromise) as Record<string, unknown>;
+    expect(event).toMatchObject({
+      audience: 'admin',
+      originClientInstanceId: '123e4567-e89b-42d3-a456-426614174000',
+      event: {
+        resource: 'global-training-plan',
+        state: 'present',
+        version: 0,
+      },
+    });
+    await subscriber.quit();
+  });
+
   it('protects every operation with authentication and administrative authorization', async () => {
     const planId = new Types.ObjectId().toString();
     const workoutId = new Types.ObjectId().toString();

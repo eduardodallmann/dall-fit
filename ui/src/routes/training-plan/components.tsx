@@ -513,11 +513,13 @@ export function DeleteConfirmationDialog({
 }
 
 interface ConflictAlertProps {
+  directReload?: boolean;
   onReload: () => Promise<void>;
   reason?: 'conflict' | 'uncertain';
 }
 
 export function TrainingPlanConflictAlert({
+  directReload = false,
   onReload,
   reason = 'conflict',
 }: Readonly<ConflictAlertProps>) {
@@ -550,6 +552,39 @@ export function TrainingPlanConflictAlert({
           }}
         >
           Verificar dados
+        </Button>
+      </Alert>
+    );
+  }
+
+  if (directReload) {
+    return (
+      <Alert status="danger">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Este plano foi alterado em outro lugar.</Alert.Title>
+          <Alert.Description>
+            As gravações foram pausadas. Recarregue para usar a versão mais
+            recente e descartar as alterações locais.
+          </Alert.Description>
+          {reloadError ? (
+            <p>
+              Não foi possível recarregar. Suas alterações foram preservadas.
+            </p>
+          ) : null}
+        </Alert.Content>
+        <Button
+          isPending={pending}
+          onPress={() => {
+            setPending(true);
+            setReloadError(false);
+            void onReload()
+              .catch(() => setReloadError(true))
+              .finally(() => setPending(false));
+          }}
+          variant="danger"
+        >
+          Descartar e recarregar
         </Button>
       </Alert>
     );

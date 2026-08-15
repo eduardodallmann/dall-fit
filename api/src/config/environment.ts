@@ -82,6 +82,16 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(60_000),
+  RATE_LIMIT_REALTIME_CONNECTION_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(30),
+  RATE_LIMIT_REALTIME_CONNECTION_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
   RATE_LIMIT_AUTHENTICATED_MUTATION_LIMIT: z.coerce
     .number()
     .int()

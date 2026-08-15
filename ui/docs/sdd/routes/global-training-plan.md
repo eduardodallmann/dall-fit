@@ -185,6 +185,8 @@ Não se aplica — não existem imagens em `routes/assets/global-training-plan/`
 8. URL inválida: `two-pages&page=101` remove `page` com `replace`, preserva os
    seletores mock e consulta a página 1.
 9. Conflito: `version-conflict` preserva formulário e exige recarga confirmada.
+10. Invalidação SSE atualiza a coleção automaticamente; se o plano ativo em modal
+    possui trabalho local, pausa o aggregate e reutiliza o alerta de conflito.
 
 ## Estrutura técnica relevante
 

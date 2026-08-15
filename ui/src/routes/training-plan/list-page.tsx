@@ -72,6 +72,7 @@ export function TrainingPlanListPage({
   const aggregate = useAggregateMutationCoordinator(
     activePlan?.id,
     activePlan?.version,
+    activePlan !== undefined,
   );
   const rows = query.data?.data ?? [];
   const pageCount =

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
+  TrainingPlanConflictAlert,
   TrainingPlanForm,
   TrainingPlanFormModal,
 } from '~/routes/training-plan/components';
@@ -140,5 +141,18 @@ describe('training plan analytics', () => {
       }),
     );
     expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it('reloads a workout conflict directly from the alert', async () => {
+    const user = userEvent.setup();
+    const onReload = vi.fn().mockResolvedValue(undefined);
+    render(<TrainingPlanConflictAlert directReload onReload={onReload} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Descartar e recarregar' }),
+    );
+
+    await waitFor(() => expect(onReload).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

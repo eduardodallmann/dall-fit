@@ -502,8 +502,9 @@ test.describe('Rotas administrativas de planos de treino', () => {
       page.getByRole('button', { name: 'Adicionar exercício' }),
     ).toBeDisabled();
     await expect(
-      page.getByRole('button', { name: 'Recarregar dados' }),
+      page.getByRole('button', { name: 'Descartar e recarregar' }),
     ).toBeVisible();
+    await expect(page.getByRole('alertdialog')).not.toBeVisible();
   });
 
   test('trata 412 externo como falha genérica sem pausar a fila', async ({

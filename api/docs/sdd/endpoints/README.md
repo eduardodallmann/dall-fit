@@ -22,3 +22,4 @@ somente quando constituir requisito funcional excepcional.
 - [`Probes operacionais`](operational.md): liveness e readiness de MongoDB/Redis.
 - [`Planos de treino globais`](global-training-plans.md): sete operações
   administrativas de planos e workouts.
+- [`GET /realtime/events`](realtime-events.md): stream autenticado de invalidações.

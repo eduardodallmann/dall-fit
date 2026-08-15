@@ -7,6 +7,7 @@ import { validateEnvironment } from '~/config/environment';
 import { ObservabilityModule } from '~/observability/observability.module';
 import { OperationalModule } from '~/operational/operational.module';
 import { PersonModule } from '~/person/person.module';
+import { RealtimeModule } from '~/realtime/realtime.module';
 import { RedisModule } from '~/redis/redis.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
 
@@ -28,6 +29,7 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
       }),
     }),
     RedisModule,
+    RealtimeModule,
     OperationalModule,
     PersonModule,
     AuthModule,

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   closestCenter,
@@ -180,17 +186,17 @@ function trackCompleted(
 interface WorkoutEditorProps {
   data: TrainingPlanWorkoutDetails;
   mockScenario: MockTrainingPlansScenario;
-  onConflict: () => void;
   onImageLoadError: (signedUrlExpiresAt: string) => void;
   onRetryImage: () => void;
+  onUnsavedWorkChange?: (hasUnsavedWork: boolean) => void;
 }
 
 export function WorkoutEditor({
   data,
   mockScenario,
-  onConflict,
   onImageLoadError,
   onRetryImage,
+  onUnsavedWorkChange,
 }: Readonly<WorkoutEditorProps>) {
   const queryClient = useQueryClient();
   const initialItems = data.exercises.map(createEditorExercise);
@@ -212,11 +218,7 @@ export function WorkoutEditor({
   const [activeExerciseId, setActiveExerciseId] = useState<string>();
   const dragDirection = useRef(0);
   const focusAfterReorder = useRef<string | undefined>(undefined);
-  const queue = useAggregateMutationQueue(
-    data.trainingPlan.id,
-    data.version,
-    onConflict,
-  );
+  const queue = useAggregateMutationQueue(data.trainingPlan.id, data.version);
   const queueRef = useRef(queue);
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -912,6 +914,10 @@ export function WorkoutEditor({
         item.status !== 'idle' ||
         Object.keys(item.dirty).length > 0,
     );
+  useLayoutEffect(() => {
+    onUnsavedWorkChange?.(hasUnsavedWork);
+    return () => onUnsavedWorkChange?.(false);
+  }, [hasUnsavedWork, onUnsavedWorkChange]);
   const navigationBlocker = useBlocker({
     disabled: !hasUnsavedWork,
     enableBeforeUnload: hasUnsavedWork,

@@ -57,4 +57,29 @@ describe('API client transport policy', () => {
 
     expect(transportSignal?.aborted).toBe(true);
   });
+
+  it('identifies the originating document on mutations', async () => {
+    let clientInstanceId: unknown;
+
+    await apiClient.patch(
+      '/mutation-origin',
+      {},
+      {
+        adapter: (config) => {
+          clientInstanceId = config.headers.get('X-Client-Instance-Id');
+          return Promise.resolve({
+            config,
+            data: {},
+            headers: {},
+            status: 200,
+            statusText: 'OK',
+          } as AxiosResponse);
+        },
+      },
+    );
+
+    expect(clientInstanceId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+  });
 });
