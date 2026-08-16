@@ -78,6 +78,125 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     await expect(page.getByText('Plano atualizado.')).toBeVisible();
   });
 
+  test('propaga a atualização para outro documento sem recarga manual', async ({
+    context,
+    page,
+  }) => {
+    const otherDocument = await context.newPage();
+    const path =
+      '/global/training-plan?mockAuth=admin&mockTrainingPlans=update-success';
+    await Promise.all([page.goto(path), otherDocument.goto(path)]);
+    await expect(
+      otherDocument.getByRole('link', { name: 'Hipertrofia iniciante' }),
+    ).toBeVisible();
+
+    await page
+      .getByRole('button', { name: 'Ações de Hipertrofia iniciante' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Editar' }).click();
+    await page.getByLabel('Nome').fill('Hipertrofia em dois dispositivos');
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+
+    await expect(
+      otherDocument.getByRole('link', {
+        name: 'Hipertrofia em dois dispositivos',
+      }),
+    ).toBeVisible();
+    await otherDocument.close();
+  });
+
+  test('atualiza detalhe e editor limpos a partir da leitura canônica', async ({
+    context,
+    page,
+  }) => {
+    const otherDocument = await context.newPage();
+    const detailPath = `/global/training-plan/${planId}?mockAuth=admin&mockTrainingPlans=success`;
+    await Promise.all([page.goto(detailPath), otherDocument.goto(detailPath)]);
+
+    await page.getByRole('button', { name: 'Editar plano' }).click();
+    await page.getByLabel('Nome').fill('Plano externo no detalhe');
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+    await expect(
+      otherDocument.getByRole('heading', {
+        name: 'Plano externo no detalhe',
+      }),
+    ).toBeVisible();
+
+    const workoutPath = `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=success`;
+    await Promise.all([
+      page.goto(workoutPath),
+      otherDocument.goto(workoutPath),
+    ]);
+    await page.getByRole('button', { name: 'Editar nome do treino' }).click();
+    await page
+      .getByRole('textbox', { name: 'Nome do treino' })
+      .fill('Treino externo limpo');
+    await page.getByRole('button', { name: 'Salvar nome do treino' }).click();
+
+    await expect(
+      otherDocument.getByRole('heading', { name: 'Treino externo limpo' }),
+    ).toBeVisible();
+    await expect(
+      otherDocument.getByText('Este plano foi alterado em outro lugar.'),
+    ).not.toBeVisible();
+    await otherDocument.close();
+  });
+
+  test('sai do workout removido externamente para o detalhe', async ({
+    context,
+    page,
+  }) => {
+    const workoutDocument = await context.newPage();
+    const detailPath = `/global/training-plan/${planId}?mockAuth=admin&mockTrainingPlans=success`;
+    const workoutPath = `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=success`;
+    await Promise.all([
+      page.goto(detailPath),
+      workoutDocument.goto(workoutPath),
+    ]);
+
+    await page.getByRole('button', { name: 'Ações de Treino A' }).click();
+    await page.getByRole('menuitem', { name: 'Excluir' }).click();
+    await page.getByRole('button', { name: 'Excluir', exact: true }).click();
+
+    await expect(workoutDocument).toHaveURL(
+      new RegExp(`/global/training-plan/${planId}(?:\\?|$)`),
+    );
+    await expect(
+      workoutDocument.getByRole('heading', { name: 'Hipertrofia iniciante' }),
+    ).toBeVisible();
+    await workoutDocument.close();
+  });
+
+  test('pausa um draft externo e descarta direto pelo alerta do workout', async ({
+    context,
+    page,
+  }) => {
+    const otherDocument = await context.newPage();
+    const path = `/global/training-plan/${planId}/workout/${workoutId}?mockAuth=admin&mockTrainingPlans=success`;
+    await Promise.all([page.goto(path), otherDocument.goto(path)]);
+    const otherExerciseName = otherDocument
+      .getByRole('list', { name: 'Exercícios em ordem' })
+      .getByRole('listitem')
+      .first()
+      .getByLabel('Nome');
+    await otherExerciseName.fill('Draft ainda não salvo');
+
+    await page.getByRole('button', { name: 'Editar nome do treino' }).click();
+    await page
+      .getByRole('textbox', { name: 'Nome do treino' })
+      .fill('Treino externo');
+    await page.getByRole('button', { name: 'Salvar nome do treino' }).click();
+
+    const discard = otherDocument.getByRole('button', {
+      name: 'Descartar e recarregar',
+    });
+    await expect(discard).toBeVisible();
+    await discard.click();
+    await expect(otherExerciseName).toHaveValue('Agachamento');
+    await expect(otherDocument.getByRole('alertdialog')).not.toBeVisible();
+    await otherDocument.close();
+  });
+
   test('mantém o modal de edição e restaura somente o cache quando a atualização falha', async ({
     page,
   }) => {

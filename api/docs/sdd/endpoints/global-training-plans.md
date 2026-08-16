@@ -34,6 +34,13 @@ malformado ou inseguro é `400 VALIDATION_ERROR`; versão antiga de recurso exis
 precondição. CORS permite e expõe `X-Resource-Version`, não anuncia `If-Match` ou
 ETag, e aceita PUT.
 
+Cada mutação efetiva envia também `X-Client-Instance-Id` quando originada pela UI.
+Depois do commit, `TrainingPlanService` pede ao `RealtimePublisherService` uma
+invalidação `global-training-plan`; o envelope Redis leva o UUID apenas para
+suprimir aquele documento. No-op, validação, conflito e falha não publicam. Falha
+de Pub/Sub é registrada e não altera a resposta HTTP já comprometida. CORS aceita
+o header de origem sem expô-lo na resposta.
+
 ## Contratos
 
 | Método e path                                  | Entrada                                 | Sucesso                         |

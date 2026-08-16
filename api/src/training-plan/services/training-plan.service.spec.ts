@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { RealtimePublisherService } from '~/realtime/realtime-publisher.service';
 import type { TrainingPlanEntity } from '~/training-plan/domain/training-plan.entity';
 import type { TrainingPlanRepository } from '~/training-plan/repositories/training-plan.repository';
 import type { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
@@ -43,7 +44,10 @@ function createRepositoryMock() {
   return result as typeof result & TrainingPlanRepository;
 }
 
-function createService(repository: TrainingPlanRepository) {
+function createService(
+  repository: TrainingPlanRepository,
+  realtimePublisher?: RealtimePublisherService,
+) {
   const youtube = {
     normalizeAndValidate: vi.fn(),
   } as unknown as YoutubeReferenceService;
@@ -51,7 +55,12 @@ function createService(repository: TrainingPlanRepository) {
     deleteImages: vi.fn(),
     processAndUpload: vi.fn(),
   } as unknown as ExerciseImageService;
-  return new TrainingPlanService(repository, youtube, images);
+  const realtime =
+    realtimePublisher ??
+    ({
+      publish: vi.fn().mockResolvedValue(undefined),
+    } as unknown as RealtimePublisherService);
+  return new TrainingPlanService(repository, youtube, images, realtime);
 }
 
 describe('TrainingPlanService', () => {
@@ -65,8 +74,11 @@ describe('TrainingPlanService', () => {
 
   it('creates a global plan with null ownership', async () => {
     const repository = createRepositoryMock();
+    const publish = vi.fn().mockResolvedValue(undefined);
     repository.create.mockResolvedValue(trainingPlan);
-    const result = await createService(repository).createGlobal({
+    const result = await createService(repository, {
+      publish,
+    } as unknown as RealtimePublisherService).createGlobal({
       name: trainingPlan.name,
       description: trainingPlan.description,
     });
@@ -80,6 +92,12 @@ describe('TrainingPlanService', () => {
       ],
     ]);
     expect(result).toBe(trainingPlan);
+    expect(publish).toHaveBeenCalledWith({
+      resource: 'global-training-plan',
+      resourceId: trainingPlan.id,
+      state: 'present',
+      version: trainingPlan.version,
+    });
   });
 
   it('maps a stale update to a version conflict without overwriting', async () => {

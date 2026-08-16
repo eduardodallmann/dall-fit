@@ -79,4 +79,31 @@ describe('RequestContextMiddleware', () => {
       ]),
     );
   });
+
+  it('accepts one valid document UUID without reflecting it in the response', () => {
+    const storage = new AsyncLocalStorage<RequestContext>();
+    const middleware = new RequestContextMiddleware(storage);
+    const setHeader = vi.fn();
+    let clientInstanceId: string | undefined;
+
+    middleware.use(
+      {
+        get: vi.fn(),
+        rawHeaders: [
+          'x-client-instance-id',
+          '123e4567-e89b-42d3-a456-426614174000',
+        ],
+      } as unknown as Request,
+      { setHeader } as unknown as Response,
+      (() => {
+        clientInstanceId = storage.getStore()?.clientInstanceId;
+      }) as NextFunction,
+    );
+
+    expect(clientInstanceId).toBe('123e4567-e89b-42d3-a456-426614174000');
+    expect(setHeader).not.toHaveBeenCalledWith(
+      'x-client-instance-id',
+      expect.anything(),
+    );
+  });
 });

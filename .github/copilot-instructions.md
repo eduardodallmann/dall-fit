@@ -8,6 +8,8 @@ viva, contratos, mocks e testes junto da implementação. Respeite os quality ga
 a estratégia de testes definida em `AGENTS.md`. Não altere features de demandas já
 entregues: elas são registros históricos e uma evolução exige nova feature.
 
+Para bugfixes solicitados sem feature SDD, atualize docs vivas no mesmo commit.
+
 Pedidos para criar ou refinar uma feature autorizam somente seu SDD autocontido.
 Encerre o trabalho depois de apresentá-lo; implemente e atualize os SDDs vivos
 somente após uma ordem explícita do usuário em uma mensagem posterior.

@@ -11,6 +11,16 @@ futuras devem ser organizadas em módulos por domínio.
 O servidor HTTP usa a porta `4000` por padrão e aceita requests da origem da UI em
 `http://localhost:3000`. Ambos os valores são configuráveis por ambiente.
 
+## Tempo real transversal
+
+`RealtimeModule` oferece stream SSE autenticado e publicação genérica de
+invalidações. Escritas efetivas publicam após o commit pelo client Redis de
+comandos; uma conexão ioredis exclusiva permanece em modo subscriber por runtime
+e distribui envelopes aos streams locais. Falha de publicação é best-effort. O
+payload nunca replica entidades e reconexões fazem nova leitura HTTP.
+`api/vercel.json` habilita Fluid Compute e limita a função a 300 segundos; o
+stream encerra voluntariamente antes desse limite.
+
 ## Aggregate de planos, concorrência e integrações
 
 `TrainingPlanModule` mantém `TrainingPlan -> Workout -> Exercise` em um documento

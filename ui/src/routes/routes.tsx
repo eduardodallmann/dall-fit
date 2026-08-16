@@ -31,6 +31,7 @@ import {
 } from '~/routes/route-components';
 import { TrainingPlanDetailPage } from '~/routes/training-plan/detail-page';
 import { TrainingPlanListPage } from '~/routes/training-plan/list-page';
+import { TrainingPlanRealtimeBridge } from '~/routes/training-plan/realtime-bridge';
 import { canonicalTrainingPlanPage } from '~/routes/training-plan/training-plan-pagination';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
 import { TrainingPlanWorkoutPage } from '~/routes/training-plan/workout-page';
@@ -115,7 +116,7 @@ export const adminRoute = createRoute({
 
     return result;
   },
-  component: Outlet,
+  component: AdminRouteComponent,
 });
 
 const dashRoute = createRoute({
@@ -305,6 +306,17 @@ function TrainingPlanListRouteComponent() {
   );
 
   return result;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function AdminRouteComponent() {
+  authenticatedRoute.useRouteContext();
+  return (
+    <>
+      <TrainingPlanRealtimeBridge />
+      <Outlet />
+    </>
+  );
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

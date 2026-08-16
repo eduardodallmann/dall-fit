@@ -63,6 +63,15 @@ obrigatório ou mudar semântica exige migração coordenada e atualização de:
 
 Não expor diretamente entidades de banco. A resposta HTTP é montada explicitamente.
 
+## Streaming SSE
+
+`GET /realtime/events` é a exceção de streaming ao JSON de sucesso: depois de
+autenticação, rate limit e validação, responde `text/event-stream` com eventos
+nomeados. Falhas anteriores à abertura continuam usando `ApiError`; depois da
+abertura, encerramento de rede ou duração é recuperado pela reconexão do cliente.
+O stream é leitura sem CSRF, não oferece replay e transporta somente contratos
+compartilhados de invalidação, nunca entidades completas.
+
 ## Idempotência e concorrência
 
 Cada operação de escrita documenta se é idempotente, como duplicidade é tratada e

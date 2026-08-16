@@ -1,0 +1,3 @@
+export const REALTIME_CHANNEL_SUFFIX = 'events';
+export const REALTIME_HEARTBEAT_MS = 20_000;
+export const REALTIME_CONNECTION_LIFETIME_MS = 270_000;

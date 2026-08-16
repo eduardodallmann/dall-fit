@@ -27,6 +27,7 @@ export function configureApplication(app: INestApplication): void {
       'Content-Type',
       'X-Resource-Version',
       'X-CSRF-Token',
+      'X-Client-Instance-Id',
       'X-Request-Id',
     ],
     credentials: true,

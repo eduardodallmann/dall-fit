@@ -58,6 +58,15 @@ nem prevalece sobre o SDD.
 - documentos em `base/`, `flows/`, `endpoints/` e `routes/` descrevem somente o
   estado atual, não um histórico de tickets.
 
+## Bugfixes diretos (quando solicitados sem feature SDD)
+
+- correções de bug, ajustes de comportamento ou refatorações, e que expressamente
+solicitados que não exigem sem feature SDD **devem atualizar a documentação viva afetada na mesma entrega**;
+- não há pausa para autorização: implemente a correção, atualize os SDDs vivos
+  (endpoints, routes, flows, ADRs se aplicável) e execute os quality gates;
+- a regra de "não altere features históricas" continua valendo: features em
+  `docs/sdd/features/` são registros imutáveis após entrega.
+
 ## Gate obrigatório entre feature e implementação
 
 Criar, escrever, documentar, detalhar, revisar ou refinar uma feature autoriza

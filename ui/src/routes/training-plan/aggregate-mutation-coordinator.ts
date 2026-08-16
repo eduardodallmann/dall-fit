@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useSyncExternalStore } from 'react';
 
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+
+import type { RealtimeResourceInvalidation } from '@dall-fit/types';
 
 import { registerSessionResource } from '~/auth/session-lifecycle';
 import { isAmbiguousMutationFailure } from '~/core/http/http-error';
@@ -9,6 +11,7 @@ import { isAmbiguousMutationFailure } from '~/core/http/http-error';
 import type { VersionedMutationResult } from './training-plan-service';
 
 interface AggregateMutationSnapshot {
+  externalChange?: RealtimeResourceInvalidation;
   isPending: boolean;
   pauseReason?: 'conflict' | 'uncertain';
   paused: boolean;
@@ -17,6 +20,8 @@ interface AggregateMutationSnapshot {
 interface AggregateMutationState {
   chain: Promise<void>;
   listeners: Set<() => void>;
+  localWorkOwners: Set<string>;
+  externalChange?: RealtimeResourceInvalidation;
   pauseReason?: 'conflict' | 'uncertain';
   paused: boolean;
   pendingCount: number;
@@ -55,6 +60,41 @@ export class AggregateMutationCoordinator {
       state.version = version;
   }
 
+  notifyExternalChange(
+    event: RealtimeResourceInvalidation,
+  ): boolean | undefined {
+    const state = this.states.get(event.resourceId) ?? this.createState(-1);
+    this.states.set(event.resourceId, state);
+    if (event.state === 'present') {
+      if (event.version <= state.version) return undefined;
+      if (state.externalChange?.state === 'deleted') return undefined;
+      if (
+        state.externalChange?.state === 'present' &&
+        event.version <= state.externalChange.version
+      )
+        return undefined;
+    } else if (state.externalChange?.state === 'deleted') return undefined;
+    state.externalChange = event;
+    if (state.pendingCount > 0 || state.localWorkOwners.size > 0) {
+      state.paused = true;
+      state.pauseReason = 'conflict';
+    }
+    this.publish(state);
+    return state.paused;
+  }
+
+  setLocalWork(trainingPlanId: string, owner: string, active: boolean): void {
+    const state = this.states.get(trainingPlanId) ?? this.createState(0);
+    this.states.set(trainingPlanId, state);
+    if (active) state.localWorkOwners.add(owner);
+    else state.localWorkOwners.delete(owner);
+    if (active && state.externalChange !== undefined) {
+      state.paused = true;
+      state.pauseReason = 'conflict';
+      this.publish(state);
+    }
+  }
+
   enqueue<T>(
     trainingPlanId: string,
     initialVersion: number,
@@ -78,6 +118,16 @@ export class AggregateMutationCoordinator {
         if (taskEpoch !== this.epoch)
           throw new axios.CanceledError('Session ended.');
         state.version = result.version;
+        if (
+          state.externalChange?.state === 'present' &&
+          result.version >= state.externalChange.version
+        ) {
+          state.externalChange = undefined;
+          if (state.pauseReason === 'conflict') {
+            state.paused = false;
+            state.pauseReason = undefined;
+          }
+        }
         return result.data;
       } catch (error) {
         if (isTrainingPlanVersionConflict(error)) {
@@ -114,6 +164,7 @@ export class AggregateMutationCoordinator {
     state.version = version;
     state.paused = false;
     state.pauseReason = undefined;
+    state.externalChange = undefined;
     this.publish(state);
   }
 
@@ -123,6 +174,8 @@ export class AggregateMutationCoordinator {
       state.paused = false;
       state.pauseReason = undefined;
       state.pendingCount = 0;
+      state.externalChange = undefined;
+      state.localWorkOwners.clear();
       this.publish(state);
     }
     this.states.clear();
@@ -147,7 +200,9 @@ export class AggregateMutationCoordinator {
   private createState(version: number): AggregateMutationState {
     return {
       chain: Promise.resolve(),
+      externalChange: undefined,
       listeners: new Set(),
+      localWorkOwners: new Set(),
       pauseReason: undefined,
       paused: false,
       pendingCount: 0,
@@ -158,6 +213,9 @@ export class AggregateMutationCoordinator {
 
   private publish(state: AggregateMutationState): void {
     state.snapshot = {
+      ...(state.externalChange === undefined
+        ? {}
+        : { externalChange: state.externalChange }),
       isPending: state.pendingCount > 0,
       ...(state.pauseReason === undefined
         ? {}
@@ -184,13 +242,20 @@ export function getAggregateMutationCoordinator(
 export function useAggregateMutationCoordinator(
   trainingPlanId: string | undefined,
   initialVersion: number | undefined,
+  hasLocalWork = false,
 ) {
+  const owner = useId();
   const queryClient = useQueryClient();
   const coordinator = getAggregateMutationCoordinator(queryClient);
   useEffect(() => {
     if (trainingPlanId !== undefined && initialVersion !== undefined)
       coordinator.seed(trainingPlanId, initialVersion);
   }, [coordinator, initialVersion, trainingPlanId]);
+  useEffect(() => {
+    if (trainingPlanId === undefined) return;
+    coordinator.setLocalWork(trainingPlanId, owner, hasLocalWork);
+    return () => coordinator.setLocalWork(trainingPlanId, owner, false);
+  }, [coordinator, hasLocalWork, owner, trainingPlanId]);
   const subscribe = useCallback(
     (listener: () => void) => coordinator.subscribe(trainingPlanId, listener),
     [coordinator, trainingPlanId],

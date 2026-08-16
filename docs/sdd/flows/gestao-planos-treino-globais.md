@@ -82,13 +82,20 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
    mídia confirmada/draft correspondente e não remonta o editor. Falha da imagem
    perto da expiração tenta uma renovação por ciclo; falha persistente mostra
    fallback acessível e retry explícito.
+10. O layout administrativo mantém uma conexão SSE por documento. Escritas
+    efetivas publicam invalidações via Redis para outras abas, dispositivos,
+    pessoas e runtimes. Lista, detalhe e workout reconciliam por HTTP; todo
+    `realtime-ready` também invalida queries para recuperar perdas.
 
 ## Concorrência e falhas
 
-- somente `412 TRAINING_PLAN_VERSION_CONFLICT` preserva drafts, pausa a fila e
+- somente `412 TRAINING_PLAN_VERSION_CONFLICT` ou uma invalidação SSE externa
+  enquanto existe trabalho local preserva drafts, pausa a fila e
   mostra alerta persistente. Um `412` externo sem esse código é falha genérica,
   não pausa a fila e não é interpretado como conflito. `Recarregar dados` pede
-  confirmação antes de descartar o trabalho local; não há reenvio automático.
+  confirmação antes de descartar o trabalho local na lista e no detalhe. No
+  workout, `Descartar e recarregar` atua diretamente no alerta; o draft só é
+  descartado após leitura bem-sucedida. Não há reenvio automático.
 - rollbacks de plano, workout ou exercício alteram somente entidade, token, delta
   de total ou posição daquela operação; mudanças concorrentes posteriores não são
   substituídas e detalhe de plano só é removido do cache após DELETE bem-sucedido;

@@ -11,6 +11,7 @@ import type {
   UpdateTrainingPlanRequest,
 } from '@dall-fit/types';
 
+import { RealtimePublisherService } from '~/realtime/realtime-publisher.service';
 import type {
   StoredExercise,
   StoredExerciseImage,
@@ -71,6 +72,7 @@ export class TrainingPlanService {
     private readonly trainingPlanRepository: TrainingPlanRepository,
     private readonly youtubeReferenceService: YoutubeReferenceService,
     private readonly exerciseImageService: ExerciseImageService,
+    private readonly realtimePublisher: RealtimePublisherService,
   ) {}
 
   async listGlobal(page: number): Promise<TrainingPlanPage> {
@@ -107,6 +109,7 @@ export class TrainingPlanService {
       ...input,
       ownerPersonId: null,
     });
+    await this.publishPresent(result.id, result.version);
     this.logger.log('TrainingPlanService -> createGlobal -> return:', {
       data: { trainingPlanId: result.id, version: result.version },
     });
@@ -150,6 +153,8 @@ export class TrainingPlanService {
       data: this.toSummary(repositoryResult.data),
       version: repositoryResult.version,
     };
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     this.logger.log('TrainingPlanService -> updateGlobal -> return:', {
       data: { trainingPlanId, version: result.version },
     });
@@ -174,6 +179,7 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    await this.publishDeleted(trainingPlanId);
     await this.exerciseImageService.deleteImages(images);
     this.logger.log('TrainingPlanService -> deleteGlobal -> completed:', {
       data: { imageCount: images.length, trainingPlanId },
@@ -205,6 +211,7 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    await this.publishPresent(trainingPlanId, result.version);
     this.logger.log('TrainingPlanService -> createWorkout -> return:', {
       data: {
         trainingPlanId,
@@ -236,6 +243,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     await this.exerciseImageService.deleteImages(result.data);
     this.logger.log('TrainingPlanService -> deleteWorkout -> return:', {
       data: { trainingPlanId, version: result.version, workoutId },
@@ -298,6 +307,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     return result;
   }
 
@@ -333,6 +344,7 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    await this.publishPresent(trainingPlanId, repositoryResult.version);
     this.logger.log('TrainingPlanService -> createExercise -> return:', {
       data: {
         exerciseId: repositoryResult.data.id,
@@ -406,6 +418,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (repositoryResult.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, repositoryResult.version);
     this.logger.log('TrainingPlanService -> updateExercise -> return:', {
       data: {
         exerciseId,
@@ -438,6 +452,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     return result.version;
@@ -497,6 +513,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     return result.version;
   }
 
@@ -559,6 +577,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     this.logger.log('TrainingPlanService -> commitExerciseImage -> return:', {
@@ -603,6 +623,8 @@ export class TrainingPlanService {
       );
       return failure;
     }
+    if (result.version > expectedVersion)
+      await this.publishPresent(trainingPlanId, result.version);
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     return result.version;
@@ -627,6 +649,38 @@ export class TrainingPlanService {
       exerciseId,
     );
     throw createVersionConflictException();
+  }
+
+  private async publishPresent(
+    trainingPlanId: string,
+    version: number,
+  ): Promise<void> {
+    this.logger.log('TrainingPlanService -> publishPresent -> params:', {
+      params: { trainingPlanId, version },
+    });
+    await this.realtimePublisher.publish({
+      resource: 'global-training-plan',
+      resourceId: trainingPlanId,
+      state: 'present',
+      version,
+    });
+    this.logger.log('TrainingPlanService -> publishPresent -> completed:', {
+      data: { trainingPlanId, version },
+    });
+  }
+
+  private async publishDeleted(trainingPlanId: string): Promise<void> {
+    this.logger.log('TrainingPlanService -> publishDeleted -> params:', {
+      params: { trainingPlanId },
+    });
+    await this.realtimePublisher.publish({
+      resource: 'global-training-plan',
+      resourceId: trainingPlanId,
+      state: 'deleted',
+    });
+    this.logger.log('TrainingPlanService -> publishDeleted -> completed:', {
+      data: { trainingPlanId },
+    });
   }
 
   private assertState(
