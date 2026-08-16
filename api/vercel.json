@@ -5,8 +5,6 @@
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.js": {
-      "runtime": "vercel-node@latest",
-      "memory": 1024,
       "maxDuration": 300
     }
   }
