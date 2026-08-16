@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Alert, Button, Table, toast } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
@@ -62,7 +62,18 @@ export function TrainingPlanDetailPage({
   const aggregate = useAggregateMutationCoordinator(
     trainingPlanId,
     plan?.version,
+    editing || deleteWorkoutId !== undefined,
   );
+  useEffect(() => {
+    const external = aggregate.externalChange;
+    if (external === undefined || aggregate.paused) return;
+    if (external.state === 'deleted') {
+      void navigate({ replace: true, to: '/global/training-plan' });
+      return;
+    }
+    if (plan !== undefined && plan.version >= external.version)
+      void aggregate.reset(plan.version);
+  }, [aggregate, navigate, plan]);
   const submitChanges = async (input: CreateTrainingPlanRequest) => {
     const generation = requireActiveSessionGeneration();
     trackUiEvent({

@@ -19,7 +19,7 @@ describe('useAggregateMutationQueue', () => {
     const second = vi.fn().mockResolvedValue({ data: 'second', version: 4 });
     const queryClient = new QueryClient();
     const { result } = renderHook(
-      () => useAggregateMutationQueue('plan-1', 2, vi.fn()),
+      () => useAggregateMutationQueue('plan-1', 2),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={queryClient}>
@@ -50,7 +50,7 @@ describe('useAggregateMutationQueue', () => {
     const second = vi.fn().mockResolvedValue({ data: 'second', version: 4 });
     const queryClient = new QueryClient();
     const { result } = renderHook(
-      () => useAggregateMutationQueue('plan-1', 2, vi.fn()),
+      () => useAggregateMutationQueue('plan-1', 2),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={queryClient}>
@@ -90,7 +90,6 @@ describe('useAggregateMutationQueue', () => {
   });
 
   it('pauses after a domain version conflict and never starts later queued work', async () => {
-    const onConflict = vi.fn();
     const response = {
       status: 412,
       data: { code: 'TRAINING_PLAN_VERSION_CONFLICT' },
@@ -104,7 +103,7 @@ describe('useAggregateMutationQueue', () => {
     );
     const queryClient = new QueryClient();
     const { result } = renderHook(
-      () => useAggregateMutationQueue('plan-1', 0, onConflict),
+      () => useAggregateMutationQueue('plan-1', 0),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={queryClient}>
@@ -125,12 +124,10 @@ describe('useAggregateMutationQueue', () => {
       await expect(laterTask).rejects.toThrow('paused');
     });
     expect(later).not.toHaveBeenCalled();
-    expect(onConflict).toHaveBeenCalledOnce();
     expect(result.current.paused).toBe(true);
   });
 
   it('does not pause after an external 412 without the domain error code', async () => {
-    const onConflict = vi.fn();
     const response = {
       status: 412,
       data: 'PRECONDITION_FAILED',
@@ -145,7 +142,7 @@ describe('useAggregateMutationQueue', () => {
     );
     const queryClient = new QueryClient();
     const { result } = renderHook(
-      () => useAggregateMutationQueue('plan-1', 0, onConflict),
+      () => useAggregateMutationQueue('plan-1', 0),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={queryClient}>
@@ -170,7 +167,6 @@ describe('useAggregateMutationQueue', () => {
       await expect(laterTask).resolves.toBe('later');
     });
     expect(later).toHaveBeenCalledWith(0);
-    expect(onConflict).not.toHaveBeenCalled();
     expect(result.current.paused).toBe(false);
   });
 
@@ -217,8 +213,8 @@ describe('useAggregateMutationQueue', () => {
     const planB = vi.fn().mockResolvedValue({ data: 'plan-b', version: 1 });
     const { result } = renderHook(
       () => ({
-        planA: useAggregateMutationQueue('plan-a', 0, vi.fn()),
-        planB: useAggregateMutationQueue('plan-b', 0, vi.fn()),
+        planA: useAggregateMutationQueue('plan-a', 0),
+        planB: useAggregateMutationQueue('plan-b', 0),
       }),
       {
         wrapper: ({ children }) => (

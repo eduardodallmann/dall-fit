@@ -10,6 +10,7 @@ export type {
   CsrfTokenResponse,
   CurrentPersonResponse,
   GlobalTrainingPlanCollectionResponse,
+  RealtimeResourceInvalidation,
   ReorderExercisesRequest,
   TrainingPlanDetailsResponse,
   TrainingPlanWorkoutDetailsResponse,

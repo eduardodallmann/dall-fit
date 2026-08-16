@@ -24,3 +24,5 @@ substituída permanece no histórico e aponta para a sucessora.
   aggregate no header `X-Resource-Version`.
 - [`ADR-0007`](ADR-0007-blob-privado-oidc-e-urls-assinadas.md): Blob privado por
   OIDC e entrega direta por signed URLs temporárias.
+- [`ADR-0008`](ADR-0008-sse-e-invalidacao-realtime.md): invalidação em tempo
+  real por SSE e Redis Pub/Sub.

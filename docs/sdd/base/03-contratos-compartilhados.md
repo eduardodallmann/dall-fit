@@ -70,6 +70,11 @@ mesmo quando vazio; `requestId` é o mesmo valor devolvido no header
 
 ## Contratos vigentes de planos de treino
 
+`RealtimeResourceInvalidation` é o contrato transversal do evento SSE
+`resource-invalidated`. Ele identifica `resource`, `resourceId` e `state`;
+`present` inclui a versão canônica e `deleted` não inclui versão. Origem,
+audiência, identidade e conteúdo permanecem internos da API.
+
 - `TrainingPlanSummary` expõe ID, nome, descrição, `version` inteira a partir de
   zero e timestamps, sem ownership ou workouts.
 - `TrainingPlanDetails` acrescenta resumos de workouts com ID, nome e

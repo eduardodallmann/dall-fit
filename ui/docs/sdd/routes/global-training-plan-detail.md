@@ -123,3 +123,10 @@ Não se aplica — não existem imagens em
   handlers/fixtures `training-plans.ts`.
 - Specs: rota `training-plan.spec.ts`, flow `gestao-planos-treino.spec.ts` e E2E
   separado da API.
+
+## Atualização externa
+
+Invalidações SSE do plano refazem detalhe e resumos para qualquer usuário
+autenticado (admin ou não-admin) quando não há edição ou confirmação local
+aberta. Com trabalho local, o coordenador pausa e conserva a recarga confirmada
+desta tela. Exclusão externa navega para a listagem depois da reconciliação.

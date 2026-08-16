@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Alert, Button } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { trackUiEvent } from '~/core/analytics';
+import { getApiErrorCode } from '~/core/http/http-error';
 import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
 import {
   TrainingPlanBreadcrumbs,
@@ -17,7 +19,10 @@ import {
 } from '~/routes/training-plan/signed-image-urls';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import { trainingPlanWorkoutQueryOptions } from '~/routes/training-plan/training-plan-queries';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import {
+  trainingPlanMockSearch,
+  type MockTrainingPlansScenario,
+} from '~/routes/training-plan/training-plan-service';
 import { WorkoutEditor } from '~/routes/training-plan/workout-editor';
 
 const styles = trainingPlanStyles();
@@ -35,6 +40,7 @@ export function TrainingPlanWorkoutPage({
   trainingPlanId,
   workoutId,
 }: Readonly<WorkoutPageProps>) {
+  const navigate = useNavigate();
   const query = useQuery(
     trainingPlanWorkoutQueryOptions(
       trainingPlanId,
@@ -44,13 +50,52 @@ export function TrainingPlanWorkoutPage({
   );
   const refetchWorkout = query.refetch;
   const [reloadKey, setReloadKey] = useState(0);
+  const [hasUnsavedWork, setHasUnsavedWork] = useState(false);
   const automaticallyRetriedExpirations = useRef(new Set<string>());
   const workout = query.data;
   const plan = workout?.trainingPlan;
+  const mockSearch = trainingPlanMockSearch(mockTrainingPlans);
   const aggregate = useAggregateMutationCoordinator(
     trainingPlanId,
     workout?.version,
+    hasUnsavedWork,
   );
+
+  useEffect(() => {
+    const external = aggregate.externalChange;
+    if (external === undefined || aggregate.paused) return;
+    if (external.state === 'deleted') {
+      void navigate({ replace: true, to: '/global/training-plan' });
+      return;
+    }
+    const errorCode = getApiErrorCode(query.error);
+    if (errorCode === 'TRAINING_PLAN_NOT_FOUND') {
+      void navigate({ replace: true, to: '/global/training-plan' });
+      return;
+    }
+    if (errorCode === 'WORKOUT_NOT_FOUND') {
+      void navigate({
+        params: { trainingPlanId },
+        replace: true,
+        search: { mockAuth, ...mockSearch },
+        to: '/global/training-plan/$trainingPlanId',
+      });
+      return;
+    }
+    if (workout !== undefined && workout.version >= external.version) {
+      void aggregate.reset(workout.version).then(() => {
+        setReloadKey((current) => current + 1);
+      });
+    }
+  }, [
+    aggregate,
+    mockAuth,
+    mockSearch,
+    navigate,
+    query.error,
+    trainingPlanId,
+    workout,
+  ]);
 
   const refreshSignedImageUrls = useCallback(() => {
     refetchWorkout().catch(() => undefined);
@@ -105,6 +150,20 @@ export function TrainingPlanWorkoutPage({
   const reload = async () => {
     trackRetry();
     const result = await query.refetch();
+    const errorCode = getApiErrorCode(result.error);
+    if (errorCode === 'TRAINING_PLAN_NOT_FOUND') {
+      await navigate({ replace: true, to: '/global/training-plan' });
+      return;
+    }
+    if (errorCode === 'WORKOUT_NOT_FOUND') {
+      await navigate({
+        params: { trainingPlanId },
+        replace: true,
+        search: { mockAuth, ...mockSearch },
+        to: '/global/training-plan/$trainingPlanId',
+      });
+      return;
+    }
     if (!result.isSuccess || result.data === undefined)
       throw result.error ?? new Error('Workout reload failed.');
     await aggregate.reset(result.data.version);
@@ -151,6 +210,7 @@ export function TrainingPlanWorkoutPage({
       ) : null}
       {aggregate.paused ? (
         <TrainingPlanConflictAlert
+          directReload
           onReload={reload}
           reason={aggregate.pauseReason}
         />
@@ -160,9 +220,9 @@ export function TrainingPlanWorkoutPage({
           data={workout}
           key={`${workout.id}:${reloadKey}`}
           mockScenario={mockTrainingPlans}
-          onConflict={() => undefined}
           onImageLoadError={handleImageLoadError}
           onRetryImage={refreshSignedImageUrls}
+          onUnsavedWorkChange={setHasUnsavedWork}
         />
       )}
     </div>

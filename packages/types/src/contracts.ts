@@ -21,6 +21,19 @@ export interface ApiResponse<TData> {
   data: TData;
 }
 
+export type RealtimeResourceInvalidation =
+  | {
+      resource: 'global-training-plan';
+      resourceId: string;
+      state: 'deleted';
+    }
+  | {
+      resource: 'global-training-plan';
+      resourceId: string;
+      state: 'present';
+      version: number;
+    };
+
 export interface CollectionResponse<TData> {
   data: readonly TData[];
   page: number;

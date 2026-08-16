@@ -25,6 +25,10 @@ import { RequestContextMiddleware } from '~/observability/request-context.middle
       useClass: GlobalExceptionFilter,
     },
   ],
-  exports: [RequestContextLogger, RequestContextMiddleware],
+  exports: [
+    REQUEST_CONTEXT_STORAGE,
+    RequestContextLogger,
+    RequestContextMiddleware,
+  ],
 })
 export class ObservabilityModule {}
