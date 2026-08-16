@@ -19,16 +19,17 @@ nome. A edição inline valida trim
 o modo inline até o sucesso, mantém o campo sem label visível e fornece seu nome
 acessível diretamente ao input. Só apresenta toast para resultado não cancelado;
 falha mantém texto, erro e retry. Cancelar restaura o confirmado. Somente
-`412 TRAINING_PLAN_VERSION_CONFLICT` ou uma invalidação SSE externa com trabalho
-local mostra alerta persistente e bloqueia novas gravações. No editor,
+`412 TRAINING_PLAN_VERSION_CONFLICT` ou uma invalidação SSE externa (admin
+ou não-admin) com trabalho local mostra alerta persistente e bloqueia novas
+gravações. No editor,
 `Descartar e recarregar` executa a leitura diretamente no alerta, sem segunda
 modal; falha preserva drafts e a pausa. Refetches
 normais não remontam o editor nem reinicializam sua fila; somente o reload
 bem-sucedido descarta os drafts e reinicia a fila com a versão retornada pelo
 servidor.
 
-Com o editor limpo, invalidação SSE refaz a leitura e remonta a representação
-canônica. Exclusão externa do plano navega para a listagem; com draft, isso ocorre
+Com o editor limpo, invalidação SSE (admin ou não-admin) refaz a leitura e remonta
+a representação canônica. Exclusão externa do plano navega para a listagem; com draft, isso ocorre
 somente depois da ação direta e da confirmação HTTP.
 
 ## Lista e campos

@@ -310,10 +310,10 @@ function TrainingPlanListRouteComponent() {
 
 // eslint-disable-next-line react-refresh/only-export-components
 function AdminRouteComponent() {
-  const { mockAuth } = authenticatedRoute.useRouteContext();
+  authenticatedRoute.useRouteContext();
   return (
     <>
-      <TrainingPlanRealtimeBridge mockAuth={mockAuth} />
+      <TrainingPlanRealtimeBridge />
       <Outlet />
     </>
   );

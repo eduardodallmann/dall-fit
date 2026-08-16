@@ -19,7 +19,7 @@ endpoint não entrega conteúdo; o consumidor relê o endpoint HTTP proprietári
 ## Contrato HTTP resumido
 
 - `GET /realtime/events?clientInstanceId=<uuid>` com cookie de sessão;
-- qualquer sessão abre o stream, mas audiência admin exige `isAdmin: true`;
+- qualquer sessão abre o stream; eventos `global-training-plan` são transmitidos para todas as sessões autenticadas, demais eventos de audiência admin exigem `isAdmin: true`;
 - 30 novas conexões/minuto por sessão e IP;
 - sucesso `200 text/event-stream`, retry 3 s, heartbeat 20 s, duração até 270 s;
 - eventos `realtime-ready`, `resource-invalidated` e `heartbeat`;

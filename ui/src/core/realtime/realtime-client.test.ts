@@ -39,8 +39,8 @@ describe('RealtimeClient', () => {
     client.onReady(ready);
     client.onInvalidation(invalidated);
 
-    client.start('admin');
-    client.start('admin');
+    client.start();
+    client.start();
 
     expect(FakeEventSource.instances).toHaveLength(1);
     const source = FakeEventSource.instances[0];

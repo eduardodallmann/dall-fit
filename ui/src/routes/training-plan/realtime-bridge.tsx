@@ -2,15 +2,12 @@ import { useEffect } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
-import type { MockAuthScenario } from '~/auth/auth-service';
 import { realtimeClient } from '~/core/realtime/realtime-client';
 
 import { getAggregateMutationCoordinator } from './aggregate-mutation-coordinator';
 import { trainingPlanKeys } from './training-plan-queries';
 
-export function TrainingPlanRealtimeBridge({
-  mockAuth,
-}: Readonly<{ mockAuth?: MockAuthScenario }>) {
+export function TrainingPlanRealtimeBridge() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -35,13 +32,13 @@ export function TrainingPlanRealtimeBridge({
         });
       }
     });
-    realtimeClient.start(mockAuth);
+    realtimeClient.start();
     return () => {
       unsubscribeInvalidation();
       unsubscribeReady();
       realtimeClient.stop();
     };
-  }, [mockAuth, queryClient]);
+  }, [queryClient]);
 
   return null;
 }

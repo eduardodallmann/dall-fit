@@ -63,7 +63,7 @@ export class AggregateMutationCoordinator {
   notifyExternalChange(
     event: RealtimeResourceInvalidation,
   ): boolean | undefined {
-    const state = this.states.get(event.resourceId) ?? this.createState(0);
+    const state = this.states.get(event.resourceId) ?? this.createState(-1);
     this.states.set(event.resourceId, state);
     if (event.state === 'present') {
       if (event.version <= state.version) return undefined;

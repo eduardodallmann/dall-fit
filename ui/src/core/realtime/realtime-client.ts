@@ -10,13 +10,11 @@ type ReadyListener = () => void;
 export class RealtimeClient {
   private eventSource?: EventSource;
   private hiddenTimer?: number;
-  private mockAuth?: string;
   private readonly invalidationListeners = new Set<InvalidationListener>();
   private readonly readyListeners = new Set<ReadyListener>();
   private started = false;
 
-  start(mockAuth?: string): void {
-    this.mockAuth = mockAuth;
+  start(): void {
     if (this.started) return;
     this.started = true;
     document.addEventListener('visibilitychange', this.handleVisibility);
@@ -68,8 +66,6 @@ export class RealtimeClient {
     const baseUrl = String(import.meta.env.VITE_API_URL).replace(/\/$/, '');
     const url = new URL(`${baseUrl}/realtime/events`, window.location.origin);
     url.searchParams.set('clientInstanceId', getClientInstanceId());
-    if (import.meta.env.DEV && this.mockAuth !== undefined)
-      url.searchParams.set('mockAuth', this.mockAuth);
     const source = new EventSource(url, { withCredentials: true });
     this.eventSource = source;
     source.addEventListener('realtime-ready', () => {

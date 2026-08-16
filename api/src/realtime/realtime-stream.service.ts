@@ -28,7 +28,9 @@ export class RealtimeStreamService {
       });
       observer.next({ data: {}, retry: 3_000, type: 'realtime-ready' });
       const unsubscribe = this.subscriber.subscribe((envelope) => {
-        if (!connection.isAdmin) {
+        const isGlobalTrainingPlanEvent =
+          envelope.event?.resource === 'global-training-plan';
+        if (!connection.isAdmin && !isGlobalTrainingPlanEvent) {
           this.logger.log(
             'RealtimeStreamService -> stream -> audienceSuppressed branch:',
             { data: { audienceAccepted: false } },
