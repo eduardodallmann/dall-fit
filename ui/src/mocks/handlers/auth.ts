@@ -9,6 +9,7 @@ import {
   lightThemePersonFixture,
   personWithoutThemeFixture,
 } from '~/mocks/fixtures/person';
+import { MOCK_REQUEST_ID } from '~/mocks/mock-constants';
 import {
   createMockApiError,
   createMockResponseInit,
@@ -20,6 +21,19 @@ const revokedSessions = new Set<string>();
 const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
+
+function isSessionRevoked(scenario: string | null, request: Request): boolean {
+  const key = scenario ?? 'authenticated';
+  if (revokedSessions.has(key)) return true;
+
+  const cookie = request.headers.get('cookie');
+  if (cookie !== null) {
+    const match = cookie.match(/(?:^|;\s*)dall-fit-revoked=([^;]+)/);
+    if (match !== null && decodeURIComponent(match[1]) === key) return true;
+  }
+
+  return false;
+}
 
 function nextRequestCount(key: string): number {
   const count = (authRequestCount.get(key) ?? 0) + 1;
@@ -146,7 +160,13 @@ export const authHandlers = [
       );
     }
     revokedSessions.add(scenario ?? 'authenticated');
-    return new HttpResponse(null, createMockResponseInit({ status: 204 }));
+    return new HttpResponse(null, {
+      headers: {
+        'Set-Cookie': `dall-fit-revoked=${encodeURIComponent(scenario ?? 'authenticated')}; Path=/; SameSite=Lax`,
+        'x-request-id': MOCK_REQUEST_ID,
+      },
+      status: 204,
+    });
   }),
   http.get('*/auth/me', async ({ request }) => {
     const scenario = request.headers.get('x-dall-fit-mock-auth');
@@ -173,7 +193,7 @@ export const authHandlers = [
       return result;
     }
 
-    if (revokedSessions.has(scenario ?? 'authenticated')) {
+    if (isSessionRevoked(scenario, request)) {
       const result = HttpResponse.json(
         createMockApiError(
           'AUTHENTICATION_REQUIRED',

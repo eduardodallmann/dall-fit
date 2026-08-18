@@ -189,13 +189,14 @@ seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
 reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercem os
 dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o body e
 devolve a `Person` atualizada ou a falha selecionada. `GET /auth/csrf` devolve
-token fictício no-store e `POST /auth/logout` valida seu header, com cenários
-`csrf-error` e `logout-error`. `session-expired` responde a primeira pessoa e
-depois `401`; `admin-revoked` remove `isAdmin` na revalidação; `csrf-refresh`
-entrega um token obsoleto e depois outro token para recuperação single-flight. Após
-`POST /auth/logout` bem-sucedido, o seletor correspondente é revogado e
-subsequentes `GET /auth/me` para o mesmo seletor respondem `401`, simulando a
-invalidação do lado do servidor. O estado de autenticação é
+token fictício no-store e `POST /auth/logout` com sucesso revoga a sessão do seletor: adiciona-o a
+`revokedSessions` e emite `Set-Cookie: dall-fit-revoked=<scenario>; Path=/;
+SameSite=Lax` para que a revogação sobreviva a recargas de página no Service Worker
+do MSW Browser. `GET /auth/me` retorna `401` quando o seletor está em
+`revokedSessions` ou quando o cookie `dall-fit-revoked` corresponde ao seletor,
+simulando a invalidação do lado do servidor. O middleware exclusivo do Vite em
+`/api/auth/google` limpa o cookie com `Max-Age=0` para permitir novo login após
+logout. O estado de autenticação é
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 
