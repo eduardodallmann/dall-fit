@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Fluxo Login com Google', () => {
   test('Cenário 2 — Jornada integrada fictícia', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mockAuth=unauthenticated');
     await page.getByRole('button', { name: 'Entrar com Google' }).click();
 
     await expect(page).toHaveURL('/dash');

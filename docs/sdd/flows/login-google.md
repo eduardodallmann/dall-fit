@@ -13,11 +13,14 @@
 
 ## Entrada e pré-condições
 
-A jornada começa em `http://localhost:3000/`, que permanece pública. O ambiente
-real exige credencial OAuth válida, URI de callback exatamente igual à cadastrada,
-MongoDB, Redis TLS e segredo de sessão disponíveis. Em desenvolvimento integrado,
-MSW simula requests Axios; a navegação top-level OAuth permanece na mesma origem
-controlada pelo middleware de teste do Vite, sem acessar a API real.
+A jornada começa em `http://localhost:3000/`, que permanece pública. Ao carregar a
+raiz, um probe de sessão executa `GET /auth/me` em `beforeLoad`: com sessão válida,
+o router substitui a URL para `/dash` sem renderizar a entrada. Com sessão inválida,
+a entrada pública é exibida e o visitante pode iniciar login. Após logout ou
+expiração, um bypass one-shot permite que a navegação terminal volte à raiz e mostre
+a entrada pública sem novo probe. Em desenvolvimento integrado, MSW simula requests
+Axios; a navegação top-level OAuth permanece na mesma origem controlada pelo
+middleware de teste do Vite, sem acessar a API real.
 
 ## Rotas e endpoints participantes
 
@@ -35,41 +38,46 @@ controlada pelo middleware de teste do Vite, sem acessar a API real.
 
 ## Sequência e decisões
 
-1. A pessoa aciona `Entrar com Google`. A UI emite somente o início de
+1. A pessoa acessa `/`. O probe de sessão verifica `GET /auth/me` via MSW; com
+   sessão válida, redireciona silenciosamente para `/dash`. Com sessão inválida,
+   renderiza a entrada pública.
+2. A pessoa autenticada que atinge `/dash` reutiliza o dado cacheado pelo probe,
+   sem nova requisição a `GET /auth/me`.
+3. A pessoa sem sessão aciona `Entrar com Google`. A UI emite somente o início de
    `google_login` e navega o documento diretamente para
    `GET ${VITE_API_URL}/auth/google`; não emite conclusão antes de sair da página.
-2. A API cria `state`, `nonce` e verifier PKCE, grava cookies temporários e
-   redireciona para a URL Google com challenge S256.
-3. O Google autentica a pessoa e retorna um código ao
-   callback.
-4. A API compara `state`, troca o código com o verifier e valida assinatura,
-   issuer, audience, ID token e `nonce`.
-5. Se não houver `Person` para o `sub`, a API persiste nome, e-mail e foto sem
-   `isAdmin`; se já houver, sincroniza atomicamente somente nome, e-mail e foto
-   realmente alterados, sem duplicar cadastro nem alterar a condição
-   administrativa/configs.
-6. A fronteira HTTP já agenda a remoção dos cookies temporários antes de guards,
-   validação e command. A API assina JWT técnico e só emite o cookie depois de criar o registro
-   revogável e o segredo CSRF no Redis; em sucesso redireciona a
-   `/dash`. No deploy da UI, o fallback da Vercel entrega `index.html` para esse
-   acesso direto e o TanStack Router assume a rota, sem exigir um arquivo físico
-   `/dash`.
-7. A rota-pai protegida consulta `GET /auth/me`; a API exige claims JWT, registro
-   Redis ativo e pessoa MongoDB ainda existente.
-8. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
-   público. Antes de pintar o shell, a UI aplica `configs.theme` e o sincroniza no
-   navegador; quando ele não existe, remove uma escolha local potencialmente
-   pertencente a outra conta e usa `prefers-color-scheme` sem persistir um default.
-   O layout autenticado mostra avatar, nome, e-mail, toggle de tema, navegação
-   `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
-   de `/dash` permanece vazia.
-9. Ainda antes do shell, a UI consulta `GET /auth/csrf` em single-flight, mantém o token apenas em
-   memória e habilita mutações somente após os dois bootstraps. Falha de CSRF é
-   recuperável e não apaga a autenticação; `401` limpa CSRF/cache privado e
-   redireciona a `/`. O shell mantém `GET /auth/me` observado, revalida em foco,
-   reconexão e a cada cinco minutos enquanto visível, refletindo expiração, pessoa
-   removida ou mudança de privilégio sem cache indefinido.
-10. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
+4. A API cria `state`, `nonce` e verifier PKCE, grava cookies temporários e
+    redireciona para a URL Google com challenge S256.
+5. O Google autentica a pessoa e retorna um código ao
+    callback.
+6. A API compara `state`, troca o código com o verifier e valida assinatura,
+    issuer, audience, ID token e `nonce`.
+7. Se não houver `Person` para o `sub`, a API persiste nome, e-mail e foto sem
+    `isAdmin`; se já houver, sincroniza atomicamente somente nome, e-mail e foto
+    realmente alterados, sem duplicar cadastro nem alterar a condição
+    administrativa/configs.
+8. A fronteira HTTP já agenda a remoção dos cookies temporários antes de guards,
+    validação e command. A API assina JWT técnico e só emite o cookie depois de criar o registro
+    revogável e o segredo CSRF no Redis; em sucesso redireciona a
+    `/dash`. No deploy da UI, o fallback da Vercel entrega `index.html` para esse
+    acesso direto e o TanStack Router assume a rota, sem exigir um arquivo físico
+    `/dash`.
+9. A rota-pai protegida consulta `GET /auth/me`; a API exige claims JWT, registro
+    Redis ativo e pessoa MongoDB ainda existente.
+10. Com sessão válida, a API valida o JWT, encontra a pessoa e devolve seu contrato
+    público. Antes de pintar o shell, a UI aplica `configs.theme` e o sincroniza no
+    navegador; quando ele não existe, remove uma escolha local potencialmente
+    pertencente a outra conta e usa `prefers-color-scheme` sem persistir um default.
+    O layout autenticado mostra avatar, nome, e-mail, toggle de tema, navegação
+    `Home` e, quando recebe `isAdmin: true`, o indicador `Admin`; a região própria
+    de `/dash` permanece vazia.
+11. Ainda antes do shell, a UI consulta `GET /auth/csrf` em single-flight, mantém o token apenas em
+    memória e habilita mutações somente após os dois bootstraps. Falha de CSRF é
+    recuperável e não apaga a autenticação; `401` limpa CSRF/cache privado e
+    redireciona a `/`. O shell mantém `GET /auth/me` observado, revalida em foco,
+    reconexão e a cada cinco minutos enquanto visível, refletindo expiração, pessoa
+    removida ou mudança de privilégio sem cache indefinido.
+12. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
     CSRF. Sucesso ou falha remota encerra localmente uma única geração: aborta
     requests, reseta recursos privados, limpa CSRF/cache e navega com replace para
     `/`; a falha também mostra feedback acessível.
@@ -146,7 +154,7 @@ devem acompanhar a reversão.
 
 ### Cenário 2 — Jornada integrada fictícia
 
-- Link para testar: `http://127.0.0.1:3100/`
+- Link para testar: `http://127.0.0.1:3100/?mockAuth=unauthenticated`
 - Given: o Vite está iniciado pelo Playwright com MSW Browser e controla
   `GET /api/auth/google` na mesma origem com redirect fictício para `/dash`
 - When: a pessoa aciona `Entrar com Google`
@@ -186,7 +194,11 @@ devem acompanhar a reversão.
 - Unitários e componentes da UI: home, consulta de pessoa, autorização
   administrativa, bootstrap/reconciliação do tema, rollback, iniciais e
   apresentação comum/administrativa do menu.
-- Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`.
+- Unitários de probe e lifecycle: `root-session-probe.test.ts` e
+  `session-lifecycle.test.ts` cobrem decisão do probe, reuso de cache e bypass
+  one-shot após logout/expiração.
+- Playwright da jornada UI: `ui/tests/integration/flows/login-google.spec.ts`
+  e `ui/tests/integration/routes/auth/root.spec.ts`.
 - Analytics: testes da composição global, fronteira, home, menu, tema e PWA isolam
   o transporte oficial e validam eventos sem conteúdo.
 - E2E dos endpoints da API:

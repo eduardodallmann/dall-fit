@@ -10,10 +10,18 @@
 ## Entradas e pré-condições
 
 - Como o usuário chega: URL direta ou redirecionamento após sessão/callback inválido.
-- Path e query params: `/`; query opcional `authError=oauth_failed`.
+- Path e query params: `/`; query opcional `authError=oauth_failed` e `mockAuth`
+  (desenvolvimento apenas).
 - Contexto e estado persistido: não exige sessão; pode usar somente a preferência
   local `dall-fit:theme` com valor `light | dark`.
 - Permissões: pública.
+
+Antes de renderizar, a rota executa um probe de sessão em `beforeLoad`. Quando a
+sessão é válida, autenticada ou revogada/recuperada, o router substitui a URL por
+`/dash` sem renderizar a entrada pública. Um bypass one-shot permite que a navegação
+terminal (logout, expiração) volte à raiz e renderize a entrada pública sem novo
+probe. Consulte `../../api/docs/sdd/endpoints/auth.md` e
+`../../../../docs/sdd/flows/login-google.md`.
 
 ## Elementos e conteúdo
 
@@ -34,20 +42,30 @@ preferência atualizam a rota sem escrever no armazenamento.
 ## Caminho feliz
 
 1. O visitante acessa `/`.
-2. Aciona `Entrar com Google`.
-3. O browser navega o documento para `GET ${VITE_API_URL}/auth/google`.
+2. O probe de sessão confa requisição `GET /auth/me`; com sessão válida, o router
+   substitui a URL para `/dash`.
+3. Com sessão inválida, a entrada pública é renderizada.
+4. O visitante aciona `Entrar com Google`.
+5. O browser navega o documento para `GET ${VITE_API_URL}/auth/google`.
 
 Resultado esperado: a API inicia o fluxo OAuth.
 
 ## Caminhos alternativos
 
-### Alternativa 1 — Login falhou
+### Alternativa 1 — Sessão válida redireciona para `/dash`
+
+- Condição: o probe de sessão obtém `200` de `GET /auth/me`.
+- Comportamento: o router substitui a URL para `/dash` e a rota pública não é
+  renderizada.
+- Resultado: usuários autenticados não veem a entrada pública.
+
+### Alternativa 2 — Login falhou
 
 - Condição: query `authError=oauth_failed` devolvida pelo callback.
 - Comportamento: a tela continua pública e mostra alerta genérico.
 - Resultado: nenhuma informação técnica é exposta e a ação pode ser repetida.
 
-### Alternativa 2 — Nova versão do PWA
+### Alternativa 3 — Nova versão do PWA
 
 - Condição: o service worker encontra uma versão em espera enquanto a rota pública
   está aberta.
@@ -62,7 +80,7 @@ Resultado esperado: a API inicia o fluxo OAuth.
   categoria sanitizada `pwa_registration`. Falha de atualização mantém o aviso,
   informa erro genérico e oferece `Tentar atualizar`.
 
-### Alternativa 3 — Falha global de bootstrap ou renderização
+### Alternativa 4 — Falha global de bootstrap ou renderização
 
 - Condição: MSW habilitado não inicia, provider não pode ser preparado ou erro de
   renderização escapa dos boundaries de rota.
@@ -71,7 +89,7 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Resultado: o diagnóstico usa somente `bootstrap` ou `render`; erro, stack, URL,
   sessão e pessoa não são transportados.
 
-### Alternativa 4 — Preferência de tema inválida ou indisponível
+### Alternativa 5 — Preferência de tema inválida ou indisponível
 
 - Condição: `dall-fit:theme` não contém `light | dark` ou o navegador bloqueia o
   armazenamento.
@@ -86,9 +104,13 @@ Não se aplica — não há formulário nem entrada local.
 
 ## Estados
 
-- Loading: não se aplica ao início; a navegação top-level deixa o documento.
+- Loading: enquanto o probe de sessão não retorna, um skeleton espelha o card de
+  entrada com placeholders para eyebrow, título, descrição e botão, com atraso de
+  `300ms` antes do componente de pending (`aria-label="Verificando sua sessão"`,
+  `role="status"`).
 - Vazio: não se aplica.
-- Sucesso: card de entrada e ação visíveis.
+- Sucesso: card de entrada e ação visíveis (usuário sem sessão) ou redirecionado
+  para `/dash` (usuário autenticado).
 - Erro recuperável: alerta após falha OAuth esperada no callback ou falha na
   preparação.
 - Erro não recuperável: não se aplica.
@@ -169,14 +191,14 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ### Cenário 1 — Iniciar login
 
-- Link para testar: `http://localhost:3000/`
-- Given: a rota pública está carregada
+- Link para testar: `http://localhost:3000/?mockAuth=unauthenticated`
+- Given: a rota pública está carregada (probe retorna `public-entry`)
 - When: o visitante aciona `Entrar com Google`
 - Then: o documento navega diretamente para `GET /auth/google`
 
 ### Cenário 2 — Exibir erro recuperável
 
-- Link para testar: `http://localhost:3000/?authError=oauth_failed`
+- Link para testar: `http://localhost:3000/?mockAuth=unauthenticated&authError=oauth_failed`
 - Given: o callback classificou uma falha OAuth esperada e retornou erro genérico
 - When: a rota renderiza
 - Then: mostra o alerta e mantém a ação de login disponível
@@ -193,7 +215,8 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ### Cenário 4 — Tema público acompanha o sistema
 
-- Link para testar: `http://localhost:3000/` sem `dall-fit:theme`
+- Link para testar: `http://localhost:3000/?mockAuth=unauthenticated` sem
+  `dall-fit:theme`
 - Given: o sistema prefere `light`
 - When: a rota abre e a preferência muda para `dark`
 - Then: `data-theme` muda de `light` para `dark`
@@ -201,17 +224,39 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ### Cenário 5 — Preferência local inicia o tema
 
-- Link para testar: `http://localhost:3000/` com `dall-fit:theme=dark` preparado
-  antes da navegação
+- Link para testar: `http://localhost:3000/?mockAuth=unauthenticated` com
+  `dall-fit:theme=dark` preparado antes da navegação
 - Given: o sistema prefere `light`
 - When: o documento inicia
 - Then: `data-theme="dark"` é aplicado antes da primeira pintura útil e mudanças
   do sistema não substituem a escolha local
 
+### Cenário 6 — Sessão ativa redireciona da raiz
+
+- Link para testar: `http://localhost:3000/`
+- Given: o probe obtém `200` de `GET /auth/me`
+- When: a raiz resolve o `beforeLoad`
+- Then: o router substitui a URL para `/dash` sem renderizar a entrada pública
+- And: a rota `/dash` reutiliza o dado cacheado do probe sem nova requisição
+
+### Cenário 7 — Logout encerra a sessão e a raiz permanece pública
+
+- Link para testar: `http://localhost:3000/dash`
+- Given: a sessão está ativa e o usuário aciona `Sair`
+- When: o logout conclui e a raiz é carregada via navegação terminal
+- Then: o bypass one-shot permite a entrada pública sem novo probe
+- And: uma navegação subsequente à raiz mantém a entrada pública (sessão revogada)
+
 ## Estrutura técnica relevante
 
-- Arquivo da rota: `src/routes/home/index.tsx`
-- Componentes HeroUI utilizados: `Alert`, `Button` e `Card`
+- Arquivo da rota: `src/routes/routes.tsx` (homeRoute `beforeLoad`, `validateSearch`,
+  `pendingComponent`, `pendingMs`)
+- Probe de sessão: `src/routes/root-session-probe.ts`
+- Lifecycle de sessão: `src/auth/session-lifecycle.ts`
+- Componentes de entrada: `src/routes/route-components.tsx`
+  (`HomeRouteComponent`, `HomeRoutePending`)
+- Arquivo do componente home: `src/routes/home/index.tsx`
+- Componentes HeroUI utilizados: `Alert`, `Button`, `Card`, `Skeleton`
 - Componentes core: `pwa-update-notice`, aplicado pelos providers globais
 - Infraestrutura core: `ThemeProvider`, `theme-storage`,
   `ApplicationErrorBoundary` e `ApplicationFallback`
@@ -221,17 +266,20 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ## Cobertura automatizada
 
-| Regra ou cenário de negócio | Vitest          | Playwright    |
-| --------------------------- | --------------- | ------------- |
-| conteúdo e destino do login | componente home | rota root     |
-| alerta de callback          | componente home | rota root     |
-| avanço até `/dash` mockado  | não se aplica   | flow login    |
-| aviso de atualização        | componente PWA  | não se aplica |
-| bootstrap local/sistema     | theme storage   | rota root     |
-| mudança do sistema          | theme provider  | rota root     |
+| Regra ou cenário de negócio | Vitest                                     | Playwright   |
+| --------------------------- | ------------------------------------------ | ------------ |
+| conteúdo e destino do login | componente home                            | rota root    |
+| alerta de callback          | componente home                            | rota root    |
+| avanço até `/dash` mockado  | não se aplica                              | flow login   |
+| aviso de atualização        | componente PWA                             | não se aplica |
+| bootstrap local/sistema     | theme storage                              | rota root    |
+| mudança do sistema          | theme provider                             | rota root    |
+| probe redireciona autenticado | root-session-probe, session-lifecycle    | rota root    |
+| bypass one-shot após logout | app, session-lifecycle                     | rota root    |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.
+- Spec Playwright do flow: `tests/integration/flows/login-google.spec.ts`.
 - Cenários manuais e justificativa: consentimento Google real exige serviço e conta
   externos. O layout do aviso é conferido no preview de duas versões do build,
   porque o Playwright usa MSW Browser e mantém o Service Worker da PWA desabilitado.

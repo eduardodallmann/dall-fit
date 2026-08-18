@@ -4,6 +4,7 @@ import { toast } from '@heroui/react';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
+import { resetSessionLifecycleForTests } from '~/auth/session-lifecycle';
 import { resetAuthScenarioStates } from '~/mocks/handlers/auth';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import { mockServer } from '~/mocks/server';
@@ -17,6 +18,7 @@ afterEach(() => {
   toast.clear();
   mockServer.resetHandlers();
   resetAuthScenarioStates();
+  resetSessionLifecycleForTests();
   resetTrainingPlanScenarioStates();
   vi.restoreAllMocks();
 });

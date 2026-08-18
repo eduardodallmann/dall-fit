@@ -186,13 +186,16 @@ enviado quando mocks estão desabilitados e não pertence ao contrato da API.
 fixture autenticada sem `isAdmin` por padrão, a fixture com `isAdmin: true` no
 seletor `admin`, `401` no seletor `unauthenticated` e erro técnico no seletor
 `error`. Os seletores `theme-light`, `theme-dark` e `theme-unset` controlam a
-reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercitam os
+reconciliação do tema; `theme-save-error` e `theme-save-error-unset` exercem os
 dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o body e
 devolve a `Person` atualizada ou a falha selecionada. `GET /auth/csrf` devolve
 token fictício no-store e `POST /auth/logout` valida seu header, com cenários
 `csrf-error` e `logout-error`. `session-expired` responde a primeira pessoa e
 depois `401`; `admin-revoked` remove `isAdmin` na revalidação; `csrf-refresh`
-entrega um token obsoleto e depois outro token para recuperação single-flight. O estado de autenticação é
+entrega um token obsoleto e depois outro token para recuperação single-flight. Após
+`POST /auth/logout` bem-sucedido, o seletor correspondente é revogado e
+subsequentes `GET /auth/me` para o mesmo seletor respondem `401`, simulando a
+invalidação do lado do servidor. O estado de autenticação é
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 

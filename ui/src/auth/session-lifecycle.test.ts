@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   activateSession,
+  armSessionReturnBypass,
   configureSessionEndHandler,
+  consumeSessionReturnBypass,
   endSession,
   getActiveSessionGeneration,
   getActiveSessionSignal,
@@ -67,5 +69,39 @@ describe('session lifecycle', () => {
     await expect(endSession('logout')).rejects.toThrow('navigation');
 
     expect(isSessionGenerationActive(generation)).toBe(false);
+  });
+
+  it('consumeSessionReturnBypass is single-use and resets after consumption', () => {
+    armSessionReturnBypass();
+
+    expect(consumeSessionReturnBypass()).toBe(true);
+    expect(consumeSessionReturnBypass()).toBe(false);
+
+    armSessionReturnBypass();
+    expect(consumeSessionReturnBypass()).toBe(true);
+  });
+
+  it('endSession arms the bypass for logout and expired reasons', async () => {
+    await activateSession('person-1', 'admin');
+
+    await endSession('logout');
+
+    expect(consumeSessionReturnBypass()).toBe(true);
+  });
+
+  it('endSession arms the bypass for expired reason', async () => {
+    await activateSession('person-1', 'admin');
+
+    await endSession('expired');
+
+    expect(consumeSessionReturnBypass()).toBe(true);
+  });
+
+  it('endSession does not arm the bypass for identity_changed', async () => {
+    await activateSession('person-1', 'admin');
+
+    await endSession('identity_changed');
+
+    expect(consumeSessionReturnBypass()).toBe(false);
   });
 });

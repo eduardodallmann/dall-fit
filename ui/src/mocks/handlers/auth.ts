@@ -16,6 +16,7 @@ import {
 
 const personState = new Map<string, Person>();
 const authRequestCount = new Map<string, number>();
+const revokedSessions = new Set<string>();
 const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
@@ -75,6 +76,7 @@ function isThemeBody(value: unknown): value is { theme: Theme } {
 export function resetAuthScenarioStates(): void {
   personState.clear();
   authRequestCount.clear();
+  revokedSessions.clear();
   resetCsrfTokenForTests();
 }
 
@@ -143,6 +145,7 @@ export const authHandlers = [
         createMockResponseInit({ status: 403 }),
       );
     }
+    revokedSessions.add(scenario ?? 'authenticated');
     return new HttpResponse(null, createMockResponseInit({ status: 204 }));
   }),
   http.get('*/auth/me', async ({ request }) => {
@@ -165,6 +168,18 @@ export const authHandlers = [
       const result = HttpResponse.json(
         createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
         createMockResponseInit({ status: 503 }),
+      );
+
+      return result;
+    }
+
+    if (revokedSessions.has(scenario ?? 'authenticated')) {
+      const result = HttpResponse.json(
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
       );
 
       return result;
