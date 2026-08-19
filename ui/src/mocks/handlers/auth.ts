@@ -22,14 +22,31 @@ const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
 
-function isSessionRevoked(scenario: string | null, request: Request): boolean {
+function isSessionRevoked(scenario: string | null): boolean {
   const key = scenario ?? 'authenticated';
-  if (revokedSessions.has(key)) return true;
+  return revokedSessions.has(key);
+}
 
-  const cookie = request.headers.get('cookie');
-  if (cookie !== null) {
-    const match = cookie.match(/(?:^|;\s*)dall-fit-revoked=([^;]+)/);
-    if (match !== null && decodeURIComponent(match[1]) === key) return true;
+async function isSessionRevokedPersisted(
+  scenario: string | null,
+): Promise<boolean> {
+  const key = scenario ?? 'authenticated';
+
+  try {
+    const store = (
+      globalThis as {
+        cookieStore?: {
+          get: (name: string) => Promise<{ value: string } | null>;
+        };
+      }
+    ).cookieStore;
+    if (store !== undefined) {
+      const entry = await store.get('dall-fit-revoked');
+      if (entry !== null && decodeURIComponent(entry.value) === key)
+        return true;
+    }
+  } catch {
+    // Cookie Store API not available
   }
 
   return false;
@@ -193,7 +210,8 @@ export const authHandlers = [
       return result;
     }
 
-    if (isSessionRevoked(scenario, request)) {
+    const sessionRevocationStatus = await isSessionRevokedPersisted(scenario);
+    if (isSessionRevoked(scenario) || sessionRevocationStatus) {
       const result = HttpResponse.json(
         createMockApiError(
           'AUTHENTICATION_REQUIRED',

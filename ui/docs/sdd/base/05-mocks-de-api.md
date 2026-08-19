@@ -191,12 +191,11 @@ dois rollbacks. `PATCH /auth/me/configs` mantém estado por seletor, valida o bo
 devolve a `Person` atualizada ou a falha selecionada. `GET /auth/csrf` devolve
 token fictício no-store e `POST /auth/logout` com sucesso revoga a sessão do seletor: adiciona-o a
 `revokedSessions` e emite `Set-Cookie: dall-fit-revoked=<scenario>; Path=/;
-SameSite=Lax` para que a revogação sobreviva a recargas de página no Service Worker
-do MSW Browser. `GET /auth/me` retorna `401` quando o seletor está em
-`revokedSessions` ou quando o cookie `dall-fit-revoked` corresponde ao seletor,
-simulando a invalidação do lado do servidor. O middleware exclusivo do Vite em
-`/api/auth/google` limpa o cookie com `Max-Age=0` para permitir novo login após
-logout. O estado de autenticação é
+SameSite=Lax`. `GET /auth/me` retorna `401` quando o seletor está em
+`revokedSessions` (mesmo worker ativo) ou quando o `Cookie Store API` encontra o
+cookie `dall-fit-revoked` correspondente (sobrevive a reinícios do Service Worker em
+recargas de página). O middleware exclusivo do Vite em `/api/auth/google` limpa o
+cookie com `Max-Age=0` para permitir novo login após logout. O estado de autenticação é
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 
