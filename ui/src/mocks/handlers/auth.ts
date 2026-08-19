@@ -9,6 +9,7 @@ import {
   lightThemePersonFixture,
   personWithoutThemeFixture,
 } from '~/mocks/fixtures/person';
+import { MOCK_REQUEST_ID } from '~/mocks/mock-constants';
 import {
   createMockApiError,
   createMockResponseInit,
@@ -16,9 +17,40 @@ import {
 
 const personState = new Map<string, Person>();
 const authRequestCount = new Map<string, number>();
+const revokedSessions = new Set<string>();
 const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
+
+function isSessionRevoked(scenario: string | null): boolean {
+  const key = scenario ?? 'authenticated';
+  return revokedSessions.has(key);
+}
+
+async function isSessionRevokedPersisted(
+  scenario: string | null,
+): Promise<boolean> {
+  const key = scenario ?? 'authenticated';
+
+  try {
+    const store = (
+      globalThis as {
+        cookieStore?: {
+          get: (name: string) => Promise<{ value: string } | null>;
+        };
+      }
+    ).cookieStore;
+    if (store !== undefined) {
+      const entry = await store.get('dall-fit-revoked');
+      if (entry !== null && decodeURIComponent(entry.value) === key)
+        return true;
+    }
+  } catch {
+    // Cookie Store API not available
+  }
+
+  return false;
+}
 
 function nextRequestCount(key: string): number {
   const count = (authRequestCount.get(key) ?? 0) + 1;
@@ -75,6 +107,7 @@ function isThemeBody(value: unknown): value is { theme: Theme } {
 export function resetAuthScenarioStates(): void {
   personState.clear();
   authRequestCount.clear();
+  revokedSessions.clear();
   resetCsrfTokenForTests();
 }
 
@@ -143,7 +176,14 @@ export const authHandlers = [
         createMockResponseInit({ status: 403 }),
       );
     }
-    return new HttpResponse(null, createMockResponseInit({ status: 204 }));
+    revokedSessions.add(scenario ?? 'authenticated');
+    return new HttpResponse(null, {
+      headers: {
+        'Set-Cookie': `dall-fit-revoked=${encodeURIComponent(scenario ?? 'authenticated')}; Path=/; SameSite=Lax`,
+        'x-request-id': MOCK_REQUEST_ID,
+      },
+      status: 204,
+    });
   }),
   http.get('*/auth/me', async ({ request }) => {
     const scenario = request.headers.get('x-dall-fit-mock-auth');
@@ -165,6 +205,19 @@ export const authHandlers = [
       const result = HttpResponse.json(
         createMockApiError('SERVICE_UNAVAILABLE', 'Service unavailable.'),
         createMockResponseInit({ status: 503 }),
+      );
+
+      return result;
+    }
+
+    const sessionRevocationStatus = await isSessionRevokedPersisted(scenario);
+    if (isSessionRevoked(scenario) || sessionRevocationStatus) {
+      const result = HttpResponse.json(
+        createMockApiError(
+          'AUTHENTICATION_REQUIRED',
+          'Authentication is required.',
+        ),
+        createMockResponseInit({ status: 401 }),
       );
 
       return result;

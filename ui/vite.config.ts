@@ -25,6 +25,7 @@ const mockOAuthNavigationPlugin: Plugin = {
       response.statusCode = 302;
       response.setHeader('Location', '/dash');
       response.setHeader('x-request-id', MOCK_REQUEST_ID);
+      response.setHeader('Set-Cookie', 'dall-fit-revoked=; Path=/; Max-Age=0');
       response.end();
     });
   },
@@ -104,6 +105,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    env: {
+      VITE_API_URL: 'http://localhost:4000',
+      VITE_ENABLE_API_MOCKS: 'true',
+    },
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',

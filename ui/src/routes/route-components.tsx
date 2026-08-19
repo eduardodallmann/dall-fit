@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react';
 
+import { Card, Skeleton } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Outlet,
@@ -13,6 +14,7 @@ import { endSession } from '~/auth/session-lifecycle';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { useTheme } from '~/core/theme/theme-context';
 import { HomePage } from '~/routes/home';
+import { homeStyles } from '~/routes/home/styles';
 
 export function AuthenticatedRouteComponent() {
   const { mockAuth, person: routePerson } = useRouteContext({
@@ -52,6 +54,8 @@ export function AuthenticatedRouteComponent() {
   return result;
 }
 
+const homePageStyles = homeStyles();
+
 export function HomeRouteComponent() {
   const search = useSearch({ from: '/' });
   const { reconcilePublic } = useTheme();
@@ -62,6 +66,33 @@ export function HomeRouteComponent() {
 
   const result = (
     <HomePage hasAuthError={search.authError === 'oauth_failed'} />
+  );
+
+  return result;
+}
+
+export function HomeRoutePending() {
+  const result = (
+    <main className={homePageStyles.page()}>
+      <div
+        aria-label="Verificando sua sessão"
+        className={homePageStyles.pageContent()}
+        role="status"
+      >
+        <Card>
+          <Card.Header>
+            <div className="flex flex-col gap-3">
+              <Skeleton className={homePageStyles.skeletonEyebrow()} />
+              <Skeleton className={homePageStyles.skeletonTitle()} />
+              <Skeleton className={homePageStyles.skeletonDescription()} />
+            </div>
+          </Card.Header>
+          <Card.Footer>
+            <Skeleton className={homePageStyles.skeletonButton()} />
+          </Card.Footer>
+        </Card>
+      </div>
+    </main>
   );
 
   return result;

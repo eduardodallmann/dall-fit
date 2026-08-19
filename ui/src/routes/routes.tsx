@@ -14,7 +14,9 @@ import { clearCsrfToken } from '~/auth/csrf-token';
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
 import {
   activateSession,
+  armSessionReturnBypass,
   configureSessionEndHandler,
+  consumeSessionReturnBypass,
   endSession,
   getActiveSessionMockAuth,
 } from '~/auth/session-lifecycle';
@@ -24,10 +26,12 @@ import {
   ProtectedRoutePending,
 } from '~/core/components/route-status';
 import { assertAdminAccess } from '~/routes/admin-access';
+import { probeRootSession } from '~/routes/root-session-probe';
 import {
   AuthenticatedRouteComponent,
   DashRouteComponent,
   HomeRouteComponent,
+  HomeRoutePending,
 } from '~/routes/route-components';
 import { TrainingPlanDetailPage } from '~/routes/training-plan/detail-page';
 import { TrainingPlanListPage } from '~/routes/training-plan/list-page';
@@ -42,6 +46,7 @@ interface RouterContext {
 
 interface HomeSearch {
   authError?: 'oauth_failed';
+  mockAuth?: MockAuthScenario;
 }
 
 interface DashSearch {
@@ -63,15 +68,38 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  beforeLoad: async ({ abortController, context, preload, search }) => {
+    if (preload || consumeSessionReturnBypass()) return;
+    const scenario = search.mockAuth ?? 'authenticated';
+    const decision = await probeRootSession({
+      mockAuth: scenario,
+      queryClient: context.queryClient,
+    });
+    if (decision === 'replace-with-dash' && !abortController.signal.aborted)
+      redirect({
+        replace: true,
+        search:
+          search.mockAuth === undefined ? {} : { mockAuth: search.mockAuth },
+        throw: true,
+        to: '/dash',
+      });
+  },
   validateSearch: (search: Record<string, unknown>): HomeSearch => {
-    const result =
-      search.authError === 'oauth_failed'
-        ? { authError: 'oauth_failed' as const }
-        : {};
+    const result: HomeSearch = {};
+    if (search.authError === 'oauth_failed')
+      result.authError = 'oauth_failed' as const;
+    const mockAuth: MockAuthScenario | undefined = isMockAuthScenario(
+      search.mockAuth,
+    )
+      ? search.mockAuth
+      : undefined;
+    if (mockAuth !== undefined) result.mockAuth = mockAuth;
 
     return result;
   },
   component: HomeRouteComponent,
+  pendingComponent: HomeRoutePending,
+  pendingMs: 300,
 });
 
 const authenticatedRoute = createRoute({
@@ -96,6 +124,7 @@ const authenticatedRoute = createRoute({
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         await endSession('expired');
+        armSessionReturnBypass();
         redirect({ replace: true, throw: true, to: '/' });
       }
 

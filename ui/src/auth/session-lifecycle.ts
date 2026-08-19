@@ -21,7 +21,18 @@ let activeSession: ActiveSession | undefined;
 let endHandler: SessionEndHandler | undefined;
 let endPromise: Promise<void> | undefined;
 let nextGeneration = 0;
+let sessionReturnBypass = false;
 const resources = new Set<SessionResource>();
+
+export function armSessionReturnBypass(): void {
+  sessionReturnBypass = true;
+}
+
+export function consumeSessionReturnBypass(): boolean {
+  if (!sessionReturnBypass) return false;
+  sessionReturnBypass = false;
+  return true;
+}
 
 export function configureSessionEndHandler(handler: SessionEndHandler): void {
   endHandler = handler;
@@ -94,6 +105,8 @@ export function endSession(reason: SessionEndReason): Promise<void> {
   if (endPromise !== undefined) return endPromise;
 
   const endingSession = activeSession;
+  if (endingSession !== undefined && reason !== 'identity_changed')
+    sessionReturnBypass = true;
   if (endingSession !== undefined) {
     endingSession.status = 'ending';
     endingSession.controller.abort();
@@ -119,5 +132,6 @@ export function resetSessionLifecycleForTests(): void {
   endHandler = undefined;
   endPromise = undefined;
   nextGeneration = 0;
+  sessionReturnBypass = false;
   resources.clear();
 }

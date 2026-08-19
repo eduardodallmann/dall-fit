@@ -6,7 +6,7 @@ test.describe('FIT-0010 — Bloqueio global da seleção de textos', () => {
   test('Cenário 1 — Conteúdo público não pode ser selecionado', async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('/?mockAuth=unauthenticated');
 
     const heading = page.getByRole('heading', { name: 'Entre para continuar' });
     const headingBox = await heading.boundingBox();

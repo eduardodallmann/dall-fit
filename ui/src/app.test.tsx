@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '~/app';
 import { AppProviders } from '~/context/providers';
@@ -16,10 +16,11 @@ vi.mock('@vercel/analytics/react', () => ({
 
 describe('App', () => {
   beforeEach(async () => {
+    vi.stubEnv('VITE_ENABLE_API_MOCKS', 'true');
     analyticsMock.mockClear();
     queryClient.clear();
-    window.history.replaceState({}, '', '/');
-    await router.navigate({ to: '/' });
+    window.history.replaceState({}, '', '/?mockAuth=unauthenticated');
+    await router.navigate({ to: '/', search: { mockAuth: 'unauthenticated' } });
   });
 
   it('resolves the public root route inside the application providers', async () => {
@@ -34,4 +35,6 @@ describe('App', () => {
     ).toBeInTheDocument();
     expect(analyticsMock).toHaveBeenCalledTimes(1);
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 });
