@@ -97,6 +97,9 @@ jobs:
       - name: Run unit tests with coverage
         run: pnpm test:coverage:ci
 
+      - name: Inject SONAR_TOKEN for dotenv
+        run: echo "SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}" >> .env
+
       - name: SonarCloud Analysis
         run: pnpm sonar
         env:
