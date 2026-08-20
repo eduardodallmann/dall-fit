@@ -2,6 +2,7 @@ name: Pull request quality
 
 on:
   pull_request
+  workflow_dispatch
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -73,6 +74,7 @@ jobs:
     needs: [lint, build]
     env:
       VITE_API_URL: http://localhost:4000
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
