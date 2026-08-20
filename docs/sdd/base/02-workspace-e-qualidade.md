@@ -62,6 +62,7 @@ Todos os quality gates são iniciados na raiz:
 | `pnpm typecheck`        | Compila types e executa o typecheck de API e UI              |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                       |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint |
+| `pnpm sonar`            | Executa análise SonarCloud nos três projetos                 |
 | `pnpm test`             | Compila types e chama os testes de API e UI                  |
 | `pnpm test:coverage`    | Agrega cobertura local de API e UI                           |
 | `pnpm test:coverage:ci` | Agrega cobertura e relatórios para CI                        |
@@ -70,6 +71,14 @@ Todos os quality gates são iniciados na raiz:
 
 Os comandos explícitos com `pnpm -C` tornam visível qual projeto falhou e preservam
 a autonomia de configuração de cada suíte.
+
+`pnpm sonar` agrega a execução do `sonar-scanner` nos três projetos
+(`packages/types`, `api` e `ui`). Cada projeto possui seu próprio
+`sonar-project.properties` e script `sonar`. Localmente, os scripts carregam
+`SONAR_TOKEN` do `.env` da raiz via `dotenv-cli`; no workflow de pull request, o token é
+proveniente dos environments do GitHub. A análise usa o LCOV gerado pelos testes
+de cobertura e avalia code smells e duplicações; métricas de coverage não são
+gates.
 
 `test:integration` executa os cenários Playwright da UI. A adoção ocorreu com a
 jornada de login e segue
@@ -96,8 +105,16 @@ pnpm test:coverage:ci
 pnpm -C api test:e2e
 pnpm -C ui test:integration:install:ci
 pnpm test:integration
+pnpm sonar
 pnpm build
 ```
+
+O checkout usa `fetch-depth: 0` para que o scanner envie o histórico completo ao
+SonarCloud. O step `SonarCloud Analysis` usa `SONAR_TOKEN` e `GITHUB_TOKEN`
+provenientes dos environments do repositório, além das variáveis
+`SONAR_PULL_REQUEST_KEY`, `SONAR_PULL_REQUEST_BRANCH` e
+`SONAR_PULL_REQUEST_BASE` derivadas do evento. O resultado é decorado no pull
+request correspondente.
 
 O workflow reutiliza os caches do pnpm e dos binários de MongoDB e Redis usados
 pelos memory servers. Ele define a URL da API usada pelos handlers MSW nos testes
@@ -182,7 +199,7 @@ Testes unitários e integrados priorizam regras de negócio, decisões, caminhos
 alternativos e erros observáveis. Cobertura de linhas é um indicador de lacunas,
 não o motivo para criar testes.
 
-No backend, “integrado” corresponde aos E2E da aplicação completa; não cria uma
+No backend, "integrado" corresponde aos E2E da aplicação completa; não cria uma
 suíte `test:integration`. No frontend, testes integrados usam Playwright para
 renderizar a UI no Chromium e exercitar rotas e flows com MSW Browser. Eles não
 validam o backend real nem geram cobertura.
@@ -193,3 +210,35 @@ A configuração, estrutura e comandos do frontend estão em
 Não escrever testes triviais apenas para executar getters, decorators, linhas de
 composição ou branches sem significado de negócio. Cada teste deve apontar para uma
 regra, cenário, contrato ou risco documentado.
+
+## Consulta de issues do SonarCloud para IAs
+
+Quando uma IA precisar analisar code smells do SonarCloud, ela deve:
+
+1. Garantir que `SONAR_TOKEN` está definido no ambiente (local ou CI).
+2. Executar `pnpm sonar:issues` na raiz.
+3. O script retorna formato Markdown com:
+   - Projeto
+   - Arquivo e linha
+   - Severidade (`BLOCKER`, `CRITICAL`, `MAJOR`, `MINOR`, `INFO`)
+   - Regra do Sonar
+   - Mensagem descritiva
+4. A IA pode então:
+   - Ler o arquivo na linha indicada
+   - Sugerir refatoração específica
+   - Priorizar por severidade
+
+### Exemplo de output
+
+```
+## dall-fit-api
+Source: https://sonarcloud.io/project/issues?organization=dall-fit&project=dall-fit-api&types=CODE_SMELL
+- [MAJOR] src/training-plan/services/training-plan.service.ts:45
+  Rule: squid:S3776
+  Cognitive Complexity of methods should not be too high
+```
+
+### Restrições de segurança
+
+- Nunca expor `SONAR_TOKEN` em prompts ou contextos compartilhados.
+- O token é de leitura e já está no `.env` local.

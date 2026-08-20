@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Set up pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -64,6 +66,15 @@ jobs:
 
       - name: Run UI integration tests
         run: pnpm test:integration
+
+      - name: SonarCloud Analysis
+        run: pnpm sonar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SONAR_PULL_REQUEST_KEY: ${{ github.event.pull_request.number }}
+          SONAR_PULL_REQUEST_BRANCH: ${{ github.event.pull_request.head.ref }}
+          SONAR_PULL_REQUEST_BASE: ${{ github.event.pull_request.base.ref }}
 
       - name: Build
         run: pnpm build

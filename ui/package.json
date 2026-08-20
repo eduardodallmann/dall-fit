@@ -10,6 +10,7 @@
     "lint": "pnpm --dir .. exec eslint ui",
     "lint:fix": "pnpm --dir .. exec eslint ui --fix",
     "preview": "vite preview",
+    "sonar": "dotenv -e ../.env -- sh -c 'test -n \"$SONAR_TOKEN\" || { echo \"Error: SONAR_TOKEN is required. See docs/sdd/base/02-workspace-e-qualidade.md\"; exit 1; }; pnpm test:coverage:ci && sonar-scanner-npm'",
     "test": "vitest run",
     "test:integration": "playwright test",
     "test:integration:debug": "playwright test --debug",

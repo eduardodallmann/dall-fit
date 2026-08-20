@@ -20,6 +20,7 @@
     "seed": "tsx test/seeds/cli.ts",
     "lint": "pnpm --dir .. exec eslint api",
     "lint:fix": "pnpm --dir .. exec eslint api --fix",
+    "sonar": "dotenv -e ../.env -- sh -c 'test -n \"$SONAR_TOKEN\" || { echo \"Error: SONAR_TOKEN is required. See docs/sdd/base/02-workspace-e-qualidade.md\"; exit 1; }; pnpm test:coverage:ci && sonar-scanner-npm'",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
