@@ -22,9 +22,10 @@
 - Resultado: toda pessoa autenticada possui uma jornada própria de planos; planos
   criados ou clonados pertencem à pessoa e são editáveis, referências a globais
   acompanham o conteúdo global e permanecem somente leitura, e a clonagem ocorre
-  duravelmente por Vercel Workflow sobre um job visível e não navegável. A pessoa
-  escolhe no máximo um item ativo por radio, mas pode permanecer sem plano ativo.
-  A administração global continua em fronteira própria e passa a enxergar quantas
+  duravelmente por Vercel Workflow em uma aplicação Nitro própria, publicada como
+  projeto Vercel separado, sobre um job visível e não navegável. A pessoa escolhe
+  no máximo um item ativo por radio, mas pode permanecer sem plano ativo. A
+  administração global continua em fronteira própria e passa a enxergar quantas
   pessoas estão vinculadas e quantas mantêm cada global ativo antes de editar ou
   excluir.
 - Decisão arquitetural consolidada, chamada de plano C nesta demanda:
@@ -62,8 +63,18 @@
     [visão geral](https://vercel.com/workflows),
     [anúncio GA](https://vercel.com/blog/a-new-programming-model-for-durable-execution)
     e [`start()`, `Run` e `getRun()`](https://github.com/vercel/workflow/blob/main/docs/content/docs/v4/foundations/starting-workflows.mdx);
-  - integração de build e runtime com NestJS:
-    [`@workflow/nest`](https://vercel.com/changelog/workflow-event-sourcing);
+  - integração do Workflow com Nitro pelo módulo `workflow/nitro`:
+    [repositório e referência oficial](https://github.com/vercel/workflow)
+    e [skill oficial do SDK](https://github.com/vercel/workflow/blob/main/skills/workflow/SKILL.md);
+  - Nitro 2 estável pelo pacote
+    [`nitropack`](https://www.npmjs.com/package/nitropack) e configuração de
+    [deploy na Vercel](https://nitro.build/deploy/providers/vercel);
+  - projetos Vercel separados no mesmo monorepo e descoberta do deployment
+    correspondente:
+    [monorepos](https://vercel.com/docs/monorepos) e
+    [Related Projects](https://vercel.com/docs/monorepos#how-to-link-projects-together-in-a-monorepo);
+  - acesso server-to-server a previews protegidos:
+    [Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation);
   - Vercel Blob `copy()` server-side, pathname determinístico, `ifMatch`,
     `allowOverwrite` e `AbortSignal`:
     [SDK oficial](https://vercel.com/docs/vercel-blob/using-blob-sdk);
@@ -73,10 +84,16 @@
   - API usa NestJS `11.1.x`, Mongoose `9.8.x`, `@vercel/blob` `2.7.x`,
     `@vercel/functions` `3.9.x`, Node 24 e TypeScript 6;
   - UI usa HeroUI 3 e TanStack Query/Router/Form conforme o SDD vigente;
-  - `workflow` e `@workflow/nest` ainda não estão instalados. A implementação deve
-    selecionar a linha estável compatível, confirmar peer dependencies, tipos,
-    transformações de build e documentação empacotada; não deve adotar
-    `workflow@beta` para obter cancelamento em voo.
+  - `workflow`, `@workflow/vitest` e `nitropack` ainda não estão instalados. A
+    implementação deve selecionar as linhas estáveis v4 do Workflow e v2 do Nitro,
+    confirmar peer dependencies, tipos, transformação das diretivas e documentação
+    empacotada; não deve instalar `workflow@5` beta nem o pacote `nitro@3` beta;
+  - a versão estável observada na revalidação é `nitropack@2.13.4`. O patch estável
+    mais recente de Workflow deve ser reconfirmado pelo lockfile e pelos artefatos
+    oficiais no início da implementação, sem ranges que admitam prerelease;
+  - `@workflow/nitro` é alcançado pelo módulo público `workflow/nitro`. Sua
+    compatibilidade com Nitro 2, Node 24, build do monorepo e deploy Vercel é um
+    gate executável anterior à habilitação da clonagem.
 - Features relacionadas:
   - `FIT-0005` criou o aggregate reutilizável e antecipou ownership pessoal por
     `ownerPersonId`;
@@ -109,6 +126,8 @@
 - job de clonagem persistido no MongoDB e orquestrado por Vercel Workflow estável,
   com progresso, retry automático, retry manual, cancelamento cooperativo,
   compensação e finalização idempotente;
+- nova aplicação `workflow/`, com Nitro 2 estável, deploy Vercel independente,
+  endpoint interno autenticado e acesso direto ao MongoDB e ao mesmo store Blob;
 - destino clonado invisível até estar completo; a lista apresenta somente uma
   linha de operação bloqueada durante o processamento;
 - bloqueio, para a pessoa que iniciou o job, da linha de origem correspondente no
@@ -147,8 +166,11 @@
   finalização;
 - usar Redis Pub/Sub, `waitUntil`, Vercel Queues ou Cron como executor principal da
   clonagem;
-- adotar Workflow SDK beta, cancelamento em voo beta ou infraestrutura externa de
-  worker;
+- executar toda a clonagem de árvore e imagens sincronamente na request pública;
+- adotar Workflow SDK beta, cancelamento em voo beta ou worker/fila adicional fora
+  da aplicação Nitro definida nesta feature;
+- usar Vercel Services enquanto permanecer em Private Beta, hospedar o Workflow
+  dentro do processo Nest ou encaminhar `/.well-known/workflow/*` pela API;
 - remover CAS, `X-Resource-Version`, limites de 25 workouts/50 exercícios,
   variantes WebP, OIDC, URLs assinadas ou reconciliação de mídia vigentes;
 - mudar os cinco tipos ou os campos de exercícios;
@@ -172,10 +194,40 @@
     exclusão global com limpeza referencial idempotente;
   - adicionar schemas/repositories para entrada de catálogo, ponteiro ativo e job
     de clonagem, preservando `training_plans` como coleção única para as árvores;
-  - integrar `workflow`/`@workflow/nest` no build da API e manter Mongo/Blob apenas
-    em steps;
+  - persistir o job antes do agendamento e chamar por HTTP autenticado o projeto
+    Nitro com somente `cloneJobId` e geração; a API não executa nem empacota as
+    diretivas do Workflow;
+  - encapsular descoberta da URL, assinatura, timeout e classificação da resposta
+    em adapter próprio, mantendo controller e command sem client HTTP ad hoc;
   - criar `api/docs/sdd/endpoints/personal-training-plans.md` e atualizar
     `global-training-plans.md`, `realtime-events.md` e os documentos base afetados.
+- Aplicação de Workflow:
+  - criar `workflow/` como pacote privado `dall-fit-workflow`, membro do workspace e
+    projeto Vercel com Root Directory própria, domínio, deploy e rollback
+    independentes da API e da UI;
+  - usar Nitro 2 estável com `workflow/nitro`; o endpoint interno inicia o run e as
+    funções `"use workflow"`/`"use step"` orquestram MongoDB, Blob, retenção,
+    compensação e finalização idempotente;
+  - manter handler Nitro fino: validar transporte/assinatura, registrar log seguro,
+    chamar command e devolver seu resultado. Commands orquestram o caso; services
+    encapsulam regras, MongoDB, Blob e SDK; repositories são usados somente por
+    services e recebem dados já preparados;
+  - compartilhar o cluster MongoDB e o store Blob privado com a API por conexões e
+    OIDC configurados separadamente no projeto Vercel, sem encaminhar steps pela
+    API e sem importar arquivos internos de `api/` ou `ui/`;
+  - possuir `package.json`, TypeScript estrito, configuração Nitro, ambiente de
+    exemplo, estrutura `src/`, testes/configurações Vitest, cobertura LCOV/JUnit,
+    build e `sonar-project.properties` próprios, sem lockfile independente;
+  - expor scripts próprios `dev`, `typecheck`, `test`, `test:workflow`,
+    `test:coverage`, `test:coverage:ci` e `build`; o desenvolvimento local usa a
+    porta `5000`, com `WORKFLOW_BASE_URL=http://localhost:5000` na API;
+  - criar `workflow/docs/sdd/README.md`, documentos base de arquitetura, segurança,
+    logging, testes e ambiente, `endpoints/training-plan-clone-runs.md` e
+    `workflows/training-plan-clone.md`; os SDDs da raiz referenciam esses documentos
+    sem duplicar detalhes locais;
+  - incluir o novo projeto nos agregadores de `dev`, `typecheck`, `lint`, `test`,
+    `test:coverage:ci`, `build` e Sonar da raiz, na configuração ESLint única e no
+    CI, preservando `pnpm test:integration` exclusivamente para Playwright da UI.
 - UI e rotas:
   - acrescentar manualmente à árvore tipada `/training-plan`,
     `/training-plan/:catalogEntryId` e
@@ -196,16 +248,25 @@
 - Contratos em `@dall-fit/types`:
   - adicionar união discriminada dos itens da lista pessoal, respostas de
     biblioteca, catálogo, ativação, jobs e métricas administrativas;
-  - manter IDs opacos; nenhum contrato expõe `ownerPersonId`, blob pathname,
+  - adicionar também o envelope serializável e versionado do bridge interno
+    API→Workflow; o body contém somente `cloneJobId` e geração;
+  - manter IDs opacos; nenhum contrato público expõe `ownerPersonId`, blob pathname,
     `workflowRunId`, estado interno de lease ou snapshot do job;
   - preservar contratos globais existentes quando compatíveis e evoluí-los
-    atomicamente quando as métricas forem adicionadas.
+    atomicamente quando as métricas forem adicionadas;
+  - módulos com diretiva `"use workflow"` ou `"use step"` recebem somente
+    primitivos e dependem de código local de `workflow/`; o uso de pacote irmão
+    dentro desses bundles só é permitido se o spike comprovar sua resolução no
+    build e no runtime Vercel.
 - Decisões arquiteturais:
   - criar ADR para o catálogo pessoal, referência viva, ponteiro ativo e Workflow
     durável, relacionando e sem reescrever as ADRs históricas 0003, 0005, 0007 e
     0008;
   - registrar explicitamente que fronteiras HTTP permanecem separadas, enquanto o
-    núcleo reutiliza escopos tipados e não parâmetros de confiança do cliente.
+    núcleo reutiliza escopos tipados e não parâmetros de confiança do cliente;
+  - registrar a aplicação Nitro como quarto projeto do monorepo e terceiro projeto
+    Vercel desta jornada, com comunicação API→Workflow por HTTP assinado e dados de
+    execução compartilhados apenas por MongoDB/Blob.
 - Handlers e fixtures MSW:
   - adicionar pessoa comum e admin com catálogos pessoais independentes;
   - cobrir plano próprio, referência global, item ativo, nenhum ativo, job em cada
@@ -213,8 +274,8 @@
   - simular progresso por estado HTTP determinístico; MSW não executa Workflow nem
     acessa API/Blob reais.
 - Mocks de repositories/caches nos unitários da API:
-  - mocks tipados para catálogo, preferência ativa, clone job, Workflow runner,
-    Blob copy e publicação de invalidação;
+  - mocks tipados para catálogo, preferência ativa, clone job, adapter de disparo
+    HTTP e publicação de invalidação;
   - manter repositories acessados somente por services.
 - Fixtures MongoDB/Redis nos E2E:
   - MongoDB efêmero cobre ownership, referências, ponteiro ativo, jobs, índices,
@@ -223,6 +284,13 @@
     limit e SSE; não recebe jobs;
   - Vercel Workflow e Blob são isolados na fronteira externa nos testes, sem
     credencial, rede ou dependência do painel da Vercel.
+- Testes e documentação próprios de `workflow/`:
+  - unitários substituem MongoDB, Blob, relógio e starter do Workflow por ports
+    tipados; integrados executam a runtime local oficial e adapters determinísticos;
+  - testes de contrato cobrem envelope, assinatura, replay, idempotência e respostas
+    do bridge sem chamar um deployment Vercel real;
+  - build smoke verifica descoberta das diretivas, rotas geradas e artefato Nitro;
+    preview autorizado valida a integração real sem dados de produção.
 
 ## Requisitos funcionais
 
@@ -330,14 +398,17 @@
 
 29. `Clonar` valida a origem global, captura no MongoDB um snapshot imutável da
     versão, estrutura, IDs lógicos e referências/ETags de mídia e cria um clone job
-    pertencente à sessão. A request inicia o Workflow e responde `202` com o item
-    de operação, sem criar plano destino ou entrada `owned` parcial.
+    pertencente à sessão. Depois do commit, a API solicita por HTTP autenticado que
+    o projeto Nitro inicie o Workflow e responde `202` com o item de operação, sem
+    criar plano destino ou entrada `owned` parcial.
 30. O input do Workflow contém somente `cloneJobId` e geração. Snapshot, identidade,
     blob keys e progresso permanecem no MongoDB e não entram no event log, contrato
-    público ou URL.
+    público, bridge HTTP ou URL.
 31. O Workflow usa `"use workflow"` somente para controle determinístico. Todo
     acesso a MongoDB, Vercel Blob, logging e publicação ocorre em funções
-    `"use step"` integradas à aplicação Nest.
+    `"use step"` da aplicação Nitro. O projeto Workflow acessa esses recursos
+    diretamente com credenciais próprias e nunca chama endpoints pessoais da API
+    para executar cada step.
 32. Cada step copia um lote pequeno e limitado. Para cada imagem, `thumbnail` e
     `display` são copiados server-side para pathnames privados novos,
     determinísticos e pertencentes ao clone; a imagem só avança no progresso depois
@@ -392,9 +463,13 @@
     vencedor: finalização já confirmada mantém o plano e faz cancelamento responder
     conflito terminal; cancelamento confirmado impede a criação posterior.
 47. A falha entre criar o job e iniciar/registrar o Workflow deixa estado
-    `start-failed` recuperável pelo mesmo retry manual. O primeiro step também
-    vincula/confirma seu `runId`, evitando que uma queda da request deixe um run
-    durável sem correlação ao job.
+    `start-failed` recuperável pelo mesmo retry manual. Timeout do bridge é resultado
+    ambíguo, não autorização para criar outro job: repetir a mesma chave
+    `cloneJobId+generation` primeiro tenta reconciliar o run aceito. O endpoint Nitro
+    usa reserva atômica recuperável por lease, e o primeiro step
+    reivindica/confirma atomicamente seu `runId`; se a queda ocorrer na janela entre
+    `start()` e essa confirmação, um run físico concorrente pode existir, mas somente
+    o vencedor prossegue e os demais encerram sem side effects.
 
 ### Plano ativo
 
@@ -476,6 +551,60 @@
     pessoal concede acesso à árvore de outra pessoa nem transforma sessão comum em
     administradora.
 
+### Bridge interno API→Workflow e deploy
+
+67. O monorepo possui três projetos Vercel para esta jornada: UI, API Nest e
+    Workflow Nitro. `workflow/` tem domínio e ciclo de deploy próprios; Vercel
+    Services, proxy pela UI/API e execução no mesmo processo Nest não são fallback.
+68. A API chama `POST /internal/training-plan-clone-runs` no domínio do projeto
+    Workflow. O contrato interno v1 possui body JSON canônico com somente
+    `cloneJobId` e `generation` e nunca transporta sessão, person ID, snapshot,
+    árvore, blob key, URL assinada ou credencial.
+69. A request interna usa versão explícita e HMAC-SHA-256 sobre método, pathname,
+    timestamp e hash dos bytes exatos do body. O projeto Nitro verifica assinatura
+    em tempo constante e rejeita relógio fora da janela documentada antes de ler ou
+    alterar o job. O segredo fica somente em variáveis server-side equivalentes nos
+    dois projetos e nunca possui valor funcional no repositório.
+70. A URL correspondente é resolvida por Related Projects nos deployments Git da
+    Vercel, com `WORKFLOW_BASE_URL` explícita como fallback obrigatório para local,
+    CI e ambientes sem Related Projects. Não há host hardcoded, URL vinda do cliente
+    nem fallback silencioso entre preview e produção. Se Deployment Protection
+    estiver ativa, o adapter envia o header oficial de Protection Bypass for
+    Automation com segredo server-side próprio; ele complementa e não substitui a
+    autenticação HMAC da aplicação.
+71. O endpoint interno é idempotente por `cloneJobId+generation`: `202` representa
+    execução nova ou já aceita para a mesma chave. Assinatura inválida/expirada,
+    versão incompatível, job inexistente, geração obsoleta, estado terminal e falha
+    transitória possuem status e code internos estáveis documentados. Replays
+    válidos dentro da janela não produzem segunda execução lógica nem segundo
+    destino; eventual run físico perdedor encerra antes de qualquer side effect.
+72. A API persiste o job antes da chamada. Sucesso vincula a correlação do run;
+    falha definitiva de start marca `start-failed`; timeout mantém estado
+    recuperável e uma nova chamada com a mesma chave reconcilia o resultado. A API
+    continua sendo a única fronteira pública para iniciar, repetir e cancelar.
+73. Cancelamento público grava intenção no MongoDB; o Workflow a observa entre
+    lotes. Não existe callback público do Nitro para a API nem dependência de uma
+    Function Nest permanecer ativa enquanto o run executa.
+74. As rotas geradas `/.well-known/workflow/v1/*` pertencem exclusivamente ao
+    deployment Nitro e seguem a proteção/runtime oficiais do SDK. Elas não são
+    reescritas, expostas como contrato do produto ou implementadas manualmente.
+75. API e Workflow podem fazer deploy e rollback independentes. O bridge interno é
+    versionado e retrocompatível durante a janela de rollout; novo contrato é
+    publicado no Workflow antes de seu produtor na API. Runs em andamento continuam
+    associados ao deployment Nitro que os iniciou.
+76. Localmente, o Nitro escuta na porta `5000` e integra o `pnpm dev` agregado sem
+    mudar as portas `3000` da UI e `4000` da API. CI e testes escolhem porta efêmera
+    quando iniciarem servidor isolado, para não depender de estado externo.
+77. A API é responsável por criar o snapshot/job, expor o read model e registrar
+    intenção de cancelamento. O Workflow é responsável por aceitar o run, avançar
+    progresso, copiar/compensar mídia e materializar/finalizar o clone. Ambas as
+    aplicações acessam o job somente por services/repositories locais e updates
+    atômicos filtrados por ID, geração e estado esperado.
+78. Schema persistido, índices e transições compartilhadas são definidos na ADR e
+    cobertos por contratos/fixtures comuns; a API continua proprietária da criação
+    de índices/migração. O Workflow não usa sincronização automática de schema nem
+    mantém uma segunda interpretação silenciosa dos estados.
+
 ## Requisitos não funcionais
 
 - Acessibilidade:
@@ -504,6 +633,9 @@
     filtros de ownership;
   - Workflow recebe somente identificadores técnicos mínimos e steps revalidam
     geração/estado antes de side effects;
+  - bridge interno exige HMAC, timestamp, versão, body limitado, comparação em
+    tempo constante e idempotência; CORS não é mecanismo de autenticação entre os
+    dois projetos;
   - cópia ocorre server-side no store privado por OIDC; blob keys, URLs assinadas,
     ETags, `runId`, snapshot e tokens não entram em responses comuns, Analytics ou
     logs;
@@ -514,25 +646,36 @@
   - o uso do Hobby da Vercel deve respeitar cotas e finalidade do plano; ambiente
     comercial não assume gratuidade como requisito arquitetural.
 - Observabilidade:
-  - controller, command, service, repository e adapters de Workflow/Blob registram
-    entrada, branches, dependências e saída sanitizada conforme o padrão vigente;
+  - controller, command, service, repository e adapter HTTP na API, assim como
+    handlers, services, repositories e adapters no Workflow, registram entrada,
+    branches, dependências e saída sanitizada conforme padrões locais documentados;
   - logs usam job ID, geração, contadores e categorias estáveis, nunca nomes,
     árvore, arquivo, URL, pathname, ETag ou payload;
   - transições `starting|queued|running|cancel-requested|failed|completed|cancelled`
     são correlacionáveis com request e run sem expor o `runId` ao cliente;
+  - logs correlacionam chamada API, aceitação Nitro, `cloneJobId`, geração e run sem
+    registrar assinatura, segredo, body canônico, protection bypass ou headers
+    sensíveis;
   - métricas operacionais distinguem duração, retries, falha permanente,
     cancelamento, cleanup pendente e blobs compensados;
   - Analytics preserva um início e um terminal por intenção de criar, usar, clonar,
     ativar, excluir, retry e cancelar, com identificadores enumerados e sem conteúdo.
 - Compatibilidade e manutenção:
-  - usar somente a versão estável do Workflow compatível com Node 24, Nest 11 e o
-    build vigente; confirmar APIs nos tipos locais e docs empacotados;
+  - usar somente Workflow v4 e `nitropack` v2 estáveis compatíveis com Node 24 e o
+    build vigente; confirmar APIs nos tipos locais e docs empacotados e impedir
+    prereleases no lockfile;
   - separar função determinística de Workflow de steps com side effects e não
-    serializar providers, clients Mongo/Redis/Blob ou contexto de request;
+    serializar handlers, clients Mongo/Redis/Blob ou contexto de request;
+  - `workflow/` não importa internos de API/UI; dependências de workspace são
+    declaradas e qualquer import de pacote irmão alcançável por diretiva precisa
+    passar build e execução de preview, devido à fronteira própria do bundler;
   - componentes compartilhados recebem uniões discriminadas exaustivas; não usam
     listas abertas de booleans que permitam combinações impossíveis;
-  - UI e API existentes continuam compatíveis durante a entrega atômica do
-    monorepo; não há cliente antigo suportado fora desse deploy coordenado.
+  - cada projeto mantém `package.json` único/privado, TypeScript, testes, cobertura,
+    documentação, Sonar e build próprios, mas usa o ESLint/Prettier e os quality
+    gates agregados da raiz;
+  - UI, API e Workflow permanecem compatíveis durante deployments independentes;
+    a ativação da ação de clone só ocorre depois do preview integrado aprovado.
 
 ## Critérios de aceite
 
@@ -610,8 +753,8 @@
 
 ### Cenário 9 — Clone conclui com novas imagens
 
-- Forma de validar: E2E MongoDB com adapter determinístico de Workflow/Blob e flow
-  Playwright `clone-success`.
+- Forma de validar: integrado do projeto Workflow com runtime local, MongoDB efêmero
+  e adapter Blob determinístico, mais flow Playwright `clone-success`.
 - Given: snapshot possui workouts, todos os tipos e imagens com duas variantes.
 - When: steps concluem e a UI refaz a lista.
 - Then: existe exatamente um plano próprio completo com novos IDs e novos pathnames
@@ -690,7 +833,8 @@
 
 ### Cenário 18 — Recuperação após reinício e entrega repetida
 
-- Forma de validar: teste de adapter/Workflow e E2E com repetição de step/finalização.
+- Forma de validar: integrado do Workflow com runtime local, repetição de
+  step/finalização e MongoDB efêmero.
 - Given: execução cai depois de copiar mídia ou criar o plano final.
 - When: Workflow retoma/reexecuta o step.
 - Then: progresso persistido continua, cópias são idempotentes, `cloneJobId` resolve
@@ -714,34 +858,70 @@
 - Then: a UI converge, substitui job pelo plano ou mantém a falha, interrompe
   polling e não depende de Redis/stream para consistência.
 
+### Cenário 21 — Bridge interno autenticado e idempotente
+
+- Forma de validar: teste de contrato HTTP entre adapters API/Nitro com relógio e
+  starter determinísticos.
+- Given: existe job persistido e a API conhece a URL do deployment Workflow
+  correspondente.
+- When: envia o envelope v1 assinado, perde a primeira resposta por timeout e repete
+  exatamente `cloneJobId+generation`; também são tentadas assinatura alterada,
+  timestamp expirado e versão desconhecida.
+- Then: a chamada válida recebe/reconcilia `202` com a execução lógica correlacionada;
+  as inválidas são rejeitadas antes de side effects com status+code estáveis; há uma
+  única execução lógica/destino mesmo na janela de queda, e nenhum dado pessoal,
+  snapshot ou segredo aparece no contrato ou nos logs.
+
+### Cenário 22 — Projeto Nitro independente e executável
+
+- Forma de validar: gates do workspace, teste integrado local do Workflow e deploy
+  de preview dos projetos relacionados.
+- Given: `workflow/` está incluído no workspace e API, UI e Workflow são projetos
+  Vercel separados do mesmo repositório.
+- When: lint, typecheck, unitários, cobertura, build Nitro e smoke de preview são
+  executados, e o processo API é reiniciado durante um clone.
+- Then: o projeto possui configurações e documentação próprias, todos os gates da
+  raiz o abrangem, as diretivas/rotas oficiais são geradas sem prerelease, o run
+  continua no deployment Nitro e API/Workflow não importam internos entre si.
+
 ## Estratégia de entrega e compatibilidade
 
-1. Confirmar a versão estável de `workflow`/`@workflow/nest`, API oficial,
-   transformação de build Nest 11, ambiente local e suporte da Vercel antes de
-   alterar contratos; se a integração exigir beta ou contradizer esta feature,
-   retornar à especificação.
-2. Registrar a ADR e introduzir schemas/índices do catálogo, ponteiro ativo e clone
+1. Fazer primeiro um spike executável mínimo em `workflow/` com `nitropack` v2 e
+   Workflow v4 estáveis: dev local, build de produção, diretivas, runtime local,
+   `@workflow/vitest` e preview Vercel. Inspecionar lockfile para prereleases. Se o
+   SDK exigir Nitro 3/Workflow 5 beta ou falhar no runtime Vercel, retornar à
+   especificação antes de alterar contratos de produto.
+2. Estruturar `workflow/` como aplicação completa do workspace: pacote privado,
+   TypeScript estrito, ESLint raiz com escopo próprio, Prettier raiz, Vitest,
+   cobertura, Sonar, scripts, ambiente de exemplo e SDD local. Adicionar o projeto
+   aos agregadores e ao CI antes de implementar o domínio de clone.
+3. Registrar a ADR e introduzir schemas/índices do catálogo, ponteiro ativo e clone
    job sem separar a árvore de `training_plans`.
-3. Evoluir `@dall-fit/types`, produtor API, consumidores UI, handlers e testes de
-   forma atômica.
-4. Criar controllers/commands pessoais separados e extrair do domínio global
+4. Evoluir `@dall-fit/types`, bridge interno versionado, produtor API, consumidor
+   Nitro, consumidores UI, handlers e testes de contrato de forma atômica.
+5. Criar controllers/commands pessoais separados e extrair do domínio global
    somente reutilização real por escopo tipado, preservando autorização e logs.
-5. Adicionar Workflow fino, steps idempotentes, adapter de Blob copy, retenção de
-   origem e compensação; validar build local e deploy de preview antes de habilitar
-   a ação na UI.
-6. Entregar menu, lista, biblioteca, radios e os três modos discriminados nas rotas
-   pessoais; manter globais administrativas funcionando durante o mesmo deploy.
-7. Acrescentar métricas e aviso de impacto administrativo depois que o catálogo for
+6. Implementar persistência anterior ao start, resolver de URL por Related
+   Projects/fallback explícito, assinatura HMAC e endpoint Nitro idempotente. O
+   preview deve provar pareamento correto de ambiente e rejeição de requests
+   inválidas antes de habilitar a ação na UI.
+7. Adicionar Workflow fino, steps idempotentes, services/repositories locais,
+   adapter de Blob copy, retenção de origem e compensação; validar retomada em
+   runtime local e preview entre invocações.
+8. Entregar menu, lista, biblioteca, radios e os três modos discriminados nas rotas
+   pessoais; manter globais administrativas funcionando mesmo se o Workflow estiver
+   temporariamente indisponível.
+9. Acrescentar métricas e aviso de impacto administrativo depois que o catálogo for
    fonte confiável dos vínculos.
-8. Não há backfill de planos pessoais preexistentes, pois o produto ainda não os
-   oferece. Planos globais existentes passam a ser elegíveis à biblioteca e começam
-   com contadores zero.
-9. Falha de rollout do Workflow deve desabilitar somente iniciar/repetir clone com
-   erro explícito; criação própria, referências e gestão global permanecem
-   utilizáveis. Jobs já iniciados continuam vinculados à versão do deployment que
-   os criou conforme a garantia da plataforma.
-10. Atualizar SDDs vivos, seeds/cURLs, rotas e flows somente junto da implementação
-    autorizada e remover símbolos/arquivos sem uso em API e UI.
+10. Não há backfill de planos pessoais preexistentes, pois o produto ainda não os
+    oferece. Planos globais existentes passam a ser elegíveis à biblioteca e começam
+    com contadores zero.
+11. Publicar/promover primeiro a versão do Workflow que aceita o contrato interno e
+    depois a API produtora. Falha de rollout desabilita somente iniciar/repetir clone
+    com erro explícito; jobs iniciados continuam no deployment Nitro de origem.
+12. Atualizar SDDs vivos, seeds/cURLs, rotas, flows, documentação do workspace e
+    instruções do projeto somente junto da implementação autorizada; revisar e
+    remover símbolos/arquivos sem uso em API, UI, Workflow e packages.
 
 ## Plano de testes
 
@@ -754,10 +934,10 @@ observáveis. Não criar testes somente para aumentar cobertura de linhas.
   - contagens `linked/active` e exclusão global com referências;
   - snapshot, transições válidas do job, geração, retry, cancelamento e corrida com
     finalização;
-  - batches de mídia, pathnames determinísticos, retenção, idempotência e
-    compensação;
-  - Workflow runner e steps com repositories/Blob/publicação substituídos por
-    mocks tipados;
+  - criação do snapshot/job antes do start e transições diante de aceitação, erro,
+    timeout ambíguo e retry;
+  - resolver Related Projects/fallback, canonicalização, assinatura e adapter HTTP
+    com relógio/client substituídos;
   - classificação de erros transitórios e permanentes sem retry indevido.
 - E2E da API, serial com Nest/MongoDB/Redis efêmeros:
   - todos os endpoints pessoais com autenticação, ownership, DTOs, status, codes,
@@ -766,11 +946,30 @@ observáveis. Não criar testes somente para aumentar cobertura de linhas.
   - referência viva, duplicidade, read-only e exclusão visual/desvinculação;
   - ponteiro ativo e todos os caminhos que o deixam vazio;
   - métricas e exclusão global com dangling invisível/cleanup idempotente;
-  - persistência/reexecução dos jobs e finalização única;
-  - adapters externos determinísticos sem rede Vercel, preservando Mongo/Redis reais.
+  - persistência dos jobs, geração, cancelamento e observação da finalização única;
+  - adapter de start determinístico sem rede Vercel, preservando Mongo/Redis reais.
+- Unitários do Workflow:
+  - validação do envelope interno, tamanho, versão, timestamp, HMAC em tempo
+    constante e rejeição anterior a side effects;
+  - máquina de estados/geração, idempotência do start e correlação do mesmo run;
+  - batches de mídia, limites de concorrência, pathnames determinísticos, retenção,
+    ETag, idempotência e compensação;
+  - cancelamento cooperativo, disputa com finalização, retry e classificação de
+    falhas, com MongoDB, Blob, relógio e starter substituídos por ports tipados;
+  - logging sanitizado sem corpo, assinatura, segredo, mídia ou dado pessoal.
+- Integrados do Workflow:
+  - runtime oficial local com `@workflow/vitest`, reexecução de step, retomada,
+    geração obsoleta e finalização exatamente uma vez;
+  - handler Nitro real e bridge assinado com MongoDB efêmero e adapters Blob
+    determinísticos, sem rede ou credenciais Vercel;
+  - contrato API→Nitro compartilhado testado nas duas pontas, incluindo timeout e
+    replay da mesma chave;
+  - nenhuma suíte raiz `test:integration` é criada para o Workflow; esses testes
+    usam `pnpm -C workflow test:workflow`, rodam serialmente quando compartilham
+    runtime/fixtures e também integram `pnpm test`.
 - Unitários/componentes da UI:
-  - união discriminada e composição `global-admin | personal-owned |
-personal-global-reference | clone-job`;
+  - união discriminada e composição dos modos `global-admin`, `personal-owned`,
+    `personal-global-reference` e `clone-job`;
   - dropdown, modal, resumo limitado, ações e estados duplicados/bloqueados;
   - RadioGroup controlado, nomes, posição da coluna, realce discreto e nenhum
     deselect;
@@ -786,10 +985,13 @@ personal-global-reference | clone-job`;
   - desktop/mobile, teclado, foco, tabela válida e ausência de API real ou
     `page.route`.
 - Workflow/build:
-  - descoberta e transformação das diretivas no build Nest;
+  - descoberta e transformação das diretivas no build Nitro 2 estável;
+  - build smoke confirma artefato `.output`, handlers internos e rotas oficiais
+    geradas sem import não resolvido de pacote irmão;
   - execução local durável, retry de step, retomada e inspeção sanitizada;
   - preview na Vercel confirma OIDC, Blob copy privado, continuidade entre
-    invocações e ausência de dependência de Queue/worker/Cron;
+    invocações, Related Projects/fallback correto e ausência de dependência de
+    Queue/worker/Cron/Services;
   - smoke não inclui dados pessoais ou blobs reais de produção.
 - Regressão:
   - CRUD global, CAS, fila por aggregate, SSE, signed URLs, renovação, mídia,
@@ -800,6 +1002,8 @@ personal-global-reference | clone-job`;
   - `pnpm test:coverage:ci`;
   - `pnpm build`;
   - `pnpm -C api test:e2e`;
+  - `pnpm -C workflow test:workflow`, também agregado por `pnpm test` e sem ocupar
+    `pnpm test:integration`;
   - `pnpm test:integration`.
 
 ## Riscos e decisões
@@ -826,6 +1030,13 @@ personal-global-reference | clone-job`;
 - Workflow remove a necessidade de worker, Queue e encadeamento manual, mas cada
   step continua uma Function e consome cotas. Lotes limitados e ausência de polling
   ocioso controlam duração e custo; o plano Hobby não é garantia para uso comercial.
+- Separar API e Workflow adiciona uma chamada HTTP e dois ciclos de deploy. Essa
+  fronteira é intencional: mantém Nest fora do bundler do Workflow e evita Vercel
+  Services beta. HMAC, Related Projects, contrato versionado e start idempotente
+  tratam autenticação, pareamento de ambiente, rollout e timeout ambíguo.
+- A chamada HTTP serve somente para iniciar/reconciliar o run. Fazer cada step
+  atravessar a API aumentaria acoplamento, latência e indisponibilidade; o Nitro usa
+  MongoDB e Blob diretamente com configuração própria e filtros de job/geração.
 - O Workflow é durável, porém side effects externos continuam at-least-once na
   prática. Pathnames determinísticos, geração e `cloneJobId` único são requisitos,
   não otimizações.
@@ -841,23 +1052,38 @@ personal-global-reference | clone-job`;
 - Colocar radios em tabela pode produzir marcação inválida se `RadioGroup` envolver
   elementos estruturais incorretos. A composição deve preservar semântica de grupo
   e tabela conforme HeroUI/React Aria, validada em browser e testes de acessibilidade.
-- A integração `@workflow/nest` adiciona transformação de build e fronteira de
-  serialização. Capturar providers, clients ou request context no corpo do Workflow
-  é proibido; incompatibilidade da versão estável devolve a demanda à especificação.
+- O módulo `workflow/nitro` adiciona transformação de build e fronteira de
+  serialização. Capturar handlers, clients ou request context no corpo do Workflow
+  é proibido. Imports de pacotes irmãos alcançados por diretivas também exigem smoke
+  real porque o bundler possui fronteira própria; os módulos duráveis devem preferir
+  primitivos e código local.
+- O nome atual `nitro` no npm representa a linha 3 beta, enquanto a linha 2 estável
+  é publicada como `nitropack`. Esta feature escolhe Nitro 2 estável; a
+  incompatibilidade entre `workflow/nitro`, Node 24, `nitropack` 2 ou Vercel devolve
+  a demanda à especificação, sem trocar silenciosamente para prerelease.
+- Related Projects cobre deployments Git do mesmo repositório, mas não todos os
+  fluxos de CLI/local. Por isso `WORKFLOW_BASE_URL` é fallback explícito e validado;
+  nunca se presume que um preview possa chamar produção.
 
 ## Condições esperadas da entrega
 
 - Critérios de aceite atendidos
 - Contratos, endpoints, rotas e fluxos afetados atualizados
 - ADR de catálogo pessoal e clonagem durável registrada
+- Aplicação `workflow/` Nitro criada como pacote do workspace e projeto Vercel
+  separado, com SDD, configuração e ciclo de deploy próprios
 - Fronteiras global/pessoal separadas e núcleo reutilizado por escopo tipado
 - Referências globais vivas, somente leitura e removíveis do catálogo
 - Clone invisível, idempotente, cancelável e com mídia privada independente
 - Plano ativo opcional, radio acessível e nenhum fallback automático
 - Impacto administrativo visível sem bloquear edição ou exclusão
-- MSW, mocks unitários e E2E atualizados conforme o impacto
+- MSW, mocks unitários, testes do Workflow e E2E atualizados conforme o impacto
+- Lint, typecheck, cobertura, build, Sonar, CI e agregadores da raiz abrangem o novo
+  projeto sem configuração paralela de Prettier ou lockfile próprio
 - Migração entre produtor e consumidores compatível
-- Workflow estável validado em local/build/preview, sem Queue ou beta
+- Bridge API→Workflow versionado, assinado, idempotente e pareado por ambiente
+- Workflow v4 e Nitro 2 estáveis validados em local/build/preview, sem Queue,
+  Services ou dependência beta
 - Ownership, OIDC, URLs assinadas, logs e privacidade preservados
-- Revisão de código sem uso concluída em API e UI
+- Revisão de código sem uso concluída em API, UI, Workflow e packages
 - Quality gates da raiz e suítes adicionais aprovados
