@@ -97,7 +97,10 @@ describe('ApplicationMenu', () => {
     expect(screen.getByText(person.email)).toBeInTheDocument();
     expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Planos de treino' }),
+      screen.getByRole('link', { name: 'Planos globais' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Meus planos' }),
     ).toBeInTheDocument();
   });
 

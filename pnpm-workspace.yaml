@@ -1,10 +1,12 @@
 packages:
   - api
   - ui
+  - workflow
   - packages/*
 
 allowBuilds:
   '@swc/core': true
+  cbor-extract: true
   esbuild: true
   mongodb-memory-server: true
   msw: true

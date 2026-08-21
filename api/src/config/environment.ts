@@ -127,6 +127,16 @@ const environmentSchema = z.looseObject({
     .max(10_000)
     .default(2_000),
   BLOB_STORE_ID: optionalNonEmptyString,
+  WORKFLOW_BASE_URL: z.url().default('http://localhost:5000'),
+  WORKFLOW_PROJECT_NAME: z.string().min(1).default('dall-fit-workflow'),
+  WORKFLOW_HMAC_SECRET: optionalSecret,
+  WORKFLOW_PROTECTION_BYPASS_SECRET: optionalNonEmptyString,
+  WORKFLOW_START_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(30_000)
+    .default(5_000),
   GOOGLE_OAUTH_CREDENTIALS_BASE64: z.string().min(1),
   AUTH_SESSION_SECRET: z.string().min(32),
   AUTH_SESSION_ACTIVE_KEY_ID: z.string().min(1).default('active-v1'),
@@ -196,16 +206,37 @@ export function validateEnvironment(
   const redisUrl = resolveRedisUrl(parsed, runtimeEnvironment);
   const redisNamespace = resolveRedisNamespace(parsed, runtimeEnvironment);
   const blob = resolveBlobConfiguration(parsed, runtimeEnvironment);
+  const workflow = resolveWorkflowConfiguration(parsed, runtimeEnvironment);
 
   const result = {
     ...parsed,
     ...blob,
+    ...workflow,
     GOOGLE_OAUTH_CREDENTIALS: googleCredentials,
     REDIS_NAMESPACE: redisNamespace,
     REDIS_URL: redisUrl,
     RUNTIME_ENVIRONMENT: runtimeEnvironment,
   };
 
+  return result;
+}
+
+function resolveWorkflowConfiguration(
+  config: ParsedEnvironment,
+  runtimeEnvironment: RuntimeEnvironment,
+): { WORKFLOW_HMAC_SECRET: string } {
+  if (
+    (runtimeEnvironment === 'preview' || runtimeEnvironment === 'production') &&
+    config.WORKFLOW_HMAC_SECRET === undefined
+  )
+    throw new Error(
+      'Invalid environment variables: WORKFLOW_HMAC_SECRET is required in production and preview',
+    );
+  const result = {
+    WORKFLOW_HMAC_SECRET:
+      config.WORKFLOW_HMAC_SECRET ??
+      'local-workflow-hmac-secret-change-me-000000000000',
+  };
   return result;
 }
 

@@ -8,6 +8,7 @@ import {
   BlobStoreSuspendedError,
   BlobUnknownError,
   del,
+  head,
   issueSignedToken,
   list,
   presignUrl,
@@ -25,7 +26,7 @@ export type BlobFailureCategory =
   | 'store_suspended'
   | 'unknown';
 
-export type BlobOperation = 'delete' | 'list' | 'sign' | 'upload';
+export type BlobOperation = 'delete' | 'head' | 'list' | 'sign' | 'upload';
 
 export class BlobStorageOperationError extends Error {
   constructor(
@@ -38,7 +39,12 @@ export class BlobStorageOperationError extends Error {
 }
 
 export interface StoredBlob {
+  etag: string;
   key: string;
+}
+
+export interface StoredBlobMetadata {
+  etag: string;
 }
 
 @Injectable()
@@ -59,13 +65,35 @@ export class BlobStorageService {
       this.logger.log('BlobStorageService -> upload -> put return:', {
         data: { uploaded: true },
       });
-      const result = { key: blob.pathname };
+      const result = { etag: blob.etag, key: blob.pathname };
       this.logger.log('BlobStorageService -> upload -> return:', {
         data: { uploaded: true },
       });
       return result;
     } catch (error: unknown) {
       const failure = this.toOperationError('upload', error);
+      throw failure;
+    }
+  }
+
+  async getMetadata(pathname: string): Promise<StoredBlobMetadata> {
+    this.logger.log('BlobStorageService -> getMetadata -> params:', {
+      params: { pathnamePresent: pathname.length > 0 },
+    });
+    try {
+      const metadata = await head(pathname, {
+        abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+      });
+      this.logger.log('BlobStorageService -> getMetadata -> head return:', {
+        data: { found: true },
+      });
+      const result = { etag: metadata.etag };
+      this.logger.log('BlobStorageService -> getMetadata -> return:', {
+        data: { etagPresent: result.etag.length > 0 },
+      });
+      return result;
+    } catch (error: unknown) {
+      const failure = this.toOperationError('head', error);
       throw failure;
     }
   }

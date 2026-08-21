@@ -14,7 +14,7 @@ no `package.json` dessa aplicação.
 
 ## Desenvolvimento local
 
-O comando abaixo, executado na raiz, inicia API e UI simultaneamente:
+O comando abaixo, executado na raiz, inicia API, Workflow e UI simultaneamente:
 
 ```bash
 pnpm dev
@@ -30,6 +30,7 @@ No desenvolvimento local:
 
 - UI: `http://localhost:3000`;
 - API: `http://localhost:4000`.
+- Workflow: `http://localhost:5000`;
 - MongoDB persistente local: `127.0.0.1:27017`, database `dall-fit`;
 - Redis efêmero: `127.0.0.1:6379`.
 
@@ -59,12 +60,12 @@ Todos os quality gates são iniciados na raiz:
 
 | Comando                 | Responsabilidade                                             |
 | ----------------------- | ------------------------------------------------------------ |
-| `pnpm typecheck`        | Compila types e executa o typecheck de API e UI              |
+| `pnpm typecheck`        | Compila types e executa typecheck de API, Workflow e UI      |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                       |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint |
-| `pnpm sonar`            | Executa análise SonarCloud nos três projetos                 |
-| `pnpm test`             | Compila types e chama os testes de API e UI                  |
-| `pnpm test:coverage`    | Agrega cobertura local de API e UI                           |
+| `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos               |
+| `pnpm test`             | Compila types e testa API, Workflow e UI                     |
+| `pnpm test:coverage`    | Agrega cobertura local de API, Workflow e UI                 |
 | `pnpm test:coverage:ci` | Agrega cobertura e relatórios para CI                        |
 | `pnpm test:integration` | Executa Playwright da UI após sua adoção                     |
 | `pnpm build`            | Compila types antes das aplicações consumidoras              |
@@ -72,8 +73,8 @@ Todos os quality gates são iniciados na raiz:
 Os comandos explícitos com `pnpm -C` tornam visível qual projeto falhou e preservam
 a autonomia de configuração de cada suíte.
 
-`pnpm sonar` agrega a execução do `sonar-scanner` nos três projetos
-(`packages/types`, `api` e `ui`). Cada projeto possui seu próprio
+`pnpm sonar` agrega a execução do `sonar-scanner` nos quatro projetos
+(`packages/types`, `api`, `workflow` e `ui`). Cada projeto possui seu próprio
 `sonar-project.properties` e script `sonar`. Localmente, os scripts carregam
 `SONAR_TOKEN` do `.env` da raiz via `dotenv-cli`; no workflow de pull request, o token é
 proveniente dos environments do GitHub. A análise usa o LCOV gerado pelos testes
@@ -128,6 +129,7 @@ os E2E da API permanecem seriais conforme sua configuração.
 - `base.config.mjs`: TypeScript type-aware, Prettier e regras transversais;
 - `api.config.mjs`: runtime Node e regras específicas do backend;
 - `ui.config.mjs`: browser, React, hooks e Vite Fast Refresh.
+- `workflow.config.mjs`: runtime Node da aplicação Nitro.
 
 Aplicações não mantêm outro `eslint.config.*`. Uma exceção local deve ser o menor
 override possível, entrar no arquivo de escopo correto e ter justificativa.
@@ -185,6 +187,8 @@ API e UI usam Vitest, mas mantêm ambientes e configurações independentes:
 - E2E do backend permanece em comando próprio e usa MongoDB e Redis efêmeros,
   iniciados sem Docker;
 - E2E do backend sempre executam de forma serial;
+- o Workflow possui unitários Vitest, teste de runtime com `@workflow/vitest` e
+  build Nitro `vercel` que confirma a descoberta de workflows e steps;
 - no backend, não existe nível, pasta ou comando `test:integration`.
 
 A estratégia completa está registrada em

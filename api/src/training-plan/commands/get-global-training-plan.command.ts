@@ -1,16 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { TrainingPlanDetailsResponse } from '@dall-fit/types';
+import type { GlobalTrainingPlanDetailsResponse } from '@dall-fit/types';
 
+import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 
 @Injectable()
 export class GetGlobalTrainingPlanCommand {
   private readonly logger = new Logger(GetGlobalTrainingPlanCommand.name);
 
-  constructor(private readonly trainingPlanService: TrainingPlanService) {}
+  constructor(
+    private readonly trainingPlanService: TrainingPlanService,
+    private readonly personalTrainingPlanService: PersonalTrainingPlanService,
+  ) {}
 
-  async execute(trainingPlanId: string): Promise<TrainingPlanDetailsResponse> {
+  async execute(
+    trainingPlanId: string,
+  ): Promise<GlobalTrainingPlanDetailsResponse> {
     this.logger.log('GetGlobalTrainingPlanCommand -> execute -> params:', {
       params: { trainingPlanId },
     });
@@ -27,6 +33,8 @@ export class GetGlobalTrainingPlanCommand {
       },
     );
 
+    const usage =
+      await this.personalTrainingPlanService.usageForGlobal(trainingPlanId);
     const result = {
       data: {
         id: serviceResult.id,
@@ -36,6 +44,7 @@ export class GetGlobalTrainingPlanCommand {
         workouts: serviceResult.workouts,
         createdAt: serviceResult.createdAt,
         updatedAt: serviceResult.updatedAt,
+        usage,
       },
     };
     this.logger.log('GetGlobalTrainingPlanCommand -> execute -> return:', {

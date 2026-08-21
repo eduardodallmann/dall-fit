@@ -72,6 +72,7 @@ import {
   updateTrainingPlanWorkout,
   uploadTrainingPlanExerciseImage,
   type MockTrainingPlansScenario,
+  type TrainingPlanResource,
 } from '~/routes/training-plan/training-plan-service';
 
 import {
@@ -189,6 +190,7 @@ interface WorkoutEditorProps {
   onImageLoadError: (signedUrlExpiresAt: string) => void;
   onRetryImage: () => void;
   onUnsavedWorkChange?: (hasUnsavedWork: boolean) => void;
+  resource?: TrainingPlanResource;
 }
 
 export function WorkoutEditor({
@@ -197,6 +199,7 @@ export function WorkoutEditor({
   onImageLoadError,
   onRetryImage,
   onUnsavedWorkChange,
+  resource = 'global',
 }: Readonly<WorkoutEditorProps>) {
   const queryClient = useQueryClient();
   const initialItems = data.exercises.map(createEditorExercise);
@@ -361,6 +364,7 @@ export function WorkoutEditor({
             submitted,
             version,
             mockScenario,
+            resource,
           );
           confirmedVersion = result.version;
           return result;
@@ -393,6 +397,7 @@ export function WorkoutEditor({
             scheduleTimer(exerciseId);
           synchronizeWorkoutMutation(queryClient, {
             mockScenario,
+            resource,
             trainingPlanId: data.trainingPlan.id,
             updateWorkout: (workout) => ({
               ...workout,
@@ -431,6 +436,7 @@ export function WorkoutEditor({
       data.version,
       mockScenario,
       queryClient,
+      resource,
       scheduleTimer,
       setItems,
     ],
@@ -481,6 +487,7 @@ export function WorkoutEditor({
         name,
         version,
         mockScenario,
+        resource,
       );
       confirmedVersion = result.version;
       return result;
@@ -494,6 +501,7 @@ export function WorkoutEditor({
         setEditingName(false);
         synchronizeWorkoutMutation(queryClient, {
           mockScenario,
+          resource,
           trainingPlanId: data.trainingPlan.id,
           updateDetail: (detail) => ({
             ...detail,
@@ -556,6 +564,7 @@ export function WorkoutEditor({
           { type },
           version,
           mockScenario,
+          resource,
         );
         confirmedVersion = result.version;
         return result;
@@ -570,6 +579,7 @@ export function WorkoutEditor({
         );
         synchronizeWorkoutMutation(queryClient, {
           mockScenario,
+          resource,
           trainingPlanId: data.trainingPlan.id,
           updateDetail: (detail) => ({
             ...detail,
@@ -632,6 +642,7 @@ export function WorkoutEditor({
           exerciseId,
           version,
           mockScenario,
+          resource,
         );
         confirmedVersion = nextVersion;
         return { data: undefined, version: nextVersion };
@@ -640,6 +651,7 @@ export function WorkoutEditor({
         removed.current.delete(exerciseId);
         synchronizeWorkoutMutation(queryClient, {
           mockScenario,
+          resource,
           trainingPlanId: data.trainingPlan.id,
           updateDetail: (detail) => ({
             ...detail,
@@ -755,6 +767,7 @@ export function WorkoutEditor({
           { exerciseIds: orderedIds },
           version,
           mockScenario,
+          resource,
         );
         confirmedVersion = nextVersion;
         return { data: undefined, version: nextVersion };
@@ -763,6 +776,7 @@ export function WorkoutEditor({
         if (confirmedIds !== undefined)
           synchronizeWorkoutMutation(queryClient, {
             mockScenario,
+            resource,
             trainingPlanId: data.trainingPlan.id,
             updateWorkout: (workout) => ({
               ...workout,
@@ -810,6 +824,7 @@ export function WorkoutEditor({
           file,
           version,
           mockScenario,
+          resource,
         );
         confirmedVersion = result.version;
         return result;
@@ -828,6 +843,7 @@ export function WorkoutEditor({
         );
         synchronizeWorkoutMutation(queryClient, {
           mockScenario,
+          resource,
           trainingPlanId: data.trainingPlan.id,
           updateWorkout: (workout) => ({
             ...workout,
@@ -863,6 +879,7 @@ export function WorkoutEditor({
           exerciseId,
           version,
           mockScenario,
+          resource,
         );
         confirmedVersion = nextVersion;
         return { data: undefined, version: nextVersion };
@@ -881,6 +898,7 @@ export function WorkoutEditor({
         );
         synchronizeWorkoutMutation(queryClient, {
           mockScenario,
+          resource,
           trainingPlanId: data.trainingPlan.id,
           updateWorkout: (workout) => ({
             ...workout,

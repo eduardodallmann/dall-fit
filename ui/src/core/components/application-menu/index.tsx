@@ -108,6 +108,29 @@ export function ApplicationMenu({
           />
           <span>Home</span>
         </Link>
+        <Link
+          activeOptions={{ includeSearch: false }}
+          className={styles.navigationLink()}
+          onClick={() => {
+            trackUiEvent({
+              control: 'training_plans_link',
+              destination: 'training_plan_list',
+              eventName: 'ui_navigation_selected',
+              navigationKind: 'menu',
+              surface: 'application_menu',
+            });
+            onNavigate?.();
+          }}
+          search={adminSearch}
+          to="/training-plan"
+        >
+          <Dumbbell
+            aria-hidden="true"
+            className={styles.navigationIcon()}
+            focusable="false"
+          />
+          <span>Meus planos</span>
+        </Link>
         {person.isAdmin === true ? (
           <Link
             activeOptions={{ includeSearch: false }}
@@ -130,7 +153,7 @@ export function ApplicationMenu({
               className={styles.navigationIcon()}
               focusable="false"
             />
-            <span>Planos de treino</span>
+            <span>Planos globais</span>
           </Link>
         ) : null}
       </nav>

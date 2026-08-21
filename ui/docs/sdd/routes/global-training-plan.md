@@ -22,6 +22,11 @@
 
 ## Elementos e conteúdo
 
+A tabela inclui uma coluna única “Impacto”, com pessoas vinculadas e pessoas que
+mantêm o plano ativo. Esses números não bloqueiam ações. A confirmação de exclusão
+repete ambos e informa que pessoas podem ficar sem plano ativo; confirmar continua
+permitido.
+
 - breadcrumb semântico e tipado `Home / Planos de treino`;
 - título, descrição e ação `Novo plano`;
 - `Table` HeroUI com nome, descrição, atualização e dropdown de ações;

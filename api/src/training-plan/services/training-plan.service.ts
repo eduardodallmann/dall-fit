@@ -116,12 +116,120 @@ export class TrainingPlanService {
     return result;
   }
 
+  async createOwned(
+    ownerPersonId: string,
+    input: CreateTrainingPlanRequest,
+  ): Promise<TrainingPlanEntity> {
+    this.logger.log('TrainingPlanService -> createOwned -> params:', {
+      params: { fields: Object.keys(input), ownerPersonId },
+    });
+    const result = await this.trainingPlanRepository.create({
+      ...input,
+      ownerPersonId,
+    });
+    this.logger.log('TrainingPlanService -> createOwned -> return:', {
+      data: {
+        ownerPersonId,
+        trainingPlanId: result.id,
+        version: result.version,
+      },
+    });
+    return result;
+  }
+
+  async getOwned(
+    ownerPersonId: string,
+    trainingPlanId: string,
+  ): Promise<TrainingPlanEntity> {
+    this.logger.log('TrainingPlanService -> getOwned -> params:', {
+      params: { ownerPersonId, trainingPlanId },
+    });
+    const result = await this.trainingPlanRepository.findById(trainingPlanId, {
+      ownerPersonId,
+    });
+    if (result === null) throw createTrainingPlanNotFoundException();
+    this.logger.log('TrainingPlanService -> getOwned -> return:', {
+      data: { ownerPersonId, trainingPlanId, version: result.version },
+    });
+    return result;
+  }
+
+  async updateOwned(
+    ownerPersonId: string,
+    trainingPlanId: string,
+    expectedVersion: number,
+    changes: UpdateTrainingPlanRequest,
+  ): Promise<VersionedResult<TrainingPlanSummary>> {
+    this.logger.log('TrainingPlanService -> updateOwned -> params:', {
+      params: {
+        expectedVersion,
+        fields: Object.keys(changes),
+        ownerPersonId,
+        trainingPlanId,
+      },
+    });
+    const repositoryResult = await this.trainingPlanRepository.update(
+      trainingPlanId,
+      expectedVersion,
+      changes,
+      { ownerPersonId },
+    );
+    if (repositoryResult === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        undefined,
+        undefined,
+        ownerPersonId,
+      );
+      return failure;
+    }
+    const result = {
+      data: this.toSummary(repositoryResult.data),
+      version: repositoryResult.version,
+    };
+    this.logger.log('TrainingPlanService -> updateOwned -> return:', {
+      data: { ownerPersonId, trainingPlanId, version: result.version },
+    });
+    return result;
+  }
+
+  async deleteOwned(
+    ownerPersonId: string,
+    trainingPlanId: string,
+    expectedVersion: number,
+  ): Promise<void> {
+    this.logger.log('TrainingPlanService -> deleteOwned -> params:', {
+      params: { expectedVersion, ownerPersonId, trainingPlanId },
+    });
+    const images = await this.trainingPlanRepository.delete(
+      trainingPlanId,
+      expectedVersion,
+      { ownerPersonId },
+    );
+    if (images === null) {
+      const failure = this.throwMutationFailure(
+        trainingPlanId,
+        expectedVersion,
+        undefined,
+        undefined,
+        ownerPersonId,
+      );
+      return failure;
+    }
+    await this.exerciseImageService.deleteImages(images);
+    this.logger.log('TrainingPlanService -> deleteOwned -> completed:', {
+      data: { imageCount: images.length, ownerPersonId, trainingPlanId },
+    });
+  }
+
   async getGlobal(trainingPlanId: string): Promise<TrainingPlanEntity> {
     this.logger.log('TrainingPlanService -> getGlobal -> params:', {
       params: { trainingPlanId },
     });
-    const result =
-      await this.trainingPlanRepository.findGlobalById(trainingPlanId);
+    const result = await this.trainingPlanRepository.findById(trainingPlanId, {
+      ownerPersonId: null,
+    });
     if (result === null) throw createTrainingPlanNotFoundException();
     this.logger.log('TrainingPlanService -> getGlobal -> return:', {
       data: { trainingPlanId, version: result.version },
@@ -137,10 +245,11 @@ export class TrainingPlanService {
     this.logger.log('TrainingPlanService -> updateGlobal -> params:', {
       params: { expectedVersion, fields: Object.keys(changes), trainingPlanId },
     });
-    const repositoryResult = await this.trainingPlanRepository.updateGlobal(
+    const repositoryResult = await this.trainingPlanRepository.update(
       trainingPlanId,
       expectedVersion,
       changes,
+      { ownerPersonId: null },
     );
     if (repositoryResult === null) {
       const failure = this.throwMutationFailure(
@@ -164,13 +273,15 @@ export class TrainingPlanService {
   async deleteGlobal(
     trainingPlanId: string,
     expectedVersion: number,
+    retainedImageKeys: ReadonlySet<string> = new Set(),
   ): Promise<void> {
     this.logger.log('TrainingPlanService -> deleteGlobal -> params:', {
       params: { expectedVersion, trainingPlanId },
     });
-    const images = await this.trainingPlanRepository.deleteGlobal(
+    const images = await this.trainingPlanRepository.delete(
       trainingPlanId,
       expectedVersion,
+      { ownerPersonId: null },
     );
     if (images === null) {
       const failure = this.throwMutationFailure(
@@ -180,21 +291,35 @@ export class TrainingPlanService {
       return failure;
     }
     await this.publishDeleted(trainingPlanId);
-    await this.exerciseImageService.deleteImages(images);
+    const deletableImages = images.filter(
+      (image) =>
+        !retainedImageKeys.has(image.thumbnail.key) &&
+        !retainedImageKeys.has(image.display.key),
+    );
+    await this.exerciseImageService.deleteImages(deletableImages);
     this.logger.log('TrainingPlanService -> deleteGlobal -> completed:', {
-      data: { imageCount: images.length, trainingPlanId },
+      data: {
+        deletedImageCount: deletableImages.length,
+        retainedImageCount: images.length - deletableImages.length,
+        trainingPlanId,
+      },
     });
   }
 
   async createWorkout(
     trainingPlanId: string,
     expectedVersion: number,
+    ownerPersonId: string | null = null,
   ): Promise<VersionedResult<TrainingPlanWorkoutSummary>> {
     this.logger.log('TrainingPlanService -> createWorkout -> params:', {
       params: { expectedVersion, trainingPlanId },
     });
-    const state =
-      await this.trainingPlanRepository.inspectTarget(trainingPlanId);
+    const state = await this.trainingPlanRepository.inspectTarget(
+      trainingPlanId,
+      undefined,
+      undefined,
+      { ownerPersonId },
+    );
     this.assertState(state, expectedVersion, trainingPlanId);
     this.assertAggregateCapacity(state);
     if ((state.workoutCount ?? 0) >= MAX_WORKOUTS_PER_PLAN)
@@ -203,15 +328,23 @@ export class TrainingPlanService {
       trainingPlanId,
       expectedVersion,
       DEFAULT_WORKOUT_NAME,
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
+        undefined,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
-    await this.publishPresent(trainingPlanId, result.version);
+    await this.publishScopedPresent(
+      trainingPlanId,
+      result.version,
+      ownerPersonId,
+    );
     this.logger.log('TrainingPlanService -> createWorkout -> return:', {
       data: {
         trainingPlanId,
@@ -226,6 +359,7 @@ export class TrainingPlanService {
     trainingPlanId: string,
     workoutId: string,
     expectedVersion: number,
+    ownerPersonId: string | null = null,
   ): Promise<number> {
     this.logger.log('TrainingPlanService -> deleteWorkout -> params:', {
       params: { expectedVersion, trainingPlanId, workoutId },
@@ -234,17 +368,24 @@ export class TrainingPlanService {
       trainingPlanId,
       workoutId,
       expectedVersion,
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
         workoutId,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     await this.exerciseImageService.deleteImages(result.data);
     this.logger.log('TrainingPlanService -> deleteWorkout -> return:', {
       data: { trainingPlanId, version: result.version, workoutId },
@@ -255,6 +396,7 @@ export class TrainingPlanService {
   async getWorkout(
     trainingPlanId: string,
     workoutId: string,
+    ownerPersonId: string | null = null,
   ): Promise<WorkoutAggregate> {
     this.logger.log('TrainingPlanService -> getWorkout -> params:', {
       params: { trainingPlanId, workoutId },
@@ -262,11 +404,14 @@ export class TrainingPlanService {
     const result = await this.trainingPlanRepository.findWorkout(
       trainingPlanId,
       workoutId,
+      { ownerPersonId },
     );
     if (result === null) {
       const state = await this.trainingPlanRepository.inspectTarget(
         trainingPlanId,
         workoutId,
+        undefined,
+        { ownerPersonId },
       );
       this.assertState(state, state.version ?? 0, workoutId);
       throw createWorkoutNotFoundException();
@@ -274,6 +419,8 @@ export class TrainingPlanService {
     const metrics = await this.trainingPlanRepository.inspectTarget(
       trainingPlanId,
       workoutId,
+      undefined,
+      { ownerPersonId },
     );
     this.warnIfAggregateNearLimit(trainingPlanId, metrics);
     this.logger.log('TrainingPlanService -> getWorkout -> return:', {
@@ -292,23 +439,31 @@ export class TrainingPlanService {
     workoutId: string,
     expectedVersion: number,
     name: string,
+    ownerPersonId: string | null = null,
   ): Promise<VersionedResult<WorkoutNameResult>> {
     const result = await this.trainingPlanRepository.updateWorkoutName(
       trainingPlanId,
       workoutId,
       expectedVersion,
       name,
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
         workoutId,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     return result;
   }
 
@@ -317,6 +472,7 @@ export class TrainingPlanService {
     workoutId: string,
     expectedVersion: number,
     type: ExerciseType,
+    ownerPersonId: string | null = null,
   ): Promise<VersionedResult<StoredExercise>> {
     this.logger.log('TrainingPlanService -> createExercise -> params:', {
       params: { expectedVersion, trainingPlanId, type, workoutId },
@@ -324,6 +480,8 @@ export class TrainingPlanService {
     const state = await this.trainingPlanRepository.inspectTarget(
       trainingPlanId,
       workoutId,
+      undefined,
+      { ownerPersonId },
     );
     this.assertState(state, expectedVersion, workoutId);
     this.assertAggregateCapacity(state);
@@ -335,16 +493,23 @@ export class TrainingPlanService {
       workoutId,
       expectedVersion,
       exercise,
+      { ownerPersonId },
     );
     if (repositoryResult === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
         workoutId,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
-    await this.publishPresent(trainingPlanId, repositoryResult.version);
+    await this.publishScopedPresent(
+      trainingPlanId,
+      repositoryResult.version,
+      ownerPersonId,
+    );
     this.logger.log('TrainingPlanService -> createExercise -> return:', {
       data: {
         exerciseId: repositoryResult.data.id,
@@ -362,6 +527,7 @@ export class TrainingPlanService {
     exerciseId: string,
     expectedVersion: number,
     changes: UpdateExerciseRequest,
+    ownerPersonId: string | null = null,
   ): Promise<VersionedResult<StoredExercise>> {
     const definedChanges = Object.fromEntries(
       Object.entries(changes).filter(([, value]) => value !== undefined),
@@ -379,6 +545,7 @@ export class TrainingPlanService {
       trainingPlanId,
       workoutId,
       exerciseId,
+      { ownerPersonId },
     );
     this.assertState(
       state,
@@ -408,6 +575,7 @@ export class TrainingPlanService {
       exerciseId,
       expectedVersion,
       normalized,
+      { ownerPersonId },
     );
     if (repositoryResult === null) {
       const failure = this.throwMutationFailure(
@@ -415,11 +583,16 @@ export class TrainingPlanService {
         expectedVersion,
         workoutId,
         exerciseId,
+        ownerPersonId,
       );
       return failure;
     }
     if (repositoryResult.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, repositoryResult.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        repositoryResult.version,
+        ownerPersonId,
+      );
     this.logger.log('TrainingPlanService -> updateExercise -> return:', {
       data: {
         exerciseId,
@@ -436,12 +609,14 @@ export class TrainingPlanService {
     workoutId: string,
     exerciseId: string,
     expectedVersion: number,
+    ownerPersonId: string | null = null,
   ): Promise<number> {
     const result = await this.trainingPlanRepository.deleteExercise(
       trainingPlanId,
       workoutId,
       exerciseId,
       expectedVersion,
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
@@ -449,11 +624,16 @@ export class TrainingPlanService {
         expectedVersion,
         workoutId,
         exerciseId,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     return result.version;
@@ -464,16 +644,20 @@ export class TrainingPlanService {
     workoutId: string,
     expectedVersion: number,
     exerciseIds: readonly string[],
+    ownerPersonId: string | null = null,
   ): Promise<number> {
     const workout = await this.trainingPlanRepository.findWorkout(
       trainingPlanId,
       workoutId,
+      { ownerPersonId },
     );
     if (workout === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
         workoutId,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
@@ -504,17 +688,24 @@ export class TrainingPlanService {
       workoutId,
       expectedVersion,
       exerciseIds,
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
         trainingPlanId,
         expectedVersion,
         workoutId,
+        undefined,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     return result.version;
   }
 
@@ -523,6 +714,7 @@ export class TrainingPlanService {
     workoutId: string,
     exerciseId: string,
     expectedVersion: number,
+    ownerPersonId: string | null = null,
   ): Promise<void> {
     this.logger.log(
       'TrainingPlanService -> validateExerciseImageUpload -> params:',
@@ -534,6 +726,7 @@ export class TrainingPlanService {
       trainingPlanId,
       workoutId,
       exerciseId,
+      { ownerPersonId },
     );
     this.assertState(
       state,
@@ -557,6 +750,7 @@ export class TrainingPlanService {
     exerciseId: string,
     expectedVersion: number,
     image: StoredExerciseImage,
+    ownerPersonId: string | null = null,
   ): Promise<number> {
     this.logger.log('TrainingPlanService -> commitExerciseImage -> params:', {
       params: { exerciseId, expectedVersion, trainingPlanId, workoutId },
@@ -567,6 +761,7 @@ export class TrainingPlanService {
       exerciseId,
       expectedVersion,
       { image },
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
@@ -574,11 +769,16 @@ export class TrainingPlanService {
         expectedVersion,
         workoutId,
         exerciseId,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     this.logger.log('TrainingPlanService -> commitExerciseImage -> return:', {
@@ -592,11 +792,13 @@ export class TrainingPlanService {
     workoutId: string,
     exerciseId: string,
     expectedVersion: number,
+    ownerPersonId: string | null = null,
   ): Promise<number> {
     const state = await this.trainingPlanRepository.inspectTarget(
       trainingPlanId,
       workoutId,
       exerciseId,
+      { ownerPersonId },
     );
     this.assertState(
       state,
@@ -613,6 +815,7 @@ export class TrainingPlanService {
       exerciseId,
       expectedVersion,
       { image: null },
+      { ownerPersonId },
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
@@ -620,11 +823,16 @@ export class TrainingPlanService {
         expectedVersion,
         workoutId,
         exerciseId,
+        ownerPersonId,
       );
       return failure;
     }
     if (result.version > expectedVersion)
-      await this.publishPresent(trainingPlanId, result.version);
+      await this.publishScopedPresent(
+        trainingPlanId,
+        result.version,
+        ownerPersonId,
+      );
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
     return result.version;
@@ -635,11 +843,13 @@ export class TrainingPlanService {
     expectedVersion: number,
     workoutId?: string,
     exerciseId?: string,
+    ownerPersonId: string | null = null,
   ): Promise<never> {
     const state = await this.trainingPlanRepository.inspectTarget(
       trainingPlanId,
       workoutId,
       exerciseId,
+      { ownerPersonId },
     );
     this.assertState(
       state,
@@ -667,6 +877,32 @@ export class TrainingPlanService {
     this.logger.log('TrainingPlanService -> publishPresent -> completed:', {
       data: { trainingPlanId, version },
     });
+  }
+
+  private async publishScopedPresent(
+    trainingPlanId: string,
+    version: number,
+    ownerPersonId: string | null,
+  ): Promise<void> {
+    this.logger.log('TrainingPlanService -> publishScopedPresent -> params:', {
+      params: {
+        ownerIsGlobal: ownerPersonId === null,
+        trainingPlanId,
+        version,
+      },
+    });
+    if (ownerPersonId === null)
+      await this.publishPresent(trainingPlanId, version);
+    this.logger.log(
+      'TrainingPlanService -> publishScopedPresent -> completed:',
+      {
+        data: {
+          ownerIsGlobal: ownerPersonId === null,
+          trainingPlanId,
+          version,
+        },
+      },
+    );
   }
 
   private async publishDeleted(trainingPlanId: string): Promise<void> {

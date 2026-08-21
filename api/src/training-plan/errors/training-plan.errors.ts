@@ -111,3 +111,45 @@ export const createImageUrlSigningFailedException = () =>
     'IMAGE_URL_SIGNING_FAILED',
     'Image URL signing failed.',
   );
+export const createCatalogEntryNotFoundException = () =>
+  domainException(
+    HttpStatus.NOT_FOUND,
+    'TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND',
+    'Training plan catalog entry not found.',
+  );
+export const createGlobalReferenceDuplicateException = () =>
+  domainException(
+    HttpStatus.CONFLICT,
+    'GLOBAL_TRAINING_PLAN_REFERENCE_DUPLICATE',
+    'Global training plan reference already exists.',
+  );
+export const createGlobalReferenceReadOnlyException = () =>
+  domainException(
+    HttpStatus.FORBIDDEN,
+    'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+    'Global training plan reference is read-only.',
+  );
+export const createCloneJobDuplicateException = () =>
+  domainException(
+    HttpStatus.CONFLICT,
+    'TRAINING_PLAN_CLONE_JOB_DUPLICATE',
+    'A clone job already exists for this training plan.',
+  );
+export const createCloneJobNotFoundException = () =>
+  domainException(
+    HttpStatus.NOT_FOUND,
+    'TRAINING_PLAN_CLONE_JOB_NOT_FOUND',
+    'Training plan clone job not found.',
+  );
+export const createCloneJobStateConflictException = () =>
+  domainException(
+    HttpStatus.CONFLICT,
+    'TRAINING_PLAN_CLONE_JOB_STATE_CONFLICT',
+    'Training plan clone job state does not allow this operation.',
+  );
+export const createCloneSchedulingUnavailableException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'TRAINING_PLAN_CLONE_SCHEDULING_UNAVAILABLE',
+    'Training plan clone scheduling is unavailable.',
+  );

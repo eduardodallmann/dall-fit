@@ -15,6 +15,12 @@ a página 1 é omitida e somente inteiros decimais canônicos de 2 a 100 permane
 Depois da response, uma página acima do último resultado é substituída pela última
 página existente antes de apresentar o conteúdo.
 
+As rotas pessoais `/training-plan`, `/training-plan/:catalogEntryId` e workout são
+filhas autenticadas. As equivalentes `/global/training-plan*` permanecem filhas
+administrativas. O shell autenticado monta uma única conexão SSE para ambos os
+fluxos. O menu mostra “Meus planos” para todas as pessoas e, adicionalmente,
+“Planos globais” para admins.
+
 Todo segmento estático de um path navegável usa inglês, letras minúsculas e
 `kebab-case`, conforme a
 [convenção transversal de paths públicos](../../../../docs/sdd/base/01-arquitetura-do-monorepo.md#convenção-de-paths-públicos).

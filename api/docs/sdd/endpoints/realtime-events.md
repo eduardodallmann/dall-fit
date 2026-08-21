@@ -4,6 +4,10 @@
 
 Mantém um stream SSE autenticado que avisa quando um recurso autorizado mudou. O
 endpoint não entrega conteúdo; o consumidor relê o endpoint HTTP proprietário.
+Mutações globais e mudanças de vínculo/seleção que alteram métricas publicam
+`global-training-plan`. A UI relê coleções administrativas e referências pessoais;
+uma alteração do conteúdo global invalida também detalhe e workout pessoais porque
+suas chaves públicas usam `catalogEntryId`, não o ID global do evento.
 
 ## Referências técnicas
 

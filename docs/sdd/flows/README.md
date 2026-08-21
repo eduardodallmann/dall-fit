@@ -9,6 +9,8 @@ Cada arquivo descreve uma jornada funcional que atravessa API e UI. Use
   acesso à rota privada.
 - [`Gestão de planos de treino globais`](gestao-planos-treino-globais.md): CRUD
   administrativo de planos e manutenção de workouts.
+- [`Gestão de planos de treino pessoais`](gestao-planos-treino-pessoais.md):
+  catálogo próprio, referências globais, ativação e clonagem durável.
 
 Fluxos registram sequência, decisões e dados compartilhados, mas referenciam a
 documentação detalhada de endpoints e rotas sem duplicá-la.

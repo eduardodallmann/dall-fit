@@ -3,6 +3,8 @@ import { tv } from '@heroui/styles';
 export const trainingPlanStyles = tv({
   slots: {
     actions: 'flex flex-wrap items-center justify-end gap-2',
+    activeRadio: 'size-4 accent-accent',
+    activeRow: 'bg-accent/5',
     actionTrigger:
       'flex size-8 items-center justify-center rounded-lg outline-none transition-colors hover:bg-default focus-visible:ring-2 focus-visible:ring-focus',
     breadcrumbItem: 'flex items-center gap-2',
@@ -16,6 +18,10 @@ export const trainingPlanStyles = tv({
       'mx-auto flex w-full max-w-md flex-col items-center gap-3 py-10 text-center',
     emptyIcon: 'size-8 text-muted',
     emptyState: 'flex w-full items-center justify-center',
+    exerciseCard:
+      'flex flex-col gap-2 rounded-xl border border-default-200 p-4',
+    exerciseImage: 'h-auto max-h-96 w-full rounded-lg object-contain',
+    exerciseList: 'flex flex-col gap-3',
     fieldError: 'text-sm text-danger',
     form: 'flex flex-col gap-5',
     icon: 'size-4',
@@ -24,6 +30,12 @@ export const trainingPlanStyles = tv({
     inlineEditor: 'flex w-full min-w-0 flex-col gap-2',
     inlineTitleField: 'min-w-0 flex-1',
     inlineTitleRow: 'flex w-full min-w-0 items-start gap-2',
+    libraryItem:
+      'flex flex-col gap-4 rounded-xl border border-default-200 p-4 sm:flex-row sm:items-start sm:justify-between',
+    libraryList: 'flex max-h-[60vh] flex-col gap-3 overflow-y-auto',
+    libraryPreview: 'text-xs leading-5 text-muted',
+    newPlanTrigger:
+      'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-focus',
     page: 'mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6 lg:p-8',
     pageHeader:
       'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',

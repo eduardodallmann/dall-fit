@@ -27,6 +27,82 @@ export interface TrainingPlanSummary extends Entity {
   version: number;
 }
 
+export interface GlobalTrainingPlanUsage {
+  activePeople: number;
+  linkedPeople: number;
+}
+
+export interface GlobalTrainingPlanSummary extends TrainingPlanSummary {
+  usage: GlobalTrainingPlanUsage;
+}
+
+export interface GlobalTrainingPlanDetails extends TrainingPlanDetails {
+  usage: GlobalTrainingPlanUsage;
+}
+
+export interface PersonalOwnedTrainingPlanItem extends TrainingPlanSummary {
+  active: boolean;
+  catalogEntryId: EntityId;
+  itemType: 'training-plan';
+  source: 'owned';
+}
+
+export interface PersonalGlobalReferenceTrainingPlanItem extends TrainingPlanSummary {
+  active: boolean;
+  catalogEntryId: EntityId;
+  itemType: 'training-plan';
+  source: 'global-reference';
+}
+
+export type TrainingPlanCloneJobState =
+  'queued' | 'running' | 'cancelling' | 'failed' | 'start-failed';
+
+export interface TrainingPlanCloneJobItem {
+  cloneJobId: EntityId;
+  completedImages: number;
+  createdAt: Timestamp;
+  generation: number;
+  itemType: 'clone-job';
+  sourceName: string;
+  state: TrainingPlanCloneJobState;
+  totalImages: number | null;
+  updatedAt: Timestamp;
+}
+
+export type PersonalTrainingPlanListItem =
+  | PersonalOwnedTrainingPlanItem
+  | PersonalGlobalReferenceTrainingPlanItem
+  | TrainingPlanCloneJobItem;
+
+export interface PersonalTrainingPlanDetails extends TrainingPlanDetails {
+  active: boolean;
+  catalogEntryId: EntityId;
+  source: 'owned' | 'global-reference';
+}
+
+export interface GlobalTrainingPlanLibraryExercisePreview {
+  id: EntityId;
+  name: string;
+  type: ExerciseType;
+}
+
+export interface GlobalTrainingPlanLibraryWorkoutPreview {
+  exerciseCount: number;
+  exercises: readonly GlobalTrainingPlanLibraryExercisePreview[];
+  hiddenExerciseCount: number;
+  id: EntityId;
+  name: string;
+}
+
+export interface GlobalTrainingPlanLibraryItem extends TrainingPlanSummary {
+  cloneBlocked: boolean;
+  exerciseCount: number;
+  referenced: boolean;
+  hiddenWorkoutCount: number;
+  workouts: readonly GlobalTrainingPlanLibraryWorkoutPreview[];
+  workoutCount: number;
+}
+
 export interface TrainingPlanWorkoutSummary {
   id: EntityId;
   name: string;
@@ -116,4 +192,8 @@ export interface TrainingPlanWorkoutDetails extends Entity {
   version: number;
   trainingPlan: Pick<TrainingPlanSummary, 'id' | 'name'>;
   exercises: readonly Exercise[];
+}
+
+export interface GlobalTrainingPlanWorkoutDetails extends TrainingPlanWorkoutDetails {
+  usage: GlobalTrainingPlanUsage;
 }

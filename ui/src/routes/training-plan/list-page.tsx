@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 
 import type {
   CreateTrainingPlanRequest,
+  GlobalTrainingPlanSummary,
   TrainingPlanSummary,
 } from '@dall-fit/types';
 
@@ -62,7 +63,7 @@ export function TrainingPlanListPage({
   const [formPlan, setFormPlan] = useState<
     TrainingPlanSummary | null | undefined
   >(null);
-  const [deletePlan, setDeletePlan] = useState<TrainingPlanSummary>();
+  const [deletePlan, setDeletePlan] = useState<GlobalTrainingPlanSummary>();
   const currentPage = useRef(page);
   useEffect(() => {
     currentPage.current = page;
@@ -242,7 +243,7 @@ export function TrainingPlanListPage({
   );
   if (query.isLoading || isCorrectingPage) {
     emptyState = (
-      <TrainingPlanTableLoading columnCount={4} label="Carregando planos" />
+      <TrainingPlanTableLoading columnCount={5} label="Carregando planos" />
     );
   } else if (query.isError && query.data === undefined) {
     emptyState = (
@@ -332,6 +333,7 @@ export function TrainingPlanListPage({
                 <Table.Column isRowHeader>Nome</Table.Column>
                 <Table.Column>Descrição</Table.Column>
                 <Table.Column>Atualização</Table.Column>
+                <Table.Column>Uso</Table.Column>
                 <Table.Column>Ações</Table.Column>
               </Table.Header>
               <Table.Body items={rows} renderEmptyState={() => emptyState}>
@@ -369,6 +371,10 @@ export function TrainingPlanListPage({
                       {new Intl.DateTimeFormat('pt-BR').format(
                         new Date(plan.updatedAt),
                       )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {plan.usage.linkedPeople} vinculadas ·{' '}
+                      {plan.usage.activePeople} ativas
                     </Table.Cell>
                     <Table.Cell>
                       <ActionsMenu
@@ -501,7 +507,7 @@ export function TrainingPlanListPage({
         description={
           deletePlan === undefined
             ? ''
-            : `O plano “${deletePlan.name}” e todos os seus treinos serão removidos.`
+            : `O plano “${deletePlan.name}” e todos os seus treinos serão removidos. ${deletePlan.usage.linkedPeople} pessoa(s) vinculada(s), sendo ${deletePlan.usage.activePeople} com este plano ativo, serão impactadas.`
         }
         isWritePaused={aggregate.paused}
         onConfirm={confirmDelete}

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   GlobalTrainingPlanCollectionResponse,
+  GlobalTrainingPlanSummary,
   TrainingPlanSummary,
 } from '@dall-fit/types';
 
@@ -185,7 +186,7 @@ describe('training plan mutations', () => {
   });
 });
 
-function createPlan(id: string, name: string): TrainingPlanSummary {
+function createPlan(id: string, name: string): GlobalTrainingPlanSummary {
   return {
     id,
     name,
@@ -193,6 +194,7 @@ function createPlan(id: string, name: string): TrainingPlanSummary {
     version: 0,
     createdAt: '2026-08-01T12:00:00.000Z',
     updatedAt: '2026-08-01T12:00:00.000Z',
+    usage: { activePeople: 0, linkedPeople: 0 },
   };
 }
 

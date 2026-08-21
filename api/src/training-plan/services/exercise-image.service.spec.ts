@@ -18,9 +18,11 @@ describe('ExerciseImageService', () => {
     const upload = vi
       .fn()
       .mockResolvedValueOnce({
+        etag: 'thumb-etag',
         key: 'exercise-images/thumb.webp',
       })
       .mockResolvedValueOnce({
+        etag: 'display-etag',
         key: 'exercise-images/display.webp',
       });
     const blob = { upload, delete: vi.fn() } as unknown as BlobStorageService;
@@ -36,6 +38,49 @@ describe('ExerciseImageService', () => {
     expect(upload).toHaveBeenCalledTimes(2);
     expect(result.thumbnail).toMatchObject({ width: 80, height: 160 });
     expect(result.display).toMatchObject({ width: 320, height: 640 });
+  });
+
+  it('captures persisted ETags and resolves metadata for legacy variants', async () => {
+    const getMetadata = vi
+      .fn()
+      .mockResolvedValueOnce({ etag: 'legacy-thumbnail-etag' });
+    const service = new ExerciseImageService({
+      getMetadata,
+    } as unknown as BlobStorageService);
+
+    const [exercise] = await service.captureCloneExercises([
+      {
+        bodyArea: 'other',
+        id: 'image-1',
+        image: {
+          display: {
+            etag: 'persisted-display-etag',
+            height: 640,
+            key: 'exercise-images/display.webp',
+            width: 320,
+          },
+          thumbnail: {
+            height: 160,
+            key: 'exercise-images/thumbnail.webp',
+            width: 160,
+          },
+        },
+        name: 'Imagem',
+        repetitions: 12,
+        restSeconds: 60,
+        sets: 3,
+        type: 'image',
+      },
+    ]);
+
+    expect(getMetadata).toHaveBeenCalledOnce();
+    expect(getMetadata).toHaveBeenCalledWith('exercise-images/thumbnail.webp');
+    expect(exercise).toMatchObject({
+      image: {
+        display: { etag: 'persisted-display-etag' },
+        thumbnail: { etag: 'legacy-thumbnail-etag' },
+      },
+    });
   });
 
   it('compensates a partial upload and rejects animated/unsupported input', async () => {

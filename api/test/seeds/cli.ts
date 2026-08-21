@@ -1,11 +1,19 @@
 import 'dotenv/config';
 
-import { connect, disconnect, model, Types } from 'mongoose';
+import { connect, disconnect, model, Types, type Model } from 'mongoose';
 
 import {
   PersonDocument,
   PersonSchema,
 } from '~/person/repositories/person.schema';
+import {
+  PersonalTrainingPlanActiveDocument,
+  PersonalTrainingPlanActiveSchema,
+  PersonalTrainingPlanCatalogDocument,
+  PersonalTrainingPlanCatalogSchema,
+  TrainingPlanCloneJobDocument,
+  TrainingPlanCloneJobSchema,
+} from '~/training-plan/repositories/personal-training-plan.schema';
 import {
   TrainingPlanDocument,
   TrainingPlanSchema,
@@ -23,14 +31,25 @@ const trainingPlanScenarios = [
   'training-plans:workout-editor',
   'training-plans:workout-conflict',
   'training-plans:workout-limits',
+  'personal-training-plans:catalog',
+  'personal-training-plans:reference',
+  'personal-training-plans:clone-job',
 ] as const;
 
-async function main(): Promise<void> {
-  const scenario = process.argv.slice(2).find((argument) => argument !== '--');
-  const environment = process.env.NODE_ENV ?? 'development';
-  const mongodbUri =
-    process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/dall-fit';
+const authScenarios = [
+  'auth:person-admin',
+  'auth:person-existing',
+  'auth:person-legacy',
+  'auth:person-new',
+  'auth:person-theme-dark',
+  'auth:person-theme-light',
+] as const;
 
+function assertSeedCanRun(
+  environment: string,
+  mongodbUri: string,
+  scenario: string | undefined,
+): void {
   if (!['development', 'test'].includes(environment)) {
     throw new Error('Seeds are available only in development and test.');
   }
@@ -40,24 +59,115 @@ async function main(): Promise<void> {
     throw new Error('Seeds require an explicitly local MongoDB host.');
   }
 
-  const authScenarios = [
-    'auth:person-admin',
-    'auth:person-existing',
-    'auth:person-legacy',
-    'auth:person-new',
-    'auth:person-theme-dark',
-    'auth:person-theme-light',
+  const knownScenarios: readonly string[] = [
+    ...authScenarios,
+    ...trainingPlanScenarios,
   ];
-  if (
-    !authScenarios.includes(scenario ?? '') &&
-    !trainingPlanScenarios.includes(
-      (scenario ?? '') as (typeof trainingPlanScenarios)[number],
-    )
-  ) {
-    throw new Error(
-      `Unknown seed. Use ${[...authScenarios, ...trainingPlanScenarios].join(', ')}.`,
-    );
+  if (!knownScenarios.includes(scenario ?? '')) {
+    throw new Error(`Unknown seed. Use ${knownScenarios.join(', ')}.`);
   }
+}
+
+async function seedAuthenticationScenario(
+  personModel: Model<PersonDocument>,
+  scenario: string | undefined,
+): Promise<boolean> {
+  if (scenario === 'auth:person-new') {
+    await personModel.deleteMany({ googleSubject: 'google-new-001' }).exec();
+    return true;
+  }
+
+  if (scenario === 'auth:person-admin') {
+    await personModel
+      .findOneAndUpdate(
+        { googleSubject: 'google-admin-001' },
+        {
+          $set: {
+            email: 'admin.runner@example.test',
+            isAdmin: true,
+            name: 'Admin Runner',
+            photoUrl: 'https://example.test/admin-avatar.png',
+          },
+        },
+        { new: true, setDefaultsOnInsert: true, upsert: true },
+      )
+      .exec();
+    return true;
+  }
+
+  if (scenario === 'auth:person-existing') {
+    await personModel
+      .findOneAndUpdate(
+        { googleSubject: 'google-existing-001' },
+        {
+          $set: {
+            email: 'taylor.fit@example.test',
+            name: 'Taylor Fit',
+            photoUrl: 'https://example.test/avatar.png',
+          },
+          $unset: { configs: 1, isAdmin: 1 },
+        },
+        { new: true, setDefaultsOnInsert: true, upsert: true },
+      )
+      .exec();
+    return true;
+  }
+
+  if (
+    scenario === 'auth:person-theme-dark' ||
+    scenario === 'auth:person-theme-light'
+  ) {
+    const isDark = scenario === 'auth:person-theme-dark';
+    await personModel
+      .findOneAndUpdate(
+        {
+          googleSubject: isDark
+            ? 'google-theme-dark-001'
+            : 'google-theme-light-001',
+        },
+        {
+          $set: {
+            configs: { theme: isDark ? 'dark' : 'light' },
+            email: 'theme.runner@example.test',
+            name: 'Theme Runner',
+            photoUrl: null,
+          },
+          $unset: { isAdmin: 1 },
+        },
+        { new: true, setDefaultsOnInsert: true, upsert: true },
+      )
+      .exec();
+    return true;
+  }
+
+  if (scenario === 'auth:person-legacy') {
+    await personModel
+      .findOneAndUpdate(
+        { googleSubject: 'google-legacy-001' },
+        {
+          $set: {
+            email: 'legacy.runner@example.test',
+            name: 'Legacy Runner',
+            photoUrl: null,
+          },
+          $unset: { configs: 1, isAdmin: 1 },
+        },
+        { new: true, setDefaultsOnInsert: true, upsert: true },
+      )
+      .exec();
+    return true;
+  }
+
+  return false;
+}
+
+async function main(): Promise<void> {
+  const scenario = process.argv.slice(2).find((argument) => argument !== '--');
+  const environment = process.env.NODE_ENV ?? 'development';
+  const mongodbUri =
+    process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/dall-fit';
+
+  assertSeedCanRun(environment, mongodbUri, scenario);
 
   await connect(mongodbUri);
 
@@ -67,79 +177,20 @@ async function main(): Promise<void> {
       TrainingPlanDocument.name,
       TrainingPlanSchema,
     );
+    const catalogModel = model(
+      PersonalTrainingPlanCatalogDocument.name,
+      PersonalTrainingPlanCatalogSchema,
+    );
+    const activeModel = model(
+      PersonalTrainingPlanActiveDocument.name,
+      PersonalTrainingPlanActiveSchema,
+    );
+    const cloneJobModel = model(
+      TrainingPlanCloneJobDocument.name,
+      TrainingPlanCloneJobSchema,
+    );
 
-    if (scenario === 'auth:person-new') {
-      await personModel.deleteMany({ googleSubject: 'google-new-001' }).exec();
-    } else if (scenario === 'auth:person-admin') {
-      await personModel
-        .findOneAndUpdate(
-          { googleSubject: 'google-admin-001' },
-          {
-            $set: {
-              email: 'admin.runner@example.test',
-              isAdmin: true,
-              name: 'Admin Runner',
-              photoUrl: 'https://example.test/admin-avatar.png',
-            },
-          },
-          { new: true, setDefaultsOnInsert: true, upsert: true },
-        )
-        .exec();
-    } else if (scenario === 'auth:person-existing') {
-      await personModel
-        .findOneAndUpdate(
-          { googleSubject: 'google-existing-001' },
-          {
-            $set: {
-              email: 'taylor.fit@example.test',
-              name: 'Taylor Fit',
-              photoUrl: 'https://example.test/avatar.png',
-            },
-            $unset: { configs: 1, isAdmin: 1 },
-          },
-          { new: true, setDefaultsOnInsert: true, upsert: true },
-        )
-        .exec();
-    } else if (
-      scenario === 'auth:person-theme-dark' ||
-      scenario === 'auth:person-theme-light'
-    ) {
-      const isDark = scenario === 'auth:person-theme-dark';
-      await personModel
-        .findOneAndUpdate(
-          {
-            googleSubject: isDark
-              ? 'google-theme-dark-001'
-              : 'google-theme-light-001',
-          },
-          {
-            $set: {
-              configs: { theme: isDark ? 'dark' : 'light' },
-              email: 'theme.runner@example.test',
-              name: 'Theme Runner',
-              photoUrl: null,
-            },
-            $unset: { isAdmin: 1 },
-          },
-          { new: true, setDefaultsOnInsert: true, upsert: true },
-        )
-        .exec();
-    } else if (scenario === 'auth:person-legacy') {
-      await personModel
-        .findOneAndUpdate(
-          { googleSubject: 'google-legacy-001' },
-          {
-            $set: {
-              email: 'legacy.runner@example.test',
-              name: 'Legacy Runner',
-              photoUrl: null,
-            },
-            $unset: { configs: 1, isAdmin: 1 },
-          },
-          { new: true, setDefaultsOnInsert: true, upsert: true },
-        )
-        .exec();
-    } else {
+    if (!(await seedAuthenticationScenario(personModel, scenario))) {
       await personModel
         .findOneAndUpdate(
           { googleSubject: 'google-admin-001' },
@@ -224,6 +275,71 @@ async function main(): Promise<void> {
           workouts: [],
         },
       ]);
+      if (scenario?.startsWith('personal-training-plans:')) {
+        const personId = new Types.ObjectId('64b000000000000000000003');
+        const ownedEntryId = new Types.ObjectId('74b000000000000000000001');
+        const referenceEntryId = new Types.ObjectId('74b000000000000000000002');
+        await personModel
+          .findOneAndUpdate(
+            { _id: personId },
+            {
+              $set: {
+                email: 'regular.runner@example.test',
+                googleSubject: 'google-person-001',
+                name: 'Regular Runner',
+                photoUrl: null,
+              },
+              $unset: { isAdmin: 1 },
+            },
+            { new: true, setDefaultsOnInsert: true, upsert: true },
+          )
+          .exec();
+        await Promise.all([
+          catalogModel.deleteMany({ personId }).exec(),
+          activeModel.deleteMany({ personId }).exec(),
+          cloneJobModel.deleteMany({ personId }).exec(),
+        ]);
+        await catalogModel.create([
+          {
+            _id: ownedEntryId,
+            globalTrainingPlanId: null,
+            kind: 'owned',
+            personId,
+            trainingPlanId: personalPlanId,
+          },
+          {
+            _id: referenceEntryId,
+            globalTrainingPlanId: planId,
+            kind: 'global-reference',
+            personId,
+            trainingPlanId: null,
+          },
+        ]);
+        if (scenario === 'personal-training-plans:reference')
+          await activeModel.create({
+            catalogEntryId: referenceEntryId,
+            personId,
+          });
+        if (scenario === 'personal-training-plans:clone-job')
+          await cloneJobModel.create({
+            _id: new Types.ObjectId('84b000000000000000000001'),
+            completedImages: 0,
+            deduplicationKey: `${personId.toString()}:${planId.toString()}`,
+            generation: 1,
+            globalTrainingPlanId: planId,
+            personId,
+            snapshot: {
+              description: 'Plano estável para clonar.',
+              name: 'Plano global de exemplo',
+              sourceTrainingPlanId: planId.toString(),
+              sourceVersion: 0,
+              workouts: [],
+            },
+            sourceName: 'Plano global de exemplo',
+            state: 'failed',
+            totalImages: 0,
+          });
+      }
     }
 
     process.stdout.write(`Seed ${scenario} prepared.\n`);

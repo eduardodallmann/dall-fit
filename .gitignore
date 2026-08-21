@@ -23,6 +23,7 @@ api/.data/
 test-results
 playwright-report
 vitest-report
+.workflow-vitest
 
 # Editors and operating systems
 .idea

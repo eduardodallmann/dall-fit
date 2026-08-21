@@ -118,3 +118,20 @@ esteja sendo iniciado isoladamente.
 - [ ] Produtor e consumidores foram atualizados atomicamente
 - [ ] Testes e documentação de endpoint/rota/fluxo foram atualizados
 - [ ] Typecheck, testes, cobertura e build passaram
+
+## Planos pessoais e clonagem
+
+O catálogo pessoal usa a união discriminada `PersonalTrainingPlanListItem`:
+
+- `itemType: training-plan` identifica uma entrada `owned` ou
+  `global-reference`, inclui `catalogEntryId` e o radio `active`;
+- `itemType: clone-job` identifica somente uma operação ainda visível, com
+  estado, geração e progresso de imagens; não é um plano navegável;
+- resumos e detalhes globais incluem `GlobalTrainingPlanUsage`, com pessoas
+  vinculadas e pessoas que mantêm a referência ativa;
+- a biblioteca global expõe previews limitados e os flags `referenced` e
+  `cloneBlocked` sem entregar árvores completas.
+
+O bridge API→Workflow tem envelope v1 mínimo, composto exclusivamente por
+`cloneJobId` e `generation`. Snapshot, pessoa e conteúdo nunca atravessam esse
+request; o Workflow os lê no MongoDB.

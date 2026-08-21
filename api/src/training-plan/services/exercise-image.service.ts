@@ -4,6 +4,10 @@ import sharp from 'sharp';
 import type { Exercise, ExerciseImage } from '@dall-fit/types';
 
 import type {
+  CloneSnapshotExercise,
+  CloneSnapshotImage,
+} from '~/training-plan/domain/personal-training-plan.entity';
+import type {
   StoredExercise,
   StoredExerciseImage,
   UploadedImageFile,
@@ -224,6 +228,50 @@ export class ExerciseImageService {
     return result;
   }
 
+  async captureCloneExercises(
+    exercises: readonly StoredExercise[],
+  ): Promise<readonly CloneSnapshotExercise[]> {
+    this.logger.log(
+      'ExerciseImageService -> captureCloneExercises -> params:',
+      {
+        params: { count: exercises.length },
+      },
+    );
+    const result = new Array<CloneSnapshotExercise>(exercises.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(IMAGE_HYDRATION_CONCURRENCY, exercises.length);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (nextIndex < exercises.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const exercise = exercises[index];
+        if (exercise === undefined) continue;
+        if (exercise.type !== 'image') {
+          result[index] = exercise;
+          continue;
+        }
+        if (exercise.image === null) {
+          result[index] = { ...exercise, image: null };
+          continue;
+        }
+        const image = await this.captureCloneImage(exercise.image);
+        result[index] = { ...exercise, image };
+      }
+    });
+    await Promise.all(workers);
+    this.logger.log(
+      'ExerciseImageService -> captureCloneExercises -> workers completed:',
+      { data: { count: result.length, workers: workerCount } },
+    );
+    this.logger.log(
+      'ExerciseImageService -> captureCloneExercises -> return:',
+      {
+        data: { count: result.length },
+      },
+    );
+    return result;
+  }
+
   async deleteImages(images: readonly StoredExerciseImage[]): Promise<void> {
     this.logger.log('ExerciseImageService -> deleteImages -> params:', {
       params: { count: images.length },
@@ -240,6 +288,30 @@ export class ExerciseImageService {
     this.logger.log('ExerciseImageService -> deleteImages -> completed:', {
       data: { count: keys.length },
     });
+  }
+
+  private async captureCloneImage(
+    image: StoredExerciseImage,
+  ): Promise<CloneSnapshotImage> {
+    this.logger.log('ExerciseImageService -> captureCloneImage -> params:', {
+      params: { variants: 2 },
+    });
+    const [thumbnailMetadata, displayMetadata] = await Promise.all([
+      image.thumbnail.etag === undefined
+        ? this.blobStorageService.getMetadata(image.thumbnail.key)
+        : { etag: image.thumbnail.etag },
+      image.display.etag === undefined
+        ? this.blobStorageService.getMetadata(image.display.key)
+        : { etag: image.display.etag },
+    ]);
+    const result = {
+      display: { ...image.display, etag: displayMetadata.etag },
+      thumbnail: { ...image.thumbnail, etag: thumbnailMetadata.etag },
+    };
+    this.logger.log('ExerciseImageService -> captureCloneImage -> return:', {
+      data: { variants: 2 },
+    });
+    return result;
   }
 
   async deleteKeysSafely(keys: readonly string[]): Promise<void> {

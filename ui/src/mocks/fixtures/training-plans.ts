@@ -1,6 +1,6 @@
 import type {
   GlobalTrainingPlanCollectionResponse,
-  TrainingPlanDetails,
+  GlobalTrainingPlanDetails,
   TrainingPlanSummary,
   TrainingPlanWorkoutDetails,
 } from '@dall-fit/types';
@@ -43,7 +43,7 @@ export const largeTrainingPlanFixtures: readonly TrainingPlanSummary[] =
     };
   });
 
-export const trainingPlanDetailFixture: TrainingPlanDetails = {
+export const trainingPlanDetailFixture: GlobalTrainingPlanDetails = {
   ...trainingPlanFixtures[0],
   workouts: [
     {
@@ -57,6 +57,7 @@ export const trainingPlanDetailFixture: TrainingPlanDetails = {
       name: 'Treino B',
     },
   ],
+  usage: { activePeople: 2, linkedPeople: 4 },
 };
 
 export const trainingPlanWorkoutFixture: TrainingPlanWorkoutDetails = {
@@ -114,7 +115,10 @@ export function trainingPlanCollectionFixture(
 ): GlobalTrainingPlanCollectionResponse {
   const pageSize = 20;
   const result = {
-    data: plans.slice((page - 1) * pageSize, page * pageSize),
+    data: plans.slice((page - 1) * pageSize, page * pageSize).map((plan) => ({
+      ...plan,
+      usage: { activePeople: 0, linkedPeople: 0 },
+    })),
     page,
     pageSize,
     total: plans.length,

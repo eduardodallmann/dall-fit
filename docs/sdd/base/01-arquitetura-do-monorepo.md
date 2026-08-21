@@ -9,6 +9,7 @@ pacotes internos compartilhados.
 dall-fit/
 ├── api/                 # backend NestJS
 ├── ui/                  # frontend React + Vite
+├── workflow/            # executor Nitro + Vercel Workflow
 ├── packages/
 │   └── types/           # contratos TypeScript compartilhados
 ├── eslint/              # configurações comuns e específicas de lint
@@ -21,18 +22,25 @@ dall-fit/
   e contratos HTTP.
 - `ui/` possui apresentação, interação, acessibilidade, navegação e estado do
   cliente.
+- `workflow/` é uma aplicação Vercel independente. Recebe somente comandos
+  internos assinados da API, executa a clonagem durável de planos e acessa
+  diretamente o MongoDB e o mesmo store Blob por OIDC.
 - `packages/types/` possui somente estruturas estáveis necessárias nos dois lados:
   requests, responses, entidades, identificadores e enums.
 - a raiz orquestra dependências, lint, typecheck, testes, cobertura e build.
 
 ## Regras de dependência
 
-1. `api` e `ui` podem depender de `@dall-fit/types`.
+1. `api` e `ui` podem depender de `@dall-fit/types`; `workflow` usa seus contratos
+   internos persistidos e não importa código do Nest.
 2. `api` não importa arquivos de `ui`, e `ui` não importa arquivos de `api`.
 3. `packages/types` não depende de nenhuma aplicação nem contém infraestrutura.
 4. Código compartilhado que possua comportamento de runtime não deve ser colocado
    automaticamente em `types`; ele exige pacote próprio e, quando relevante, ADR.
 5. Cada aplicação mantém configuração e suíte de testes próprias.
+6. API e Workflow se comunicam por HTTPS assinado com HMAC. A API resolve o host
+   do Related Project na Vercel e nunca chama funções internas do Workflow por
+   import ou execução no mesmo processo.
 
 ## Convenções de importação
 

@@ -1,0 +1,36 @@
+{
+  "name": "dall-fit-workflow",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nitro build --preset vercel",
+    "dev": "nitro dev --port 5000",
+    "lint": "pnpm --dir .. exec eslint workflow",
+    "lint:fix": "pnpm --dir .. exec eslint workflow --fix",
+    "preview": "node .output/server/index.mjs",
+    "sonar": "dotenv -e ../.env -- sh -c 'test -n \"$SONAR_TOKEN\" || { echo \"Error: SONAR_TOKEN is required. See docs/sdd/base/02-workspace-e-qualidade.md\"; exit 1; }; pnpm test:coverage:ci && sonar-scanner-npm'",
+    "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
+    "test:coverage:ci": "vitest run --config vitest.config.ts --coverage --reporter=default --reporter=junit --outputFile.junit=coverage/junit.xml",
+    "test:watch": "vitest --config vitest.config.ts",
+    "test:workflow": "vitest run --config vitest.workflow.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.7.0",
+    "consola": "3.4.2",
+    "h3": "1.15.11",
+    "mongodb": "7.5.0",
+    "nitropack": "2.13.4",
+    "workflow": "4.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@vitest/coverage-v8": "4.1.10",
+    "@workflow/vitest": "4.0.20",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  }
+}

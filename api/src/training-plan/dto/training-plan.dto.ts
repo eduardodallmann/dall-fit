@@ -44,6 +44,36 @@ export class TrainingPlanParamsDto {
   trainingPlanId!: string;
 }
 
+export class PersonalTrainingPlanParamsDto {
+  @IsMongoId()
+  catalogEntryId!: string;
+}
+
+export class PersonalTrainingPlanWorkoutParamsDto extends PersonalTrainingPlanParamsDto {
+  @IsMongoId()
+  workoutId!: string;
+}
+
+export class PersonalTrainingPlanExerciseParamsDto extends PersonalTrainingPlanWorkoutParamsDto {
+  @IsMongoId()
+  exerciseId!: string;
+}
+
+export class CreateGlobalTrainingPlanReferenceDto {
+  @IsMongoId()
+  globalTrainingPlanId!: string;
+}
+
+export class ActivatePersonalTrainingPlanDto {
+  @IsMongoId()
+  catalogEntryId!: string;
+}
+
+export class TrainingPlanCloneJobParamsDto {
+  @IsMongoId()
+  cloneJobId!: string;
+}
+
 export class TrainingPlanWorkoutParamsDto extends TrainingPlanParamsDto {
   @IsMongoId()
   workoutId!: string;
