@@ -38,17 +38,26 @@ falha do CAS faz uma inspeção projetada para distinguir not-found de `412`. A
 listagem tem page máxima 100, ordem
 `createdAt/_id` decrescente e warning único a partir de 1600 globais.
 
+O mesmo módulo possui duas fronteiras HTTP: `/global/training-plans` deriva escopo
+administrativo e `/training-plans` deriva a pessoa da sessão. Árvores próprias
+continuam em `training_plans`; catálogo, seleção opcional e jobs usam coleções
+separadas. Uma referência resolve o global vivo e nunca aceita mutations. A API
+persiste snapshot/job antes de iniciar, por HTTP HMAC, o projeto Nitro documentado
+em `workflow/docs/sdd`; timeout ambíguo deixa o job recuperável.
+
 `YoutubeReferenceService` normaliza allowlist e consulta apenas o thumbnail do host
 fixo. `ExerciseImageService` valida até 10 MiB/40 MP, rejeita animação, remove
 metadata e gera WebP 160x160 e 1080x1920 sem ampliação. `BlobStorageService`
 encapsula `@vercel/blob` no store privado identificado pelo valor opaco de
 `BLOB_STORE_ID`. Produção/Preview usam OIDC gerenciado pela Vercel; a aplicação não
 recebe nem passa `BLOB_READ_WRITE_TOKEN`, não deriva hostname do ID e não configura
-uma URL paralela. `put` usa `access: 'private'`; `del` e `list` selecionam o mesmo
-store por OIDC.
+uma URL paralela. `put` usa `access: 'private'`; `head`, `del` e `list` selecionam
+o mesmo store por OIDC.
 
-MongoDB persiste somente pathname/key e dimensões. Depois da autorização da
-request, `ExerciseImageService` emite um delegation token por pathname exato com
+MongoDB persiste somente pathname/key, dimensões e o ETag opaco recebido no
+upload. Imagens legadas sem esse campo têm o ETag resolvido por `head` ao iniciar
+uma clonagem, com a mesma concorrência limitada da hidratação. Depois da
+autorização da request, `ExerciseImageService` emite um delegation token por pathname exato com
 `issueSignedToken`, operação `get` e validade de quinze minutos, e o converte com
 `presignUrl` privado e cache do Blob. As duas variantes compartilham a expiração;
 a hidratação limita-se a quatro imagens simultâneas, no máximo oito emissões. Token,

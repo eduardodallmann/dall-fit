@@ -1,5 +1,9 @@
 # Rota `/global/training-plan/:trainingPlanId`
 
+O cabeçalho administrativo exibe `Pessoas vinculadas` e `Planos ativos` do global,
+atualizados por invalidação. São dados informativos: edição e exclusão de workouts
+continuam disponíveis mesmo com impacto pessoal.
+
 ## Objetivo funcional
 
 - Problema resolvido: identificar um plano, editá-lo e manter seus treinos.

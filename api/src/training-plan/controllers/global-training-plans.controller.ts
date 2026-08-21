@@ -24,8 +24,8 @@ import type {
   CreateTrainingPlanResponse,
   CreateTrainingPlanWorkoutResponse,
   GlobalTrainingPlanCollectionResponse,
-  TrainingPlanDetailsResponse,
-  TrainingPlanWorkoutDetailsResponse,
+  GlobalTrainingPlanDetailsResponse,
+  GlobalTrainingPlanWorkoutDetailsResponse,
   UpdateExerciseImageResponse,
   UpdateExerciseResponse,
   UpdateTrainingPlanResponse,
@@ -126,7 +126,7 @@ export class GlobalTrainingPlansController {
   async get(
     @Param() params: TrainingPlanParamsDto,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<TrainingPlanDetailsResponse> {
+  ): Promise<GlobalTrainingPlanDetailsResponse> {
     const result = await this.getCommand.execute(params.trainingPlanId);
     this.setResourceVersion(response, result.data.version);
     return result;
@@ -200,7 +200,7 @@ export class GlobalTrainingPlansController {
   async getWorkout(
     @Param() params: TrainingPlanWorkoutParamsDto,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<TrainingPlanWorkoutDetailsResponse> {
+  ): Promise<GlobalTrainingPlanWorkoutDetailsResponse> {
     const result = await this.getWorkoutCommand.execute(
       params.trainingPlanId,
       params.workoutId,

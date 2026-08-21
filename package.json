@@ -9,18 +9,18 @@
     "version": "8.0.12"
   },
   "scripts": {
-    "build": "pnpm -C packages/types build && pnpm -C api build && pnpm -C ui build",
-    "dev": "pnpm --recursive --parallel --stream --filter dall-fit-api --filter dall-fit-app run dev",
+    "build": "pnpm -C packages/types build && pnpm -C api build && pnpm -C workflow build && pnpm -C ui build",
+    "dev": "pnpm --recursive --parallel --stream --filter dall-fit-api --filter dall-fit-workflow --filter dall-fit-app run dev",
     "format": "prettier --write .",
     "lint": "pnpm typecheck && eslint .",
     "lint:fix": "pnpm format && pnpm typecheck && eslint . --fix",
-    "sonar": "pnpm -C packages/types sonar && pnpm -C api sonar && pnpm -C ui sonar",
+    "sonar": "pnpm -C packages/types sonar && pnpm -C api sonar && pnpm -C workflow sonar && pnpm -C ui sonar",
     "sonar:issues": "dotenv -e .env -- node scripts/sonar-issues.mjs",
-    "test": "pnpm -C packages/types build && pnpm -C api test && pnpm -C ui test",
-    "test:coverage": "pnpm -C packages/types build && pnpm -C api test:coverage && pnpm -C ui test:coverage",
-    "test:coverage:ci": "pnpm -C packages/types build && pnpm -C api test:coverage:ci && pnpm -C ui test:coverage:ci",
+    "test": "pnpm -C packages/types build && pnpm -C api test && pnpm -C workflow test && pnpm -C workflow test:workflow && pnpm -C ui test",
+    "test:coverage": "pnpm -C packages/types build && pnpm -C api test:coverage && pnpm -C workflow test:coverage && pnpm -C ui test:coverage",
+    "test:coverage:ci": "pnpm -C packages/types build && pnpm -C api test:coverage:ci && pnpm -C workflow test:coverage:ci && pnpm -C workflow test:workflow && pnpm -C ui test:coverage:ci",
     "test:integration": "pnpm -C ui test:integration",
-    "typecheck": "pnpm -C packages/types build && pnpm -C api typecheck && pnpm -C ui typecheck"
+    "typecheck": "pnpm -C packages/types build && pnpm -C api typecheck && pnpm -C workflow typecheck && pnpm -C ui typecheck"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

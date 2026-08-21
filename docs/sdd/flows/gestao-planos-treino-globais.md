@@ -7,6 +7,8 @@
 Uma pessoa com `isAdmin: true` mantém planos globais, seus treinos e uma lista
 ordenada de exercícios tipados. A jornada termina no editor real, com autosave,
 concorrência explícita e mídia processada pela API.
+Lista, detalhe e workout também mostram o impacto atual em referências pessoais e
+seleções ativas, sem transformar essas métricas em bloqueio administrativo.
 
 ## Entrada e proteção
 
@@ -33,6 +35,8 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
    da consulta. A janela visual possui no máximo sete posições com primeira,
    última, vizinhança e elipses. Se o total revelar página excedente, a rota usa
    `replace` para consultar a última página sem apresentar vazio incoerente.
+   Cada linha mostra vinculadas/ativas na mesma coluna de impacto. A confirmação
+   de exclusão repete os números e alerta que pessoas podem ficar sem ativo.
 2. Formulários inline/modais e confirmações permanecem durante pending e falha,
    preservam draft e fecham somente após sucesso. Criação de treino aguarda o ID
    real antes de navegar. Lista/detalhe carregam e conservam `version`; toda mutação
@@ -86,6 +90,9 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
     efetivas publicam invalidações via Redis para outras abas, dispositivos,
     pessoas e runtimes. Lista, detalhe e workout reconciliam por HTTP; todo
     `realtime-ready` também invalida queries para recuperar perdas.
+11. Excluir um global permanece permitido com qualquer impacto: a API limpa
+    referências e seleções sem fallback. Jobs já persistidos continuam pelo
+    snapshot e suas keys de origem ficam retidas até o estado terminal.
 
 ## Concorrência e falhas
 

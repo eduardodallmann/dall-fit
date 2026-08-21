@@ -31,7 +31,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(
       page
         .getByRole('navigation', { name: 'Navegação principal' })
-        .getByRole('link', { name: 'Planos de treino', exact: true }),
+        .getByRole('link', { name: 'Planos globais', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('Página 1 de 2')).toBeVisible();
   });

@@ -8,12 +8,16 @@ import type {
 } from '@dall-fit/types';
 
 import { trainingPlanKeys } from '~/routes/training-plan/training-plan-queries';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import type {
+  MockTrainingPlansScenario,
+  TrainingPlanResource,
+} from '~/routes/training-plan/training-plan-service';
 
 interface WorkoutCacheTarget {
   mockScenario: MockTrainingPlansScenario;
   trainingPlanId: string;
   workoutId: string;
+  resource?: TrainingPlanResource;
 }
 
 interface WorkoutCacheMutation extends WorkoutCacheTarget {
@@ -44,15 +48,18 @@ export function synchronizeWorkoutMutation(
     updateWorkout,
     version,
     workoutId,
+    resource = 'global',
   }: WorkoutCacheMutation,
 ): void {
   queryClient.setQueryData<TrainingPlanWorkoutDetails>(
-    trainingPlanKeys.workout(trainingPlanId, workoutId, mockScenario),
+    trainingPlanKeys.workout(trainingPlanId, workoutId, mockScenario, resource),
     (current) =>
       current === undefined ? current : { ...updateWorkout(current), version },
   );
   queryClient.setQueryData<TrainingPlanDetails>(
-    trainingPlanKeys.detail(trainingPlanId, mockScenario),
+    resource === 'personal'
+      ? trainingPlanKeys.personalDetail(trainingPlanId, mockScenario)
+      : trainingPlanKeys.detail(trainingPlanId, mockScenario),
     (current) => {
       if (current === undefined) return current;
       const synchronized = updateDetail?.(current) ?? current;

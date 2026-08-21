@@ -11,6 +11,7 @@ import { UpdateGlobalTrainingPlanCommand } from '~/training-plan/commands/update
 import { UploadTrainingPlanExerciseImageCommand } from '~/training-plan/commands/upload-training-plan-exercise-image.command';
 import type { TrainingPlanEntity } from '~/training-plan/domain/training-plan.entity';
 import type { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
+import type { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import type { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 
 const plan: TrainingPlanEntity = {
@@ -59,14 +60,31 @@ function createImageServiceMock() {
   return result as typeof result & ExerciseImageService;
 }
 
+function createPersonalServiceMock() {
+  const result = {
+    cleanupGlobalReferences: vi.fn(),
+    retainedSourceImageKeys: vi.fn(),
+    usageForGlobal: vi.fn().mockResolvedValue({
+      activePeople: 0,
+      linkedPeople: 0,
+    }),
+    usageForGlobals: vi.fn().mockResolvedValue(new Map()),
+  };
+
+  return result as typeof result & PersonalTrainingPlanService;
+}
+
 describe('training plan commands', () => {
   it('maps the list service result to the fixed collection contract', async () => {
     const service = createServiceMock();
     service.listGlobal.mockResolvedValue({ data: [plan], total: 1 });
-    const command = new ListGlobalTrainingPlansCommand(service);
+    const command = new ListGlobalTrainingPlansCommand(
+      service,
+      createPersonalServiceMock(),
+    );
 
     await expect(command.execute(2)).resolves.toEqual({
-      data: [plan],
+      data: [{ ...plan, usage: { activePeople: 0, linkedPeople: 0 } }],
       page: 2,
       pageSize: 20,
       total: 1,
@@ -91,7 +109,10 @@ describe('training plan commands', () => {
   it('maps the projected detail', async () => {
     const service = createServiceMock();
     service.getGlobal.mockResolvedValue(plan);
-    const command = new GetGlobalTrainingPlanCommand(service);
+    const command = new GetGlobalTrainingPlanCommand(
+      service,
+      createPersonalServiceMock(),
+    );
 
     const result = await command.execute(plan.id);
 
@@ -103,6 +124,7 @@ describe('training plan commands', () => {
       workouts: plan.workouts,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
+      usage: { activePeople: 0, linkedPeople: 0 },
     });
   });
 
@@ -118,12 +140,17 @@ describe('training plan commands', () => {
 
   it('waits for plan deletion', async () => {
     const service = createServiceMock();
+    const personalService = createPersonalServiceMock();
     service.deleteGlobal.mockResolvedValue(undefined);
-    const command = new DeleteGlobalTrainingPlanCommand(service);
+    personalService.retainedSourceImageKeys.mockResolvedValue(new Set());
+    const command = new DeleteGlobalTrainingPlanCommand(
+      service,
+      personalService,
+    );
 
     await command.execute(plan.id, 2);
 
-    expect(service.deleteGlobal.mock.calls).toEqual([[plan.id, 2]]);
+    expect(service.deleteGlobal.mock.calls).toEqual([[plan.id, 2, new Set()]]);
   });
 
   it('wraps the workout created by the service', async () => {
@@ -168,7 +195,11 @@ describe('training plan commands', () => {
     };
     service.getWorkout.mockResolvedValue(workout);
     imageService.hydrateExercises.mockResolvedValue(workout.exercises);
-    const command = new GetTrainingPlanWorkoutCommand(service, imageService);
+    const command = new GetTrainingPlanWorkoutCommand(
+      service,
+      imageService,
+      createPersonalServiceMock(),
+    );
 
     const result = await command.execute(plan.id, workout.id);
 

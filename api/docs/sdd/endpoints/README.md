@@ -20,6 +20,10 @@ somente quando constituir requisito funcional excepcional.
 - [`Autenticação`](auth.md): início/callback Google e bypass restrito local/teste.
 - [`GET /auth/me`](current-person.md): pessoa vinculada à sessão.
 - [`Probes operacionais`](operational.md): liveness e readiness de MongoDB/Redis.
-- [`Planos de treino globais`](global-training-plans.md): sete operações
-  administrativas de planos e workouts.
+- [`Planos de treino globais`](global-training-plans.md): operações
+  administrativas, editor e métricas de impacto.
+- [`Planos de treino pessoais`](personal-training-plans.md): catálogo, referência,
+  ativação e editor próprio.
+- [`Jobs de clonagem`](training-plan-clone-jobs.md): start, retry e cancelamento
+  durável.
 - [`GET /realtime/events`](realtime-events.md): stream autenticado de invalidações.

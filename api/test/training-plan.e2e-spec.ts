@@ -20,11 +20,18 @@ import {
 
 import type {
   GlobalTrainingPlanCollectionResponse,
+  GlobalTrainingPlanLibraryResponse,
   TrainingPlanDetailsResponse,
 } from '@dall-fit/types';
 
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
+import { TrainingPlanCloneStarter } from '~/training-plan/adapters/training-plan-clone-starter';
+import {
+  PersonalTrainingPlanActiveDocument,
+  PersonalTrainingPlanCatalogDocument,
+  TrainingPlanCloneJobDocument,
+} from '~/training-plan/repositories/personal-training-plan.schema';
 import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan.schema';
 import { BlobStorageService } from '~/training-plan/services/blob-storage.service';
 import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
@@ -43,6 +50,9 @@ const testBypassKey = 'e2e-training-test-key-with-at-least-32-random-bytes';
 describe('Global training plans (e2e)', () => {
   let app: INestApplication<App>;
   let mongoServer: MongoMemoryServer;
+  let activeModel: Model<PersonalTrainingPlanActiveDocument>;
+  let catalogModel: Model<PersonalTrainingPlanCatalogDocument>;
+  let cloneJobModel: Model<TrainingPlanCloneJobDocument>;
   let personModel: Model<PersonDocument>;
   let redisClient: Redis;
   let redisServer: RedisMemoryServer;
@@ -59,18 +69,22 @@ describe('Global training plans (e2e)', () => {
       deletedBlobKeys.push([...keys]);
       return Promise.resolve();
     }),
+    getMetadata: vi.fn((pathname: string) =>
+      Promise.resolve({ etag: `etag:${pathname}` }),
+    ),
     listExerciseKeys: vi.fn((): Promise<readonly string[]> =>
       Promise.resolve([]),
     ),
     upload: vi.fn((pathname: string, content: Buffer) => {
       const key = `${pathname.replace('.webp', '')}-${uploadedBlobs.length + 1}.webp`;
       uploadedBlobs.push({ content, key });
-      return Promise.resolve({ key });
+      return Promise.resolve({ etag: `etag:${key}`, key });
     }),
   };
   const youtubeReference = {
     normalizeAndValidate: vi.fn(() => Promise.resolve('ZA8gs8XP2bs')),
   };
+  const cloneStarter = { start: vi.fn(() => Promise.resolve()) };
   const csrfTokens = new WeakMap<ReturnType<typeof request.agent>, string>();
 
   beforeAll(async () => {
@@ -99,6 +113,8 @@ describe('Global training plans (e2e)', () => {
       .useValue(blobStorage)
       .overrideProvider(YoutubeReferenceService)
       .useValue(youtubeReference)
+      .overrideProvider(TrainingPlanCloneStarter)
+      .useValue(cloneStarter)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -108,12 +124,24 @@ describe('Global training plans (e2e)', () => {
     personModel = app.get<Model<PersonDocument>>(
       getModelToken(PersonDocument.name),
     );
+    activeModel = app.get<Model<PersonalTrainingPlanActiveDocument>>(
+      getModelToken(PersonalTrainingPlanActiveDocument.name),
+    );
+    catalogModel = app.get<Model<PersonalTrainingPlanCatalogDocument>>(
+      getModelToken(PersonalTrainingPlanCatalogDocument.name),
+    );
+    cloneJobModel = app.get<Model<TrainingPlanCloneJobDocument>>(
+      getModelToken(TrainingPlanCloneJobDocument.name),
+    );
     trainingPlanModel = app.get<Model<TrainingPlanDocument>>(
       getModelToken(TrainingPlanDocument.name),
     );
     await Promise.all([
       personModel.syncIndexes(),
       trainingPlanModel.syncIndexes(),
+      activeModel.syncIndexes(),
+      catalogModel.syncIndexes(),
+      cloneJobModel.syncIndexes(),
     ]);
     redisClient = new Redis(process.env.REDIS_URL);
   });
@@ -125,6 +153,9 @@ describe('Global training plans (e2e)', () => {
     await Promise.all([
       personModel.deleteMany({}).exec(),
       trainingPlanModel.deleteMany({}).exec(),
+      activeModel.deleteMany({}).exec(),
+      catalogModel.deleteMany({}).exec(),
+      cloneJobModel.deleteMany({}).exec(),
       redisClient.flushdb(),
     ]);
   });
@@ -1047,5 +1078,182 @@ describe('Global training plans (e2e)', () => {
         }),
       ]),
     );
+  });
+
+  it('keeps owned plans and live global references in one personal catalog', async () => {
+    const person = await login(false);
+    const admin = await login(true);
+    const global = await createGlobalPlan();
+    const createOwned = await authenticatedMutation(
+      person,
+      person.post('/training-plans'),
+    ).send({
+      name: 'Meu plano',
+      description: 'Plano editável pela pessoa.',
+    });
+    expect(createOwned.status).toBe(201);
+    expect(createOwned.body).toMatchObject({
+      data: { active: false, itemType: 'training-plan', source: 'owned' },
+    });
+    const ownedEntryId = (
+      createOwned.body as { data: { catalogEntryId: string } }
+    ).data.catalogEntryId;
+
+    const reference = await authenticatedMutation(
+      person,
+      person.post('/training-plans/global-references'),
+    ).send({ globalTrainingPlanId: global.id });
+    expect(reference.status).toBe(201);
+    expect(reference.body).toMatchObject({
+      data: {
+        active: false,
+        id: global.id,
+        itemType: 'training-plan',
+        source: 'global-reference',
+      },
+    });
+    const referenceEntryId = (
+      reference.body as { data: { catalogEntryId: string } }
+    ).data.catalogEntryId;
+
+    const list = await person.get('/training-plans?page=1').expect(200);
+    const listBody = list.body as { data: unknown[] };
+    expect(list.body).toMatchObject({ page: 1, pageSize: 20, total: 2 });
+    expect(listBody.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          catalogEntryId: ownedEntryId,
+          source: 'owned',
+        }),
+        expect.objectContaining({
+          catalogEntryId: referenceEntryId,
+          source: 'global-reference',
+        }),
+      ]),
+    );
+
+    const readOnly = await authenticatedMutation(
+      person,
+      person
+        .patch(`/training-plans/${referenceEntryId}`)
+        .set('X-Resource-Version', '0'),
+    ).send({ name: 'Não permitido' });
+    expect(readOnly.body).toMatchObject({
+      code: 'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+    });
+    expect(readOnly.status).toBe(403);
+
+    await authenticatedMutation(person, person.put('/training-plans/active'))
+      .send({ catalogEntryId: referenceEntryId })
+      .expect(200);
+    const adminList = await admin
+      .get('/global/training-plans?page=1')
+      .expect(200);
+    const adminListBody =
+      adminList.body as GlobalTrainingPlanCollectionResponse;
+    expect(adminListBody.data[0]).toMatchObject({
+      usage: { activePeople: 1, linkedPeople: 1 },
+    });
+
+    await authenticatedMutation(
+      admin,
+      admin
+        .delete(`/global/training-plans/${global.id}`)
+        .set('X-Resource-Version', '0'),
+    ).expect(204);
+    const afterDelete = await person.get('/training-plans?page=1').expect(200);
+    expect(afterDelete.body).toMatchObject({ total: 1 });
+    await expect(activeModel.countDocuments()).resolves.toBe(0);
+  });
+
+  it('persists an invisible clone job before scheduling and exposes only its blocked row', async () => {
+    const person = await login(false);
+    const global = await createGlobalPlan({
+      workouts: [
+        {
+          _id: new Types.ObjectId(),
+          name: 'Treino com imagem',
+          exercises: [
+            {
+              _id: new Types.ObjectId(),
+              bodyArea: 'chest',
+              image: {
+                display: {
+                  height: 640,
+                  key: 'source/display.webp',
+                  width: 640,
+                },
+                thumbnail: {
+                  height: 160,
+                  key: 'source/thumbnail.webp',
+                  width: 160,
+                },
+              },
+              name: 'Supino',
+              repetitions: 12,
+              restSeconds: 60,
+              sets: 3,
+              type: 'image',
+            },
+          ],
+        },
+      ],
+    });
+    const start = await authenticatedMutation(
+      person,
+      person.post('/training-plan-clone-jobs'),
+    ).send({ globalTrainingPlanId: global.id });
+    expect(start.status).toBe(202);
+    expect(start.body).toMatchObject({
+      data: {
+        completedImages: 0,
+        itemType: 'clone-job',
+        sourceName: global.name,
+        state: 'queued',
+        totalImages: 1,
+      },
+    });
+    const cloneJobId = (start.body as { data: { cloneJobId: string } }).data
+      .cloneJobId;
+    expect(cloneStarter.start).toHaveBeenCalledWith({
+      cloneJobId,
+      generation: 1,
+    });
+    const persistedJob = await cloneJobModel.findById(cloneJobId).lean().exec();
+    expect(persistedJob?.snapshot).toMatchObject({
+      workouts: [
+        {
+          exercises: [
+            {
+              image: {
+                display: { etag: 'etag:source/display.webp' },
+                thumbnail: { etag: 'etag:source/thumbnail.webp' },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    await expect(
+      trainingPlanModel.countDocuments({ ownerPersonId: { $ne: null } }),
+    ).resolves.toBe(0);
+
+    const list = await person.get('/training-plans?page=1').expect(200);
+    expect(list.body).toMatchObject({
+      data: [expect.objectContaining({ cloneJobId, itemType: 'clone-job' })],
+      total: 1,
+    });
+    const library = await person
+      .get('/training-plans/library?page=1')
+      .expect(200);
+    const libraryBody = library.body as GlobalTrainingPlanLibraryResponse;
+    expect(libraryBody.data[0]).toMatchObject({ cloneBlocked: true });
+
+    const cancel = await authenticatedMutation(
+      person,
+      person.delete(`/training-plan-clone-jobs/${cloneJobId}`),
+    );
+    expect(cancel.status).toBe(202);
+    expect(cancel.body).toMatchObject({ data: { state: 'cancelling' } });
   });
 });

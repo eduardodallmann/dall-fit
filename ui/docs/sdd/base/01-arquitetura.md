@@ -102,8 +102,8 @@ usa wildcard de `vercel.app` nem conserva o host público excluído.
 
 ### Atualização em tempo real
 
-`src/core/realtime` mantém um único `EventSource` autenticado por documento na
-área administrativa e um UUID efêmero compartilhado com o interceptor Axios das
+`src/core/realtime` mantém um único `EventSource` autenticado por documento no
+shell autenticado e um UUID efêmero compartilhado com o interceptor Axios das
 mutações. O recurso participa do ciclo de sessão; logout ou troca de identidade
 fecha a conexão e descarta o UUID. Após 60 segundos oculto o documento fecha o
 stream e, ao voltar, reconecta. Todo `realtime-ready` invalida queries registradas
@@ -113,6 +113,12 @@ Pontes de domínio interpretam `resource-invalidated`; o core não importa rotas
 A ponte de planos consulta o coordenador: trabalho local ou mutation pendente
 pausa o aggregate e mantém o draft; estado limpo reconcilia automaticamente pela
 leitura HTTP canônica.
+
+O domínio de planos possui composições `global-admin`, `personal-owned` e
+`personal-global-reference`. Elas compartilham apresentação e editor quando o
+comportamento coincide, mas rotas/services HTTP continuam separados. O source
+discriminado escolhe edição completa ou leitura completa; não existe matriz de
+capabilities controlada pelo cliente.
 
 O client Axios vigente está em `src/core/http/api-client.ts`, usa `VITE_API_URL`
 como `baseURL`, `withCredentials=true`, timeout default de 15 segundos e erros de

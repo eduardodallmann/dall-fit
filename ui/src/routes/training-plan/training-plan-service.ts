@@ -7,9 +7,11 @@ import type {
   Exercise,
   ExerciseImage,
   GlobalTrainingPlanCollectionResponse,
+  GlobalTrainingPlanDetails,
+  GlobalTrainingPlanDetailsResponse,
+  GlobalTrainingPlanWorkoutDetails,
+  GlobalTrainingPlanWorkoutDetailsResponse,
   ReorderExercisesRequest,
-  TrainingPlanDetails,
-  TrainingPlanDetailsResponse,
   TrainingPlanSummary,
   TrainingPlanWorkoutDetails,
   TrainingPlanWorkoutDetailsResponse,
@@ -38,6 +40,11 @@ export type MockTrainingPlansScenario =
   | 'large-pagination'
   | 'loading'
   | 'not-found'
+  | 'personal-mixed'
+  | 'personal-reference'
+  | 'clone-running'
+  | 'clone-failed'
+  | 'usage-counts'
   | 'success'
   | 'update-error'
   | 'update-success'
@@ -50,6 +57,17 @@ export type MockTrainingPlansScenario =
   | 'timeout'
   | 'csrf-refresh'
   | 'version-conflict';
+
+export type TrainingPlanResource = 'global' | 'personal';
+
+function trainingPlanResourcePath(
+  trainingPlanId: string,
+  resource: TrainingPlanResource,
+): string {
+  const prefix =
+    resource === 'global' ? '/global/training-plans' : '/training-plans';
+  return `${prefix}/${trainingPlanId}`;
+}
 
 export function trainingPlanMockSearch(
   mockScenario: MockTrainingPlansScenario,
@@ -134,8 +152,8 @@ export async function getGlobalTrainingPlan(
   trainingPlanId: string,
   mockScenario: MockTrainingPlansScenario,
   signal?: AbortSignal,
-): Promise<TrainingPlanDetails> {
-  const response = await apiClient.get<TrainingPlanDetailsResponse>(
+): Promise<GlobalTrainingPlanDetails> {
+  const response = await apiClient.get<GlobalTrainingPlanDetailsResponse>(
     `/global/training-plans/${trainingPlanId}`,
     requestConfig(mockScenario, signal),
   );
@@ -192,9 +210,10 @@ export async function createTrainingPlanWorkout(
   trainingPlanId: string,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<VersionedMutationResult<TrainingPlanWorkoutSummary>> {
   const response = await apiClient.post<CreateTrainingPlanWorkoutResponse>(
-    `/global/training-plans/${trainingPlanId}/workouts`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts`,
     {},
     mutationConfig(mockScenario, version),
   );
@@ -211,9 +230,10 @@ export async function deleteTrainingPlanWorkout(
   workoutId: string,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<number> {
   const response = await apiClient.delete(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}`,
     mutationConfig(mockScenario, version),
   );
   return responseVersion(response.headers);
@@ -224,9 +244,13 @@ export async function getTrainingPlanWorkout(
   workoutId: string,
   mockScenario: MockTrainingPlansScenario,
   signal?: AbortSignal,
-): Promise<TrainingPlanWorkoutDetails> {
-  const response = await apiClient.get<TrainingPlanWorkoutDetailsResponse>(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
+  resource: TrainingPlanResource = 'global',
+): Promise<TrainingPlanWorkoutDetails | GlobalTrainingPlanWorkoutDetails> {
+  const response = await apiClient.get<
+    | TrainingPlanWorkoutDetailsResponse
+    | GlobalTrainingPlanWorkoutDetailsResponse
+  >(
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}`,
     requestConfig(mockScenario, signal),
   );
   return response.data.data;
@@ -238,13 +262,14 @@ export async function updateTrainingPlanWorkout(
   name: string,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<
   VersionedMutationResult<{ id: string; name: string; updatedAt: string }>
 > {
   const response = await apiClient.patch<{
     data: { id: string; name: string; updatedAt: string };
   }>(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}`,
     { name },
     mutationConfig(mockScenario, version),
   );
@@ -260,9 +285,10 @@ export async function createTrainingPlanExercise(
   input: CreateExerciseRequest,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<VersionedMutationResult<Exercise>> {
   const response = await apiClient.post<CreateExerciseResponse>(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises`,
     input,
     mutationConfig(mockScenario, version),
   );
@@ -279,9 +305,10 @@ export async function updateTrainingPlanExercise(
   changes: UpdateExerciseRequest,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<VersionedMutationResult<Exercise>> {
   const response = await apiClient.patch<UpdateExerciseResponse>(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises/${exerciseId}`,
     changes,
     mutationConfig(mockScenario, version),
   );
@@ -297,9 +324,10 @@ export async function deleteTrainingPlanExercise(
   exerciseId: string,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<number> {
   const response = await apiClient.delete(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises/${exerciseId}`,
     mutationConfig(mockScenario, version),
   );
   return responseVersion(response.headers);
@@ -311,9 +339,10 @@ export async function reorderTrainingPlanExercises(
   input: ReorderExercisesRequest,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<number> {
   const response = await apiClient.put(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/order`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises/order`,
     input,
     mutationConfig(mockScenario, version),
   );
@@ -327,11 +356,12 @@ export async function uploadTrainingPlanExerciseImage(
   file: File,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<VersionedMutationResult<ExerciseImage>> {
   const form = new FormData();
   form.append('file', file);
   const response = await apiClient.put<UpdateExerciseImageResponse>(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}/image`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises/${exerciseId}/image`,
     form,
     {
       ...mutationConfig(mockScenario, version),
@@ -350,9 +380,10 @@ export async function removeTrainingPlanExerciseImage(
   exerciseId: string,
   version: number,
   mockScenario: MockTrainingPlansScenario,
+  resource: TrainingPlanResource = 'global',
 ): Promise<number> {
   const response = await apiClient.delete(
-    `/global/training-plans/${trainingPlanId}/workouts/${workoutId}/exercises/${exerciseId}/image`,
+    `${trainingPlanResourcePath(trainingPlanId, resource)}/workouts/${workoutId}/exercises/${exerciseId}/image`,
     mutationConfig(mockScenario, version),
   );
   return responseVersion(response.headers);

@@ -184,6 +184,8 @@ describe('validateEnvironment', () => {
       AUTH_COOKIE_SECURE: 'true',
       NODE_ENV: 'production',
       TRUST_PROXY_HOPS: '1',
+      WORKFLOW_HMAC_SECRET:
+        'production-workflow-hmac-secret-at-least-thirty-two',
     };
 
     expect(() => validateEnvironment(productionEnvironment)).toThrow(
@@ -204,7 +206,7 @@ describe('validateEnvironment', () => {
     ).toThrow('REDIS_NAMESPACE: required in production');
   });
 
-  it('requires only the opaque Blob store id for a published runtime', () => {
+  it('requires the opaque Blob store id and workflow secret for a published runtime', () => {
     const productionEnvironment = {
       ...validEnvironment,
       AUTH_COOKIE_SECURE: 'true',
@@ -213,10 +215,14 @@ describe('validateEnvironment', () => {
       REDIS_NAMESPACE: 'dall-fit:production',
       REDIS_URL: 'rediss://redis.example.test:6379',
       TRUST_PROXY_HOPS: '1',
+      WORKFLOW_HMAC_SECRET:
+        'production-workflow-hmac-secret-at-least-thirty-two',
     };
 
     expect(validateEnvironment(productionEnvironment)).toMatchObject({
       BLOB_STORE_ID: 'store_8u9fq5re0OENMRtC',
+      WORKFLOW_HMAC_SECRET:
+        'production-workflow-hmac-secret-at-least-thirty-two',
     });
     expect(() =>
       validateEnvironment({

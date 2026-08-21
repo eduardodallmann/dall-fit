@@ -1,5 +1,10 @@
 # Rota `/dash`
 
+O menu autenticado exibe “Meus planos” para qualquer pessoa. Para admins, exibe
+também “Planos globais”; ambos coexistem e levam a fronteiras de autorização
+distintas. A conexão SSE é montada no shell autenticado, portanto atende as rotas
+pessoais e administrativas sem conexão duplicada.
+
 ## Objetivo funcional
 
 - Problema resolvido: oferecer a entrada privada da aplicação dentro de uma

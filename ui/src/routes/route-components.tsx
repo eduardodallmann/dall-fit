@@ -15,6 +15,7 @@ import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { useTheme } from '~/core/theme/theme-context';
 import { HomePage } from '~/routes/home';
 import { homeStyles } from '~/routes/home/styles';
+import { TrainingPlanRealtimeBridge } from '~/routes/training-plan/realtime-bridge';
 
 export function AuthenticatedRouteComponent() {
   const { mockAuth, person: routePerson } = useRouteContext({
@@ -47,6 +48,7 @@ export function AuthenticatedRouteComponent() {
 
   const result = (
     <AuthenticatedShell mockAuth={mockAuth} person={person}>
+      <TrainingPlanRealtimeBridge />
       <Outlet />
     </AuthenticatedShell>
   );

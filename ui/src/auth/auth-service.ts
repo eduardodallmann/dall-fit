@@ -20,6 +20,7 @@ export type MockAuthScenario =
   | 'csrf-error'
   | 'error'
   | 'logout-error'
+  | 'person'
   | 'theme-dark'
   | 'theme-light'
   | 'theme-save-error'

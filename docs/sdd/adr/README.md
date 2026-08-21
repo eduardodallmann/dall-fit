@@ -26,3 +26,5 @@ substituída permanece no histórico e aponta para a sucessora.
   OIDC e entrega direta por signed URLs temporárias.
 - [`ADR-0008`](ADR-0008-sse-e-invalidacao-realtime.md): invalidação em tempo
   real por SSE e Redis Pub/Sub.
+- [`ADR-0009`](ADR-0009-catalogo-pessoal-e-clonagem-duravel.md): catálogo pessoal,
+  referências globais vivas e clonagem durável em projeto Nitro separado.

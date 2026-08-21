@@ -4,6 +4,7 @@ import { Types, type Model } from 'mongoose';
 
 import type { Exercise, TrainingPlanSummary } from '@dall-fit/types';
 
+import type { TrainingPlanCloneSnapshot } from '~/training-plan/domain/personal-training-plan.entity';
 import type {
   ExerciseChanges,
   ImageWriteInput,
@@ -11,6 +12,7 @@ import type {
   StoredExercise,
   StoredExerciseImage,
   TargetState,
+  TrainingPlanAccessScope,
   TrainingPlanChanges,
   TrainingPlanEntity,
   TrainingPlanPage,
@@ -19,6 +21,7 @@ import type {
   WorkoutAggregate,
   WorkoutNameResult,
 } from '~/training-plan/domain/training-plan.entity';
+import { TrainingPlanCloneJobDocument } from '~/training-plan/repositories/personal-training-plan.schema';
 import { TrainingPlanRepository } from '~/training-plan/repositories/training-plan.repository';
 import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan.schema';
 
@@ -65,6 +68,10 @@ interface PlainPlan {
   updatedAt: Date;
 }
 
+interface PlainRetainedCloneJob {
+  snapshot: TrainingPlanCloneSnapshot;
+}
+
 @Injectable()
 export class MongoTrainingPlanRepository extends TrainingPlanRepository {
   private readonly logger = new Logger(MongoTrainingPlanRepository.name);
@@ -72,6 +79,8 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
   constructor(
     @InjectModel(TrainingPlanDocument.name)
     private readonly trainingPlanModel: Model<TrainingPlanDocument>,
+    @InjectModel(TrainingPlanCloneJobDocument.name)
+    private readonly cloneJobModel: Model<TrainingPlanCloneJobDocument>,
   ) {
     super();
   }
@@ -138,15 +147,21 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     return result;
   }
 
-  async findGlobalById(id: string): Promise<TrainingPlanEntity | null> {
+  async findById(
+    id: string,
+    scope: TrainingPlanAccessScope,
+  ): Promise<TrainingPlanEntity | null> {
     this.logger.log(
       'MongoTrainingPlanRepository -> findGlobalById -> params:',
       {
-        params: { ownerIsGlobal: true, trainingPlanId: id },
+        params: {
+          ownerIsGlobal: scope.ownerPersonId === null,
+          trainingPlanId: id,
+        },
       },
     );
     const document = await this.trainingPlanModel
-      .findOne({ _id: id, ownerPersonId: null })
+      .findOne({ _id: id, ownerPersonId: scope.ownerPersonId })
       .select({
         description: 1,
         name: 1,
@@ -175,10 +190,11 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     return result;
   }
 
-  async updateGlobal(
+  async update(
     id: string,
     expectedVersion: number,
     changes: TrainingPlanChanges,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<TrainingPlanEntity> | null> {
     this.logger.log('MongoTrainingPlanRepository -> updateGlobal -> params:', {
       params: {
@@ -189,7 +205,11 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     });
     const document = await this.trainingPlanModel
       .findOneAndUpdate(
-        { _id: id, ownerPersonId: null, version: expectedVersion },
+        {
+          _id: id,
+          ownerPersonId: scope.ownerPersonId,
+          version: expectedVersion,
+        },
         { $inc: { version: 1 }, $set: changes },
         { returnDocument: 'after', runValidators: true },
       )
@@ -209,9 +229,10 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     return result;
   }
 
-  async deleteGlobal(
+  async delete(
     id: string,
     expectedVersion: number,
+    scope: TrainingPlanAccessScope,
   ): Promise<readonly StoredExerciseImage[] | null> {
     this.logger.log('MongoTrainingPlanRepository -> deleteGlobal -> params:', {
       params: { expectedVersion, trainingPlanId: id },
@@ -219,7 +240,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     const document = await this.trainingPlanModel
       .findOneAndDelete({
         _id: id,
-        ownerPersonId: null,
+        ownerPersonId: scope.ownerPersonId,
         version: expectedVersion,
       })
       .lean<PlainPlan>()
@@ -240,6 +261,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     trainingPlanId: string,
     expectedVersion: number,
     name: string,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<TrainingPlanWorkoutSummary> | null> {
     this.logger.log('MongoTrainingPlanRepository -> createWorkout -> params:', {
       params: { expectedVersion, trainingPlanId },
@@ -250,7 +272,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts.24': { $exists: false },
         },
@@ -291,6 +313,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     trainingPlanId: string,
     workoutId: string,
     expectedVersion: number,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<readonly StoredExerciseImage[]> | null> {
     this.logger.log('MongoTrainingPlanRepository -> deleteWorkout -> params:', {
       params: { expectedVersion, trainingPlanId, workoutId },
@@ -298,7 +321,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     const before = await this.trainingPlanModel
       .findOne({
         _id: trainingPlanId,
-        ownerPersonId: null,
+        ownerPersonId: scope.ownerPersonId,
         version: expectedVersion,
         'workouts._id': workoutId,
       })
@@ -313,7 +336,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
         },
@@ -341,6 +364,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
   async findWorkout(
     trainingPlanId: string,
     workoutId: string,
+    scope: TrainingPlanAccessScope,
   ): Promise<WorkoutAggregate | null> {
     this.logger.log('MongoTrainingPlanRepository -> findWorkout -> params:', {
       params: { trainingPlanId, workoutId },
@@ -348,7 +372,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     const document = await this.trainingPlanModel
       .findOne({
         _id: trainingPlanId,
-        ownerPersonId: null,
+        ownerPersonId: scope.ownerPersonId,
         'workouts._id': workoutId,
       })
       .select({
@@ -384,6 +408,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     workoutId: string,
     expectedVersion: number,
     name: string,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<WorkoutNameResult> | null> {
     const now = new Date();
     const result = await this.updateAndProjectWorkout(
@@ -391,6 +416,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       trainingPlanId,
       workoutId,
       expectedVersion,
+      scope,
       {
         $inc: { version: 1 },
         $set: { 'workouts.$.name': name, 'workouts.$.updatedAt': now },
@@ -412,6 +438,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     workoutId: string,
     expectedVersion: number,
     exercise: StoredExercise,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<StoredExercise> | null> {
     const now = new Date();
     const stored = {
@@ -424,6 +451,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       trainingPlanId,
       workoutId,
       expectedVersion,
+      scope,
       {
         $inc: { version: 1 },
         $push: { 'workouts.$.exercises': stored },
@@ -447,8 +475,9 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     exerciseId: string,
     expectedVersion: number,
     changes: ExerciseChanges,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<StoredExercise> | null> {
-    const before = await this.findWorkout(trainingPlanId, workoutId);
+    const before = await this.findWorkout(trainingPlanId, workoutId, scope);
     if (before === null || before.version !== expectedVersion) {
       const result = null;
       return result;
@@ -468,7 +497,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
           'workouts.exercises._id': exerciseId,
@@ -521,8 +550,9 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     workoutId: string,
     exerciseId: string,
     expectedVersion: number,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<StoredExerciseImage | null> | null> {
-    const before = await this.findWorkout(trainingPlanId, workoutId);
+    const before = await this.findWorkout(trainingPlanId, workoutId, scope);
     if (before === null || before.version !== expectedVersion) {
       const result = null;
       return result;
@@ -537,7 +567,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
           'workouts.exercises._id': exerciseId,
@@ -580,8 +610,9 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     workoutId: string,
     expectedVersion: number,
     exerciseIds: readonly string[],
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<undefined> | null> {
-    const before = await this.findWorkout(trainingPlanId, workoutId);
+    const before = await this.findWorkout(trainingPlanId, workoutId, scope);
     if (before === null || before.version !== expectedVersion) {
       const result = null;
       return result;
@@ -601,7 +632,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
         },
@@ -635,8 +666,9 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     exerciseId: string,
     expectedVersion: number,
     input: ImageWriteInput,
+    scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<StoredExerciseImage | null> | null> {
-    const before = await this.findWorkout(trainingPlanId, workoutId);
+    const before = await this.findWorkout(trainingPlanId, workoutId, scope);
     if (before === null || before.version !== expectedVersion) {
       const result = null;
       return result;
@@ -661,7 +693,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
           'workouts.exercises._id': exerciseId,
@@ -706,6 +738,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     trainingPlanId: string,
     workoutId?: string,
     exerciseId?: string,
+    scope: TrainingPlanAccessScope = { ownerPersonId: null },
   ): Promise<TargetState> {
     this.logger.log('MongoTrainingPlanRepository -> inspectTarget -> params:', {
       params: { trainingPlanId, workoutId, exerciseId },
@@ -729,7 +762,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
         {
           $match: {
             _id: new Types.ObjectId(trainingPlanId),
-            ownerPersonId: null,
+            ownerPersonId: scope.ownerPersonId,
           },
         },
         { $set: { originalBsonSize: { $bsonSize: '$$ROOT' } } },
@@ -850,19 +883,35 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       'MongoTrainingPlanRepository -> listReferencedImageKeys -> params:',
       { params: {} },
     );
-    const documents = await this.trainingPlanModel
-      .find({})
-      .select({ 'workouts.exercises.image': 1 })
-      .lean<PlainPlan[]>()
-      .exec();
-    const result = new Set(
-      documents.flatMap((document) =>
+    const [documents, cloneJobs] = await Promise.all([
+      this.trainingPlanModel
+        .find({})
+        .select({ 'workouts.exercises.image': 1 })
+        .lean<PlainPlan[]>()
+        .exec(),
+      this.cloneJobModel
+        .find({ state: { $nin: ['cancelled', 'completed'] } })
+        .select({ snapshot: 1 })
+        .lean<PlainRetainedCloneJob[]>()
+        .exec(),
+    ]);
+    const result = new Set([
+      ...documents.flatMap((document) =>
         this.collectImages(document.workouts).flatMap((image) => [
           image.thumbnail.key,
           image.display.key,
         ]),
       ),
-    );
+      ...cloneJobs.flatMap((job) =>
+        job.snapshot.workouts.flatMap((workout) =>
+          workout.exercises.flatMap((exercise) =>
+            exercise.type !== 'image' || exercise.image === null
+              ? []
+              : [exercise.image.thumbnail.key, exercise.image.display.key],
+          ),
+        ),
+      ),
+    ]);
     this.logger.log(
       'MongoTrainingPlanRepository -> listReferencedImageKeys -> return:',
       { data: { count: result.size } },
@@ -875,6 +924,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
     trainingPlanId: string,
     workoutId: string,
     expectedVersion: number,
+    scope: TrainingPlanAccessScope,
     update: object,
     map: (workout: PlainWorkout, version: number) => VersionedResult<T> | null,
     extraFilter: object = {},
@@ -886,7 +936,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .findOneAndUpdate(
         {
           _id: trainingPlanId,
-          ownerPersonId: null,
+          ownerPersonId: scope.ownerPersonId,
           version: expectedVersion,
           'workouts._id': workoutId,
           ...extraFilter,

@@ -282,6 +282,16 @@ export function TrainingPlanDetailPage({
           reason={aggregate.pauseReason}
         />
       ) : null}
+      <Alert status={plan.usage.linkedPeople > 0 ? 'warning' : 'default'}>
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Impacto deste plano global</Alert.Title>
+          <Alert.Description>
+            {plan.usage.linkedPeople} pessoa(s) vinculada(s), sendo{' '}
+            {plan.usage.activePeople} com este plano ativo.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
       <header className={styles.pageHeader()}>
         {editing ? (
           <TrainingPlanInlineForm

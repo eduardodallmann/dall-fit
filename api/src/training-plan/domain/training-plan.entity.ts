@@ -19,6 +19,10 @@ export interface NewTrainingPlan {
   description: string;
 }
 
+export interface TrainingPlanAccessScope {
+  ownerPersonId: string | null;
+}
+
 export interface TrainingPlanChanges {
   name?: string;
   description?: string;
@@ -30,6 +34,7 @@ export interface TrainingPlanPage {
 }
 
 export interface StoredImageVariant {
+  etag?: string;
   key: string;
   width: number;
   height: number;

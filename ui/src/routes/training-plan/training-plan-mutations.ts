@@ -7,8 +7,8 @@ import {
 import type {
   CreateTrainingPlanRequest,
   GlobalTrainingPlanCollectionResponse,
+  GlobalTrainingPlanSummary,
   TrainingPlanDetails,
-  TrainingPlanSummary,
   TrainingPlanWorkoutSummary,
   UpdateTrainingPlanRequest,
 } from '@dall-fit/types';
@@ -50,7 +50,7 @@ type InternalCollectionResponse = GlobalTrainingPlanCollectionResponse & {
   [optimisticTokens]?: readonly string[];
 };
 
-type InternalTrainingPlanSummary = TrainingPlanSummary & {
+type InternalTrainingPlanSummary = GlobalTrainingPlanSummary & {
   [optimisticPlanToken]?: string;
 };
 
@@ -59,7 +59,7 @@ type InternalTrainingPlanDetails = TrainingPlanDetails & {
 };
 
 interface OptimisticPlanEntry {
-  previous: TrainingPlanSummary;
+  previous: GlobalTrainingPlanSummary;
   queryKey: QueryKey;
   token: string;
 }
@@ -78,7 +78,7 @@ interface RemovedWorkoutEntry {
 
 interface RemovedPlanEntry {
   previousIndex: number;
-  previousPlan?: TrainingPlanSummary;
+  previousPlan?: GlobalTrainingPlanSummary;
   queryKey: QueryKey;
 }
 
@@ -107,13 +107,14 @@ interface DeleteTrainingPlanWorkoutVariables extends DeleteTrainingPlanVariables
 
 function createTemporaryPlan(input: CreateTrainingPlanRequest) {
   const now = new Date().toISOString();
-  const result: TrainingPlanSummary = {
+  const result: GlobalTrainingPlanSummary = {
     id: `temporary-${crypto.randomUUID()}`,
     name: input.name.trim(),
     description: input.description.trim(),
     version: 0,
     createdAt: now,
     updatedAt: now,
+    usage: { activePeople: 0, linkedPeople: 0 },
   };
 
   return result;
@@ -273,7 +274,9 @@ export function useCreateTrainingPlanMutation(
             return {
               ...settled,
               data: settled.data.map((plan) =>
-                plan.id === context.temporaryId ? created : plan,
+                plan.id === context.temporaryId
+                  ? { ...created, usage: plan.usage }
+                  : plan,
               ),
             };
           },
@@ -377,7 +380,9 @@ export function useUpdateTrainingPlanMutation(
                   : {
                       ...current,
                       data: current.data.map((plan) =>
-                        plan.id === updated.id ? updated : plan,
+                        plan.id === updated.id
+                          ? { ...updated, usage: plan.usage }
+                          : plan,
                       ),
                     },
             );

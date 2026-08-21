@@ -17,12 +17,14 @@ import {
 
 const {
   deleteBlobMock,
+  headBlobMock,
   issueSignedTokenMock,
   listBlobMock,
   presignUrlMock,
   putBlobMock,
 } = vi.hoisted(() => ({
   deleteBlobMock: vi.fn(),
+  headBlobMock: vi.fn(),
   issueSignedTokenMock: vi.fn(),
   listBlobMock: vi.fn(),
   presignUrlMock: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock('@vercel/blob', () => ({
   BlobStoreSuspendedError: class extends Error {},
   BlobUnknownError: class extends Error {},
   del: deleteBlobMock,
+  head: headBlobMock,
   issueSignedToken: issueSignedTokenMock,
   list: listBlobMock,
   presignUrl: presignUrlMock,
@@ -49,6 +52,7 @@ describe('BlobStorageService', () => {
 
   beforeEach(() => {
     deleteBlobMock.mockReset();
+    headBlobMock.mockReset();
     issueSignedTokenMock.mockReset();
     listBlobMock.mockReset();
     presignUrlMock.mockReset();
@@ -57,6 +61,7 @@ describe('BlobStorageService', () => {
 
   it('uploads privately through OIDC without passing a permanent token', async () => {
     putBlobMock.mockResolvedValue({
+      etag: 'upload-etag',
       pathname: 'exercise-images/thumbnail-1.webp',
     });
 
@@ -65,7 +70,10 @@ describe('BlobStorageService', () => {
       Buffer.from('image'),
     );
 
-    expect(result).toEqual({ key: 'exercise-images/thumbnail-1.webp' });
+    expect(result).toEqual({
+      etag: 'upload-etag',
+      key: 'exercise-images/thumbnail-1.webp',
+    });
     expect(putBlobMock).toHaveBeenCalledWith(
       'exercise-images/thumbnail.webp',
       expect.any(Buffer),
@@ -76,6 +84,18 @@ describe('BlobStorageService', () => {
       }),
     );
     expect(putBlobMock.mock.calls[0]?.[2]).not.toHaveProperty('token');
+  });
+
+  it('reads the current ETag through OIDC without passing a permanent token', async () => {
+    headBlobMock.mockResolvedValue({ etag: 'current-etag' });
+
+    const result = await service.getMetadata('exercise-images/image.webp');
+
+    expect(result).toEqual({ etag: 'current-etag' });
+    expect(headBlobMock).toHaveBeenCalledOnce();
+    expect(headBlobMock.mock.calls[0]?.[0]).toBe('exercise-images/image.webp');
+    expect(headBlobMock.mock.calls[0]?.[1]).toHaveProperty('abortSignal');
+    expect(headBlobMock.mock.calls[0]?.[1]).not.toHaveProperty('token');
   });
 
   it('signs an exact pathname for get with the same expiration', async () => {

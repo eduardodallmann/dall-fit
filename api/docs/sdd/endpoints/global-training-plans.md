@@ -43,23 +43,23 @@ o header de origem sem expô-lo na resposta.
 
 ## Contratos
 
-| Método e path                                  | Entrada                                 | Sucesso                         |
-| ---------------------------------------------- | --------------------------------------- | ------------------------------- |
-| `GET /global/training-plans?page=1`            | página 1–100                            | `200`, 20 resumos com versão    |
-| `POST /global/training-plans`                  | `{name,description}`                    | `201`, resumo v0 + header       |
-| `GET /global/training-plans/:planId`           | IDs MongoDB                             | `200`, detalhe + header         |
-| `PATCH /global/training-plans/:planId`         | campos + `X-Resource-Version`           | `200`, resumo + novo header     |
-| `DELETE /global/training-plans/:planId`        | `X-Resource-Version`                    | `204`, remove árvore/mídia      |
-| `POST /global/training-plans/:planId/workouts` | `{}` + `X-Resource-Version`             | `201`, `Novo treino` + header   |
-| `DELETE .../workouts/:workoutId`               | `X-Resource-Version`                    | `204`, remove workout + header  |
-| `GET .../workouts/:workoutId`                  | IDs MongoDB                             | `200`, editor completo + header |
-| `PATCH .../workouts/:workoutId`                | `{name}` + `X-Resource-Version`         | `200`, nome/timestamp + header  |
-| `POST .../workouts/:workoutId/exercises`       | `{type}` + `X-Resource-Version`         | `201`, defaults + header        |
-| `PATCH .../exercises/:exerciseId`              | campos do tipo + `X-Resource-Version`   | `200`, exercício + header       |
-| `DELETE .../exercises/:exerciseId`             | `X-Resource-Version`                    | `204`, remove linha + header    |
-| `PUT .../exercises/order`                      | ordem completa + `X-Resource-Version`   | `204`, inclusive no-op + header |
-| `PUT .../exercises/:exerciseId/image`          | multipart `file` + `X-Resource-Version` | `200`, URLs + header            |
-| `DELETE .../exercises/:exerciseId/image`       | `X-Resource-Version`                    | `204`, inclusive no-op + header |
+| Método e path                                  | Entrada                                 | Sucesso                          |
+| ---------------------------------------------- | --------------------------------------- | -------------------------------- |
+| `GET /global/training-plans?page=1`            | página 1–100                            | `200`, resumos, versão e impacto |
+| `POST /global/training-plans`                  | `{name,description}`                    | `201`, resumo v0 + header        |
+| `GET /global/training-plans/:planId`           | IDs MongoDB                             | `200`, detalhe + header          |
+| `PATCH /global/training-plans/:planId`         | campos + `X-Resource-Version`           | `200`, resumo + novo header      |
+| `DELETE /global/training-plans/:planId`        | `X-Resource-Version`                    | `204`, remove árvore/mídia       |
+| `POST /global/training-plans/:planId/workouts` | `{}` + `X-Resource-Version`             | `201`, `Novo treino` + header    |
+| `DELETE .../workouts/:workoutId`               | `X-Resource-Version`                    | `204`, remove workout + header   |
+| `GET .../workouts/:workoutId`                  | IDs MongoDB                             | `200`, editor completo + header  |
+| `PATCH .../workouts/:workoutId`                | `{name}` + `X-Resource-Version`         | `200`, nome/timestamp + header   |
+| `POST .../workouts/:workoutId/exercises`       | `{type}` + `X-Resource-Version`         | `201`, defaults + header         |
+| `PATCH .../exercises/:exerciseId`              | campos do tipo + `X-Resource-Version`   | `200`, exercício + header        |
+| `DELETE .../exercises/:exerciseId`             | `X-Resource-Version`                    | `204`, remove linha + header     |
+| `PUT .../exercises/order`                      | ordem completa + `X-Resource-Version`   | `204`, inclusive no-op + header  |
+| `PUT .../exercises/:exerciseId/image`          | multipart `file` + `X-Resource-Version` | `200`, URLs + header             |
+| `DELETE .../exercises/:exerciseId/image`       | `X-Resource-Version`                    | `204`, inclusive no-op + header  |
 
 GET do workout retorna plano mínimo, timestamps e exercícios na ordem física. Os
 tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
@@ -68,6 +68,14 @@ YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Imagem
 expõe `thumbnailUrl`, `displayUrl` assinadas e `signedUrlExpiresAt`; keys,
 dimensões internas, pathnames, delegation token e original não atravessam HTTP.
 Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-store`.
+
+Lista, detalhe e workout incluem `usage.linkedPeople` e `usage.activePeople`. O
+primeiro conta referências pessoais vivas; o segundo, referências que também são
+a seleção ativa. Clones concluídos não contam. A administração pode editar e
+excluir independentemente desses números. DELETE remove todas as referências e
+seleções daquele global, sem fallback; portanto pessoas podem ficar sem plano
+ativo. Keys presentes em snapshots de clone não terminal são retidas para que a
+exclusão do global não interrompa a clonagem e serão liberadas após o terminal.
 
 ## Persistência e branches
 

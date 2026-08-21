@@ -18,17 +18,18 @@ export function TrainingPlanRealtimeBridge() {
     const unsubscribeReady = realtimeClient.onReady(reconcile);
     const unsubscribeInvalidation = realtimeClient.onInvalidation((event) => {
       const paused = coordinator.notifyExternalChange(event);
-      if (paused === undefined) return;
       void queryClient.invalidateQueries({
         queryKey: trainingPlanKeys.lists(),
       });
+      void queryClient.invalidateQueries({
+        queryKey: trainingPlanKeys.libraries(),
+      });
+      if (paused === undefined) return;
       if (!paused) {
         void queryClient.invalidateQueries({
           predicate: (query) =>
             query.queryKey[0] === trainingPlanKeys.all[0] &&
-            (query.queryKey[1] === 'detail' ||
-              query.queryKey[1] === 'workout') &&
-            query.queryKey[2] === event.resourceId,
+            (query.queryKey[1] === 'detail' || query.queryKey[1] === 'workout'),
         });
       }
     });

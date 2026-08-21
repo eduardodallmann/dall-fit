@@ -4,8 +4,10 @@ import type {
   CreateExerciseRequest,
   CreateTrainingPlanRequest,
   Exercise,
+  GlobalTrainingPlanDetails,
+  GlobalTrainingPlanLibraryItem,
+  PersonalTrainingPlanListItem,
   ReorderExercisesRequest,
-  TrainingPlanDetails,
   TrainingPlanSummary,
   TrainingPlanWorkoutDetails,
   UpdateExerciseRequest,
@@ -30,11 +32,13 @@ import {
 } from '~/mocks/mock-response';
 
 interface ScenarioState {
-  detail: TrainingPlanDetails;
+  activeCatalogEntryId: string | null;
+  detail: GlobalTrainingPlanDetails;
   plans: TrainingPlanSummary[];
   workout: TrainingPlanWorkoutDetails;
   nextExerciseNumber: number;
   workoutReadCount: number;
+  cloneJobs: PersonalTrainingPlanListItem[];
 }
 
 const privateBlobOrigin =
@@ -68,7 +72,8 @@ function getScenario(request: Request): string {
 function getState(scenario: string): ScenarioState {
   const existing = scenarioStates.get(scenario);
   if (existing !== undefined) return existing;
-  const result = {
+  const result: ScenarioState = {
+    activeCatalogEntryId: null,
     detail: {
       ...trainingPlanDetailFixture,
       workouts: [...trainingPlanDetailFixture.workouts],
@@ -82,6 +87,7 @@ function getState(scenario: string): ScenarioState {
     },
     nextExerciseNumber: 30,
     workoutReadCount: 0,
+    cloneJobs: [],
   };
   if (scenario === 'empty-workout') {
     result.workout = { ...result.workout, exercises: [] };
@@ -93,6 +99,22 @@ function getState(scenario: string): ScenarioState {
           : workout,
       ),
     };
+  }
+  if (scenario === 'clone-running' || scenario === 'clone-failed') {
+    const now = new Date().toISOString();
+    result.cloneJobs = [
+      {
+        cloneJobId: '84b000000000000000000001',
+        completedImages: scenario === 'clone-running' ? 1 : 0,
+        createdAt: now,
+        generation: 1,
+        itemType: 'clone-job',
+        sourceName: result.detail.name,
+        state: scenario === 'clone-running' ? 'running' : 'failed',
+        totalImages: 2,
+        updatedAt: now,
+      },
+    ];
   }
   if (
     scenario === 'image-signed-url-expired' ||
@@ -119,7 +141,15 @@ function getState(scenario: string): ScenarioState {
 
 registerMockRealtimeReplication(({ scenario, state }) => {
   if (scenario === undefined || state === undefined) return;
-  scenarioStates.set(scenario, structuredClone(state));
+  scenarioStates.set(scenario, {
+    activeCatalogEntryId: null,
+    cloneJobs: [],
+    ...structuredClone(state),
+    detail: {
+      ...structuredClone(state.detail),
+      usage: { activePeople: 0, linkedPeople: 0 },
+    },
+  });
 });
 
 function synchronizeExerciseCount(state: ScenarioState): void {
@@ -366,7 +396,7 @@ export const trainingPlanHandlers = [
         };
       }
       return HttpResponse.json(
-        { data: workout },
+        { data: { ...workout, usage: state.detail.usage } },
         responseInit(state.detail.version),
       );
     },
@@ -598,7 +628,11 @@ export const trainingPlanHandlers = [
       const detail =
         plan.id === state.detail.id
           ? { ...state.detail, ...plan }
-          : { ...plan, workouts: [] };
+          : {
+              ...plan,
+              usage: { activePeople: 0, linkedPeople: 0 },
+              workouts: [],
+            };
       return HttpResponse.json({ data: detail }, responseInit(plan.version));
     },
   ),
@@ -735,4 +769,447 @@ export const trainingPlanHandlers = [
       return new HttpResponse(null, responseInit(version, 204));
     },
   ),
+  http.get('*/training-plans', ({ request }) => {
+    const scenario = getScenario(request);
+    const state = getState(scenario);
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 1);
+    const owned = toPersonalPlanItem(
+      state.detail,
+      '74b000000000000000000001',
+      'owned',
+      state.activeCatalogEntryId,
+    );
+    const reference = toPersonalPlanItem(
+      trainingPlanFixtures[1] ?? state.detail,
+      '74b000000000000000000002',
+      'global-reference',
+      state.activeCatalogEntryId,
+    );
+    let items: PersonalTrainingPlanListItem[] =
+      scenario === 'empty' ? [] : [owned, reference, ...state.cloneJobs];
+    if (scenario === 'personal-reference') items = [reference];
+    const pageSize = 20;
+    return HttpResponse.json(
+      {
+        data: items.slice((page - 1) * pageSize, page * pageSize),
+        page,
+        pageSize,
+        total: items.length,
+      },
+      createMockResponseInit(),
+    );
+  }),
+  http.get('*/training-plans/library', ({ request }) => {
+    const scenario = getScenario(request);
+    const state = getState(scenario);
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 1);
+    const plans = state.plans.map((plan): GlobalTrainingPlanLibraryItem => ({
+      ...plan,
+      cloneBlocked: state.cloneJobs.some(
+        (item) =>
+          item.itemType === 'clone-job' && item.sourceName === plan.name,
+      ),
+      exerciseCount:
+        plan.id === state.detail.id ? state.workout.exercises.length : 0,
+      hiddenWorkoutCount: 0,
+      referenced: plan.id === trainingPlanFixtures[1]?.id,
+      workoutCount: plan.id === state.detail.id ? 1 : 0,
+      workouts:
+        plan.id === state.detail.id
+          ? [
+              {
+                exerciseCount: state.workout.exercises.length,
+                exercises: state.workout.exercises
+                  .slice(0, 3)
+                  .map((exercise) => ({
+                    id: exercise.id,
+                    name: exercise.type === 'pause' ? 'Pausa' : exercise.name,
+                    type: exercise.type,
+                  })),
+                hiddenExerciseCount: Math.max(
+                  0,
+                  state.workout.exercises.length - 3,
+                ),
+                id: state.workout.id,
+                name: state.workout.name,
+              },
+            ]
+          : [],
+    }));
+    const pageSize = 20;
+    return HttpResponse.json(
+      {
+        data: plans.slice((page - 1) * pageSize, page * pageSize),
+        page,
+        pageSize,
+        total: plans.length,
+      },
+      createMockResponseInit(),
+    );
+  }),
+  http.post('*/training-plans', async ({ request }) => {
+    const scenario = getScenario(request);
+    const state = getState(scenario);
+    const input = (await request.json()) as CreateTrainingPlanRequest;
+    const now = new Date().toISOString();
+    state.detail = {
+      ...state.detail,
+      ...input,
+      id: '64b000000000000000000099',
+      version: 0,
+      workouts: [],
+      updatedAt: now,
+      createdAt: now,
+    };
+    const data = toPersonalPlanItem(
+      state.detail,
+      '74b000000000000000000099',
+      'owned',
+      state.activeCatalogEntryId,
+    );
+    return HttpResponse.json({ data }, createMockResponseInit({ status: 201 }));
+  }),
+  http.post('*/training-plans/global-references', async ({ request }) => {
+    const state = getState(getScenario(request));
+    const input = (await request.json()) as { globalTrainingPlanId: string };
+    const plan = state.plans.find(
+      (item) => item.id === input.globalTrainingPlanId,
+    );
+    if (plan === undefined)
+      return apiError(
+        'TRAINING_PLAN_NOT_FOUND',
+        'Training plan not found.',
+        404,
+      );
+    const data = toPersonalPlanItem(
+      plan,
+      '74b000000000000000000002',
+      'global-reference',
+      state.activeCatalogEntryId,
+    );
+    return HttpResponse.json({ data }, createMockResponseInit({ status: 201 }));
+  }),
+  http.put('*/training-plans/active', async ({ request }) => {
+    const state = getState(getScenario(request));
+    const input = (await request.json()) as { catalogEntryId: string };
+    state.activeCatalogEntryId = input.catalogEntryId;
+    return HttpResponse.json(
+      { data: { activeCatalogEntryId: input.catalogEntryId } },
+      createMockResponseInit(),
+    );
+  }),
+  http.get('*/training-plans/:catalogEntryId', ({ params, request }) => {
+    const state = getState(getScenario(request));
+    const source =
+      params.catalogEntryId === '74b000000000000000000002'
+        ? 'global-reference'
+        : 'owned';
+    const data = {
+      ...state.detail,
+      active: state.activeCatalogEntryId === params.catalogEntryId,
+      catalogEntryId: String(params.catalogEntryId),
+      source,
+    };
+    return HttpResponse.json({ data }, responseInit(state.detail.version));
+  }),
+  http.patch(
+    '*/training-plans/:catalogEntryId',
+    async ({ params, request }) => {
+      if (params.catalogEntryId === '74b000000000000000000002')
+        return apiError(
+          'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+          'Global reference is read only.',
+          409,
+        );
+      const state = getState(getScenario(request));
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const changes = (await request.json()) as UpdateTrainingPlanRequest;
+      const version = increment(state, request, false);
+      state.detail = { ...state.detail, ...changes, version };
+      return HttpResponse.json({ data: state.detail }, responseInit(version));
+    },
+  ),
+  http.delete('*/training-plans/:catalogEntryId', ({ request }) => {
+    const state = getState(getScenario(request));
+    if (request.headers.has('x-resource-version')) {
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+    }
+    return new HttpResponse(null, createMockResponseInit({ status: 204 }));
+  }),
+  http.get(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId',
+    ({ request }) => {
+      const state = getState(getScenario(request));
+      return HttpResponse.json(
+        { data: state.workout },
+        responseInit(state.detail.version),
+      );
+    },
+  ),
+  http.post(
+    '*/training-plans/:catalogEntryId/workouts',
+    ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const workout = {
+        exerciseCount: 0,
+        id: '64b000000000000000000199',
+        name: 'Novo treino',
+      };
+      state.detail = {
+        ...state.detail,
+        workouts: [...state.detail.workouts, workout],
+      };
+      const version = increment(state, request, false);
+      return HttpResponse.json({ data: workout }, responseInit(version, 201));
+    },
+  ),
+  http.patch(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId',
+    async ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const { name } = (await request.json()) as { name: string };
+      const version = increment(state, request, false);
+      state.workout = { ...state.workout, name };
+      return HttpResponse.json(
+        {
+          data: {
+            id: state.workout.id,
+            name,
+            updatedAt: state.workout.updatedAt,
+          },
+        },
+        responseInit(version),
+      );
+    },
+  ),
+  http.delete(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId',
+    ({ params, request }) =>
+      personalNestedDelete(params.catalogEntryId, request),
+  ),
+  http.post(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises',
+    async ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const input = (await request.json()) as CreateExerciseRequest;
+      const exercise = defaultExercise(input.type, state);
+      state.workout = {
+        ...state.workout,
+        exercises: [...state.workout.exercises, exercise],
+      };
+      synchronizeExerciseCount(state);
+      const version = increment(state, request, false);
+      return HttpResponse.json({ data: exercise }, responseInit(version, 201));
+    },
+  ),
+  http.patch(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/:exerciseId',
+    async ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const changes = (await request.json()) as UpdateExerciseRequest;
+      const current = state.workout.exercises.find(
+        (exercise) => exercise.id === params.exerciseId,
+      );
+      if (current === undefined)
+        return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
+      const updated = { ...current, ...changes } as Exercise;
+      state.workout = {
+        ...state.workout,
+        exercises: state.workout.exercises.map((exercise) =>
+          exercise.id === updated.id ? updated : exercise,
+        ),
+      };
+      const version = increment(state, request, false);
+      return HttpResponse.json({ data: updated }, responseInit(version));
+    },
+  ),
+  http.delete(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/:exerciseId',
+    ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      state.workout = {
+        ...state.workout,
+        exercises: state.workout.exercises.filter(
+          (exercise) => exercise.id !== params.exerciseId,
+        ),
+      };
+      const version = increment(state, request, false);
+      return new HttpResponse(null, responseInit(version, 204));
+    },
+  ),
+  http.put(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/order',
+    async ({ params, request }) => {
+      const state = getState(getScenario(request));
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, getScenario(request));
+      if (invalid !== null) return invalid;
+      const input = (await request.json()) as ReorderExercisesRequest;
+      const byId = new Map(
+        state.workout.exercises.map((item) => [item.id, item]),
+      );
+      state.workout = {
+        ...state.workout,
+        exercises: input.exerciseIds.flatMap((id) => {
+          const exercise = byId.get(id);
+          return exercise === undefined ? [] : [exercise];
+        }),
+      };
+      const version = increment(state, request, false);
+      return new HttpResponse(null, responseInit(version, 204));
+    },
+  ),
+  http.put(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/:exerciseId/image',
+    ({ params, request }) => personalImageMutation(params, request, false),
+  ),
+  http.delete(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/:exerciseId/image',
+    ({ params, request }) => personalImageMutation(params, request, true),
+  ),
+  http.post('*/training-plan-clone-jobs', async ({ request }) => {
+    const state = getState(getScenario(request));
+    const input = (await request.json()) as { globalTrainingPlanId: string };
+    const plan = state.plans.find(
+      (item) => item.id === input.globalTrainingPlanId,
+    );
+    if (plan === undefined)
+      return apiError(
+        'TRAINING_PLAN_NOT_FOUND',
+        'Training plan not found.',
+        404,
+      );
+    const now = new Date().toISOString();
+    const data: PersonalTrainingPlanListItem = {
+      cloneJobId: '84b000000000000000000001',
+      completedImages: 0,
+      createdAt: now,
+      generation: 1,
+      itemType: 'clone-job',
+      sourceName: plan.name,
+      state: 'running',
+      totalImages: 1,
+      updatedAt: now,
+    };
+    state.cloneJobs = [data];
+    return HttpResponse.json({ data }, createMockResponseInit({ status: 202 }));
+  }),
+  http.post('*/training-plan-clone-jobs/:cloneJobId/retry', ({ request }) => {
+    const state = getState(getScenario(request));
+    const job = state.cloneJobs[0];
+    if (job?.itemType !== 'clone-job')
+      return apiError(
+        'TRAINING_PLAN_CLONE_JOB_NOT_FOUND',
+        'Clone job not found.',
+        404,
+      );
+    const data = {
+      ...job,
+      generation: job.generation + 1,
+      state: 'running' as const,
+    };
+    state.cloneJobs = [data];
+    return HttpResponse.json({ data }, createMockResponseInit({ status: 202 }));
+  }),
+  http.delete('*/training-plan-clone-jobs/:cloneJobId', ({ request }) => {
+    const state = getState(getScenario(request));
+    const job = state.cloneJobs[0];
+    if (job?.itemType !== 'clone-job')
+      return apiError(
+        'TRAINING_PLAN_CLONE_JOB_NOT_FOUND',
+        'Clone job not found.',
+        404,
+      );
+    const data = { ...job, state: 'cancelling' as const };
+    state.cloneJobs = [data];
+    return HttpResponse.json({ data }, createMockResponseInit({ status: 202 }));
+  }),
 ];
+
+function toPersonalPlanItem(
+  plan: TrainingPlanSummary,
+  catalogEntryId: string,
+  source: 'global-reference' | 'owned',
+  activeCatalogEntryId: string | null,
+): Extract<PersonalTrainingPlanListItem, { itemType: 'training-plan' }> {
+  return {
+    ...plan,
+    active: activeCatalogEntryId === catalogEntryId,
+    catalogEntryId,
+    itemType: 'training-plan',
+    source,
+  };
+}
+
+function rejectPersonalReference(
+  catalogEntryId: string | readonly string[] | undefined,
+) {
+  return catalogEntryId === '74b000000000000000000002'
+    ? apiError(
+        'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+        'Global reference is read only.',
+        409,
+      )
+    : null;
+}
+
+function personalNestedDelete(
+  catalogEntryId: string | readonly string[] | undefined,
+  request: Request,
+) {
+  const state = getState(getScenario(request));
+  const readOnly = rejectPersonalReference(catalogEntryId);
+  if (readOnly !== null) return readOnly;
+  const invalid = validateMutation(request, state, getScenario(request));
+  if (invalid !== null) return invalid;
+  const version = increment(state, request, false);
+  return new HttpResponse(null, responseInit(version, 204));
+}
+
+function personalImageMutation(
+  params: Record<string, string | readonly string[] | undefined>,
+  request: Request,
+  removing: boolean,
+) {
+  const state = getState(getScenario(request));
+  const readOnly = rejectPersonalReference(params.catalogEntryId);
+  if (readOnly !== null) return readOnly;
+  const invalid = validateMutation(request, state, getScenario(request));
+  if (invalid !== null) return invalid;
+  const image = removing ? null : signedExerciseImage('fresh');
+  state.workout = {
+    ...state.workout,
+    exercises: state.workout.exercises.map((exercise) =>
+      exercise.id === params.exerciseId && exercise.type === 'image'
+        ? { ...exercise, image }
+        : exercise,
+    ),
+  };
+  const version = increment(state, request, false);
+  return removing
+    ? new HttpResponse(null, responseInit(version, 204))
+    : HttpResponse.json({ data: { image } }, responseInit(version));
+}

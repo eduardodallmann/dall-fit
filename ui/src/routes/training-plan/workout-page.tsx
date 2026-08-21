@@ -215,6 +215,18 @@ export function TrainingPlanWorkoutPage({
           reason={aggregate.pauseReason}
         />
       ) : null}
+      {workout !== undefined && 'usage' in workout ? (
+        <Alert status={workout.usage.linkedPeople > 0 ? 'warning' : 'default'}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Impacto deste plano global</Alert.Title>
+            <Alert.Description>
+              {workout.usage.linkedPeople} pessoa(s) vinculada(s), sendo{' '}
+              {workout.usage.activePeople} com este plano ativo.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       {workout === undefined ? null : (
         <WorkoutEditor
           data={workout}

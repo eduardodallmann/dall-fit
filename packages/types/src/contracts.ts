@@ -2,7 +2,13 @@ import type {
   Exercise,
   ExerciseImage,
   ExerciseType,
+  GlobalTrainingPlanDetails,
+  GlobalTrainingPlanLibraryItem,
+  GlobalTrainingPlanSummary,
+  GlobalTrainingPlanWorkoutDetails,
   Person,
+  PersonalTrainingPlanDetails,
+  PersonalTrainingPlanListItem,
   Theme,
   TrainingPlanDetails,
   TrainingPlanSummary,
@@ -64,7 +70,54 @@ export interface UpdateTrainingPlanRequest {
 }
 
 export type GlobalTrainingPlanCollectionResponse =
-  CollectionResponse<TrainingPlanSummary>;
+  CollectionResponse<GlobalTrainingPlanSummary>;
+
+export type PersonalTrainingPlanCollectionResponse =
+  CollectionResponse<PersonalTrainingPlanListItem>;
+
+export type GlobalTrainingPlanLibraryResponse =
+  CollectionResponse<GlobalTrainingPlanLibraryItem>;
+
+export type PersonalTrainingPlanDetailsResponse =
+  ApiResponse<PersonalTrainingPlanDetails>;
+
+export type CreatePersonalTrainingPlanResponse =
+  ApiResponse<PersonalTrainingPlanListItem>;
+
+export type GlobalTrainingPlanDetailsResponse =
+  ApiResponse<GlobalTrainingPlanDetails>;
+
+export interface CreateGlobalTrainingPlanReferenceRequest {
+  globalTrainingPlanId: string;
+}
+
+export type CreateGlobalTrainingPlanReferenceResponse =
+  ApiResponse<PersonalTrainingPlanListItem>;
+
+export interface ActivatePersonalTrainingPlanRequest {
+  catalogEntryId: string;
+}
+
+export type ActivatePersonalTrainingPlanResponse = ApiResponse<{
+  activeCatalogEntryId: string;
+}>;
+
+export interface CreateTrainingPlanCloneJobRequest {
+  globalTrainingPlanId: string;
+}
+
+export type TrainingPlanCloneJobResponse =
+  ApiResponse<PersonalTrainingPlanListItem>;
+
+export interface StartTrainingPlanCloneRunV1 {
+  cloneJobId: string;
+  generation: number;
+}
+
+export type StartTrainingPlanCloneRunResponse = ApiResponse<{
+  accepted: true;
+  generation: number;
+}>;
 
 export type CreateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
 export type UpdateTrainingPlanResponse = ApiResponse<TrainingPlanSummary>;
@@ -78,6 +131,9 @@ export interface UpdateTrainingPlanWorkoutRequest {
 
 export type TrainingPlanWorkoutDetailsResponse =
   ApiResponse<TrainingPlanWorkoutDetails>;
+
+export type GlobalTrainingPlanWorkoutDetailsResponse =
+  ApiResponse<GlobalTrainingPlanWorkoutDetails>;
 
 export type UpdateTrainingPlanWorkoutResponse = ApiResponse<{
   id: string;

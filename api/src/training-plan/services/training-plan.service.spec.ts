@@ -38,6 +38,7 @@ function createRepositoryMock() {
       'updateExercise',
       'updateExerciseImage',
       'updateGlobal',
+      'update',
       'updateWorkoutName',
     ].map((name) => [name, vi.fn()]),
   ) as Record<keyof TrainingPlanRepository, ReturnType<typeof vi.fn>>;
@@ -102,7 +103,7 @@ describe('TrainingPlanService', () => {
 
   it('maps a stale update to a version conflict without overwriting', async () => {
     const repository = createRepositoryMock();
-    repository.updateGlobal.mockResolvedValue(null);
+    repository.update.mockResolvedValue(null);
     repository.inspectTarget.mockResolvedValue({
       trainingPlanExists: true,
       workoutExists: true,
@@ -121,7 +122,7 @@ describe('TrainingPlanService', () => {
 
   it('maps a missing global plan before reporting a conflict', async () => {
     const repository = createRepositoryMock();
-    repository.updateGlobal.mockResolvedValue(null);
+    repository.update.mockResolvedValue(null);
     repository.inspectTarget.mockResolvedValue({
       trainingPlanExists: false,
       workoutExists: true,

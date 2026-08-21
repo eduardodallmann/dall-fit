@@ -1,5 +1,9 @@
 # Rota `/global/training-plan/:trainingPlanId/workout/:workoutId`
 
+O editor administrativo apresenta também o resumo de pessoas vinculadas e ativas
+do plano pai. A métrica não altera nenhuma capability do editor e se atualiza após
+mudanças de referência/seleção recebidas pelo stream.
+
 ## Objetivo
 
 Editor administrativo completo de um workout global e sua lista ordenada de até
