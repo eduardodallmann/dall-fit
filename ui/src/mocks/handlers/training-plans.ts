@@ -1102,6 +1102,7 @@ export const trainingPlanHandlers = [
         'Training plan not found.',
         404,
       );
+    await delay(300);
     const now = new Date().toISOString();
     const data: PersonalTrainingPlanListItem = {
       cloneJobId: '84b000000000000000000001',

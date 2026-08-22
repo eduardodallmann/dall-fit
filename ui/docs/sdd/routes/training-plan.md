@@ -10,8 +10,10 @@ aparece sem a pessoa usar ou clonar. A query `page` segue paginação canônica 
 
 O cabeçalho “Meus planos” possui dropdown “Novo plano”: “Criar novo plano” abre o
 formulário existente; “Copiar um plano” abre a biblioteca global paginada com
-resumo de workouts/exercícios e ações “Clonar”/“Usar esse plano”. Uma origem com
-clone ativo da mesma pessoa fica bloqueada na modal.
+resumo de workouts/exercícios e ações “Clonar”/“Usar esse plano”. Ao iniciar uma
+dessas ações, ambas ficam imediatamente bloqueadas somente para a mesma origem
+enquanto o request estiver pendente. Uma origem com clone ativo da mesma pessoa
+continua bloqueada na modal após a confirmação do job.
 
 A tabela possui Nome, Origem, Em uso, Atualização e Ações. O radio não é a primeira
 coluna, possui um único `name`, fica desabilitado no item ativo e nunca desmarca ao
@@ -49,8 +51,8 @@ linha inteira não é usada como controle de seleção.
    mesma tabela; troca do radio mantém somente um ativo.
 2. `?mockAuth=admin&mockTrainingPlans=personal-mixed`: admin também vê “Meus
    planos”, mantendo “Planos globais” separado no menu.
-3. `?mockAuth=person&mockTrainingPlans=clone-running`: linha bloqueada, progresso e
-   cancelamento.
+3. `?mockAuth=person&mockTrainingPlans=clone-running`: ações mutuamente bloqueadas
+   durante o início, linha bloqueada, progresso e cancelamento.
 4. `?mockAuth=person&mockTrainingPlans=clone-failed`: retry e cancelamento.
 
 Implementação em `personal-list-page.tsx`, service/queries da rota; MSW em

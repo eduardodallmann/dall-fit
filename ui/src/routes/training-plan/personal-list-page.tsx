@@ -389,7 +389,9 @@ export function PersonalTrainingPlanListPage({
         />
       ) : null}
       <TrainingPlanLibraryModal
-        clonePending={cloneMutation.isPending}
+        cloningPlanId={
+          cloneMutation.isPending ? cloneMutation.variables : undefined
+        }
         mockTrainingPlans={mockTrainingPlans}
         onClone={async (plan) => {
           await cloneMutation.mutateAsync(plan.id);
@@ -405,7 +407,9 @@ export function PersonalTrainingPlanListPage({
         }}
         open={copying}
         page={libraryPage}
-        referencePending={referenceMutation.isPending}
+        referencingPlanId={
+          referenceMutation.isPending ? referenceMutation.variables : undefined
+        }
       />
       <DeleteConfirmationDialog
         description={
@@ -430,7 +434,7 @@ export function PersonalTrainingPlanListPage({
 }
 
 interface LibraryModalProps {
-  clonePending: boolean;
+  cloningPlanId?: string;
   mockTrainingPlans: MockTrainingPlansScenario;
   onClone: (plan: GlobalTrainingPlanLibraryItem) => Promise<void>;
   onOpenChange: (open: boolean) => void;
@@ -438,11 +442,11 @@ interface LibraryModalProps {
   onReference: (plan: GlobalTrainingPlanLibraryItem) => Promise<void>;
   open: boolean;
   page: number;
-  referencePending: boolean;
+  referencingPlanId?: string;
 }
 
 function TrainingPlanLibraryModal({
-  clonePending,
+  cloningPlanId,
   mockTrainingPlans,
   onClone,
   onOpenChange,
@@ -450,7 +454,7 @@ function TrainingPlanLibraryModal({
   onReference,
   open,
   page,
-  referencePending,
+  referencingPlanId,
 }: Readonly<LibraryModalProps>) {
   const query = useQuery({
     ...trainingPlanLibraryQueryOptions(page, mockTrainingPlans),
@@ -470,47 +474,61 @@ function TrainingPlanLibraryModal({
             </Modal.Header>
             <Modal.Body>
               <div className={styles.libraryList()}>
-                {query.data?.data.map((plan) => (
-                  <article className={styles.libraryItem()} key={plan.id}>
-                    <div className={styles.titleGroup()}>
-                      <h3>{plan.name}</h3>
-                      <p className={styles.description()}>{plan.description}</p>
-                      <p className={styles.description()}>
-                        {plan.workoutCount} treinos · {plan.exerciseCount}{' '}
-                        exercícios
-                      </p>
-                      {plan.workouts.map((workout) => (
-                        <p className={styles.libraryPreview()} key={workout.id}>
-                          {workout.name}:{' '}
-                          {workout.exercises
-                            .map((exercise) => exercise.name)
-                            .join(', ') || 'sem exercícios'}
-                          {workout.hiddenExerciseCount > 0
-                            ? ` e mais ${workout.hiddenExerciseCount}`
-                            : ''}
+                {query.data?.data.map((plan) => {
+                  const clonePending = cloningPlanId === plan.id;
+                  const referencePending = referencingPlanId === plan.id;
+                  const actionPending = clonePending || referencePending;
+                  return (
+                    <article className={styles.libraryItem()} key={plan.id}>
+                      <div className={styles.titleGroup()}>
+                        <h3>{plan.name}</h3>
+                        <p className={styles.description()}>
+                          {plan.description}
                         </p>
-                      ))}
-                    </div>
-                    <div className={styles.actions()}>
-                      <Button
-                        isDisabled={plan.cloneBlocked || plan.referenced}
-                        isPending={referencePending}
-                        onPress={() => void onReference(plan)}
-                        variant="secondary"
-                      >
-                        Usar esse plano
-                      </Button>
-                      <Button
-                        isDisabled={plan.cloneBlocked}
-                        isPending={clonePending}
-                        onPress={() => void onClone(plan)}
-                      >
-                        <Copy aria-hidden="true" className={styles.icon()} />
-                        Clonar
-                      </Button>
-                    </div>
-                  </article>
-                ))}
+                        <p className={styles.description()}>
+                          {plan.workoutCount} treinos · {plan.exerciseCount}{' '}
+                          exercícios
+                        </p>
+                        {plan.workouts.map((workout) => (
+                          <p
+                            className={styles.libraryPreview()}
+                            key={workout.id}
+                          >
+                            {workout.name}:{' '}
+                            {workout.exercises
+                              .map((exercise) => exercise.name)
+                              .join(', ') || 'sem exercícios'}
+                            {workout.hiddenExerciseCount > 0
+                              ? ` e mais ${workout.hiddenExerciseCount}`
+                              : ''}
+                          </p>
+                        ))}
+                      </div>
+                      <div className={styles.actions()}>
+                        <Button
+                          isDisabled={
+                            plan.cloneBlocked ||
+                            plan.referenced ||
+                            actionPending
+                          }
+                          isPending={referencePending}
+                          onPress={() => void onReference(plan)}
+                          variant="secondary"
+                        >
+                          Usar esse plano
+                        </Button>
+                        <Button
+                          isDisabled={plan.cloneBlocked || actionPending}
+                          isPending={clonePending}
+                          onPress={() => void onClone(plan)}
+                        >
+                          <Copy aria-hidden="true" className={styles.icon()} />
+                          Clonar
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
               {query.isError ? (
                 <Alert status="danger">

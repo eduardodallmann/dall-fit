@@ -63,7 +63,15 @@ test.describe('Rotas pessoais de planos de treino', () => {
     await expect(
       dialog.getByRole('button', { name: 'Clonar' }).first(),
     ).toBeDisabled();
-    await dialog.getByRole('button', { name: 'Clonar' }).nth(1).click();
+    const availablePlan = dialog
+      .locator('article')
+      .filter({ hasText: 'Plano global 3' });
+    const useButton = availablePlan.getByRole('button', {
+      name: 'Usar esse plano',
+    });
+    await expect(useButton).toBeEnabled();
+    await availablePlan.getByRole('button', { name: 'Clonar' }).click();
+    await expect(useButton).toBeDisabled();
     await expect(page.getByText('Clonagem iniciada.')).toBeVisible();
     await expect(page.getByText(/Clonando imagens:/)).toBeVisible();
   });
