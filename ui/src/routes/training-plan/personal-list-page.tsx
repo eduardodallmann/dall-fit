@@ -272,7 +272,11 @@ export function PersonalTrainingPlanListPage({
                     </Table.Row>
                   ) : (
                     <Table.Row
-                      className={item.active ? styles.activeRow() : undefined}
+                      className={
+                        selectedCatalogEntryId === item.catalogEntryId
+                          ? styles.activeRow()
+                          : undefined
+                      }
                       id={item.catalogEntryId}
                     >
                       <Table.Cell>

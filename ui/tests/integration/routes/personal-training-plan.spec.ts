@@ -43,11 +43,44 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toBeVisible();
     const radios = page.getByRole('radio');
     await expect(radios).toHaveCount(2);
+    const firstRow = page.getByRole('row', {
+      name: /Hipertrofia iniciante/,
+    });
+    const secondRow = page.getByRole('row', { name: /Plano global/ });
+    const firstCell = firstRow.getByRole('gridcell').first();
+    const secondCell = secondRow.getByRole('gridcell').first();
+    const idleBackground = await firstCell.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
     await radios.first().click();
+    await page.mouse.move(0, 0);
     await expect(radios.first()).toBeChecked();
+    await expect
+      .poll(() =>
+        firstCell.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      )
+      .not.toBe(idleBackground);
+    await expect(radios.nth(1)).toBeEnabled();
     await radios.nth(1).click();
+    await page.mouse.move(0, 0);
     await expect(radios.first()).not.toBeChecked();
     await expect(radios.nth(1)).toBeChecked();
+    await expect
+      .poll(() =>
+        firstCell.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      )
+      .toBe(idleBackground);
+    await expect
+      .poll(() =>
+        secondCell.evaluate(
+          (element) => getComputedStyle(element).backgroundColor,
+        ),
+      )
+      .not.toBe(idleBackground);
   });
 
   test('abre a biblioteca pelo dropdown e inicia uma clonagem bloqueada', async ({

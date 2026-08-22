@@ -17,9 +17,11 @@ continua bloqueada na modal após a confirmação do job.
 
 A tabela possui Nome, Origem, Em uso, Atualização e Ações. O radio não é a primeira
 coluna, possui um único `name`, fica desabilitado no item ativo e nunca desmarca ao
-ser clicado. Pode não haver nenhum ativo. A linha ativa recebe realce discreto.
-Plano próprio oferece editar/excluir; referência oferece navegação e “Excluir”,
-que visualmente remove o item mas envia desvinculação sem versão.
+ser clicado. Pode não haver nenhum ativo. A seleção aplica imediatamente um realce
+discreto e persistente às células da linha ativa; falha restaura o destaque
+confirmado anterior. Plano próprio oferece editar/excluir; referência oferece
+navegação e “Excluir”, que visualmente remove o item mas envia desvinculação sem
+versão.
 
 Job aparece como linha não navegável “Clonando”, com estado/progresso. Em
 `failed|start-failed` oferece retry; enquanto não terminal oferece cancelar. A

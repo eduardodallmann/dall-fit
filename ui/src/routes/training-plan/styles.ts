@@ -4,7 +4,7 @@ export const trainingPlanStyles = tv({
   slots: {
     actions: 'flex flex-wrap items-center justify-end gap-2',
     activeRadio: 'size-4 accent-accent',
-    activeRow: 'bg-accent/5',
+    activeRow: '[&>[data-slot=table-cell]]:bg-accent-soft!',
     actionTrigger:
       'flex size-8 items-center justify-center rounded-lg outline-none transition-colors hover:bg-default focus-visible:ring-2 focus-visible:ring-focus',
     breadcrumbItem: 'flex items-center gap-2',
