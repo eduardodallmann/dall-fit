@@ -119,7 +119,8 @@ function getState(scenario: string): ScenarioState {
   if (
     scenario === 'image-signed-url-expired' ||
     scenario === 'image-ready' ||
-    scenario === 'image-error'
+    scenario === 'image-error' ||
+    scenario === 'personal-reference'
   ) {
     result.workout = {
       ...result.workout,

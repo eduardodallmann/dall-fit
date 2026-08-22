@@ -13,16 +13,7 @@ import {
   Spinner,
   TextField,
 } from '@heroui/react';
-import {
-  CirclePause,
-  Clock,
-  FileImage,
-  GripVertical,
-  RotateCcw,
-  Trash2,
-  TvMinimalPlay,
-  Video,
-} from 'lucide-react';
+import { GripVertical, RotateCcw, Trash2 } from 'lucide-react';
 
 import {
   BODY_AREAS,
@@ -33,47 +24,17 @@ import {
 
 import { trackUiEvent } from '~/core/analytics';
 import { ImageFilePicker } from '~/core/components/image-file-picker';
+import {
+  bodyAreaLabels,
+  exerciseTypeIcons,
+  exerciseTypeLabels,
+} from '~/routes/training-plan/exercise-presentation';
+import { ExerciseVideoPreview } from '~/routes/training-plan/exercise-video-preview';
 
 import type { ExerciseSaveStatus } from './editor-state';
-import { ExerciseVideoPreview } from './exercise-video-preview';
 import { workoutEditorStyles } from './styles';
 
 const styles = workoutEditorStyles();
-
-const bodyAreaLabels: Record<BodyArea, string> = {
-  stretching: 'Alongamentos',
-  abdomen: 'Abdômen',
-  quadriceps: 'Quadríceps',
-  mobility: 'Mobilidade',
-  other: 'Outros',
-  chest: 'Peito',
-  shoulder: 'Ombro',
-  triceps: 'Tríceps',
-  back: 'Costas',
-  biceps: 'Bíceps',
-  'lower-back': 'Lombar',
-  glutes: 'Glúteo',
-  calf: 'Panturrilha',
-  adductor: 'Adutor',
-  hamstrings: 'Posterior de coxa',
-  cardio: 'Cardio',
-};
-
-const typeLabels: Record<Exercise['type'], string> = {
-  'youtube-short': 'YouTube Short',
-  image: 'Imagem',
-  'youtube-long': 'YouTube Longo',
-  pause: 'Pausa',
-  duration: 'Duração',
-};
-
-const typeIcons = {
-  'youtube-short': Video,
-  'youtube-long': TvMinimalPlay,
-  image: FileImage,
-  pause: CirclePause,
-  duration: Clock,
-} as const;
 
 interface ExerciseRowProps {
   exercise: Exercise;
@@ -162,7 +123,7 @@ export function ExerciseRow({
         exercise={exercise}
         handle={
           <button
-            aria-label={`Mover ${typeLabels[exercise.type]}`}
+            aria-label={`Mover ${exerciseTypeLabels[exercise.type]}`}
             className={styles.handle()}
             data-exercise-drag-handle={exercise.id}
             disabled={isDisabled || isStructureDisabled}
@@ -175,7 +136,7 @@ export function ExerciseRow({
         }
       >
         <div className={styles.exerciseActions()}>
-          <Chip>{typeLabels[exercise.type]}</Chip>
+          <Chip>{exerciseTypeLabels[exercise.type]}</Chip>
           {status === 'error' ? (
             <Button
               isDisabled={isDisabled || isStructureDisabled}
@@ -193,7 +154,7 @@ export function ExerciseRow({
             ) : (
               <Popover>
                 <Button
-                  aria-label={`Excluir ${typeLabels[exercise.type]}`}
+                  aria-label={`Excluir ${exerciseTypeLabels[exercise.type]}`}
                   isDisabled={isDisabled || isStructureDisabled}
                   isIconOnly
                   size="sm"
@@ -203,7 +164,7 @@ export function ExerciseRow({
                 </Button>
                 <Popover.Content placement="bottom end">
                   <Popover.Dialog
-                    aria-label={`Confirmar exclusão de ${typeLabels[exercise.type]}`}
+                    aria-label={`Confirmar exclusão de ${exerciseTypeLabels[exercise.type]}`}
                   >
                     <Button onPress={onDelete} variant="danger">
                       Confirmar exclusão
@@ -253,7 +214,7 @@ export function ExerciseDragPreview({
           </span>
         }
       >
-        <Chip>{typeLabels[exercise.type]}</Chip>
+        <Chip>{exerciseTypeLabels[exercise.type]}</Chip>
       </ExerciseCardHeader>
       {'name' in exercise ? (
         <p className={styles.dragPreviewName()}>{exercise.name}</p>
@@ -271,7 +232,7 @@ function ExerciseCardHeader({
   exercise: Exercise;
   handle: ReactNode;
 }>) {
-  const TypeIcon = typeIcons[exercise.type];
+  const TypeIcon = exerciseTypeIcons[exercise.type];
   return (
     <div className={styles.cardHeader()}>
       <div className={styles.cardIdentity()}>

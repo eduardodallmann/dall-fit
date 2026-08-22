@@ -1,22 +1,18 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type DragEvent,
-} from 'react';
+import { useId, useRef, useState, type DragEvent } from 'react';
 
-import { Button, Modal, Spinner, useOverlayState } from '@heroui/react';
-import { Eye, Plus, Trash2, Upload } from 'lucide-react';
+import { Button, Spinner } from '@heroui/react';
+import { Plus, Trash2, Upload } from 'lucide-react';
+
+import {
+  ImagePreview,
+  type ImagePreviewCloseReason,
+} from '~/core/components/image-preview';
 
 import { imageFilePickerStyles } from './styles';
 
 const styles = imageFilePickerStyles();
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const maximumImageSize = 10 * 1024 * 1024;
-
-export type ImagePreviewCloseReason = 'backdrop' | 'close_trigger' | 'escape';
 
 interface ImageFilePickerProps {
   displayImageUrl?: string;
@@ -34,154 +30,11 @@ interface ImageFilePickerProps {
   previewTitle: string;
 }
 
-interface ExistingImageMediaProps {
-  disabled: boolean;
-  displayImageUrl?: string;
-  imageUrl: string;
-  isPending: boolean;
-  label: string;
-  onImageLoadError: () => void;
-  onPreviewClose: (reason: ImagePreviewCloseReason) => void;
-  onPreviewOpen: () => void;
-  onRetry: () => void;
-  previewTitle: string;
-}
-
 function getValidationError(file: File): string | undefined {
   if (!allowedTypes.has(file.type)) return 'Use uma imagem JPEG, PNG ou WebP.';
   if (file.size > maximumImageSize)
     return 'A imagem deve ter no máximo 10 MiB.';
   return undefined;
-}
-
-function ExistingImageMedia({
-  disabled,
-  displayImageUrl,
-  imageUrl,
-  isPending,
-  label,
-  onImageLoadError,
-  onPreviewClose,
-  onPreviewOpen,
-  onRetry,
-  previewTitle,
-}: Readonly<ExistingImageMediaProps>) {
-  const closeReasonRef = useRef<ImagePreviewCloseReason>('backdrop');
-  const isOpenRef = useRef(false);
-  const [failedImageUrl, setFailedImageUrl] = useState<string>();
-  const [failedDisplayImageUrl, setFailedDisplayImageUrl] = useState<string>();
-  const imageUnavailable = failedImageUrl === imageUrl;
-  const displayImageUnavailable =
-    displayImageUrl !== undefined && failedDisplayImageUrl === displayImageUrl;
-  const handleOpenChange = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen) {
-        isOpenRef.current = true;
-        onPreviewOpen();
-        return;
-      }
-      if (!isOpenRef.current) return;
-      onPreviewClose(closeReasonRef.current);
-      isOpenRef.current = false;
-      closeReasonRef.current = 'backdrop';
-    },
-    [onPreviewClose, onPreviewOpen],
-  );
-  const modalState = useOverlayState({ onOpenChange: handleOpenChange });
-
-  useEffect(() => {
-    if (!modalState.isOpen) return;
-    const markEscapeClose = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeReasonRef.current = 'escape';
-    };
-    document.addEventListener('keydown', markEscapeClose, true);
-    return () => document.removeEventListener('keydown', markEscapeClose, true);
-  }, [modalState.isOpen]);
-
-  if (imageUnavailable) {
-    return (
-      <div className={styles.fallback()} role="status">
-        <span>Imagem indisponível.</span>
-        <Button
-          isDisabled={disabled}
-          onPress={onRetry}
-          size="sm"
-          variant="secondary"
-        >
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <Modal state={modalState}>
-      <Button
-        aria-label={`Visualizar ${label.toLocaleLowerCase('pt-BR')}`}
-        className={styles.previewTrigger({ isPending })}
-        isDisabled={disabled}
-        variant="ghost"
-      >
-        <img
-          alt={label}
-          className={styles.image({ isPending })}
-          onError={() => {
-            setFailedImageUrl(imageUrl);
-            onImageLoadError();
-          }}
-          referrerPolicy="no-referrer"
-          src={imageUrl}
-        />
-        <span aria-hidden="true" className={styles.previewOverlay()}>
-          {isPending ? (
-            <Spinner color="current" size="sm" />
-          ) : (
-            <Eye className={styles.previewIcon()} />
-          )}
-        </span>
-      </Button>
-      <Modal.Backdrop
-        className={styles.modalBackdrop()}
-        isDismissable
-        onClick={(event) => {
-          if (event.target === event.currentTarget)
-            closeReasonRef.current = 'backdrop';
-        }}
-      >
-        <Modal.Container className={styles.modalContainer()} size="lg">
-          <Modal.Dialog aria-label={label} className={styles.modalDialog()}>
-            <Modal.CloseTrigger
-              aria-label="Fechar imagem"
-              onPressStart={() => {
-                closeReasonRef.current = 'close_trigger';
-              }}
-            />
-            <Modal.Header className={styles.modalHeader()}>
-              <Modal.Heading>{previewTitle}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body className={styles.modalBody()}>
-              {displayImageUrl === undefined || displayImageUnavailable ? (
-                <div className={styles.displayFallback()} role="status">
-                  Imagem indisponível.
-                </div>
-              ) : (
-                <img
-                  alt={label}
-                  className={styles.displayImage()}
-                  onError={() => {
-                    setFailedDisplayImageUrl(displayImageUrl);
-                    onImageLoadError();
-                  }}
-                  referrerPolicy="no-referrer"
-                  src={displayImageUrl}
-                />
-              )}
-            </Modal.Body>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
-  );
 }
 
 export function ImageFilePicker({
@@ -259,10 +112,10 @@ export function ImageFilePicker({
           )}
         </button>
       ) : (
-        <ExistingImageMedia
-          disabled={disabled}
+        <ImagePreview
           displayImageUrl={displayImageUrl}
           imageUrl={imageUrl}
+          isDisabled={disabled}
           isPending={isPending}
           label={label}
           onImageLoadError={onImageLoadError}
@@ -270,6 +123,7 @@ export function ImageFilePicker({
           onPreviewOpen={onPreviewOpen}
           onRetry={onRetry}
           previewTitle={previewTitle}
+          size="editor"
         />
       )}
       {imageUrl === undefined ? null : (

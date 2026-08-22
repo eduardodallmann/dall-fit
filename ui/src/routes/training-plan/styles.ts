@@ -18,10 +18,6 @@ export const trainingPlanStyles = tv({
       'mx-auto flex w-full max-w-md flex-col items-center gap-3 py-10 text-center',
     emptyIcon: 'size-8 text-muted',
     emptyState: 'flex w-full items-center justify-center',
-    exerciseCard:
-      'flex flex-col gap-2 rounded-xl border border-default-200 p-4',
-    exerciseImage: 'h-auto max-h-96 w-full rounded-lg object-contain',
-    exerciseList: 'flex flex-col gap-3',
     fieldError: 'text-sm text-danger',
     form: 'flex flex-col gap-5',
     icon: 'size-4',

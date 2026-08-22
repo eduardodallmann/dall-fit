@@ -128,6 +128,54 @@ test.describe('Rotas pessoais de planos de treino', () => {
     await expect(
       page.getByRole('button', { name: 'Adicionar exercício' }),
     ).toHaveCount(0);
+    const exerciseList = page.getByRole('list', {
+      name: 'Exercícios em ordem',
+    });
+    await expect(exerciseList.getByRole('listitem')).toHaveCount(5);
+    await expect(
+      exerciseList.getByText('YouTube Short', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      exerciseList.getByText('Quadríceps', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('ZA8gs8XP2bs', { exact: true })).toHaveCount(0);
+
+    const videoCard = exerciseList
+      .getByRole('listitem')
+      .filter({ hasText: 'Agachamento' });
+    const videoPreview = videoCard.getByRole('button', {
+      name: 'Reproduzir vídeo de Agachamento',
+    });
+    const videoCardBox = await videoCard.boundingBox();
+    const videoPreviewBox = await videoPreview.boundingBox();
+    expect(videoCardBox).not.toBeNull();
+    expect(videoPreviewBox).not.toBeNull();
+    if (videoCardBox !== null && videoPreviewBox !== null)
+      expect(videoPreviewBox.x).toBeGreaterThan(
+        videoCardBox.x + videoCardBox.width / 2,
+      );
+    await videoPreview.click();
+    await expect(
+      page.getByRole('dialog', { name: 'Vídeo de Agachamento' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Fechar vídeo' }).click();
+
+    const imageCard = exerciseList
+      .getByRole('listitem')
+      .filter({ hasText: 'Supino' });
+    const imagePreview = imageCard.getByRole('button', {
+      name: 'Visualizar imagem de supino',
+    });
+    await expect(imagePreview).toBeVisible();
+    await imagePreview.click();
+    const imageDialog = page.getByRole('dialog', {
+      name: 'Imagem de Supino',
+    });
+    await expect(imageDialog).toBeVisible();
+    await expect(
+      imageDialog.getByRole('img', { name: 'Imagem de Supino' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Fechar imagem' }).click();
   });
 
   test('mantém o editor completo para um plano próprio', async ({ page }) => {

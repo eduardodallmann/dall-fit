@@ -32,6 +32,16 @@ Loading usa empty/skeleton da tabela; vazio orienta criar ou escolher modelo; er
 mostra “Tentar novamente”. Mutations permanecem pending, invalidam catálogo e
 biblioteca no sucesso e exibem toast/erro sem inventar estado concluído.
 
+No workout de uma referência global, os exercícios formam uma lista ordenada de
+cards de consulta. Cada card mostra posição, ícone, nome, área corporal traduzida,
+tipo traduzido em `Chip` e métricas separadas por rótulo; IDs e outros valores
+técnicos de mídia não são exibidos. Imagem e miniatura do YouTube ocupam uma área
+compacta à direita, inclusive em viewport móvel. Clique ou teclado abre o mesmo
+modal amplo usado pelo editor: imagem usa a variante `display`, e vídeos curto e
+longo preservam respectivamente 9:16 e 16:9 e montam o player somente enquanto o
+modal está aberto. Mídia ausente tem placeholder explícito. A tela conserva aviso
+de somente leitura e não renderiza inputs nem ações de gravação, exclusão ou ordem.
+
 ## Integrações e navegação
 
 - `GET/POST /training-plans`, `GET /training-plans/library`;
@@ -46,6 +56,8 @@ biblioteca no sucesso e exibem toast/erro sem inventar estado concluído.
 Tabela possui headers semânticos, nome como row header, radio rotulado pelo plano,
 menus/dropdown operáveis por teclado e ações de clone com labels específicos. A
 linha inteira não é usada como controle de seleção.
+No workout somente leitura, a ordem usa `ol`, cada mídia possui botão nomeado pelo
+exercício, os modais têm heading e fechamento acessíveis e devolvem foco ao trigger.
 
 ## Cenários funcionais e cobertura
 

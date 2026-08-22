@@ -2,10 +2,11 @@ import { Button } from '@heroui/react';
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
-import type { Exercise, TrainingPlanWorkoutDetails } from '@dall-fit/types';
+import type { TrainingPlanWorkoutDetails } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
+import { ReadOnlyWorkout } from '~/routes/training-plan/read-only-workout';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import {
   personalTrainingPlanDetailQueryOptions,
@@ -98,7 +99,11 @@ export function PersonalTrainingPlanWorkoutPage({
         <span>{workout.name}</span>
       </nav>
       {plan.source === 'global-reference' ? (
-        <ReadOnlyWorkout workout={workout} />
+        <ReadOnlyWorkout
+          onImageLoadError={() => void workoutQuery.refetch()}
+          onRetryImage={() => void workoutQuery.refetch()}
+          workout={workout}
+        />
       ) : (
         <WorkoutEditor
           data={editorData}
@@ -110,80 +115,4 @@ export function PersonalTrainingPlanWorkoutPage({
       )}
     </div>
   );
-}
-
-function ReadOnlyWorkout({
-  workout,
-}: Readonly<{ workout: TrainingPlanWorkoutDetails }>) {
-  return (
-    <section
-      aria-label="Treino em modo de leitura"
-      className={styles.section()}
-    >
-      <div className={styles.titleGroup()}>
-        <h1 className={styles.title()}>{workout.name}</h1>
-        <p className={styles.description()}>
-          Exercícios definidos no plano global. Nenhuma informação pode ser
-          alterada neste vínculo.
-        </p>
-      </div>
-      <div className={styles.exerciseList()}>
-        {workout.exercises.map((exercise, index) => (
-          <article className={styles.exerciseCard()} key={exercise.id}>
-            <h2>
-              {index + 1}. {exerciseLabel(exercise)}
-            </h2>
-            <ExerciseDetails exercise={exercise} />
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ExerciseDetails({ exercise }: Readonly<{ exercise: Exercise }>) {
-  if (exercise.type === 'pause')
-    return <p>Pausa: {exercise.restSeconds} segundos</p>;
-  if (exercise.type === 'duration')
-    return (
-      <p>
-        {exercise.bodyArea} · {exercise.durationMinutes} minutos
-      </p>
-    );
-  if (exercise.type === 'youtube-long')
-    return (
-      <p>
-        {exercise.bodyArea} · YouTube: {exercise.youtubeId || 'não informado'}
-      </p>
-    );
-  if (exercise.type === 'youtube-short')
-    return (
-      <p>
-        {exercise.bodyArea} · {exercise.sets} séries · {exercise.repetitions}{' '}
-        repetições · {exercise.restSeconds}s de descanso · YouTube:{' '}
-        {exercise.youtubeId || 'não informado'}
-      </p>
-    );
-  return (
-    <div className={styles.titleGroup()}>
-      <p>
-        {exercise.bodyArea} · {exercise.sets} séries · {exercise.repetitions}{' '}
-        repetições · {exercise.restSeconds}s de descanso
-      </p>
-      {exercise.image === null ? (
-        <p>Sem imagem.</p>
-      ) : (
-        <img
-          alt={exercise.name}
-          className={styles.exerciseImage()}
-          src={exercise.image.displayUrl}
-        />
-      )}
-    </div>
-  );
-}
-
-function exerciseLabel(exercise: Exercise): string {
-  if (exercise.type === 'pause') return 'Pausa';
-  return exercise.name;
 }
