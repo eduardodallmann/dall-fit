@@ -762,7 +762,10 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
         {
           $match: {
             _id: new Types.ObjectId(trainingPlanId),
-            ownerPersonId: scope.ownerPersonId,
+            ownerPersonId:
+              scope.ownerPersonId === null
+                ? null
+                : new Types.ObjectId(scope.ownerPersonId),
           },
         },
         { $set: { originalBsonSize: { $bsonSize: '$$ROOT' } } },

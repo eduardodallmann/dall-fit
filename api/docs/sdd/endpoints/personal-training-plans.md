@@ -126,18 +126,29 @@ curl --request POST http://localhost:4000/auth/test-login \
   --cookie-jar /tmp/dall-fit-fit58.txt \
   --data '{"googleSubject":"google-person-001","name":"Regular Runner","email":"regular.runner@example.test","photoUrl":null}' \
 && CSRF_TOKEN="$(curl --silent http://localhost:4000/auth/csrf --cookie /tmp/dall-fit-fit58.txt | jq -r '.data.token')" \
-&& curl --include --request POST http://localhost:4000/training-plans \
+&& curl --silent --show-error --request POST http://localhost:4000/training-plans \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit58.txt \
-  --data '{"name":"Meu plano","description":"Treino pessoal."}'
+  --data '{"name":"Meu plano","description":"Treino pessoal."}' \
+  --dump-header /tmp/dall-fit-fit58-created-plan.headers \
+  --output /tmp/dall-fit-fit58-created-plan.json \
+&& CATALOG_ENTRY_ID="$(jq -r '.data.catalogEntryId' /tmp/dall-fit-fit58-created-plan.json)" \
+&& curl --include --request POST "http://localhost:4000/training-plans/${CATALOG_ENTRY_ID}/workouts" \
+  --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
+  --header 'x-resource-version: 0' --header "x-csrf-token: ${CSRF_TOKEN}" \
+  --cookie /tmp/dall-fit-fit58.txt --data '{}'
 ```
 
-Retorna uma entrada `owned`, v0 e inativa. O `catalogEntryId` retornado substitui
-o parâmetro nas operações PATCH/workouts; as mutations seguintes usam
-`X-Resource-Version` exatamente como no editor global.
+O primeiro request retorna uma entrada `owned`, v0 e inativa. O segundo usa o
+`catalogEntryId`, cria `Novo treino` e retorna a versão 1 no header. As demais
+mutations aninhadas usam `X-Resource-Version` exatamente como no editor global;
+na validação prévia das árvores próprias, o adapter Mongo converte o owner da
+sessão para `ObjectId` explicitamente porque pipelines de agregação não aplicam o
+casting automático das queries Mongoose.
 
 ## Cobertura
 
 E2E em `api/test/training-plan.e2e-spec.ts` cobre pessoa comum, ownership,
-catálogo misto, referência read-only, seleção, criação, desvinculação e mutações.
+catálogo misto, referência read-only, seleção, criação, desvinculação e criação de
+workout próprio pelo `catalogEntryId`.
 Unitários dos services usam repositories e starter substituídos por mocks.

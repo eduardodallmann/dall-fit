@@ -1168,6 +1168,39 @@ describe('Global training plans (e2e)', () => {
     await expect(activeModel.countDocuments()).resolves.toBe(0);
   });
 
+  it('creates a workout in an owned personal plan through its catalog entry', async () => {
+    const person = await login(false);
+    const createOwned = await authenticatedMutation(
+      person,
+      person.post('/training-plans'),
+    ).send({
+      name: 'Meu plano com treino',
+      description: 'Plano pessoal editável.',
+    });
+    expect(createOwned.status).toBe(201);
+    const owned = createOwned.body as {
+      data: { catalogEntryId: string; id: string; version: number };
+    };
+
+    const createWorkout = await authenticatedMutation(
+      person,
+      person
+        .post(`/training-plans/${owned.data.catalogEntryId}/workouts`)
+        .set('X-Resource-Version', String(owned.data.version)),
+    ).send({});
+
+    expect(createWorkout.status).toBe(201);
+    expect(createWorkout.headers['x-resource-version']).toBe('1');
+    expect(createWorkout.body).toMatchObject({
+      data: { exerciseCount: 0, name: 'Novo treino' },
+    });
+    const persisted = await trainingPlanModel
+      .findById(owned.data.id)
+      .lean()
+      .exec();
+    expect(persisted?.workouts).toHaveLength(1);
+  });
+
   it('persists an invisible clone job before scheduling and exposes only its blocked row', async () => {
     const person = await login(false);
     const global = await createGlobalPlan({
