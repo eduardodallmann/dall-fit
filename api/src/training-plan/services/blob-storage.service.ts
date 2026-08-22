@@ -58,7 +58,8 @@ export class BlobStorageService {
     try {
       const blob = await put(pathname, content, {
         access: 'private',
-        addRandomSuffix: true,
+        addRandomSuffix: false,
+        allowOverwrite: false,
         abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
         contentType: 'image/webp',
       });

@@ -62,24 +62,25 @@ describe('BlobStorageService', () => {
   it('uploads privately through OIDC without passing a permanent token', async () => {
     putBlobMock.mockResolvedValue({
       etag: 'upload-etag',
-      pathname: 'exercise-images/thumbnail-1.webp',
+      pathname: 'exercise-images/asset-1/thumbnail.webp',
     });
 
     const result = await service.upload(
-      'exercise-images/thumbnail.webp',
+      'exercise-images/asset-1/thumbnail.webp',
       Buffer.from('image'),
     );
 
     expect(result).toEqual({
       etag: 'upload-etag',
-      key: 'exercise-images/thumbnail-1.webp',
+      key: 'exercise-images/asset-1/thumbnail.webp',
     });
     expect(putBlobMock).toHaveBeenCalledWith(
-      'exercise-images/thumbnail.webp',
+      'exercise-images/asset-1/thumbnail.webp',
       expect.any(Buffer),
       expect.objectContaining({
         access: 'private',
-        addRandomSuffix: true,
+        addRandomSuffix: false,
+        allowOverwrite: false,
         contentType: 'image/webp',
       }),
     );

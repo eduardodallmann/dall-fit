@@ -71,8 +71,9 @@ CSRF e rate limit. IDs pessoais continuam ocultos por
    animação de saída.
    Imagens JPEG/PNG/WebP são
    enviadas por `FormData`, validadas por bytes/pixels e transformadas em WebP de
-   thumbnail/display sob `exercise-images/` no Blob privado, sem base64 ou
-   original persistido. Depois da autorização, a API assina cada pathname exato
+   thumbnail/display sob um mesmo `exercise-images/{imageAssetId}/` no Blob
+   privado, sem base64 ou original persistido. Cada novo upload recebe outro ID
+   opaco. Depois da autorização, a API assina cada pathname exato
    para `get` por quinze minutos e inclui as duas URLs e sua expiração no array de
    exercícios. O navegador baixa os bytes diretamente do Blob/CDN. A miniatura
    abre `displayUrl` em modal; sem imagem, clique, teclado ou drop de um arquivo

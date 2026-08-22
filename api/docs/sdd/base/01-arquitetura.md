@@ -52,7 +52,10 @@ encapsula `@vercel/blob` no store privado identificado pelo valor opaco de
 `BLOB_STORE_ID`. Produção/Preview usam OIDC gerenciado pela Vercel; a aplicação não
 recebe nem passa `BLOB_READ_WRITE_TOKEN`, não deriva hostname do ID e não configura
 uma URL paralela. `put` usa `access: 'private'`; `head`, `del` e `list` selecionam
-o mesmo store por OIDC.
+o mesmo store por OIDC. Todo novo par de variantes compartilha um `imageAssetId`
+opaco no pathname `exercise-images/{imageAssetId}/{thumbnail|display}.webp`.
+Uploads normais geram um ID novo antes do primeiro `put`, desabilitam o sufixo
+aleatório do SDK e não sobrescrevem outro asset.
 
 MongoDB persiste somente pathname/key, dimensões e o ETag opaco recebido no
 upload. Imagens legadas sem esse campo têm o ETag resolvido por `head` ao iniciar
@@ -64,6 +67,8 @@ a hidratação limita-se a quatro imagens simultâneas, no máximo oito emissõe
 pathname e signed URL nunca são registrados. Upload parcial, falha de assinatura
 ou falha pré-CAS compensam blobs novos; limpezas pós-commit podem ser retomadas por
 `pnpm -C api images:reconcile` (dry-run por padrão; `--execute` é explícito).
+Essa reconciliação preserva tanto referências materializadas quanto origens do
+snapshot e destinos já confirmados de jobs de clone não terminais.
 `autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
 `pnpm -C api indexes:apply -- --execute` com
 `INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v1`. O comando cria primeiro

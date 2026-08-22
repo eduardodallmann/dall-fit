@@ -76,7 +76,7 @@ describe('Global training plans (e2e)', () => {
       Promise.resolve([]),
     ),
     upload: vi.fn((pathname: string, content: Buffer) => {
-      const key = `${pathname.replace('.webp', '')}-${uploadedBlobs.length + 1}.webp`;
+      const key = pathname;
       uploadedBlobs.push({ content, key });
       return Promise.resolve({ etag: `etag:${key}`, key });
     }),
@@ -804,11 +804,11 @@ describe('Global training plans (e2e)', () => {
       };
     };
     expect(uploadResponse.headers['cache-control']).toBe('private, no-store');
-    expect(uploadBody.data.image.displayUrl).toContain(
-      '/exercise-images/display-',
+    expect(uploadBody.data.image.displayUrl).toMatch(
+      /\/exercise-images\/[a-f0-9]{24}\/display\.webp\?/u,
     );
-    expect(uploadBody.data.image.thumbnailUrl).toContain(
-      '/exercise-images/thumbnail-',
+    expect(uploadBody.data.image.thumbnailUrl).toMatch(
+      /\/exercise-images\/[a-f0-9]{24}\/thumbnail\.webp\?/u,
     );
     expect(uploadBody.data.image.displayUrl).toContain(
       'vercel-blob-delegation=fake',
@@ -857,11 +857,13 @@ describe('Global training plans (e2e)', () => {
       }
     )?.image;
     expect(persistedImage?.display?.height).toBe(720);
-    expect(persistedImage?.display?.key).toContain('exercise-images/display-');
+    expect(persistedImage?.display?.key).toMatch(
+      /^exercise-images\/[a-f0-9]{24}\/display\.webp$/u,
+    );
     expect(persistedImage?.display?.width).toBe(1080);
     expect(persistedImage?.thumbnail?.height).toBe(107);
-    expect(persistedImage?.thumbnail?.key).toContain(
-      'exercise-images/thumbnail-',
+    expect(persistedImage?.thumbnail?.key).toMatch(
+      /^exercise-images\/[a-f0-9]{24}\/thumbnail\.webp$/u,
     );
     expect(persistedImage?.thumbnail?.width).toBe(160);
     expect(JSON.stringify(persistedImage)).not.toContain('"url"');

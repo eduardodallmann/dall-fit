@@ -66,12 +66,10 @@ describe('CloneBlobService', () => {
   it('copies both variants with their source ETags and deterministic paths', async () => {
     copyBlobMock
       .mockResolvedValueOnce({
-        pathname:
-          'training-plan-clones/64b000000000000000000001/64b000000000000000000004/thumbnail.webp',
+        pathname: 'exercise-images/f79ea6abd92d85d5822b29f4/thumbnail.webp',
       })
       .mockResolvedValueOnce({
-        pathname:
-          'training-plan-clones/64b000000000000000000001/64b000000000000000000004/display.webp',
+        pathname: 'exercise-images/f79ea6abd92d85d5822b29f4/display.webp',
       });
     const service = new CloneBlobService();
 
@@ -83,7 +81,7 @@ describe('CloneBlobService', () => {
     expect(copyBlobMock).toHaveBeenNthCalledWith(
       1,
       'source/thumbnail.webp',
-      expect.stringContaining('/thumbnail.webp'),
+      'exercise-images/f79ea6abd92d85d5822b29f4/thumbnail.webp',
       expect.objectContaining({
         allowOverwrite: true,
         ifMatch: 'thumbnail-source-etag',
@@ -93,7 +91,7 @@ describe('CloneBlobService', () => {
     expect(copyBlobMock).toHaveBeenNthCalledWith(
       2,
       'source/display.webp',
-      expect.stringContaining('/display.webp'),
+      'exercise-images/f79ea6abd92d85d5822b29f4/display.webp',
       expect.objectContaining({ ifMatch: 'display-source-etag' }),
     );
     expect(result).toMatchObject({

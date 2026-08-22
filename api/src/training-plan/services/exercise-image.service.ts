@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 
@@ -78,10 +80,12 @@ export class ExerciseImageService {
       'ExerciseImageService -> processAndUpload -> variants rendered:',
       { data: { count: 2 } },
     );
+    const imageAssetId = randomBytes(12).toString('hex');
+    const imagePrefix = `exercise-images/${imageAssetId}`;
     const uploaded: string[] = [];
     try {
       const thumbnailBlob = await this.blobStorageService.upload(
-        'exercise-images/thumbnail.webp',
+        `${imagePrefix}/thumbnail.webp`,
         thumbnail.buffer,
       );
       uploaded.push(thumbnailBlob.key);
@@ -90,7 +94,7 @@ export class ExerciseImageService {
         { data: { uploaded: true } },
       );
       const displayBlob = await this.blobStorageService.upload(
-        'exercise-images/display.webp',
+        `${imagePrefix}/display.webp`,
         display.buffer,
       );
       uploaded.push(displayBlob.key);

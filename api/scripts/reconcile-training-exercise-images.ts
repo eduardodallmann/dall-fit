@@ -7,6 +7,24 @@ import { connect, disconnect } from 'mongoose';
 
 const prefix = 'exercise-images/';
 
+interface CloneJobImageReference {
+  display: { key: string };
+  thumbnail: { key: string };
+}
+
+interface CloneJobReferenceDocument {
+  copiedImages?: CloneJobImageReference[];
+  snapshot: {
+    workouts: Array<{
+      exercises: Array<{
+        image?: CloneJobImageReference | null;
+        type: string;
+      }>;
+    }>;
+  };
+  state: string;
+}
+
 async function main(): Promise<void> {
   const mongodbUri = process.env.MONGODB_URI;
   const blobStoreId = process.env.BLOB_STORE_ID;
@@ -18,28 +36,51 @@ async function main(): Promise<void> {
     const database = connection.connection.db;
     if (database === undefined)
       throw new Error('MongoDB database is unavailable.');
-    const references = await database
-      .collection('training_plans')
-      .aggregate<{ keys: string[] }>([
-        { $unwind: '$workouts' },
-        { $unwind: '$workouts.exercises' },
-        {
-          $match: {
-            'workouts.exercises.type': 'image',
-            'workouts.exercises.image': { $ne: null },
+    const [planReferences, cloneJobs] = await Promise.all([
+      database
+        .collection('training_plans')
+        .aggregate<{ keys: string[] }>([
+          { $unwind: '$workouts' },
+          { $unwind: '$workouts.exercises' },
+          {
+            $match: {
+              'workouts.exercises.type': 'image',
+              'workouts.exercises.image': { $ne: null },
+            },
           },
-        },
-        {
-          $project: {
-            keys: [
-              '$workouts.exercises.image.thumbnail.key',
-              '$workouts.exercises.image.display.key',
-            ],
+          {
+            $project: {
+              keys: [
+                '$workouts.exercises.image.thumbnail.key',
+                '$workouts.exercises.image.display.key',
+              ],
+            },
           },
-        },
-      ])
-      .toArray();
-    const referenced = new Set(references.flatMap((entry) => entry.keys));
+        ])
+        .toArray(),
+      database
+        .collection<CloneJobReferenceDocument>('training_plan_clone_jobs')
+        .find({ state: { $nin: ['cancelled', 'completed'] } })
+        .project<CloneJobReferenceDocument>({ copiedImages: 1, snapshot: 1 })
+        .toArray(),
+    ]);
+    const cloneReferences = cloneJobs.flatMap((job) => [
+      ...job.snapshot.workouts.flatMap((workout) =>
+        workout.exercises.flatMap((exercise) =>
+          exercise.type === 'image' && exercise.image != null
+            ? [exercise.image.thumbnail.key, exercise.image.display.key]
+            : [],
+        ),
+      ),
+      ...(job.copiedImages ?? []).flatMap((image) => [
+        image.thumbnail.key,
+        image.display.key,
+      ]),
+    ]);
+    const referenced = new Set([
+      ...planReferences.flatMap((entry) => entry.keys),
+      ...cloneReferences,
+    ]);
     const stored: string[] = [];
     let cursor: string | undefined;
     do {

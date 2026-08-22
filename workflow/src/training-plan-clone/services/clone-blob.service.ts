@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { copy, del } from '@vercel/blob';
 
 import { WorkflowLogger } from '../../core/logger';
@@ -24,7 +26,11 @@ export class CloneBlobService {
       exercise.image === undefined
     )
       throw new Error('Clone snapshot image was not found.');
-    const prefix = `training-plan-clones/${job._id}/${exerciseId}`;
+    const imageAssetId = createHash('sha256')
+      .update(`${job._id}:${exerciseId}`)
+      .digest('hex')
+      .slice(0, 24);
+    const prefix = `exercise-images/${imageAssetId}`;
     const options = {
       abortSignal: AbortSignal.timeout(15_000),
       access: 'private' as const,

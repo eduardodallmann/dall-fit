@@ -35,8 +35,9 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 3. Usar persiste só a referência; toda leitura resolve o global atual e toda
    mutação retorna `GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`.
 4. Clonar captura snapshot, persiste job e só então chama o bridge assinado.
-5. O Workflow reserva/assume o run, copia lotes, confirma imagens e materializa
-   IDs/pathnames determinísticos. Cancelamento limpa destinos.
+5. O Workflow reserva/assume o run, copia lotes e agrupa thumbnail/display em
+   `exercise-images/{imageAssetId}/` com ID/pathnames determinísticos, confirma
+   imagens e materializa a árvore. Cancelamento limpa destinos.
 6. Conclusão remove a linha do job e torna o plano próprio navegável; falha mantém
    retry/cancelamento. Timeout ambíguo mantém geração e permite reentrega.
 7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca.

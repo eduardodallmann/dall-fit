@@ -93,7 +93,10 @@ Campos de outro discriminador são `INVALID_EXERCISE_TYPE`.
 No YouTube, allowlist aceita ID, youtu.be, watch e shorts HTTPS; resposta externa
 não bem-sucedida vira `INVALID_YOUTUBE_REFERENCE`, falha/timeout vira
 `YOUTUBE_VALIDATION_UNAVAILABLE`, sem write. No upload, Sharp valida bytes,
-10 MiB, 40 MP e ausência de animação e gera duas variantes privadas. O command
+10 MiB, 40 MP e ausência de animação e gera duas variantes privadas agrupadas sob
+`exercise-images/{imageAssetId}/thumbnail.webp` e `display.webp`. O ID opaco nasce
+antes dos uploads; ambos usam pathnames exatos, sem sufixo aleatório nem overwrite.
+O command
 solicita as duas URLs assinadas antes de executar o CAS. Falha de upload,
 assinatura ou commit remove as novas keys; sucesso persiste somente keys/dimensões
 e remove variantes antigas depois do MongoDB. Leitura do workout hidrata todas as
@@ -267,7 +270,8 @@ curl --request POST http://localhost:4000/auth/test-login \
 
 Requer `BLOB_STORE_ID=store_8u9fq5re0OENMRtC`, OIDC local vigente da Vercel e
 arquivo fictício local. PUT grava variantes privadas sob `exercise-images/`,
-assina cada pathname para `get` antes do CAS e devolve duas URLs temporárias com
+agrupadas por um mesmo `imageAssetId`, assina cada pathname para `get` antes do CAS
+e devolve duas URLs temporárias com
 `signedUrlExpiresAt`; DELETE preserva o exercício e remove a associação. A leitura
 do workout devolve outro par válido sem endpoint binário intermediário.
 

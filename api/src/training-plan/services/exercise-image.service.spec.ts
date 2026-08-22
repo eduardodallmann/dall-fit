@@ -36,6 +36,14 @@ describe('ExerciseImageService', () => {
     });
 
     expect(upload).toHaveBeenCalledTimes(2);
+    const thumbnailPath = upload.mock.calls[0]?.[0] as string;
+    const displayPath = upload.mock.calls[1]?.[0] as string;
+    expect(thumbnailPath).toMatch(
+      /^exercise-images\/[a-f0-9]{24}\/thumbnail\.webp$/u,
+    );
+    expect(displayPath).toBe(
+      thumbnailPath.replace('/thumbnail.webp', '/display.webp'),
+    );
     expect(result.thumbnail).toMatchObject({ width: 80, height: 160 });
     expect(result.display).toMatchObject({ width: 320, height: 640 });
   });

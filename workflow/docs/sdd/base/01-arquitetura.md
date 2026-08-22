@@ -18,5 +18,8 @@ API --HTTP HMAC--> Nitro handler --> command --> Vercel Workflow
 
 Funções com `"use workflow"` orquestram; funções com `"use step"` fazem cada
 efeito recuperável. Apenas IDs, geração e `workflowRunId` atravessam limites de
-step. Cada `copy` privado usa OIDC, pathname determinístico e o `ifMatch` do ETag
-capturado pela API. O catálogo destino só é publicado na finalização.
+step. Cada imagem recebe um `imageAssetId` opaco determinístico derivado do job e
+do exercício; thumbnail e display usam
+`exercise-images/{imageAssetId}/{thumbnail|display}.webp`. Cada `copy` privado usa
+OIDC, esse pathname estável e o `ifMatch` do ETag capturado pela API. O catálogo
+destino só é publicado na finalização.

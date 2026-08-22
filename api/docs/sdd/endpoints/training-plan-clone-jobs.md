@@ -26,6 +26,13 @@ definitiva marca `start-failed`; timeout/rede é ambíguo e mantém `queued`, po
 Workflow pode ter aceitado. Em ambos os casos a API responde `503
 TRAINING_PLAN_CLONE_SCHEDULING_UNAVAILABLE`, deixando a linha recuperável.
 
+Cada imagem copiada recebe um `imageAssetId` opaco determinístico a partir do job e
+do exercício. Thumbnail e display ficam em
+`exercise-images/{imageAssetId}/{thumbnail|display}.webp`; a mesma geração ou um
+retry reutiliza os pathnames e pode sobrescrever somente esses destinos. Snapshot
+de origem e destinos confirmados de jobs não terminais também são referências
+válidas para a reconciliação de mídia.
+
 Retry é permitido em `failed` e `start-failed`, incrementa geração e reutiliza o
 snapshot. Cancelamento de job em execução muda para `cancelling`; em falha também
 redelivery o Workflow para executar compensação. Depois de `materializing`, a
