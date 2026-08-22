@@ -275,7 +275,7 @@ export function TrainingPlanListPage({
         <div className={styles.titleGroup()}>
           <h1 className={styles.title()}>Planos de treino</h1>
           <p className={styles.description()}>
-            Crie e mantenha os modelos globais disponíveis para administração..
+            Crie e mantenha os modelos globais disponíveis para administração.
           </p>
         </div>
         <Button
