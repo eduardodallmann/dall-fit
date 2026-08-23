@@ -184,6 +184,12 @@ existirem draft, debounce, tarefa, estrutura pendente, linha temporária ou erro
 recuperável; `Permanecer` conserva foco e dados, e `Sair e descartar` cancela timers
 locais. `beforeunload` oferece somente o aviso nativo para saída do documento.
 
+O mesmo `hasUnsavedWork`, sem cálculo paralelo, alimenta a fronteira global de
+segurança de reload da PWA. Assim draft, debounce, fila, tarefa estrutural, upload,
+linha temporária, patch dirty e erro/conflito recuperável mantêm uma versão nova em
+espera silenciosa. Quando o editor e as mutations globais ficam seguros, a
+ativação/reload pendente prossegue automaticamente se o documento estiver visível.
+
 O coordenador pertence ao domínio, mas registra reset no ciclo transversal de
 sessão. Logout, `401` ou troca de pessoa aborta request, cancela tarefas ainda não
 iniciadas e remove versão/pausa; callbacks antigos não atualizam editor, cache,

@@ -187,7 +187,8 @@ type AnalyticsProperties = Record<
 
 const pendingEventFingerprints = new Set<string>();
 
-export type SystemFailureCategory = 'bootstrap' | 'pwa_registration' | 'render';
+export type SystemFailureCategory =
+  'bootstrap' | 'pwa_registration' | 'pwa_update' | 'render';
 
 export function normalizeAnalyticsRoute(pathname: string): string | undefined {
   if (pathname === '/' || pathname === '/dash') {

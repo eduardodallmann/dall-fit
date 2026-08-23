@@ -12,8 +12,8 @@ function renderNotice(value: Partial<PwaContextValue> = {}) {
     installationMode: 'manual',
     isInstalling: false,
     isUpdating: false,
-    needRefresh: true,
     update: vi.fn().mockResolvedValue(undefined),
+    updateFailed: false,
     ...value,
   };
 
@@ -27,71 +27,50 @@ function renderNotice(value: Partial<PwaContextValue> = {}) {
 }
 
 describe('PwaUpdateNotice', () => {
-  it('is absent while the installed worker is current', () => {
-    renderNotice({ needRefresh: false });
+  it('stays absent during the normal silent update lifecycle', () => {
+    renderNotice({ isUpdating: true });
 
     expect(
       screen.queryByText('Nova versão disponível'),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('lets the person confirm or defer an available update', async () => {
-    const user = userEvent.setup();
-    const context = renderNotice();
-
-    expect(screen.getByText('Nova versão disponível')).toBeInTheDocument();
-    expect(
-      screen.getByText('Atualize para usar a versão mais recente.'),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Atualizar agora' }));
-    await user.click(screen.getByRole('button', { name: 'Agora não' }));
-
-    expect(context.update).toHaveBeenCalledOnce();
-    expect(context.dismissUpdate).toHaveBeenCalledOnce();
-  });
-
-  it('keeps the message before its actions in the live region', () => {
-    renderNotice();
-
-    const notice = screen.getByRole('status');
-    const actions = screen.getAllByRole('button');
-
-    expect(notice).toHaveAttribute('aria-live', 'polite');
-    expect(actions.map((action) => action.textContent)).toEqual([
-      'Atualizar agora',
-      'Agora não',
-    ]);
-  });
-
-  it('blocks both update actions while activation is pending', async () => {
-    const user = userEvent.setup();
-    const context = renderNotice({ isUpdating: true });
-    const updateAction = screen.getByRole('button', {
-      name: 'Atualizar agora',
-    });
-    const dismissAction = screen.getByRole('button', { name: 'Agora não' });
-
-    expect(updateAction).toHaveAttribute('aria-disabled', 'true');
-    expect(dismissAction).toBeDisabled();
-
-    await user.click(updateAction);
-    await user.click(dismissAction);
-
-    expect(context.update).not.toHaveBeenCalled();
-    expect(context.dismissUpdate).not.toHaveBeenCalled();
-  });
-
-  it('keeps the notice actionable after an update failure', async () => {
+  it('offers retry and continuation only after terminal activation failure', async () => {
     const user = userEvent.setup();
     const context = renderNotice({ updateFailed: true });
 
     expect(screen.getByText('Não foi possível atualizar')).toBeInTheDocument();
     expect(
-      screen.getByText('Continue usando esta versão e tente novamente.'),
+      screen.getByText(
+        'Você pode continuar usando esta versão e tentar novamente.',
+      ),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Tentar atualizar' }));
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveAttribute('aria-live', 'polite');
+
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     expect(context.update).toHaveBeenCalledOnce();
+    expect(context.dismissUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('prevents concurrent retry and continuation while retry is pending', async () => {
+    const user = userEvent.setup();
+    const context = renderNotice({ isUpdating: true, updateFailed: true });
+    const retryAction = screen.getByRole('button', {
+      name: 'Tentar novamente',
+    });
+    const continueAction = screen.getByRole('button', { name: 'Continuar' });
+
+    expect(retryAction).toHaveAttribute('aria-disabled', 'true');
+    expect(continueAction).toBeDisabled();
+
+    await user.click(retryAction);
+    await user.click(continueAction);
+
+    expect(context.update).not.toHaveBeenCalled();
+    expect(context.dismissUpdate).not.toHaveBeenCalled();
   });
 });

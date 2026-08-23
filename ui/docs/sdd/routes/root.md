@@ -30,9 +30,9 @@ probe. Consulte `../../api/docs/sdd/endpoints/auth.md` e
 - descrição curta de que a conta Google será usada;
 - botão `Entrar com Google`;
 - alerta `Não foi possível entrar. Tente novamente.` após erro de callback;
-- aviso global `Nova versão disponível` quando o service worker encontra uma
-  versão em espera, com ações `Atualizar agora` e `Agora não`; em viewports
-  estreitos, as ações ficam abaixo da mensagem e permanecem contidas no aviso.
+- aviso global somente se a ativação automática de uma nova versão falhar, com
+  título `Não foi possível atualizar`, ações `Tentar novamente` e `Continuar` e
+  informação de que a versão atual permanece utilizável.
 
 Antes da primeira pintura útil, a rota usa o tema local válido ou, quando ele não
 existe, é inválido ou está inacessível, `prefers-color-scheme`. O resultado fica em
@@ -65,20 +65,18 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Comportamento: a tela continua pública e mostra alerta genérico.
 - Resultado: nenhuma informação técnica é exposta e a ação pode ser repetida.
 
-### Alternativa 3 — Nova versão do PWA
+### Alternativa 3 — Atualização silenciosa do PWA
 
 - Condição: o service worker encontra uma versão em espera enquanto a rota pública
   está aberta.
-- Comportamento: o aviso global não bloqueia o login; `Atualizar agora` ativa a
-  versão e recarrega, enquanto `Agora não` o dispensa no documento atual. Abaixo
-  de `640px`, as ações são apresentadas depois do texto; a partir de `640px`, texto
-  e ações usam a mesma linha quando houver espaço.
-- Resultado: a atualização depende de confirmação e falhas não expõem detalhe
-  técnico nem impedem a autenticação. O aviso não corta conteúdo nem cria rolagem
-  horizontal.
+- Comportamento: o provider ativa a versão e recarrega uma única vez, sem aviso,
+  spinner ou ação manual, porque a rota pública não possui trabalho recuperável.
+- Resultado: a versão nova assume sem depender de F5 ou pull-to-refresh e sem
+  interromper a autenticação antes do reload confirmado.
 - Falha de registro mantém a aplicação como web app comum e registra somente a
-  categoria sanitizada `pwa_registration`. Falha de atualização mantém o aviso,
-  informa erro genérico e oferece `Tentar atualizar`.
+  categoria sanitizada `pwa_registration`. Falha terminal de ativação registra
+  `pwa_update` e mostra apenas o aviso recuperável com `Tentar novamente` e
+  `Continuar`, sem detalhe técnico.
 
 ### Alternativa 4 — Falha global de bootstrap ou renderização
 
@@ -114,8 +112,8 @@ Não se aplica — não há formulário nem entrada local.
 - Erro recuperável: alerta após falha OAuth esperada no callback ou falha na
   preparação.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: durante a ativação da nova versão, `Atualizar agora` indica
-  progresso e `Agora não` fica indisponível para impedir ações concorrentes.
+- Ações desabilitadas: no retry de uma falha PWA, `Tentar novamente` indica pending
+  e `Continuar` fica indisponível para impedir ações concorrentes.
 - Tema: local válido prevalece sobre o sistema; sem valor local válido, acompanha
   o sistema.
 
@@ -147,13 +145,13 @@ Não se aplica — não há formulário nem entrada local.
 - o botão possui nome acessível `Entrar com Google` e foco visível;
 - acionamento por teclado executa a mesma navegação;
 - o alerta usa o componente semântico HeroUI e texto independente de cor.
-- o aviso de atualização usa região viva polida, título e descrição, com ações
-  nomeadas e operáveis por teclado; a mensagem precede `Atualizar agora` e
-  `Agora não` na ordem de leitura e de foco em qualquer largura.
+- o caminho normal da atualização não move foco nem cria anúncio; o aviso de falha
+  usa região viva polida, título e descrição, com `Tentar novamente` e `Continuar`
+  nomeados e operáveis por teclado;
 - a mudança de tema preserva os tokens de contraste e foco e não depende de texto
   adicional na rota.
 
-## Responsividade do aviso de atualização
+## Responsividade do aviso de falha de atualização
 
 ### Viewport menor que `640px`
 
@@ -167,21 +165,24 @@ Não se aplica — não há formulário nem entrada local.
 
 - o aviso preserva `24px` de distância das laterais e largura máxima de `768px`;
 - mensagem e ações ficam lado a lado, com as ações em sua ordem original;
-- redimensionar o viewport altera somente a disposição visual e não confirma nem
-  dispensa a atualização.
+- redimensionar o viewport altera somente a disposição visual e não executa retry
+  nem fecha o erro.
 
 ## Analytics
 
 - `Entrar com Google` emite somente `ui_operation_started` para `google_login`
   imediatamente antes da navegação. Não emite conclusão antecipada nem interpreta
   redirect/consentimento externo como sucesso.
-- `Atualizar agora` emite início e resultado `success|error` de `pwa_update`;
-  `Agora não` emite início e resultado `dismissed` da mesma operação.
+- descoberta e ativação automáticas não emitem evento de interação; falha automática
+  emite no máximo o diagnóstico sanitizado `pwa_update`;
+- `Tentar novamente` emite início e resultado confirmado `success|error` de
+  `pwa_update`; `Continuar` emite somente `ui_button_pressed` com a decisão
+  enumerada de fechar o erro.
 - o contexto usa somente `route=/`, superfície e controle enumerados. `authError`,
   mensagens técnicas, URL de autorização e qualquer dado de pessoa não são
   enviados.
 - o componente global do Vercel Analytics permanece invisível e uma falha ou
-  bloqueio de coleta não altera login, aviso de atualização ou navegação.
+  bloqueio de coleta não altera login, aviso de falha de atualização ou navegação.
 
 ## Referências visuais de layout — opcional
 
@@ -203,15 +204,14 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - When: a rota renderiza
 - Then: mostra o alerta e mantém a ação de login disponível
 
-### Cenário 3 — Aviso responsivo de nova versão
+### Cenário 3 — Atualização silenciosa e falha recuperável
 
 - Link para testar: não se aplica — o estado depende de uma nova versão do Service
   Worker instalada em espera no preview do build
 - Given: uma nova versão está em espera enquanto a rota pública está aberta
-- When: o aviso é conferido em `320x568`, `360x800`, `390x844` e `768x1024`
-- Then: todo o conteúdo permanece dentro do viewport; abaixo de `640px`, as ações
-  ficam abaixo da mensagem e, a partir desse breakpoint, ficam ao lado dela
-- And: não há corte, sobreposição ou rolagem horizontal
+- When: a ativação é confirmada
+- Then: o documento recarrega uma única vez sem aviso normal
+- And: se a ativação falhar, o aviso acessível oferece retry ou continuidade
 
 ### Cenário 4 — Tema público acompanha o sistema
 
@@ -266,20 +266,20 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 
 ## Cobertura automatizada
 
-| Regra ou cenário de negócio | Vitest                                     | Playwright   |
-| --------------------------- | ------------------------------------------ | ------------ |
-| conteúdo e destino do login | componente home                            | rota root    |
-| alerta de callback          | componente home                            | rota root    |
-| avanço até `/dash` mockado  | não se aplica                              | flow login   |
-| aviso de atualização        | componente PWA                             | não se aplica |
-| bootstrap local/sistema     | theme storage                              | rota root    |
-| mudança do sistema          | theme provider                             | rota root    |
-| probe redireciona autenticado | root-session-probe, session-lifecycle    | rota root    |
-| bypass one-shot após logout | app, session-lifecycle                     | rota root    |
+| Regra ou cenário de negócio   | Vitest                                | Playwright   |
+| ----------------------------- | ------------------------------------- | ------------ |
+| conteúdo e destino do login   | componente home                       | rota root    |
+| alerta de callback            | componente home                       | rota root    |
+| avanço até `/dash` mockado    | não se aplica                         | flow login   |
+| update silencioso e falha     | provider, lifecycle e componente PWA  | isolado real |
+| bootstrap local/sistema       | theme storage                         | rota root    |
+| mudança do sistema            | theme provider                        | rota root    |
+| probe redireciona autenticado | root-session-probe, session-lifecycle | rota root    |
+| bypass one-shot após logout   | app, session-lifecycle                | rota root    |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.
 - Spec Playwright do flow: `tests/integration/flows/login-google.spec.ts`.
 - Cenários manuais e justificativa: consentimento Google real exige serviço e conta
-  externos. O layout do aviso é conferido no preview de duas versões do build,
-  porque o Playwright usa MSW Browser e mantém o Service Worker da PWA desabilitado.
+  externos. O lifecycle PWA real é validado por `pnpm test:pwa-update`, porque o
+  Playwright com MSW Browser mantém o Workbox desabilitado.

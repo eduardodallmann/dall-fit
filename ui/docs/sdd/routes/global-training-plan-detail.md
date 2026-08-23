@@ -93,6 +93,12 @@ formulário e dialog são persistentes, não dependem do toast. O browser voltar
 preserva o cache enquanto válido. A interface usa somente `treino`/`treinos`;
 `workout` permanece restrito a identificadores técnicos, paths e contratos.
 
+Enquanto a edição inline estiver alterada, falhar com draft recuperável ou
+participar de conflito que preserve esse trabalho, ela registra um bloqueador na
+fronteira global de reload. Mutations pendentes também bloqueiam por TanStack
+Query. A atualização PWA pronta permanece silenciosa e só prossegue depois de
+salvar, cancelar ou descartar o último trabalho recuperável.
+
 ## Analytics
 
 - breadcrumbs e nomes de treino emitem `ui_navigation_selected` com destino

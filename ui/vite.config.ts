@@ -10,6 +10,22 @@ import { MOCK_REQUEST_ID } from './src/mocks/mock-constants.js';
 
 const applicationBackgroundColor = '#f7f7f7';
 
+const pwaUpdateTestBuildMarker: Plugin = {
+  name: 'dall-fit-pwa-update-test-build-marker',
+  transformIndexHtml() {
+    const build = process.env.VITE_PWA_TEST_BUILD;
+    if (build === undefined) return;
+
+    return [
+      {
+        attrs: { content: build, name: 'dall-fit-pwa-test-build' },
+        injectTo: 'head',
+        tag: 'meta',
+      },
+    ];
+  },
+};
+
 const mockOAuthNavigationPlugin: Plugin = {
   name: 'dall-fit-mock-oauth-navigation',
   configureServer(server) {
@@ -39,6 +55,7 @@ export default defineConfig({
   plugins: [
     react(),
     mockOAuthNavigationPlugin,
+    pwaUpdateTestBuildMarker,
     tailwindcss(),
     VitePWA({
       devOptions: {

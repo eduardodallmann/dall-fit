@@ -19,7 +19,7 @@ const baseContext: PwaContextValue = {
   installationMode: 'manual',
   isInstalling: false,
   isUpdating: false,
-  needRefresh: false,
+  updateFailed: false,
   update: vi.fn().mockResolvedValue(undefined),
 };
 

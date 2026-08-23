@@ -126,6 +126,15 @@ cancelamento e status permanentes/transitórios. Queries comprovam propagação 
 upload valida seu timeout específico. Bootstrap, Error Boundary e PWA comprovam
 fallback acionável e recuperação sem tela vazia ou bloqueio do web app.
 
+O ciclo PWA possui testes próprios para relógio de uma hora, revalidação
+`no-store`, deduplicação, offline, retomada, espera por `activated`, mudança de
+controle, `redundant`, timeout, abort, retry, diagnóstico e reload único. A
+fronteira de segurança cobre múltiplos owners, cleanup e mutations globais; os
+formulários e editores registram seus estados recuperáveis pela mesma fronteira.
+Como o Playwright integrado usa MSW Browser e mantém Workbox desabilitado,
+`pnpm test:pwa-update` executa separadamente dois builds reais na mesma origem e
+duas abas Chromium, preservando um draft até o reload se tornar seguro.
+
 Esses cenários não precisam existir todos no Playwright. Funções puras, hooks e
 componentes cobrem a matriz combinatória; Playwright preserva os caminhos
 observáveis de maior risco e a integração real entre tela, cliente e MSW.
@@ -147,6 +156,7 @@ pnpm -C ui test:watch
 pnpm -C ui test:coverage
 pnpm -C ui test:coverage:ci
 pnpm -C ui typecheck
+pnpm test:pwa-update
 ```
 
 Os gates completos são executados na raiz. Não excluir código testável apenas para

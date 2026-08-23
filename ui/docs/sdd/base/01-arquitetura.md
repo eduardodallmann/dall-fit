@@ -413,15 +413,37 @@ desktop e móvel do menu coexistam no DOM, e observa:
   ações quando a aplicação já está instalada;
 - ausência, recusa ou falha do prompt para oferecer orientação manual compatível
   com iOS e demais navegadores;
-- nova versão do service worker para mostrar um aviso global e só ativá-la e
-  recarregar após `Atualizar agora`.
+- registro e URL reais por `onRegisteredSW`, com checagem inicial e no máximo uma
+  vez por hora enquanto o documento estiver visível e online;
+- retomadas por visibilidade, foco ou reconexão, usando o mesmo relógio e uma única
+  Promise de `registration.update()`; antes dela, `sw.js` é revalidado com
+  `cache: no-store` na mesma origem;
+- worker em espera, ativação, `controllerchange` e um único reload confirmado do
+  path, query e hash correntes.
 
-`Agora não` dispensa o aviso apenas no documento corrente. Falha de atualização
-mantém o aviso, informa erro genérico e oferece `Tentar atualizar`; falha de
-registro é diagnosticada somente pela categoria sanitizada `pwa_registration`.
-A aplicação não exibe mensagem de cache pronto, não solicita instalação
-automaticamente e continua utilizável quando registro, instalação ou atualização
-falham.
+O modo técnico continua `registerType: 'prompt'`, mas não apresenta confirmação no
+caminho normal. Uma versão pronta é ativada e recarrega silenciosamente somente
+quando `ReloadSafetyProvider` não possui bloqueadores. Essa fronteira core agrega
+toda mutation TanStack Query pendente e recebe os owners de formulários alterados,
+drafts, filas, autosaves, uploads, conflitos e edições temporárias das rotas. O
+último owner removido retoma automaticamente uma atualização pendente; documento
+oculto espera ficar visível. Leituras, menus e overlays sem valor alterado não
+bloqueiam.
+
+A resolução de `updateServiceWorker()` significa apenas que `SKIP_WAITING` pôde
+ser enviado. O provider aguarda o worker esperado alcançar `activated`, assumir a
+registration ou mudar o controller observado, com timeout de 15 segundos e
+deduplicação por documento. Mudança iniciada em outra aba também respeita a
+segurança local antes do reload. O caminho normal não mostra aviso, toast, modal ou
+spinner e não registra ação humana.
+
+Somente falha terminal de ativação mostra o aviso global
+`Não foi possível atualizar`, informa que a versão atual continua utilizável e
+oferece `Tentar novamente` e `Continuar`. Retry registra início e terminal
+`success|error`; `Continuar` fecha o erro corrente sem remover registration ou
+cache. Falhas automáticas usam apenas o diagnóstico sanitizado `pwa_update`;
+falha de registro usa `pwa_registration`. A aplicação não exibe mensagem de cache
+pronto, não solicita instalação automaticamente e permanece utilizável nas falhas.
 
 O precache contém somente o app shell, bundles versionados, fontes e ativos locais
 necessários. Requests da API, autenticação, imagens remotas, avatares, respostas
@@ -435,6 +457,11 @@ produção, `vercel.json` serve primeiro arquivos reais, aplica fallback de SPA 
 depois e mantém `sw.js` e `manifest.webmanifest` revalidáveis com seus MIME types
 explícitos. A origem de produção precisa usar HTTPS, como exigido pela plataforma
 de service workers.
+
+O comando `pnpm test:pwa-update` cria dois builds de produção marcados somente no
+HTML do ambiente isolado, serve ambos sucessivamente na mesma origem e usa Chromium
+com Workbox real. Ele comprova reload único da aba segura e preservação do draft em
+outra aba até a remoção do bloqueador; não registra o worker do MSW.
 
 O documento compartilhado `index.html` declara a viewport com escala inicial e
 máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual

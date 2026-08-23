@@ -63,6 +63,7 @@ import type {
 
 import { trackUiEvent, type AnalyticsControl } from '~/core/analytics';
 import { isExpectedCancellation } from '~/core/http/http-error';
+import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
 import {
   createTrainingPlanExercise,
   deleteTrainingPlanExercise,
@@ -932,6 +933,7 @@ export function WorkoutEditor({
         item.status !== 'idle' ||
         Object.keys(item.dirty).length > 0,
     );
+  useReloadBlocker(hasUnsavedWork);
   useLayoutEffect(() => {
     onUnsavedWorkChange?.(hasUnsavedWork);
     return () => onUnsavedWorkChange?.(false);

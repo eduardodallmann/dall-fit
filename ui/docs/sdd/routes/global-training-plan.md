@@ -149,6 +149,13 @@ Truncamento visual preserva o texto integral e `title`. A página ativa usa a
 semântica do HeroUI; elipses não recebem foco, anterior/próxima desabilitam nos
 limites e URL inválida é corrigida com `replace`.
 
+Formulário de criação ou edição alterado registra um owner na fronteira global de
+segurança de reload. Draft preservado após falha ou conflito continua bloqueando a
+ativação/reload automático da PWA; cancelar, concluir ou descartar o formulário
+remove o owner. Mutations pendentes são agregadas transversalmente pelo
+`ReloadSafetyProvider`. A descoberta da versão continua silenciosa e não fecha
+modal, confirmação ou alerta.
+
 ## Analytics
 
 - breadcrumb, nome de plano e paginação emitem `ui_navigation_selected` com destino
