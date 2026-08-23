@@ -8,8 +8,7 @@ export interface PwaContextValue {
   installationMode: PwaInstallationMode;
   isInstalling: boolean;
   isUpdating: boolean;
-  needRefresh: boolean;
-  updateFailed?: boolean;
+  updateFailed: boolean;
   update: () => Promise<void>;
 }
 

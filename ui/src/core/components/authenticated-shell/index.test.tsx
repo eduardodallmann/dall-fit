@@ -33,7 +33,7 @@ const pwaContextValue = {
   installationMode: 'manual' as const,
   isInstalling: false,
   isUpdating: false,
-  needRefresh: false,
+  updateFailed: false,
   update: vi.fn().mockResolvedValue(undefined),
 };
 const themeContextValue = {

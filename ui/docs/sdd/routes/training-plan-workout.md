@@ -14,6 +14,11 @@ sequenciais para os cinco discriminadores, incluindo imagem quando existente, se
 inputs nem botões edit/delete/move/upload. O modo é derivado exclusivamente do
 detalhe retornado.
 
+O `hasUnsavedWork` compartilhado também registra o owner desta rota na fronteira
+global de reload. Draft, debounce, fila, upload, item temporário, patch dirty e
+falha/conflito recuperável adiam silenciosamente a ativação PWA; ao terminar o
+último bloqueador, o reload confirmado prossegue se o documento estiver visível.
+
 Loading usa skeleton; erro oferece retry; signed URL de plano próprio é renovada
 pelo refetch já vigente. Breadcrumbs retornam a Meus planos e ao detalhe. SSE
 global invalida a query da referência mesmo que o evento possua ID global e a

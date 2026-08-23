@@ -51,6 +51,12 @@ de somente leitura e não renderiza inputs nem ações de gravação, exclusão 
 - SSE global invalida catálogo/biblioteca; polling limitado garante progresso se o
   stream for perdido.
 
+Formulários próprios alterados e mutations pendentes registram bloqueadores na
+fronteira global de reload. Draft preservado após falha continua impedindo que uma
+atualização PWA pronta recarregue o documento; fechar, confirmar ou descartar o
+formulário remove seu owner. Biblioteca, tabela, polling de clone e overlays sem
+valor local alterado não bloqueiam por si só.
+
 ## Acessibilidade
 
 Tabela possui headers semânticos, nome como row header, radio rotulado pelo plano,

@@ -15,6 +15,7 @@ import { Check, X } from 'lucide-react';
 import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
 import { trackUiEvent } from '~/core/analytics';
+import { ReloadBlocker } from '~/core/reload-safety/reload-blocker';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import { useTrainingPlanFieldAnalytics } from '~/routes/training-plan/training-plan-analytics';
 import {
@@ -74,6 +75,9 @@ export function TrainingPlanInlineForm({
 
   return (
     <form className={styles.inlineEditor()} onSubmit={handleSubmit}>
+      <form.Subscribe selector={(state) => state.isDefaultValue}>
+        {(isDefaultValue) => <ReloadBlocker active={!isDefaultValue} />}
+      </form.Subscribe>
       <form.Field
         name="name"
         validators={{

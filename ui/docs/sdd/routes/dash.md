@@ -119,16 +119,15 @@ enquanto o dashboard permanece intencionalmente vazio.
 - Resultado: a recusa não é persistida, não há prompt automático e a ação some em
   modo standalone ou após `appinstalled`.
 
-### Alternativa 5 — Nova versão do PWA
+### Alternativa 5 — Atualização silenciosa do PWA
 
 - Condição: o service worker encontra uma versão em espera.
-- Comportamento: um aviso global mostra `Nova versão disponível`, as ações
-  `Atualizar agora` e `Agora não` e não interrompe o uso da rota. Abaixo de
-  `640px`, as ações ficam abaixo da mensagem; a partir de `640px`, mensagem e ações
-  usam a mesma linha quando houver espaço.
-- Resultado: somente `Atualizar agora` ativa a versão e recarrega; `Agora não`
-  dispensa o aviso no documento atual. Falhas permanecem não bloqueantes e sem
-  detalhe técnico. O aviso não corta conteúdo nem cria rolagem horizontal.
+- Comportamento: sem trabalho recuperável, o provider ativa a versão e recarrega
+  uma única vez, sem aviso, spinner, bloqueio ou ação manual.
+- Resultado: a aba comum e a PWA instalada usam a mesma política e não dependem de
+  F5, pull-to-refresh ou reabertura. Falha terminal mostra somente
+  `Não foi possível atualizar`, `Tentar novamente` e `Continuar`, sem detalhe
+  técnico e sem bloquear o shell.
 
 ### Alternativa 6 — Perfil sem preferência de tema
 
@@ -179,10 +178,11 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro recuperável: mensagem `Não foi possível carregar sua conta` e orientação de
   recarga, sem shell.
 - Erro não recuperável: não se aplica.
-- Ações desabilitadas: controles de tema, logout, instalação e atualização indicam
-  o progresso e evitam ativações concorrentes. Os dois toggles de tema compartilham
-  exatamente o mesmo pending; os dois botões icon-only de logout conservam seu
-  slot, compartilham outra única mutation e o mesmo pending.
+- Ações desabilitadas: controles de tema, logout e instalação indicam o progresso
+  e evitam ativações concorrentes. No aviso excepcional de falha PWA,
+  `Tentar novamente` indica pending e desabilita `Continuar`. Os dois toggles de
+  tema compartilham exatamente o mesmo pending; os dois botões icon-only de logout
+  conservam seu slot, compartilham outra única mutation e o mesmo pending.
 
 ## Integrações
 
@@ -290,9 +290,9 @@ móvel não o reabre.
   ativos;
 - a instalação manual usa `Disclosure` com trigger nomeado, conteúdo inline e
   texto de compatibilidade; não abre modal dentro do `Drawer`;
-- o aviso de versão possui título, descrição textual, região viva polida e duas
-  ações explícitas, sem depender apenas de cor; mensagem e ações mantêm a mesma
-  ordem de leitura e de foco em todas as larguras;
+- o caminho normal de update não move foco nem anuncia estado; o aviso excepcional
+  possui título, descrição textual, região viva polida e as ações explícitas
+  `Tentar novamente` e `Continuar`, sem depender apenas de cor;
 - o avatar é exposto como imagem com o nome completo da pessoa; foto e iniciais são
   apresentações alternativas da mesma identidade;
 - nome e e-mail usam `Typography` HeroUI; cada um ocupa sua própria linha com
@@ -300,7 +300,7 @@ móvel não o reabre.
 - `Admin` possui texto explícito, não depende de cor e não entra na ordem de foco;
 - loading possui nome acessível além dos skeletons; erro possui texto explícito.
 
-## Responsividade do aviso de atualização
+## Responsividade do aviso de falha de atualização
 
 ### Viewport menor que `640px`
 
@@ -315,8 +315,8 @@ móvel não o reabre.
 
 - o aviso preserva `24px` de distância das laterais e largura máxima de `768px`;
 - mensagem e ações ficam lado a lado, com as ações em sua ordem original;
-- redimensionar o viewport altera somente a disposição visual e não confirma nem
-  dispensa a atualização.
+- redimensionar o viewport altera somente a disposição visual e não executa retry
+  nem fecha o erro.
 
 ## Analytics
 
@@ -332,7 +332,8 @@ móvel não o reabre.
 - a instalação nativa emite início e resultado
   `success|dismissed|error` de `pwa_install`; `Como instalar` emite somente
   `ui_disclosure_toggled` com `open|closed`;
-- a atualização da PWA segue os eventos documentados na rota `/`;
+- a atualização automática não emite interação; retry, continuidade e diagnóstico
+  sanitizado seguem os eventos documentados na rota `/`;
 - nome, e-mail, foto, `isAdmin`, preferência e seletores `mockAuth` nunca entram nas
   emissões.
 
@@ -517,8 +518,8 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
 | menu persistente e breakpoint             | estilos/typecheck   | rota `/dash`     |
 | backdrop, teclado e foco móvel            | componentes HeroUI  | rota `/dash`     |
 | prompt e orientação de instalação         | provider/componente | rota `/dash`     |
-| atualização confirmada ou dispensada      | provider/componente | não se aplica    |
-| responsividade do aviso de atualização    | componente/estilos  | não se aplica    |
+| update silencioso, retry e continuidade   | provider/lifecycle  | isolado real     |
+| responsividade do aviso excepcional       | componente/estilos  | não se aplica    |
 | redirect em `401`                         | router/app          | rota `/dash`     |
 | erro técnico sem identidade parcial       | router/app          | rota `/dash`     |
 | precedência perfil/local/sistema          | theme provider      | rota `/dash`     |
@@ -533,6 +534,5 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   `tests/integration/flows/login-google.spec.ts`.
 - Cenários manuais e justificativa: truncamento visual com valores longos é
   conferido no browser sem referência de screenshot; o valor integral e a regra de
-  iniciais possuem cobertura unitária. O layout do aviso é conferido no preview de
-  duas versões do build, porque o Playwright usa MSW Browser e mantém o Service
-  Worker da PWA desabilitado.
+  iniciais possuem cobertura unitária. `pnpm test:pwa-update` cobre dois builds e
+  duas abas reais, porque o Playwright com MSW Browser mantém o Workbox desabilitado.

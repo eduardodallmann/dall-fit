@@ -27,6 +27,12 @@ mesmo prefixo. Breadcrumbs ligam Home → Meus planos → plano; workout avança
 `/training-plan/:catalogEntryId/workout/:workoutId`. Formulários e dialogs mantêm
 labels, foco e teclado dos componentes compartilhados.
 
+No plano `owned`, edição inline alterada ou preservada após falha registra um owner
+na fronteira global de segurança de reload, e mutations pendentes são agregadas
+pelo provider transversal. A atualização PWA espera silenciosamente até salvar,
+cancelar ou descartar o draft. O modo `global-reference`, somente leitura, não
+cria bloqueador por navegação ou consulta.
+
 ## Cenários e cobertura
 
 - `...?mockAuth=person&mockTrainingPlans=personal-reference`: alerta read-only e

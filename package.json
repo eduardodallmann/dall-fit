@@ -20,6 +20,7 @@
     "test:coverage": "pnpm -C packages/types build && pnpm -C api test:coverage && pnpm -C workflow test:coverage && pnpm -C ui test:coverage",
     "test:coverage:ci": "pnpm -C packages/types build && pnpm -C api test:coverage:ci && pnpm -C workflow test:coverage:ci && pnpm -C workflow test:workflow && pnpm -C ui test:coverage:ci",
     "test:integration": "pnpm -C ui test:integration",
+    "test:pwa-update": "pnpm -C ui test:pwa-update",
     "typecheck": "pnpm -C packages/types build && pnpm -C api typecheck && pnpm -C workflow typecheck && pnpm -C ui typecheck"
   },
   "devDependencies": {
