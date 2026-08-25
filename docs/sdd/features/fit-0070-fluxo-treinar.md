@@ -45,7 +45,7 @@
 - Decisão de persistência:
   - Redis guarda somente a sessão ativa e seu snapshot de execução, sob uma chave
     por pessoa e expiração absoluta de 24 horas;
-  - MongoDB guarda conclusões imutáveis e o perfil da última carga confirmada por
+  - MongoDB guarda conclusões imutáveis e o perfil da última carga informada por
     pessoa e exercício;
   - MongoDB com índice TTL não será usado para a sessão, pois sua remoção é um
     processo de background eventualmente atrasado e o dado continuaria sendo um
@@ -102,7 +102,7 @@
 - tela final com semana, exercícios, áreas corporais, carga total registrada,
   duração e compartilhamento;
 - histórico durável de conclusões no MongoDB;
-- perfil da última carga confirmada por pessoa/plano/exercício, usado para preencher
+- perfil da última carga informada por pessoa/plano/exercício, usado para preencher
   a próxima execução;
 - limpeza idempotente dos perfis de carga quando exercício, workout ou plano for
   excluído, sem apagar o histórico agregado de uma conclusão já realizada;
@@ -203,7 +203,8 @@
    - quantidade de workouts do plano no início;
    - exercícios na ordem inicial com campos necessários à execução;
    - referências internas de mídia estritamente server-side, nunca signed URLs;
-   - séries, cargas em edição confirmadas no backend, conclusões e timestamps;
+   - séries, cargas opcionais persistidas como inteiro ou `null`, conclusões e
+     timestamps;
    - timer ativo opcional, com tipo, início e vencimento absolutos;
    - `version`, `startedAt` e `expiresAt`.
 5. A implementação deve provar que o pior snapshot permitido pelos limites atuais
@@ -215,6 +216,8 @@
    gravar o valor completo e preservar o mesmo `PXAT` em uma única operação.
 7. Leituras e sucessos devolvem `X-Resource-Version`. Toda mutation da sessão exige
    uma versão canônica; divergência responde conflito sem merge ou retry automático.
+   Ao receber o conflito, o cliente descarta drafts e estado otimista locais, refaz
+   o GET e substitui integralmente a sessão visível pela versão canônica.
 8. Timers armazenam timestamps, não um contador regravado por segundo. A UI calcula
    a apresentação a partir de `serverNow` e `endsAt`; GET reconcilia atomicamente um
    timer vencido quando necessário.
@@ -256,12 +259,14 @@
 
 1. `person_exercise_load_profiles` contém no máximo um documento por
    `personId + trainingPlanId + exerciseId`.
-2. O documento guarda também `workoutId`, cargas por posição de série, referência
-   da última execução e timestamps. Somente séries efetivamente concluídas
-   atualizam o perfil; valor `0` é válido.
-3. O preview agrupa cargas iguais em um único valor; valores diferentes aparecem
-   na ordem das séries separados por `/`. Sem perfil, todas as séries começam em
-   `0 kg`.
+2. O documento guarda também `workoutId`, cargas opcionais por posição de série,
+   referência da última execução e timestamps. Cada posição concluída recebe um
+   inteiro ou `null`; vazio e `0` são estados distintos. Se todas as posições
+   ficarem vazias, o perfil anterior é removido e um novo perfil não é criado.
+3. O preview ignora posições vazias, agrupa cargas iguais em um único valor e
+   apresenta valores diferentes na ordem das séries separados por `/`. Sem valor
+   anterior para uma posição, seu input começa vazio; `0 kg` aparece somente quando
+   zero tiver sido informado explicitamente.
 4. Índices suportam unicidade e cleanup por plano/workout/exercício sem varrer a
    coleção inteira.
 5. Excluir exercício remove perfis de todas as pessoas para aquele exercício;
@@ -366,12 +371,16 @@
 18. A UI mantém fila FIFO por `sessionId`, injeta `X-Resource-Version` somente na
     cabeça e não executa duas mutations da mesma sessão em paralelo.
 19. Outro dispositivo que alterou a sessão causa
-    `WORKOUT_SESSION_VERSION_CONFLICT`; a UI conserva qualquer draft de carga,
-    refaz GET e exige nova ação quando houver colisão. Não faz merge silencioso.
-20. Carga editada usa `NumberField` HeroUI, aceita número finito de `0` a
-    `9999.99`, com no máximo duas casas decimais, e é salva no backend após debounce
-    curto de 500 ms ou blur. A série só pode ser concluída depois da carga
-    confirmada.
+    `WORKOUT_SESSION_VERSION_CONFLICT`; a UI descarta qualquer draft, mutation
+    otimista ou debounce local, refaz GET e aceita integralmente a versão canônica.
+    Não faz merge silencioso nem exige que a pessoa repita a ação conflitante; um
+    aviso informa que o treino foi atualizado em outro lugar.
+20. Carga usa `NumberField` HeroUI sem botões de incremento/decremento, aceita vazio
+    ou inteiro de `0` a `9999` e é salva no backend após debounce curto de 500 ms ou
+    blur. Vazio é serializado como `null` e não equivale a `0 kg`. Informar carga é
+    opcional: ao concluir uma série, a UI cancela o debounce pendente e envia o
+    valor visível, inclusive `null`, junto da conclusão atômica. Somente um valor
+    não vazio inválido impede a ação.
 21. Draft, debounce e mutation pendente bloqueiam atualização silenciosa do PWA.
     Depois da confirmação Redis, um reload é seguro porque a rota retoma a sessão.
 22. Se a sessão tiver expirado, a rota informa `Seu treino em andamento expirou`,
@@ -401,14 +410,15 @@
 
 28. Expandido, o card oculta os resumos de séries, repetições e carga e mantém área
     corporal e descanso.
-29. Existe uma linha por série com número, repetições prescritas, input de carga e
-    estado não interativo. A primeira série incompleta é a série atual.
-30. `Finalizar série N` conclui somente a série atual com a carga confirmada. Uma
-    linha concluída fica desabilitada e não pode ser alterada até reiniciar o
-    exercício.
+29. Existe uma linha por série com número, repetições prescritas, input opcional de
+    carga e estado não interativo. A primeira série incompleta é a série atual.
+30. `Finalizar série N` conclui somente a série atual e persiste atomicamente sua
+    carga inteira ou vazia. Uma linha concluída fica desabilitada e não pode ser
+    alterada até reiniciar o exercício.
 31. `Finalizar séries restantes` conclui atomicamente todas as séries ainda
-    incompletas usando as cargas confirmadas de cada linha. A ação fica indisponível
-    enquanto houver draft inválido ou não salvo.
+    incompletas usando a carga inteira ou vazia visível em cada linha. A ação fica
+    indisponível somente enquanto houver valor não vazio inválido ou outra mutation
+    da sessão em voo.
 32. Ao concluir uma série que não é a última do exercício, a response já persiste a
     conclusão e inicia um timer `series-rest` com o descanso configurado.
 33. O overlay de descanso mostra `Descanso`, segundos restantes em número simples,
@@ -491,9 +501,12 @@
     - `GET /training/workouts/:workoutId` — preview não iniciado e cargas;
     - `POST /training/workouts/:workoutId/session` — iniciar;
     - `GET /training/session` e `DELETE /training/session` — retomar/abandonar;
-    - `PUT /training/session/exercises/:exerciseId/series/:seriesNumber/load`;
-    - `POST .../series/:seriesNumber/complete`;
-    - `POST .../series/complete-remaining`;
+    - `PUT /training/session/exercises/:exerciseId/series/:seriesNumber/load` —
+      grava carga inteira ou `null` sem concluir;
+    - `POST .../series/:seriesNumber/complete` — conclui com a carga opcional
+      enviada na mesma operação;
+    - `POST .../series/complete-remaining` — conclui as restantes com suas cargas
+      opcionais;
     - `POST /training/session/exercises/:exerciseId/timer`;
     - `POST /training/session/timer/resolve` com outcome discriminado;
     - `POST /training/session/exercises/:exerciseId/complete` para `youtube-long`;
@@ -620,7 +633,7 @@
 
 - Forma de validar: link do cenário 4 e E2E Redis.
 - Given: não existe sessão.
-- When: inicia, altera carga confirmada, conclui uma série, fecha o documento e
+- When: inicia, informa uma carga inteira, conclui uma série, fecha o documento e
   reabre antes de 24 horas.
 - Then: mesma sessão, versão, carga, série e timer aplicável são reconstruídos sem
   `localStorage` e sem duplicar início.
@@ -636,9 +649,11 @@
 ### Cenário 7 — Série comum e descanso
 
 - Forma de validar: fixture `series-running` com relógio controlado.
-- Given: primeira de três séries tem carga válida confirmada.
-- When: aciona `Finalizar série 1`.
-- Then: série fica concluída no Redis, drawer/modal mostra descanso e progresso,
+- Given: a primeira de três séries está com a carga vazia.
+- When: aciona `Finalizar série 1`; em repetição isolada, informa uma carga inteira
+  e conclui.
+- Then: ambos os caminhos concluem a série no Redis, preservando respectivamente
+  `null` ou o inteiro; drawer/modal mostra descanso e progresso e
   backdrop/gesto/pular/zero fecham sem desfazer a série.
 
 ### Cenário 8 — Última série avança o foco
@@ -695,8 +710,8 @@
 - Forma de validar: fixture `workout-complete` e rota de conclusão.
 - Given: o último exercício acabou.
 - When: confirma a mensagem de parabéns.
-- Then: vê semana ISO, exercícios/áreas, soma de cargas e duração; voltar recalcula
-  `Atual` e reabrir a URL devolve a mesma conclusão.
+- Then: vê semana ISO, exercícios/áreas, soma somente das cargas informadas e
+  duração; voltar recalcula `Atual` e reabrir a URL devolve a mesma conclusão.
 
 ### Cenário 15 — Compartilhamento nativo e fallback
 
@@ -720,8 +735,9 @@
 - Forma de validar: E2E/script Lua e teste de fila UI.
 - Given: dois clientes leram a mesma versão.
 - When: ambos concluem ações diferentes.
-- Then: apenas um CAS vence, o outro recebe conflito, refaz a leitura e nenhuma
-  série/timer é perdido por last-write-wins.
+- Then: apenas um CAS vence; o outro cliente descarta drafts e estado otimista,
+  refaz a leitura, exibe o aviso e adota integralmente a sessão vencedora. Nenhum
+  last-write-wins silencioso sobrescreve o backend.
 
 ### Cenário 18 — Plano alterado ou excluído durante a sessão
 
@@ -784,7 +800,7 @@
 
 - Contratos compartilhados:
   - narrowing exaustivo de overview, sessão, exercícios e timers;
-  - validação de versão, timestamps, cargas, semana e conclusão;
+  - validação de versão, timestamps, carga `integer | null`, semana e conclusão;
   - exports públicos e ausência de campos de infraestrutura.
 - Unitários da API:
   - seleção ativa, prioridade da sessão e algoritmo cíclico de `Atual`;
@@ -805,8 +821,9 @@
   - exclusões globais/pessoais e cleanup sem tocar outra pessoa/árvore.
 - Unitários/componentes da UI:
   - menu, empty states, cards, áreas distintas e thumbnails/fallbacks;
-  - preview por discriminador e agrupamento de carga;
-  - fila por sessão, debounce, merge de response, conflito e reload safety;
+  - preview por discriminador, agrupamento de carga e distinção entre vazio e zero;
+  - `NumberField` sem steppers, inteiro opcional, debounce e conclusão com vazio;
+  - fila por sessão, substituição pela response canônica, conflito e reload safety;
   - expansão exclusiva, propagação de foco e prevenção de eventos aninhados;
   - séries, estados concluídos, reinício e confirmações;
   - relógio baseado em `serverNow`, progressão e todos os outcomes de timer;
@@ -839,6 +856,11 @@
   e possui vencimento absoluto. MongoDB TTL seria possível, mas não acrescentaria
   valor durável e não garante remoção imediata; misturar sessão e histórico na
   mesma coleção aumentaria branches e índices.
+- Em conflito de versão, aceitar integralmente o GET canônico pode descartar uma
+  edição local ainda não persistida. O risco é aceito porque uma pessoa possui uma
+  única sessão, mutations locais são serializadas e colisões dependem de uso
+  concorrente em outro cliente. Aviso visível evita perda silenciosa; merge de
+  drafts fica fora do escopo até existir evidência de conflitos frequentes.
 - Redis não é histórico. Reset, indisponibilidade ou eviction podem perder uma
   sessão; `noeviction`, capacidade e falha fechada reduzem esse risco, enquanto a
   janela de 24 horas limita o impacto. Prometer recuperação depois de desastre do
