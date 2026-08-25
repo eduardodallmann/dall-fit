@@ -62,10 +62,15 @@ de rede no desenvolvimento, no Vitest e no Playwright.
 
 ## Organização
 
-A configuração executável está em
+A configuração executável dos testes está em
 [`ui/playwright.config.ts`](../../../playwright.config.ts), e o setup compartilhado
-está em [`ui/tests/setup.ts`](../../../tests/setup.ts). Não reproduzir esses
-arquivos neste SDD.
+está em [`ui/tests/setup.ts`](../../../tests/setup.ts). A geração curatorial de
+screenshots usa a configuração isolada
+[`ui/playwright.sdd-screenshots.config.ts`](../../../playwright.sdd-screenshots.config.ts)
+e não pertence à suíte comportamental. As duas configurações compartilham somente
+o servidor Vite, a URL base e o projeto Chromium por
+[`ui/playwright-shared-config.ts`](../../../playwright-shared-config.ts). Não
+reproduzir esses arquivos neste SDD.
 
 - `tests/integration/routes/<flow>/<route>.spec.ts` valida uma rota isolada,
   iniciando diretamente pelo link reproduzível documentado nela;
@@ -171,7 +176,7 @@ entre testes. A regra de execução serial aplica-se somente aos E2E do backend.
 [`ui/package.json`](../../../package.json) é a fonte de verdade dos comandos de
 execução, depuração, interface interativa e instalação do Chromium.
 [`package.json`](../../../../package.json) expõe o agregador
-`test:integration` da raiz.
+`test:integration` e o gerador curatorial `capture:sdd` da raiz.
 
 Esse nome não cria uma suíte intermediária no backend. A API continua possuindo
 somente unitários e E2E.
@@ -245,6 +250,14 @@ condicionada à existência de referências em
 
 Quando houver regressão visual automatizada, suas golden images executáveis ficam
 junto dos testes Playwright e não substituem as imagens curadas do SDD.
+
+`pnpm capture:sdd` não é regressão visual nem quality gate. Ele gera candidatas em
+`ui/test-results/sdd-screenshots/`, fora da suíte `tests/integration`, para revisão
+e promoção humanas conforme `06-referencias-visuais-de-layout.md`. Sua configuração
+sempre possui o processo Vite da porta `3100` e aguarda a mensagem de prontidão do
+servidor; não reutiliza servidor externo. A matriz inicial cobre as oito rotas
+documentadas em `390x844` e `1440x900`; novas combinações só entram quando
+acrescentarem um estado ou viewport útil para a curadoria.
 
 ## Estado de adoção
 

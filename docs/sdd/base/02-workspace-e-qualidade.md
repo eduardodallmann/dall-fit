@@ -58,17 +58,18 @@ mas credenciais e valores de ambientes reais nunca são versionados.
 
 Todos os quality gates são iniciados na raiz:
 
-| Comando                 | Responsabilidade                                             |
-| ----------------------- | ------------------------------------------------------------ |
-| `pnpm typecheck`        | Compila types e executa typecheck de API, Workflow e UI      |
-| `pnpm lint`             | Executa typecheck e ESLint no monorepo                       |
-| `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint |
-| `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos               |
-| `pnpm test`             | Compila types e testa API, Workflow e UI                     |
-| `pnpm test:coverage`    | Agrega cobertura local de API, Workflow e UI                 |
-| `pnpm test:coverage:ci` | Agrega cobertura e relatórios para CI                        |
-| `pnpm test:integration` | Executa Playwright da UI após sua adoção                     |
-| `pnpm build`            | Compila types antes das aplicações consumidoras              |
+| Comando                 | Responsabilidade                                                      |
+| ----------------------- | --------------------------------------------------------------------- |
+| `pnpm typecheck`        | Compila types e executa typecheck de API, Workflow e UI               |
+| `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
+| `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint          |
+| `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos                        |
+| `pnpm test`             | Compila types e testa API, Workflow e UI                              |
+| `pnpm test:coverage`    | Agrega cobertura local de API, Workflow e UI                          |
+| `pnpm test:coverage:ci` | Agrega cobertura e relatórios para CI                                 |
+| `pnpm test:integration` | Executa Playwright da UI após sua adoção                              |
+| `pnpm capture:sdd`      | Gera candidatas locais de screenshots para curadoria documental da UI |
+| `pnpm build`            | Compila types antes das aplicações consumidoras                       |
 
 Os comandos explícitos com `pnpm -C` tornam visível qual projeto falhou e preservam
 a autonomia de configuração de cada suíte.
@@ -84,6 +85,12 @@ gates.
 `test:integration` executa os cenários Playwright da UI. A adoção ocorreu com a
 jornada de login e segue
 `../../../ui/docs/sdd/base/07-testes-integrados-playwright.md`.
+
+`capture:sdd` executa uma configuração Playwright isolada para gerar candidatas de
+referências visuais em diretório ignorado pelo Git. O comando não integra os
+quality gates e não altera automaticamente as referências curadas; seleção,
+promoção e documentação seguem
+`../../../ui/docs/sdd/base/06-referencias-visuais-de-layout.md`.
 
 O pacote `@dall-fit/types` também é compilado em `postinstall`, garantindo suas
 exportações de runtime após um clone novo. Os agregadores repetem o build para

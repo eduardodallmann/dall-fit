@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "capture:sdd": "playwright test --config playwright.sdd-screenshots.config.ts",
     "generate:pwa-assets": "pwa-assets-generator --preset minimal-2023 public/favicon.svg",
     "lint": "pnpm --dir .. exec eslint ui",
     "lint:fix": "pnpm --dir .. exec eslint ui --fix",
