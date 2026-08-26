@@ -41,6 +41,11 @@ somente o vínculo. Ambos limpam a seleção ativa sem escolher fallback. Repeti
 referência retorna `409 GLOBAL_TRAINING_PLAN_REFERENCE_DUPLICATE`. Ativação nunca
 aceita job, item de outra pessoa ou referência cujo global foi excluído.
 
+Ao excluir plano próprio, workout ou exercício, `TrainingPlanService` solicita ao
+`TrainingLoadProfileService` a remoção dos perfis de carga correspondentes. A
+limpeza acontece depois da mutation canônica do plano e não altera o histórico de
+execuções já finalizadas.
+
 ## Persistência e branches
 
 `training_plan_catalog_entries` possui unicidade por pessoa/plano próprio e por

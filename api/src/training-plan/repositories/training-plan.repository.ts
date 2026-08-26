@@ -8,6 +8,7 @@ import type {
   TrainingPlanAccessScope,
   TrainingPlanChanges,
   TrainingPlanEntity,
+  TrainingPlanExecutionTree,
   TrainingPlanPage,
   TrainingPlanWorkoutSummary,
   VersionedResult,
@@ -25,6 +26,10 @@ export abstract class TrainingPlanRepository {
     id: string,
     scope: TrainingPlanAccessScope,
   ): Promise<TrainingPlanEntity | null>;
+  abstract findExecutionTree(
+    id: string,
+    scope: TrainingPlanAccessScope,
+  ): Promise<TrainingPlanExecutionTree | null>;
   abstract update(
     id: string,
     expectedVersion: number,

@@ -17,6 +17,7 @@ import type {
   StoredExerciseImage,
   TargetState,
   TrainingPlanEntity,
+  TrainingPlanExecutionTree,
   TrainingPlanPage,
   VersionedResult,
   WorkoutAggregate,
@@ -47,6 +48,7 @@ import {
   TRAINING_PLAN_SIZE_WARNING,
   TRAINING_PLAN_WORKOUT_WARNING,
 } from '~/training-plan/training-plan.constants';
+import { TrainingLoadProfileService } from '~/training/services/training-load-profile.service';
 
 const editableFields: Record<ExerciseType, ReadonlySet<string>> = {
   'youtube-short': new Set([
@@ -73,6 +75,7 @@ export class TrainingPlanService {
     private readonly youtubeReferenceService: YoutubeReferenceService,
     private readonly exerciseImageService: ExerciseImageService,
     private readonly realtimePublisher: RealtimePublisherService,
+    private readonly trainingLoadProfiles: TrainingLoadProfileService,
   ) {}
 
   async listGlobal(page: number): Promise<TrainingPlanPage> {
@@ -218,6 +221,7 @@ export class TrainingPlanService {
       return failure;
     }
     await this.exerciseImageService.deleteImages(images);
+    await this.trainingLoadProfiles.cleanupPlan(trainingPlanId);
     this.logger.log('TrainingPlanService -> deleteOwned -> completed:', {
       data: { imageCount: images.length, ownerPersonId, trainingPlanId },
     });
@@ -297,6 +301,7 @@ export class TrainingPlanService {
         !retainedImageKeys.has(image.display.key),
     );
     await this.exerciseImageService.deleteImages(deletableImages);
+    await this.trainingLoadProfiles.cleanupPlan(trainingPlanId);
     this.logger.log('TrainingPlanService -> deleteGlobal -> completed:', {
       data: {
         deletedImageCount: deletableImages.length,
@@ -387,6 +392,7 @@ export class TrainingPlanService {
         ownerPersonId,
       );
     await this.exerciseImageService.deleteImages(result.data);
+    await this.trainingLoadProfiles.cleanupWorkout(trainingPlanId, workoutId);
     this.logger.log('TrainingPlanService -> deleteWorkout -> return:', {
       data: { trainingPlanId, version: result.version, workoutId },
     });
@@ -430,6 +436,43 @@ export class TrainingPlanService {
         version: result.version,
         workoutId,
       },
+    });
+    return result;
+  }
+
+  async getExecutionTree(
+    trainingPlanId: string,
+    ownerPersonId: string | null,
+  ): Promise<TrainingPlanExecutionTree> {
+    this.logger.log('TrainingPlanService -> getExecutionTree -> params:', {
+      params: { ownerIsGlobal: ownerPersonId === null, trainingPlanId },
+    });
+    const tree = await this.findExecutionTree(trainingPlanId, ownerPersonId);
+    if (tree === null) throw createTrainingPlanNotFoundException();
+    const result = tree;
+    this.logger.log('TrainingPlanService -> getExecutionTree -> return:', {
+      data: { trainingPlanId, workoutCount: result.workouts.length },
+    });
+    return result;
+  }
+
+  async findExecutionTree(
+    trainingPlanId: string,
+    ownerPersonId: string | null,
+  ): Promise<TrainingPlanExecutionTree | null> {
+    this.logger.log('TrainingPlanService -> findExecutionTree -> params:', {
+      params: { ownerIsGlobal: ownerPersonId === null, trainingPlanId },
+    });
+    const result = await this.trainingPlanRepository.findExecutionTree(
+      trainingPlanId,
+      { ownerPersonId },
+    );
+    this.logger.log(
+      'TrainingPlanService -> findExecutionTree -> repository return:',
+      { data: { found: result !== null, trainingPlanId } },
+    );
+    this.logger.log('TrainingPlanService -> findExecutionTree -> return:', {
+      data: { found: result !== null, trainingPlanId },
     });
     return result;
   }
@@ -636,6 +679,7 @@ export class TrainingPlanService {
       );
     if (result.data !== null)
       await this.exerciseImageService.deleteImages([result.data]);
+    await this.trainingLoadProfiles.cleanupExercise(trainingPlanId, exerciseId);
     return result.version;
   }
 

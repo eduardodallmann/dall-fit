@@ -15,6 +15,7 @@ import type {
   TrainingPlanAccessScope,
   TrainingPlanChanges,
   TrainingPlanEntity,
+  TrainingPlanExecutionTree,
   TrainingPlanPage,
   TrainingPlanWorkoutSummary,
   VersionedResult,
@@ -186,6 +187,54 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       {
         data: { found: result !== null, trainingPlanId: id },
       },
+    );
+    return result;
+  }
+
+  async findExecutionTree(
+    id: string,
+    scope: TrainingPlanAccessScope,
+  ): Promise<TrainingPlanExecutionTree | null> {
+    this.logger.log(
+      'MongoTrainingPlanRepository -> findExecutionTree -> params:',
+      {
+        params: {
+          ownerIsGlobal: scope.ownerPersonId === null,
+          trainingPlanId: id,
+        },
+      },
+    );
+    const document = await this.trainingPlanModel
+      .findOne({ _id: id, ownerPersonId: scope.ownerPersonId })
+      .lean<PlainPlan>()
+      .exec();
+    this.logger.log(
+      'MongoTrainingPlanRepository -> findExecutionTree -> mongoose return:',
+      { data: { found: document !== null, trainingPlanId: id } },
+    );
+    const result =
+      document === null
+        ? null
+        : {
+            ...this.mapPlan(document),
+            workouts: document.workouts.map((workout) => ({
+              createdAt: workout.createdAt.toISOString(),
+              exercises: workout.exercises.map((exercise) =>
+                this.mapStoredExercise(exercise),
+              ),
+              id: workout._id.toString(),
+              name: workout.name,
+              trainingPlan: {
+                id: document._id.toString(),
+                name: document.name,
+              },
+              updatedAt: workout.updatedAt.toISOString(),
+              version: document.version,
+            })),
+          };
+    this.logger.log(
+      'MongoTrainingPlanRepository -> findExecutionTree -> return:',
+      { data: { found: result !== null, trainingPlanId: id } },
     );
     return result;
   }

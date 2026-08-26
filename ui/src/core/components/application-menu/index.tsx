@@ -1,6 +1,6 @@
 import { Avatar, Button, Chip, Typography } from '@heroui/react';
 import { Link, useLocation } from '@tanstack/react-router';
-import { Dumbbell, House, LogOut } from 'lucide-react';
+import { Dumbbell, House, LogOut, Play } from 'lucide-react';
 
 import type { Person } from '@dall-fit/types';
 
@@ -130,6 +130,29 @@ export function ApplicationMenu({
             focusable="false"
           />
           <span>Meus planos</span>
+        </Link>
+        <Link
+          activeOptions={{ includeSearch: false }}
+          className={styles.navigationLink()}
+          onClick={() => {
+            trackUiEvent({
+              control: 'training_link',
+              destination: 'training',
+              eventName: 'ui_navigation_selected',
+              navigationKind: 'menu',
+              surface: 'application_menu',
+            });
+            onNavigate?.();
+          }}
+          search={adminSearch}
+          to="/training"
+        >
+          <Play
+            aria-hidden="true"
+            className={styles.navigationIcon()}
+            focusable="false"
+          />
+          <span>Treinar</span>
         </Link>
         {person.isAdmin === true ? (
           <Link

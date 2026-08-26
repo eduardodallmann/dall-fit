@@ -11,6 +11,8 @@ Cada arquivo descreve uma jornada funcional que atravessa API e UI. Use
   administrativo de planos e manutenção de workouts.
 - [`Gestão de planos de treino pessoais`](gestao-planos-treino-pessoais.md):
   catálogo próprio, referências globais, ativação e clonagem durável.
+- [`Execução de treino`](execucao-de-treino.md): seleção, sessão retomável,
+  séries, timers, finalização e resumo semanal.
 
 Fluxos registram sequência, decisões e dados compartilhados, mas referenciam a
 documentação detalhada de endpoints e rotas sem duplicá-la.

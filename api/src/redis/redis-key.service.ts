@@ -10,7 +10,16 @@ export class RedisKeyService {
     this.namespace = configService.getOrThrow<string>('REDIS_NAMESPACE');
   }
 
-  create(subject: 'rate' | 'realtime' | 'session', identifier: string): string {
+  create(
+    subject:
+      | 'rate'
+      | 'realtime'
+      | 'session'
+      | 'workout-completion-receipt'
+      | 'workout-session'
+      | 'workout-session-expiry',
+    identifier: string,
+  ): string {
     this.logger.log('RedisKeyService -> create -> params:', {
       params: { subject },
     });

@@ -10,10 +10,14 @@ import type {
   PersonalTrainingPlanDetails,
   PersonalTrainingPlanListItem,
   Theme,
+  TrainingOverview,
   TrainingPlanDetails,
   TrainingPlanSummary,
   TrainingPlanWorkoutDetails,
   TrainingPlanWorkoutSummary,
+  TrainingSession,
+  TrainingWorkoutPreview,
+  WorkoutExecutionSummary,
 } from './entities.js';
 
 export interface ApiError {
@@ -164,3 +168,33 @@ export interface ReorderExercisesRequest {
 export type UpdateExerciseImageResponse = ApiResponse<{
   image: ExerciseImage;
 }>;
+
+export type TrainingOverviewResponse = ApiResponse<TrainingOverview>;
+export type TrainingWorkoutPreviewResponse =
+  ApiResponse<TrainingWorkoutPreview>;
+export type TrainingSessionResponse = ApiResponse<TrainingSession>;
+export type WorkoutExecutionSummaryResponse =
+  ApiResponse<WorkoutExecutionSummary>;
+
+export interface TrainingLoadRequest {
+  loadKg: number | null;
+}
+
+export type CompleteTrainingSeriesRequest = TrainingLoadRequest;
+
+export interface CompleteRemainingTrainingSeriesRequest {
+  loadsKg: readonly (number | null)[];
+}
+
+export interface StartTrainingTimerRequest {
+  kind: 'duration' | 'pause';
+}
+
+export interface ResolveTrainingTimerRequest {
+  outcome: 'cancel' | 'finish' | 'skip';
+}
+
+export interface CompleteTrainingSessionRequest {
+  confirmIncomplete: boolean;
+  timezone: string;
+}

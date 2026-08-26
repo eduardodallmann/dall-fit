@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
 import { resetSessionLifecycleForTests } from '~/auth/session-lifecycle';
 import { resetAuthScenarioStates } from '~/mocks/handlers/auth';
+import { resetTrainingScenarioStates } from '~/mocks/handlers/training';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import { mockServer } from '~/mocks/server';
 
@@ -20,6 +21,7 @@ afterEach(() => {
   resetAuthScenarioStates();
   resetSessionLifecycleForTests();
   resetTrainingPlanScenarioStates();
+  resetTrainingScenarioStates();
   vi.restoreAllMocks();
 });
 

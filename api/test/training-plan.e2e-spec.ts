@@ -35,6 +35,8 @@ import {
 import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan.schema';
 import { BlobStorageService } from '~/training-plan/services/blob-storage.service';
 import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
+import { TrainingLoadProfileDocument } from '~/training/repositories/training-load-profile.schema';
+import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 
 const googleCredential = Buffer.from(
   JSON.stringify({
@@ -54,9 +56,11 @@ describe('Global training plans (e2e)', () => {
   let catalogModel: Model<PersonalTrainingPlanCatalogDocument>;
   let cloneJobModel: Model<TrainingPlanCloneJobDocument>;
   let personModel: Model<PersonDocument>;
+  let loadProfileModel: Model<TrainingLoadProfileDocument>;
   let redisClient: Redis;
   let redisServer: RedisMemoryServer;
   let trainingPlanModel: Model<TrainingPlanDocument>;
+  let workoutExecutionModel: Model<WorkoutExecutionDocument>;
   const uploadedBlobs: Array<{ content: Buffer; key: string }> = [];
   const deletedBlobKeys: string[][] = [];
   const blobStorage = {
@@ -136,12 +140,20 @@ describe('Global training plans (e2e)', () => {
     trainingPlanModel = app.get<Model<TrainingPlanDocument>>(
       getModelToken(TrainingPlanDocument.name),
     );
+    loadProfileModel = app.get<Model<TrainingLoadProfileDocument>>(
+      getModelToken(TrainingLoadProfileDocument.name),
+    );
+    workoutExecutionModel = app.get<Model<WorkoutExecutionDocument>>(
+      getModelToken(WorkoutExecutionDocument.name),
+    );
     await Promise.all([
       personModel.syncIndexes(),
       trainingPlanModel.syncIndexes(),
       activeModel.syncIndexes(),
       catalogModel.syncIndexes(),
       cloneJobModel.syncIndexes(),
+      loadProfileModel.syncIndexes(),
+      workoutExecutionModel.syncIndexes(),
     ]);
     redisClient = new Redis(process.env.REDIS_URL);
   });
@@ -156,6 +168,8 @@ describe('Global training plans (e2e)', () => {
       activeModel.deleteMany({}).exec(),
       catalogModel.deleteMany({}).exec(),
       cloneJobModel.deleteMany({}).exec(),
+      loadProfileModel.deleteMany({}).exec(),
+      workoutExecutionModel.deleteMany({}).exec(),
       redisClient.flushdb(),
     ]);
   });
@@ -1290,5 +1304,200 @@ describe('Global training plans (e2e)', () => {
     );
     expect(cancel.status).toBe(202);
     expect(cancel.body).toMatchObject({ data: { state: 'cancelling' } });
+  });
+
+  it('executes an active workout with optional integer load and persists its completion', async () => {
+    const person = await login(false);
+    const persistedPerson = await personModel
+      .findOne({ googleSubject: 'google-person-001' })
+      .lean()
+      .exec();
+    expect(persistedPerson).not.toBeNull();
+    const workoutId = new Types.ObjectId();
+    const exerciseId = new Types.ObjectId();
+    const plan = await createGlobalPlan({
+      name: 'Plano executável',
+      workouts: [
+        {
+          _id: workoutId,
+          name: 'Treino único',
+          exercises: [
+            {
+              _id: exerciseId,
+              bodyArea: 'chest',
+              name: 'Supino sem carga',
+              repetitions: 12,
+              restSeconds: 60,
+              sets: 2,
+              type: 'youtube-short',
+              youtubeId: 'ZA8gs8XP2bs',
+            },
+          ],
+        },
+      ],
+    });
+    const catalogEntry = await catalogModel.create({
+      globalTrainingPlanId: plan._id,
+      kind: 'global-reference',
+      personId: persistedPerson?._id,
+      trainingPlanId: null,
+    });
+    await activeModel.create({
+      catalogEntryId: catalogEntry._id,
+      personId: persistedPerson?._id,
+    });
+
+    const overview = await person.get('/training').expect(200);
+    expect(overview.body).toMatchObject({
+      data: {
+        plan: { id: plan.id, source: 'global-reference' },
+        workouts: [{ id: workoutId.toString(), indicator: 'current' }],
+      },
+    });
+    const preview = await person
+      .get(`/training/workouts/${workoutId.toString()}`)
+      .expect(200);
+    expect(preview.body).toMatchObject({
+      data: {
+        exercises: [{ id: exerciseId.toString(), lastLoadsKg: [null, null] }],
+      },
+    });
+
+    const started = await authenticatedMutation(
+      person,
+      person.post(`/training/workouts/${workoutId.toString()}/session`),
+    )
+      .send({})
+      .expect(201);
+    expect(started.headers['x-resource-version']).toBe('0');
+    expect(started.body).toMatchObject({
+      data: {
+        exercises: [{ series: [{ loadKg: null }, { loadKg: null }] }],
+        version: 0,
+      },
+    });
+
+    const completedSeries = await authenticatedMutation(
+      person,
+      person
+        .post(
+          `/training/session/exercises/${exerciseId.toString()}/series/1/complete`,
+        )
+        .set('X-Resource-Version', '0'),
+    )
+      .send({ loadKg: null })
+      .expect(201);
+    expect(completedSeries.headers['x-resource-version']).toBe('1');
+
+    const resolvedRest = await authenticatedMutation(
+      person,
+      person
+        .post('/training/session/timer/resolve')
+        .set('X-Resource-Version', '1'),
+    )
+      .send({ outcome: 'skip' })
+      .expect(201);
+    expect(resolvedRest.headers['x-resource-version']).toBe('2');
+
+    const conflict = await authenticatedMutation(
+      person,
+      person
+        .put(
+          `/training/session/exercises/${exerciseId.toString()}/series/2/load`,
+        )
+        .set('X-Resource-Version', '1'),
+    ).send({ loadKg: 19 });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body).toMatchObject({
+      code: 'WORKOUT_SESSION_VERSION_CONFLICT',
+    });
+
+    const completedSecondSeries = await authenticatedMutation(
+      person,
+      person
+        .post(
+          `/training/session/exercises/${exerciseId.toString()}/series/2/complete`,
+        )
+        .set('X-Resource-Version', '2'),
+    )
+      .send({ loadKg: 17 })
+      .expect(201);
+    expect(completedSecondSeries.headers['x-resource-version']).toBe('3');
+
+    const completed = await authenticatedMutation(
+      person,
+      person.post('/training/session/complete').set('X-Resource-Version', '3'),
+    )
+      .send({ confirmIncomplete: false, timezone: 'America/Sao_Paulo' })
+      .expect(201);
+    expect(completed.body).toMatchObject({
+      data: {
+        fullCompletion: true,
+        totalLoadKg: 17,
+        workoutId: workoutId.toString(),
+      },
+    });
+    const executionId = (completed.body as { data: { id: string } }).data.id;
+    const repeated = await authenticatedMutation(
+      person,
+      person.post('/training/session/complete').set('X-Resource-Version', '3'),
+    )
+      .send({ confirmIncomplete: false, timezone: 'America/Sao_Paulo' })
+      .expect(201);
+    expect(repeated.body).toMatchObject({ data: { id: executionId } });
+    await person.get(`/training/completions/${executionId}`).expect(200);
+    await expect(workoutExecutionModel.countDocuments()).resolves.toBe(1);
+    const storedExecution = await workoutExecutionModel
+      .findById(executionId)
+      .lean()
+      .exec();
+    expect(storedExecution?.catalogEntryId.toString()).toBe(catalogEntry.id);
+    await expect(loadProfileModel.countDocuments()).resolves.toBe(1);
+    await person.get('/training/session').expect(404);
+
+    await authenticatedMutation(
+      person,
+      person.post(`/training/workouts/${workoutId.toString()}/session`),
+    )
+      .send({})
+      .expect(201);
+    await redisClient.del(
+      `dall-fit-training-e2e:test:workout-session:${persistedPerson?._id.toString()}`,
+    );
+    const expired = await person.get('/training/session').expect(410);
+    expect(expired.body).toMatchObject({ code: 'WORKOUT_SESSION_EXPIRED' });
+
+    await authenticatedMutation(
+      person,
+      person.post(`/training/workouts/${workoutId.toString()}/session`),
+    )
+      .send({})
+      .expect(201);
+    const admin = await login(true);
+    await authenticatedMutation(
+      admin,
+      withResourceVersion(
+        admin.delete(`/global/training-plans/${plan.id}`),
+        plan.id,
+        plan.version,
+      ),
+    ).expect(204);
+    await authenticatedMutation(
+      person,
+      person
+        .post(
+          `/training/session/exercises/${exerciseId.toString()}/series/complete-remaining`,
+        )
+        .set('X-Resource-Version', '0'),
+    )
+      .send({ loadsKg: [22, 23] })
+      .expect(201);
+    await authenticatedMutation(
+      person,
+      person.post('/training/session/complete').set('X-Resource-Version', '1'),
+    )
+      .send({ confirmIncomplete: false, timezone: 'America/Sao_Paulo' })
+      .expect(201);
+    await expect(loadProfileModel.countDocuments()).resolves.toBe(0);
   });
 });

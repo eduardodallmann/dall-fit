@@ -46,6 +46,13 @@ import { ExerciseImageService } from '~/training-plan/services/exercise-image.se
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
+import { MongoTrainingLoadProfileRepository } from '~/training/repositories/mongo-training-load-profile.repository';
+import { TrainingLoadProfileRepository } from '~/training/repositories/training-load-profile.repository';
+import {
+  TrainingLoadProfileDocument,
+  TrainingLoadProfileSchema,
+} from '~/training/repositories/training-load-profile.schema';
+import { TrainingLoadProfileService } from '~/training/services/training-load-profile.service';
 
 @Module({
   imports: [
@@ -63,6 +70,10 @@ import { YoutubeReferenceService } from '~/training-plan/services/youtube-refere
       {
         name: TrainingPlanCloneJobDocument.name,
         schema: TrainingPlanCloneJobSchema,
+      },
+      {
+        name: TrainingLoadProfileDocument.name,
+        schema: TrainingLoadProfileSchema,
       },
     ]),
   ],
@@ -91,6 +102,8 @@ import { YoutubeReferenceService } from '~/training-plan/services/youtube-refere
     BlobStorageService,
     ExerciseImageService,
     YoutubeReferenceService,
+    MongoTrainingLoadProfileRepository,
+    TrainingLoadProfileService,
     UpdateGlobalTrainingPlanCommand,
     UpdateTrainingPlanExerciseCommand,
     UpdateTrainingPlanWorkoutCommand,
@@ -108,6 +121,16 @@ import { YoutubeReferenceService } from '~/training-plan/services/youtube-refere
       provide: TrainingPlanCloneStarter,
       useExisting: HttpTrainingPlanCloneStarter,
     },
+    {
+      provide: TrainingLoadProfileRepository,
+      useExisting: MongoTrainingLoadProfileRepository,
+    },
+  ],
+  exports: [
+    ExerciseImageService,
+    PersonalTrainingPlanService,
+    TrainingLoadProfileService,
+    TrainingPlanService,
   ],
 })
 export class TrainingPlanModule {}

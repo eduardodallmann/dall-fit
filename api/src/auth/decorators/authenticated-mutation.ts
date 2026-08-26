@@ -58,3 +58,29 @@ export function ImageMutation(): MethodDecorator {
   );
   return result;
 }
+
+export function TrainingMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'training-mutation',
+      limitConfigKey: 'RATE_LIMIT_TRAINING_MUTATION_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_TRAINING_MUTATION_WINDOW_MS',
+    }),
+    UseGuards(SessionAuthGuard, RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}
+
+export function TrainingLifecycleMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'training-lifecycle',
+      limitConfigKey: 'RATE_LIMIT_TRAINING_LIFECYCLE_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_TRAINING_LIFECYCLE_WINDOW_MS',
+    }),
+    UseGuards(SessionAuthGuard, RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}

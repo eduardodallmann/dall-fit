@@ -6,9 +6,12 @@ export type AnalyticsSurface =
   | 'home'
   | 'pwa_install'
   | 'pwa_update'
+  | 'training'
+  | 'training_completion'
   | 'training_plan_detail'
   | 'training_plan_form'
   | 'training_plan_list'
+  | 'training_workout'
   | 'workout';
 
 export type AnalyticsControl =
@@ -48,6 +51,8 @@ export type AnalyticsControl =
   | 'submit'
   | 'theme_toggle'
   | 'training_plans_link'
+  | 'training_link'
+  | 'training_action'
   | 'video_preview'
   | 'workout_link'
   | 'workout_name';
@@ -57,10 +62,30 @@ type CommonEvent = {
   surface: AnalyticsSurface;
 };
 
+export type TrainingAnalyticsAction =
+  | 'abandon'
+  | 'complete_exercise'
+  | 'complete_series'
+  | 'complete_workout'
+  | 'expand_exercise'
+  | 'media_open'
+  | 'resolve_timer'
+  | 'restart_exercise'
+  | 'retry'
+  | 'save_load'
+  | 'select_workout'
+  | 'share'
+  | 'start_timer'
+  | 'start_workout';
+
 type UiAnalyticsEvent =
   | (CommonEvent & {
       destination:
-        'dash' | 'training_plan_detail' | 'training_plan_list' | 'workout';
+        | 'dash'
+        | 'training'
+        | 'training_plan_detail'
+        | 'training_plan_list'
+        | 'workout';
       eventName: 'ui_navigation_selected';
       navigationKind: 'breadcrumb' | 'menu' | 'pagination' | 'row_link';
     })
@@ -178,6 +203,11 @@ type UiAnalyticsEvent =
       disclosure: 'pwa_install_instructions';
       eventName: 'ui_disclosure_toggled';
       state: 'closed' | 'open';
+    })
+  | (CommonEvent & {
+      action: TrainingAnalyticsAction;
+      eventName: 'ui_training_action';
+      outcome?: 'cancelled' | 'error' | 'success';
     });
 
 type AnalyticsProperties = Record<
@@ -196,6 +226,8 @@ export function normalizeAnalyticsRoute(pathname: string): string | undefined {
   }
 
   const segments = pathname.split('/').filter(Boolean);
+  const trainingRoute = normalizeTrainingAnalyticsRoute(segments);
+  if (trainingRoute.matched) return trainingRoute.route;
   const isTrainingPlanRoute =
     segments[0] === 'global' && segments[1] === 'training-plan';
 
@@ -216,6 +248,22 @@ export function normalizeAnalyticsRoute(pathname: string): string | undefined {
   }
 
   return undefined;
+}
+
+function normalizeTrainingAnalyticsRoute(segments: readonly string[]): {
+  matched: boolean;
+  route?: string;
+} {
+  if (segments[0] !== 'training') return { matched: false };
+  if (segments.length === 1) return { matched: true, route: '/training' };
+  if (segments.length === 3 && segments[1] === 'workout')
+    return { matched: true, route: '/training/workout/:workoutId' };
+  if (segments.length === 3 && segments[1] === 'completion')
+    return {
+      matched: true,
+      route: '/training/completion/:workoutExecutionId',
+    };
+  return { matched: true };
 }
 
 function getCurrentRoute(): string | undefined {
@@ -307,7 +355,27 @@ function buildProperties(event: UiAnalyticsEvent): AnalyticsProperties {
         disclosure: event.disclosure,
         state: event.state,
       });
+    case 'ui_training_action':
+      return compactProperties({
+        ...common,
+        action: event.action,
+        outcome: event.outcome,
+      });
   }
+}
+
+export function trackTrainingAction(
+  surface: 'training' | 'training_completion' | 'training_workout',
+  action: TrainingAnalyticsAction,
+  outcome?: 'cancelled' | 'error' | 'success',
+): void {
+  trackUiEvent({
+    action,
+    control: 'training_action',
+    eventName: 'ui_training_action',
+    outcome,
+    surface,
+  });
 }
 
 export function trackUiEvent(event: UiAnalyticsEvent): void {
