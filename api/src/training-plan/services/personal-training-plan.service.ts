@@ -20,6 +20,7 @@ import {
 import type {
   GlobalTrainingPlanUsageMap,
   PersonalCatalogEntry,
+  PersonalTrainingExecutionPlan,
   TrainingPlanCloneJob,
 } from '~/training-plan/domain/personal-training-plan.entity';
 import type {
@@ -315,6 +316,95 @@ export class PersonalTrainingPlanService {
         workoutId,
       },
     });
+    return result;
+  }
+
+  async getActiveExecutionPlan(
+    personId: string,
+  ): Promise<PersonalTrainingExecutionPlan | null> {
+    this.logger.log(
+      'PersonalTrainingPlanService -> getActiveExecutionPlan -> params:',
+      { params: { personId } },
+    );
+    const catalogEntryId =
+      await this.repository.getActiveCatalogEntryId(personId);
+    this.logger.log(
+      'PersonalTrainingPlanService -> getActiveExecutionPlan -> repository return:',
+      { data: { active: catalogEntryId !== null, personId } },
+    );
+    if (catalogEntryId === null) {
+      const result = null;
+      this.logger.log(
+        'PersonalTrainingPlanService -> getActiveExecutionPlan -> return:',
+        { data: { active: false, personId } },
+      );
+      return result;
+    }
+    const resolved = await this.resolveEntry(personId, catalogEntryId);
+    const plan = await this.trainingPlanService.getExecutionTree(
+      resolved.plan.id,
+      resolved.ownerPersonId,
+    );
+    const result = {
+      catalogEntryId,
+      ownerPersonId: resolved.ownerPersonId,
+      plan,
+      source: resolved.source,
+    };
+    this.logger.log(
+      'PersonalTrainingPlanService -> getActiveExecutionPlan -> return:',
+      { data: { active: true, personId, trainingPlanId: plan.id } },
+    );
+    return result;
+  }
+
+  async findExecutionPlan(
+    personId: string,
+    catalogEntryId: string,
+  ): Promise<PersonalTrainingExecutionPlan | null> {
+    this.logger.log(
+      'PersonalTrainingPlanService -> findExecutionPlan -> params:',
+      { params: { catalogEntryId, personId } },
+    );
+    const entry = await this.repository.findEntry(personId, catalogEntryId);
+    if (entry === null) {
+      this.logger.log(
+        'PersonalTrainingPlanService -> findExecutionPlan -> return:',
+        { data: { found: false, personId } },
+      );
+      return null;
+    }
+    const owned = entry.kind === 'owned' && entry.trainingPlanId !== null;
+    const referenced =
+      entry.kind === 'global-reference' && entry.globalTrainingPlanId !== null;
+    if (!owned && !referenced) {
+      this.logger.log(
+        'PersonalTrainingPlanService -> findExecutionPlan -> return:',
+        { data: { found: false, personId } },
+      );
+      return null;
+    }
+    const trainingPlanId = owned
+      ? (entry.trainingPlanId as string)
+      : (entry.globalTrainingPlanId as string);
+    const ownerPersonId = owned ? personId : null;
+    const plan = await this.trainingPlanService.findExecutionTree(
+      trainingPlanId,
+      ownerPersonId,
+    );
+    const result =
+      plan === null
+        ? null
+        : {
+            catalogEntryId,
+            ownerPersonId,
+            plan,
+            source: owned ? ('owned' as const) : ('global-reference' as const),
+          };
+    this.logger.log(
+      'PersonalTrainingPlanService -> findExecutionPlan -> return:',
+      { data: { found: result !== null, personId, trainingPlanId } },
+    );
     return result;
   }
 

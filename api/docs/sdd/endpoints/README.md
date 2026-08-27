@@ -27,3 +27,5 @@ somente quando constituir requisito funcional excepcional.
 - [`Jobs de clonagem`](training-plan-clone-jobs.md): start, retry e cancelamento
   durável.
 - [`GET /realtime/events`](realtime-events.md): stream autenticado de invalidações.
+- [`Treinar`](training.md): plano ativo, sessão Redis versionada, séries, timers e
+  conclusão durável.

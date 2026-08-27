@@ -246,6 +246,9 @@ coordenadas com consumidores antes de remover campos ou alterar semântica.
 - MongoDB é o banco NoSQL principal.
 - Redis armazena dados temporários, caches, sessões, locks ou idempotência conforme
   o caso de uso.
+- a execução de treino mantém um snapshot por pessoa no Redis com TTL absoluto e
+  CAS; somente resumo final e perfil de cargas são consolidados no MongoDB,
+  conforme a ADR-0010.
 - Mongoose e ioredis são os clients oficiais de produção.
 - services dependem de ports de repository ou cache, não de clients ou models
   concretos.

@@ -7,6 +7,7 @@ import type {
 import type {
   StoredExercise,
   StoredImageVariant,
+  TrainingPlanExecutionTree,
 } from '~/training-plan/domain/training-plan.entity';
 import type {
   CloneJobState,
@@ -21,6 +22,13 @@ export interface PersonalCatalogEntry {
   personId: string;
   trainingPlanId: string | null;
   updatedAt: string;
+}
+
+export interface PersonalTrainingExecutionPlan {
+  catalogEntryId: string;
+  ownerPersonId: string | null;
+  plan: TrainingPlanExecutionTree;
+  source: 'global-reference' | 'owned';
 }
 
 export interface PersonalTrainingPlanPage {

@@ -36,5 +36,8 @@ describe('App', () => {
     expect(analyticsMock).toHaveBeenCalledTimes(1);
   });
 
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    router.cancelMatches();
+    vi.unstubAllEnvs();
+  });
 });

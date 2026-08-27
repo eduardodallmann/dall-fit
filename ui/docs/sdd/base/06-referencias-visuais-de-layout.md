@@ -147,6 +147,59 @@ Playwright é usado para testes integrados comportamentais conforme
 Regressão visual pode ser adicionada quando houver necessidade. As golden images
 executáveis permanecem junto dos testes, separadas das referências curadas do SDD.
 
+### Geração de candidatas para curadoria
+
+O comando abaixo usa uma configuração Playwright isolada, sobe o mesmo Vite com
+MSW Browser e captura a matriz declarada em
+`ui/tests/sdd-screenshots/capture.spec.ts`:
+
+```bash
+pnpm capture:sdd
+```
+
+A configuração de captura sempre inicia e encerra seu próprio servidor na porta
+`3100`; a porta precisa estar livre. Ela espera a confirmação de prontidão emitida
+pelo Vite em vez de reutilizar um processo externo, evitando capturar uma instância
+iniciada sem MSW.
+
+As candidatas são recriadas em:
+
+```text
+ui/test-results/sdd-screenshots/<route-slug>/<arquivo>.png
+```
+
+Esse diretório é ignorado pelo Git e não ativa validação visual. O comando nunca
+grava nem sobrescreve `routes/assets/`, portanto uma execução não transforma o
+layout atual em referência aprovada. Cada captura define explicitamente rota,
+estado MSW, viewport e condição observável de prontidão. A captura espera fontes e
+assets locais ou mockados visíveis, reduz movimento, encerra animações e usa escala
+de um pixel por CSS pixel. Miniaturas remotas do YouTube são ocultadas somente no
+bitmap candidato, preservando sua área de layout sem tornar conteúdo externo uma
+fonte instável.
+
+É possível gerar apenas parte da matriz pelo título da captura:
+
+```bash
+pnpm -C ui capture:sdd -- --grep 'training-plan'
+```
+
+Depois da execução:
+
+1. revisar todas as candidatas aplicáveis;
+2. descartar as que não representam um layout aprovado ou não acrescentam uma
+   variação útil;
+3. copiar somente as aprovadas para
+   `ui/docs/sdd/routes/assets/<route-slug>/`;
+4. preencher no documento da rota a tabela com cenário, viewport, estado MSW,
+   imagem e aspectos de layout relevantes;
+5. conferir novamente a referência no mesmo estado e viewport;
+6. versionar juntos a imagem aprovada e o documento da rota.
+
+Uma nova execução limpa apenas o diretório de candidatas. Referências já promovidas
+para `routes/assets/` permanecem intocadas. Atualizar uma referência vigente exige
+o fluxo explícito de aprovação descrito em “Atualização das referências”; não usar
+o comando de geração como aceite automático.
+
 Enquanto Playwright ainda não estiver adotado, as referências do SDD continuam
 válidas para conferência de layout. A ausência de referências no SDD não exige
 testes visuais.

@@ -12,6 +12,11 @@ Este diretório contém a documentação funcional viva das telas. Use
   referência global somente leitura.
 - [`/training-plan/:catalogEntryId/workout/:workoutId`](training-plan-workout.md):
   editor próprio ou workout somente leitura.
+- [`/training`](training.md): seleção do workout atual ou em andamento.
+- [`/training/workout/:workoutId`](training-workout.md): prévia, sessão, séries,
+  timers e finalização.
+- [`/training/completion/:workoutExecutionId`](training-completion.md): resumo
+  semanal e compartilhamento.
 - [`/global/training-plan`](global-training-plan.md): lista e CRUD de planos.
 - [`/global/training-plan/:trainingPlanId`](global-training-plan-detail.md):
   detalhe e manutenção de workouts.

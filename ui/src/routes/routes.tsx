@@ -41,6 +41,10 @@ import { PersonalTrainingPlanWorkoutPage } from '~/routes/training-plan/personal
 import { canonicalTrainingPlanPage } from '~/routes/training-plan/training-plan-pagination';
 import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
 import { TrainingPlanWorkoutPage } from '~/routes/training-plan/workout-page';
+import { TrainingCompletionPage } from '~/routes/training/completion-page';
+import { TrainingOverviewPage } from '~/routes/training/overview-page';
+import type { MockTrainingScenario } from '~/routes/training/training-service';
+import { TrainingWorkoutPage } from '~/routes/training/workout-page';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -61,6 +65,10 @@ interface TrainingPlanSearch extends DashSearch {
 
 interface TrainingPlanListSearch extends TrainingPlanSearch {
   page?: number;
+}
+
+interface TrainingSearch extends DashSearch {
+  mockTraining?: MockTrainingScenario;
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
@@ -241,6 +249,27 @@ const personalTrainingPlanWorkoutRoute = createRoute({
   component: PersonalTrainingPlanWorkoutRouteComponent,
 });
 
+const trainingOverviewRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: '/training',
+  validateSearch: parseTrainingSearch,
+  component: TrainingOverviewRouteComponent,
+});
+
+const trainingWorkoutRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: '/training/workout/$workoutId',
+  validateSearch: parseTrainingSearch,
+  component: TrainingWorkoutRouteComponent,
+});
+
+const trainingCompletionRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: '/training/completion/$workoutExecutionId',
+  validateSearch: parseTrainingSearch,
+  component: TrainingCompletionRouteComponent,
+});
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
   authenticatedRoute.addChildren([
@@ -248,6 +277,9 @@ const routeTree = rootRoute.addChildren([
     personalTrainingPlanListRoute,
     personalTrainingPlanDetailRoute,
     personalTrainingPlanWorkoutRoute,
+    trainingOverviewRoute,
+    trainingWorkoutRoute,
+    trainingCompletionRoute,
     adminRoute.addChildren([
       trainingPlanListRoute,
       trainingPlanDetailRoute,
@@ -363,6 +395,36 @@ function parseTrainingPlanSearch(
   return result;
 }
 
+function parseTrainingSearch(search: Record<string, unknown>): TrainingSearch {
+  const mockAuth: MockAuthScenario | undefined = isMockAuthScenario(
+    search.mockAuth,
+  )
+    ? search.mockAuth
+    : undefined;
+  const scenarios: readonly MockTrainingScenario[] = [
+    'active-plan',
+    'duration-running',
+    'exercise-completed',
+    'no-active-plan',
+    'pause-running',
+    'series-running',
+    'session-expired',
+    'session-running',
+    'workout-complete',
+    'workout-incomplete',
+    'workout-preview',
+    'youtube-long-running',
+  ];
+  const mockTraining = scenarios.find(
+    (scenario) => scenario === search.mockTraining,
+  );
+  const result = {
+    ...(mockAuth === undefined ? {} : { mockAuth }),
+    ...(mockTraining === undefined ? {} : { mockTraining }),
+  };
+  return result;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components
 function TrainingPlanListRouteComponent() {
   const search = trainingPlanListRoute.useSearch();
@@ -449,6 +511,38 @@ function PersonalTrainingPlanWorkoutRouteComponent() {
       mockAuth={search.mockAuth}
       mockTrainingPlans={search.mockTrainingPlans ?? 'success'}
       workoutId={params.workoutId}
+    />
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingOverviewRouteComponent() {
+  const search = trainingOverviewRoute.useSearch();
+  return (
+    <TrainingOverviewPage mockTraining={search.mockTraining ?? 'active-plan'} />
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingWorkoutRouteComponent() {
+  const params = trainingWorkoutRoute.useParams();
+  const search = trainingWorkoutRoute.useSearch();
+  return (
+    <TrainingWorkoutPage
+      mockTraining={search.mockTraining ?? 'workout-preview'}
+      workoutId={params.workoutId}
+    />
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+function TrainingCompletionRouteComponent() {
+  const params = trainingCompletionRoute.useParams();
+  const search = trainingCompletionRoute.useSearch();
+  return (
+    <TrainingCompletionPage
+      mockTraining={search.mockTraining ?? 'workout-complete'}
+      workoutExecutionId={params.workoutExecutionId}
     />
   );
 }

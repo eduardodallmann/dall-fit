@@ -120,6 +120,26 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(60_000),
+  RATE_LIMIT_TRAINING_MUTATION_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(240),
+  RATE_LIMIT_TRAINING_MUTATION_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
+  RATE_LIMIT_TRAINING_LIFECYCLE_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(30),
+  RATE_LIMIT_TRAINING_LIFECYCLE_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
   YOUTUBE_VALIDATION_TIMEOUT_MS: z.coerce
     .number()
     .int()

@@ -28,3 +28,5 @@ substituída permanece no histórico e aponta para a sucessora.
   real por SSE e Redis Pub/Sub.
 - [`ADR-0009`](ADR-0009-catalogo-pessoal-e-clonagem-duravel.md): catálogo pessoal,
   referências globais vivas e clonagem durável em projeto Nitro separado.
+- [`ADR-0010`](ADR-0010-sessao-efemera-e-historico-de-treino.md): sessão de treino
+  no Redis e consolidação durável de execução e cargas no MongoDB.
