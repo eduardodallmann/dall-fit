@@ -197,3 +197,126 @@ export interface TrainingPlanWorkoutDetails extends Entity {
 export interface GlobalTrainingPlanWorkoutDetails extends TrainingPlanWorkoutDetails {
   usage: GlobalTrainingPlanUsage;
 }
+
+export type TrainingPlanSource = 'global-reference' | 'owned';
+
+export type TrainingWorkoutIndicator = 'current' | 'in-progress' | null;
+
+export type TrainingWorkoutMedia =
+  | {
+      type: 'image';
+      image: ExerciseImage;
+    }
+  | {
+      type: 'youtube-long' | 'youtube-short';
+      youtubeId: string;
+    };
+
+export interface TrainingWorkoutCard {
+  bodyAreas: readonly BodyArea[];
+  id: EntityId;
+  indicator: TrainingWorkoutIndicator;
+  media: TrainingWorkoutMedia | null;
+  name: string;
+}
+
+export interface TrainingPlanExecutionSummary {
+  catalogEntryId: EntityId;
+  id: EntityId;
+  name: string;
+  source: TrainingPlanSource;
+  workoutCount: number;
+}
+
+export interface TrainingOverview {
+  plan: TrainingPlanExecutionSummary | null;
+  workouts: readonly TrainingWorkoutCard[];
+}
+
+export type TrainingExercisePreview =
+  | (YoutubeShortExercise & {
+      lastLoadsKg: readonly (number | null)[];
+    })
+  | (ImageExercise & {
+      lastLoadsKg: readonly (number | null)[];
+    })
+  | YoutubeLongExercise
+  | PauseExercise
+  | DurationExercise;
+
+export interface TrainingWorkoutPreview {
+  exercises: readonly TrainingExercisePreview[];
+  plan: TrainingPlanExecutionSummary;
+  workout: Pick<TrainingPlanWorkoutDetails, 'id' | 'name'>;
+}
+
+export interface TrainingSeriesExecution {
+  completedAt: Timestamp | null;
+  loadKg: number | null;
+  number: number;
+  repetitions: number;
+}
+
+interface TrainingExecutionState {
+  completedAt: Timestamp | null;
+}
+
+export type TrainingExerciseExecution =
+  | (YoutubeShortExercise &
+      TrainingExecutionState & {
+        series: readonly TrainingSeriesExecution[];
+      })
+  | (ImageExercise &
+      TrainingExecutionState & {
+        series: readonly TrainingSeriesExecution[];
+      })
+  | (YoutubeLongExercise & TrainingExecutionState)
+  | (PauseExercise & TrainingExecutionState)
+  | (DurationExercise & TrainingExecutionState);
+
+export type TrainingTimerKind = 'duration' | 'pause' | 'series-rest';
+
+export interface TrainingTimer {
+  endsAt: Timestamp;
+  exerciseId: EntityId;
+  kind: TrainingTimerKind;
+  seriesNumber?: number;
+  startedAt: Timestamp;
+}
+
+export interface TrainingSession {
+  activeTimer: TrainingTimer | null;
+  exercises: readonly TrainingExerciseExecution[];
+  expiresAt: Timestamp;
+  id: EntityId;
+  plan: TrainingPlanExecutionSummary;
+  serverNow: Timestamp;
+  startedAt: Timestamp;
+  version: number;
+  workout: Pick<TrainingPlanWorkoutDetails, 'id' | 'name'>;
+}
+
+export interface TrainingWeekDay {
+  completed: boolean;
+  date: string;
+  weekday: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+}
+
+export interface WorkoutExecutionSummary extends Entity {
+  bodyAreas: readonly BodyArea[];
+  completedAt: Timestamp;
+  completedExerciseCount: number;
+  durationSeconds: number;
+  fullCompletion: boolean;
+  planName: string;
+  totalExerciseCount: number;
+  totalLoadKg: number;
+  trainingPlanId: EntityId;
+  week: {
+    completedWorkoutCount: number;
+    days: readonly TrainingWeekDay[];
+    workoutCount: number;
+  };
+  workoutId: EntityId;
+  workoutName: string;
+}

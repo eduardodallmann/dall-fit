@@ -40,6 +40,12 @@ describe('analytics boundary', () => {
         '/global/training-plan/sensitive-plan-id/workout/sensitive-workout-id',
       ),
     ).toBe('/global/training-plan/:trainingPlanId/workout/:workoutId');
+    expect(
+      normalizeAnalyticsRoute('/training/workout/sensitive-workout-id'),
+    ).toBe('/training/workout/:workoutId');
+    expect(
+      normalizeAnalyticsRoute('/training/completion/sensitive-execution-id'),
+    ).toBe('/training/completion/:workoutExecutionId');
     expect(normalizeAnalyticsRoute('/unknown/sensitive-value')).toBeUndefined();
   });
 

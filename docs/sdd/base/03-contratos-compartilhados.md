@@ -135,3 +135,20 @@ O catálogo pessoal usa a união discriminada `PersonalTrainingPlanListItem`:
 O bridge API→Workflow tem envelope v1 mínimo, composto exclusivamente por
 `cloneJobId` e `generation`. Snapshot, pessoa e conteúdo nunca atravessam esse
 request; o Workflow os lê no MongoDB.
+
+## Execução de treino
+
+- `TrainingOverview` combina o resumo do plano ativo com cards de workout e um
+  indicador opcional `current | in-progress`.
+- `TrainingWorkoutPreview` publica os cinco tipos de exercício e acrescenta
+  `lastLoadsKg` aos exercícios de séries. Cada posição é inteiro de 0 a 9999 ou
+  `null`; ausência de carga é um valor válido, não um erro.
+- `TrainingSession` é o snapshot público versionado. Expõe timestamps ISO,
+  exercício/séries concluídos e no máximo um `TrainingTimer`; detalhes de chave,
+  TTL e mídia privada persistida permanecem exclusivos da API.
+- mutations de carga e conclusão usam `TrainingLoadRequest` ou
+  `CompleteRemainingTrainingSeriesRequest`; conclusão não obriga carga.
+- `WorkoutExecutionSummary` é o resultado durável com métricas, áreas treinadas e
+  os sete dias da semana calculados no timezone informado na finalização.
+- respostas seguem `ApiResponse`; mutations de sessão devolvem a versão também no
+  header `X-Resource-Version`.

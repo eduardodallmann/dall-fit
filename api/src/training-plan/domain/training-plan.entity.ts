@@ -62,6 +62,13 @@ export interface WorkoutAggregate extends Omit<
   exercises: readonly StoredExercise[];
 }
 
+export interface TrainingPlanExecutionTree extends Omit<
+  TrainingPlanEntity,
+  'workouts'
+> {
+  workouts: readonly WorkoutAggregate[];
+}
+
 export type TargetState = {
   bsonSize?: number;
   exerciseExists: boolean;

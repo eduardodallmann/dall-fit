@@ -1,9 +1,9 @@
 # Rota `/dash`
 
-O menu autenticado exibe “Meus planos” para qualquer pessoa. Para admins, exibe
-também “Planos globais”; ambos coexistem e levam a fronteiras de autorização
-distintas. A conexão SSE é montada no shell autenticado, portanto atende as rotas
-pessoais e administrativas sem conexão duplicada.
+O menu autenticado exibe `Meus planos` e `Treinar` para qualquer pessoa. Para
+admins, exibe também `Planos globais`; os itens coexistem e levam a fronteiras de
+autorização distintas. A conexão SSE é montada no shell autenticado, portanto
+atende as rotas pessoais e administrativas sem conexão duplicada.
 
 ## Objetivo funcional
 
@@ -49,10 +49,12 @@ Depois da proteção, o layout autenticado apresenta:
 - `Chip` HeroUI não interativo com texto `Admin`, somente quando
   `Person.isAdmin === true`;
 - navegação principal com o link `Home`, ícone Lucide `House` e destino `/dash`;
+- link `Meus planos`, com ícone `Dumbbell`, para `/training-plan`, e link `Treinar`,
+  com ícone `Play`, para `/training`, disponíveis a toda pessoa autenticada;
 - botão HeroUI icon-only que mostra `Sun` no escuro com nome `Ativar tema claro`
   ou `Moon` no claro com nome `Ativar tema escuro`;
 - `Home` marcado visualmente e com `aria-current="page"`;
-- somente para `Person.isAdmin === true`, link `Planos de treino` com ícone
+- somente para `Person.isAdmin === true`, link `Planos globais` com ícone
   `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
 - seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
   prompt ou orientação manual expansível quando ele não está disponível;

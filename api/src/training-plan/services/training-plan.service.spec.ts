@@ -6,6 +6,7 @@ import type { TrainingPlanRepository } from '~/training-plan/repositories/traini
 import type { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 import type { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
+import type { TrainingLoadProfileService } from '~/training/services/training-load-profile.service';
 
 const trainingPlan: TrainingPlanEntity = {
   id: '507f1f77bcf86cd799439011',
@@ -61,7 +62,18 @@ function createService(
     ({
       publish: vi.fn().mockResolvedValue(undefined),
     } as unknown as RealtimePublisherService);
-  return new TrainingPlanService(repository, youtube, images, realtime);
+  const loadProfiles = {
+    cleanupExercise: vi.fn(),
+    cleanupPlan: vi.fn(),
+    cleanupWorkout: vi.fn(),
+  } as unknown as TrainingLoadProfileService;
+  return new TrainingPlanService(
+    repository,
+    youtube,
+    images,
+    realtime,
+    loadProfiles,
+  );
 }
 
 describe('TrainingPlanService', () => {

@@ -1,0 +1,1032 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  Alert,
+  AlertDialog,
+  Button,
+  Card,
+  Chip,
+  NumberField,
+  Skeleton,
+  toast,
+} from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { Check, ChevronDown, ChevronUp, Circle } from 'lucide-react';
+
+import type {
+  TrainingExerciseExecution,
+  TrainingExercisePreview,
+  TrainingSession,
+} from '@dall-fit/types';
+
+import { trackTrainingAction } from '~/core/analytics';
+import { getApiErrorCode } from '~/core/http/http-error';
+import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
+import {
+  bodyAreaLabels,
+  exerciseTypeIcons,
+  exerciseTypeLabels,
+} from '~/routes/training-plan/exercise-presentation';
+import { TrainingMediaViewer } from '~/routes/training/media-viewer';
+import { trainingStyles } from '~/routes/training/styles';
+import { TrainingTimerOverlay } from '~/routes/training/timer-overlay';
+import {
+  trainingKeys,
+  trainingPreviewQueryOptions,
+  trainingSessionQueryOptions,
+} from '~/routes/training/training-queries';
+import {
+  abandonTrainingSession,
+  completeRemainingTrainingSeries,
+  completeTrainingExercise,
+  completeTrainingSeries,
+  completeTrainingSession,
+  resolveTrainingTimer,
+  restartTrainingExercise,
+  saveTrainingLoad,
+  startTrainingSession,
+  startTrainingTimer,
+  type MockTrainingScenario,
+} from '~/routes/training/training-service';
+
+const styles = trainingStyles();
+
+type SessionAction =
+  | {
+      exerciseId: string;
+      loadKg: number | null;
+      seriesNumber: number;
+      type: 'complete-series' | 'load';
+    }
+  | {
+      exerciseId: string;
+      loadsKg: readonly (number | null)[];
+      type: 'complete-remaining';
+    }
+  | {
+      exerciseId: string;
+      kind: 'duration' | 'pause';
+      type: 'start-timer';
+    }
+  | {
+      outcome: 'cancel' | 'finish' | 'skip';
+      type: 'resolve-timer';
+    }
+  | { exerciseId: string; type: 'complete-exercise' | 'restart-exercise' };
+
+interface TrainingWorkoutPageProps {
+  mockTraining: MockTrainingScenario;
+  workoutId: string;
+}
+
+export function TrainingWorkoutPage({
+  mockTraining,
+  workoutId,
+}: Readonly<TrainingWorkoutPageProps>) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const previewQuery = useQuery(
+    trainingPreviewQueryOptions(workoutId, mockTraining),
+  );
+  const sessionOptions = trainingSessionQueryOptions(mockTraining);
+  const sessionQuery = useQuery(sessionOptions);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const expiredHandled = useRef(false);
+  const session = sessionQuery.data;
+  const sessionNotFound =
+    sessionQuery.isError &&
+    getApiErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_NOT_FOUND';
+  const sessionExpired =
+    sessionQuery.isError &&
+    getApiErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_EXPIRED';
+  const startMutation = useMutation({
+    mutationFn: () => startTrainingSession(workoutId, mockTraining),
+    onSuccess: (data) => {
+      queryClient.setQueryData(sessionOptions.queryKey, data);
+      trackTrainingAction('training_workout', 'start_workout', 'success');
+    },
+    onError: () => {
+      trackTrainingAction('training_workout', 'start_workout', 'error');
+      toast.danger('Não foi possível iniciar o treino.');
+    },
+  });
+  const discardMutation = useMutation({
+    mutationFn: async () => {
+      await abandonTrainingSession(mockTraining);
+      return startTrainingSession(workoutId, mockTraining);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(sessionOptions.queryKey, data);
+      setDiscardOpen(false);
+      trackTrainingAction('training_workout', 'abandon', 'success');
+    },
+    onError: () => {
+      trackTrainingAction('training_workout', 'abandon', 'error');
+      toast.danger('Não foi possível trocar o treino em andamento.');
+    },
+  });
+
+  useEffect(() => {
+    if (!sessionExpired || expiredHandled.current) return;
+    expiredHandled.current = true;
+    toast.warning('Seu treino em andamento expirou');
+    void navigate({
+      replace: true,
+      search: { mockTraining: 'active-plan' },
+      to: '/training',
+    });
+  }, [navigate, sessionExpired]);
+
+  if (previewQuery.isPending || sessionQuery.isPending || sessionExpired) {
+    return (
+      <main aria-label="Carregando treino" className={styles.page()}>
+        <Skeleton className={styles.skeleton()} />
+        <Skeleton className={styles.skeleton()} />
+      </main>
+    );
+  }
+
+  if (previewQuery.isError || (sessionQuery.isError && !sessionNotFound)) {
+    return (
+      <main className={styles.page()}>
+        <Alert status="danger">
+          <Alert.Title>Não foi possível carregar o treino</Alert.Title>
+          <Alert.Description>
+            Verifique sua conexão e tente novamente.
+          </Alert.Description>
+        </Alert>
+      </main>
+    );
+  }
+
+  if (session !== undefined && session.workout.id === workoutId) {
+    return (
+      <ActiveWorkout
+        mockTraining={mockTraining}
+        session={session}
+        sessionQueryKey={sessionOptions.queryKey}
+      />
+    );
+  }
+
+  if (session !== undefined && session.workout.id !== workoutId) {
+    return (
+      <main className={styles.page()}>
+        <header className={styles.header()}>
+          <h1 className={styles.title()}>{previewQuery.data.workout.name}</h1>
+          <p className={styles.subtitle()}>
+            {session.workout.name} já está em andamento.
+          </p>
+        </header>
+        <div className={styles.pageActions()}>
+          <Button
+            onPress={() =>
+              void navigate({
+                params: { workoutId: session.workout.id },
+                search: { mockTraining },
+                to: '/training/workout/$workoutId',
+              })
+            }
+            variant="primary"
+          >
+            Retomar treino
+          </Button>
+          <Button onPress={() => setDiscardOpen(true)} variant="danger">
+            Descartar e iniciar este
+          </Button>
+        </div>
+        <PreviewExercises exercises={previewQuery.data.exercises} />
+        <AlertDialog isOpen={discardOpen} onOpenChange={setDiscardOpen}>
+          <AlertDialog.Backdrop>
+            <AlertDialog.Container>
+              <AlertDialog.Dialog>
+                <AlertDialog.Header>
+                  <AlertDialog.Heading>
+                    Descartar treino em andamento?
+                  </AlertDialog.Heading>
+                </AlertDialog.Header>
+                <AlertDialog.Body>
+                  O progresso de {session.workout.name} será perdido.
+                </AlertDialog.Body>
+                <AlertDialog.Footer>
+                  <Button
+                    isDisabled={discardMutation.isPending}
+                    onPress={() => setDiscardOpen(false)}
+                    variant="secondary"
+                  >
+                    Manter treino
+                  </Button>
+                  <Button
+                    isPending={discardMutation.isPending}
+                    onPress={() => {
+                      trackTrainingAction('training_workout', 'abandon');
+                      discardMutation.mutate();
+                    }}
+                    variant="danger"
+                  >
+                    Descartar e iniciar
+                  </Button>
+                </AlertDialog.Footer>
+              </AlertDialog.Dialog>
+            </AlertDialog.Container>
+          </AlertDialog.Backdrop>
+        </AlertDialog>
+      </main>
+    );
+  }
+
+  return (
+    <main className={styles.page()}>
+      <header className={styles.header()}>
+        <h1 className={styles.title()}>{previewQuery.data.workout.name}</h1>
+        <p className={styles.subtitle()}>
+          Confira os exercícios antes de começar.
+        </p>
+      </header>
+      <PreviewExercises exercises={previewQuery.data.exercises} />
+      <Button
+        isPending={startMutation.isPending}
+        onPress={() => {
+          trackTrainingAction('training_workout', 'start_workout');
+          startMutation.mutate();
+        }}
+        variant="primary"
+      >
+        Iniciar treino
+      </Button>
+    </main>
+  );
+}
+
+function PreviewExercises({
+  exercises,
+}: Readonly<{ exercises: readonly TrainingExercisePreview[] }>) {
+  return (
+    <ol aria-label="Exercícios do treino" className={styles.exerciseList()}>
+      {exercises.map((exercise, index) => {
+        const Icon = exerciseTypeIcons[exercise.type];
+        return (
+          <li key={exercise.id}>
+            <Card className={styles.exerciseCard()} variant="secondary">
+              <div className={styles.cardButton()}>
+                <div className={styles.exerciseIdentity()}>
+                  <span className={styles.indicator()}>{index + 1}</span>
+                  <Icon aria-hidden="true" className={styles.icon()} />
+                  <div className={styles.cardText()}>
+                    <h2 className={styles.exerciseHeading()}>
+                      {'name' in exercise ? exercise.name : 'Pausa'}
+                    </h2>
+                    <ExerciseSummary exercise={exercise} preview />
+                  </div>
+                </div>
+                <Chip size="sm" variant="soft">
+                  {exerciseTypeLabels[exercise.type]}
+                </Chip>
+              </div>
+            </Card>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ActiveWorkout({
+  mockTraining,
+  session,
+  sessionQueryKey,
+}: Readonly<{
+  mockTraining: MockTrainingScenario;
+  session: TrainingSession;
+  sessionQueryKey: readonly unknown[];
+}>) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [expandedId, setExpandedId] = useState(
+    session.exercises.find((exercise) => exercise.completedAt === null)?.id ??
+      null,
+  );
+  const [drafts, setDrafts] = useState<Record<string, number | null>>(() =>
+    sessionDrafts(session),
+  );
+  const [finishOpen, setFinishOpen] = useState(false);
+  const debounceTimers = useRef(new Map<string, number>());
+  const [hasPendingDraft, setHasPendingDraft] = useState(false);
+
+  const sessionMutation = useMutation({
+    mutationFn: async (action: SessionAction) => {
+      const current =
+        queryClient.getQueryData<TrainingSession>(sessionQueryKey);
+      const version = current?.version ?? session.version;
+      switch (action.type) {
+        case 'load':
+          return saveTrainingLoad(
+            action.exerciseId,
+            action.seriesNumber,
+            action.loadKg,
+            version,
+            mockTraining,
+          );
+        case 'complete-series':
+          return completeTrainingSeries(
+            action.exerciseId,
+            action.seriesNumber,
+            action.loadKg,
+            version,
+            mockTraining,
+          );
+        case 'complete-remaining':
+          return completeRemainingTrainingSeries(
+            action.exerciseId,
+            action.loadsKg,
+            version,
+            mockTraining,
+          );
+        case 'start-timer':
+          return startTrainingTimer(
+            action.exerciseId,
+            action.kind,
+            version,
+            mockTraining,
+          );
+        case 'resolve-timer':
+          return resolveTrainingTimer(action.outcome, version, mockTraining);
+        case 'complete-exercise':
+          return completeTrainingExercise(
+            action.exerciseId,
+            version,
+            mockTraining,
+          );
+        case 'restart-exercise':
+          return restartTrainingExercise(
+            action.exerciseId,
+            version,
+            mockTraining,
+          );
+      }
+    },
+    mutationKey: ['training-session-write', session.id],
+    scope: { id: session.id },
+    onSuccess: (data, action) => {
+      trackTrainingAction(
+        'training_workout',
+        trainingActionName(action),
+        'success',
+      );
+      queryClient.setQueryData(sessionQueryKey, data);
+      const completed = data.exercises.find(
+        (exercise) => exercise.id === expandedId,
+      )?.completedAt;
+      if (completed !== null && completed !== undefined) {
+        const next = data.exercises.find(
+          (exercise) => exercise.completedAt === null,
+        );
+        setExpandedId(next?.id ?? null);
+        if (next !== undefined)
+          window.requestAnimationFrame(() =>
+            document.getElementById(`training-exercise-${next.id}`)?.focus(),
+          );
+      }
+      if (data.exercises.every((exercise) => exercise.completedAt !== null))
+        setFinishOpen(true);
+    },
+    onError: async (error, action) => {
+      trackTrainingAction(
+        'training_workout',
+        trainingActionName(action),
+        'error',
+      );
+      if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
+        const canonical = await queryClient.fetchQuery({
+          ...trainingSessionQueryOptions(mockTraining),
+          staleTime: 0,
+        });
+        setDrafts(sessionDrafts(canonical));
+        clearDebounces(debounceTimers.current);
+        setHasPendingDraft(false);
+        toast.warning('O treino foi atualizado em outro lugar.');
+        return;
+      }
+      toast.danger('Não foi possível salvar o progresso.');
+    },
+  });
+  const completeMutation = useMutation({
+    mutationFn: (confirmIncomplete: boolean) =>
+      completeTrainingSession(
+        confirmIncomplete,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+        session.version,
+        mockTraining,
+      ),
+    onSuccess: (completion) => {
+      queryClient.removeQueries({ queryKey: sessionQueryKey });
+      void queryClient.invalidateQueries({ queryKey: trainingKeys.all });
+      void navigate({
+        params: { workoutExecutionId: completion.id },
+        replace: true,
+        search: { mockTraining },
+        to: '/training/completion/$workoutExecutionId',
+      });
+      trackTrainingAction('training_workout', 'complete_workout', 'success');
+    },
+    onError: async (error) => {
+      trackTrainingAction('training_workout', 'complete_workout', 'error');
+      if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
+        const canonical = await queryClient.fetchQuery({
+          ...trainingSessionQueryOptions(mockTraining),
+          staleTime: 0,
+        });
+        setDrafts(sessionDrafts(canonical));
+        clearDebounces(debounceTimers.current);
+        setHasPendingDraft(false);
+        setFinishOpen(false);
+        toast.warning('O treino foi atualizado em outro lugar.');
+        return;
+      }
+      toast.danger('Não foi possível finalizar o treino.');
+    },
+  });
+  useReloadBlocker(
+    hasPendingDraft || sessionMutation.isPending || completeMutation.isPending,
+  );
+
+  useEffect(() => () => clearDebounces(debounceTimers.current), []);
+
+  const setLoad = (
+    exerciseId: string,
+    seriesNumber: number,
+    loadKg: number | null,
+  ) => {
+    const key = draftKey(exerciseId, seriesNumber);
+    setDrafts((current) => ({ ...current, [key]: loadKg }));
+    const previous = debounceTimers.current.get(key);
+    if (previous !== undefined) window.clearTimeout(previous);
+    const timer = window.setTimeout(() => {
+      debounceTimers.current.delete(key);
+      setHasPendingDraft(debounceTimers.current.size > 0);
+      sessionMutation.mutate({
+        exerciseId,
+        loadKg,
+        seriesNumber,
+        type: 'load',
+      });
+    }, 500);
+    debounceTimers.current.set(key, timer);
+    setHasPendingDraft(true);
+  };
+  const flushLoad = (
+    exerciseId: string,
+    seriesNumber: number,
+    loadKg: number | null,
+  ) => {
+    const key = draftKey(exerciseId, seriesNumber);
+    const timer = debounceTimers.current.get(key);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    debounceTimers.current.delete(key);
+    setHasPendingDraft(debounceTimers.current.size > 0);
+    sessionMutation.mutate({
+      exerciseId,
+      loadKg,
+      seriesNumber,
+      type: 'load',
+    });
+  };
+  const submitAction = (action: SessionAction) => {
+    trackTrainingAction('training_workout', trainingActionName(action));
+    const keys = actionDraftKeys(action);
+    for (const key of keys) {
+      const timer = debounceTimers.current.get(key);
+      if (timer !== undefined) window.clearTimeout(timer);
+      debounceTimers.current.delete(key);
+    }
+    setHasPendingDraft(debounceTimers.current.size > 0);
+    sessionMutation.mutate(action);
+  };
+  const allComplete = session.exercises.every(
+    (exercise) => exercise.completedAt !== null,
+  );
+
+  return (
+    <main className={styles.page()}>
+      <header className={styles.header()}>
+        <h1 className={styles.title()}>{session.workout.name}</h1>
+        <p className={styles.subtitle()}>
+          Progresso salvo até{' '}
+          {new Date(session.expiresAt).toLocaleString('pt-BR')}.
+        </p>
+      </header>
+      <ol
+        aria-label="Execução dos exercícios"
+        className={styles.exerciseList()}
+      >
+        {session.exercises.map((exercise, index) => (
+          <li key={exercise.id}>
+            <ExecutionExerciseCard
+              drafts={drafts}
+              exercise={exercise}
+              expanded={expandedId === exercise.id}
+              index={index}
+              isPending={sessionMutation.isPending}
+              onAction={submitAction}
+              onExpand={() =>
+                setExpandedId((current) => {
+                  trackTrainingAction('training_workout', 'expand_exercise');
+                  return current === exercise.id ? null : exercise.id;
+                })
+              }
+              onLoadBlur={flushLoad}
+              onLoadChange={setLoad}
+            />
+          </li>
+        ))}
+      </ol>
+      <Button
+        isDisabled={hasPendingDraft}
+        onPress={() => setFinishOpen(true)}
+        variant="primary"
+      >
+        Finalizar treino
+      </Button>
+      {session.activeTimer === null ? null : (
+        <TrainingTimerOverlay
+          isPending={sessionMutation.isPending}
+          onResolve={(outcome) =>
+            sessionMutation.mutate({ outcome, type: 'resolve-timer' })
+          }
+          serverNow={session.serverNow}
+          timer={session.activeTimer}
+        />
+      )}
+      <AlertDialog
+        isOpen={finishOpen}
+        onOpenChange={(open) => {
+          if (!open && !completeMutation.isPending) setFinishOpen(false);
+        }}
+      >
+        <AlertDialog.Backdrop
+          isDismissable={!allComplete}
+          isKeyboardDismissDisabled={allComplete}
+        >
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  {allComplete ? 'Parabéns!' : 'Finalizar treino incompleto?'}
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                {allComplete
+                  ? 'Todos os exercícios foram concluídos. Deseja finalizar o treino?'
+                  : 'O progresso incompleto será encerrado e entrará no resumo.'}
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button
+                  isDisabled={completeMutation.isPending}
+                  onPress={() => setFinishOpen(false)}
+                  variant="secondary"
+                >
+                  {allComplete ? 'Voltar' : 'Continuar treino'}
+                </Button>
+                <Button
+                  isPending={completeMutation.isPending}
+                  onPress={() => {
+                    trackTrainingAction('training_workout', 'complete_workout');
+                    completeMutation.mutate(!allComplete);
+                  }}
+                  variant="primary"
+                >
+                  {allComplete ? 'Sim, finalizar' : 'Finalizar mesmo assim'}
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+    </main>
+  );
+}
+
+interface ExerciseCardProps {
+  drafts: Readonly<Record<string, number | null>>;
+  exercise: TrainingExerciseExecution;
+  expanded: boolean;
+  index: number;
+  isPending: boolean;
+  onAction: (action: SessionAction) => void;
+  onExpand: () => void;
+  onLoadBlur: (
+    exerciseId: string,
+    seriesNumber: number,
+    loadKg: number | null,
+  ) => void;
+  onLoadChange: (
+    exerciseId: string,
+    seriesNumber: number,
+    loadKg: number | null,
+  ) => void;
+}
+
+function ExecutionExerciseCard({
+  drafts,
+  exercise,
+  expanded,
+  index,
+  isPending,
+  onAction,
+  onExpand,
+  onLoadBlur,
+  onLoadChange,
+}: Readonly<ExerciseCardProps>) {
+  const Icon = exerciseTypeIcons[exercise.type];
+  const completed = exercise.completedAt !== null;
+
+  return (
+    <Card className={styles.exerciseCard({ completed })} variant="secondary">
+      <Button
+        aria-expanded={expanded}
+        className={styles.cardButton()}
+        id={`training-exercise-${exercise.id}`}
+        onPress={onExpand}
+        variant="ghost"
+      >
+        <div className={styles.exerciseIdentity()}>
+          <span className={styles.indicator({ completed })}>
+            {completed ? <Check aria-hidden="true" /> : index + 1}
+          </span>
+          <Icon aria-hidden="true" className={styles.icon()} />
+          <div className={styles.cardText()}>
+            <h2 className={styles.exerciseHeading()}>
+              {'name' in exercise ? exercise.name : 'Pausa'}
+            </h2>
+            <ExerciseSummary exercise={exercise} />
+          </div>
+        </div>
+        {expanded ? (
+          <ChevronUp aria-hidden="true" />
+        ) : (
+          <ChevronDown aria-hidden="true" />
+        )}
+      </Button>
+      {expanded ? (
+        <ExpandedExerciseContent
+          drafts={drafts}
+          exercise={exercise}
+          isPending={isPending}
+          onAction={onAction}
+          onLoadBlur={onLoadBlur}
+          onLoadChange={onLoadChange}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
+function ExpandedExerciseContent({
+  drafts,
+  exercise,
+  isPending,
+  onAction,
+  onLoadBlur,
+  onLoadChange,
+}: Readonly<
+  Pick<
+    ExerciseCardProps,
+    | 'drafts'
+    | 'exercise'
+    | 'isPending'
+    | 'onAction'
+    | 'onLoadBlur'
+    | 'onLoadChange'
+  >
+>) {
+  const isSetExercise =
+    exercise.type === 'image' || exercise.type === 'youtube-short';
+  return (
+    <div className={styles.exerciseContent()}>
+      <div className={styles.actionRow()}>
+        <TrainingMediaViewer exercise={exercise} />
+        <Chip size="sm" variant="soft">
+          {exerciseTypeLabels[exercise.type]}
+        </Chip>
+      </div>
+      {isSetExercise ? (
+        <SeriesEditor
+          drafts={drafts}
+          exercise={exercise}
+          isPending={isPending}
+          onAction={onAction}
+          onLoadBlur={onLoadBlur}
+          onLoadChange={onLoadChange}
+        />
+      ) : null}
+      <ExerciseAction
+        exercise={exercise}
+        isPending={isPending}
+        onAction={onAction}
+      />
+    </div>
+  );
+}
+
+type SetExecutionExercise = Extract<
+  TrainingExerciseExecution,
+  { type: 'image' | 'youtube-short' }
+>;
+
+function SeriesEditor({
+  drafts,
+  exercise,
+  isPending,
+  onAction,
+  onLoadBlur,
+  onLoadChange,
+}: Readonly<{
+  drafts: Readonly<Record<string, number | null>>;
+  exercise: SetExecutionExercise;
+  isPending: boolean;
+  onAction: (action: SessionAction) => void;
+  onLoadBlur: ExerciseCardProps['onLoadBlur'];
+  onLoadChange: ExerciseCardProps['onLoadChange'];
+}>) {
+  const loads = exercise.series.map((series) =>
+    draftLoad(drafts, exercise.id, series),
+  );
+  const invalid = loads.some(
+    (load) =>
+      load !== null && (!Number.isInteger(load) || load < 0 || load > 9999),
+  );
+  const current = exercise.series.find((series) => series.completedAt === null);
+  return (
+    <div className={styles.series()}>
+      {exercise.series.map((series) => {
+        const load = draftLoad(drafts, exercise.id, series);
+        return (
+          <SeriesRow
+            exerciseId={exercise.id}
+            isPending={isPending}
+            key={series.number}
+            load={load}
+            onLoadBlur={onLoadBlur}
+            onLoadChange={onLoadChange}
+            series={series}
+          />
+        );
+      })}
+      {exercise.completedAt === null ? (
+        <div className={styles.actionRow()}>
+          <Button
+            isDisabled={current === undefined || invalid || isPending}
+            data-series-action
+            onPress={() => {
+              if (current === undefined) return;
+              onAction({
+                exerciseId: exercise.id,
+                loadKg: draftLoad(drafts, exercise.id, current),
+                seriesNumber: current.number,
+                type: 'complete-series',
+              });
+            }}
+            variant="primary"
+          >
+            Finalizar série {current?.number ?? ''}
+          </Button>
+          <Button
+            isDisabled={invalid || isPending}
+            data-series-action
+            onPress={() =>
+              onAction({
+                exerciseId: exercise.id,
+                loadsKg: loads,
+                type: 'complete-remaining',
+              })
+            }
+            variant="secondary"
+          >
+            Finalizar séries restantes
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SeriesRow({
+  exerciseId,
+  isPending,
+  load,
+  onLoadBlur,
+  onLoadChange,
+  series,
+}: Readonly<{
+  exerciseId: string;
+  isPending: boolean;
+  load: number | null;
+  onLoadBlur: ExerciseCardProps['onLoadBlur'];
+  onLoadChange: ExerciseCardProps['onLoadChange'];
+  series: SetExecutionExercise['series'][number];
+}>) {
+  const completed = series.completedAt !== null;
+  return (
+    <div className={styles.seriesRow()}>
+      <strong>Série {series.number}</strong>
+      <span>{series.repetitions} repetições</span>
+      <NumberField
+        aria-label={`Carga da série ${series.number}`}
+        className={styles.loadField()}
+        isDisabled={completed || isPending}
+        maxValue={9999}
+        minValue={0}
+        onChange={(value) =>
+          onLoadChange(
+            exerciseId,
+            series.number,
+            Number.isNaN(value) ? null : value,
+          )
+        }
+        step={1}
+        value={load ?? Number.NaN}
+      >
+        <NumberField.Group>
+          <NumberField.Input
+            onBlur={(event) => {
+              const next = event.relatedTarget;
+              if (
+                next instanceof HTMLElement &&
+                next.closest('[data-series-action]') !== null
+              )
+                return;
+              onLoadBlur(exerciseId, series.number, load);
+            }}
+          />
+        </NumberField.Group>
+      </NumberField>
+      <span className={styles.seriesState({ completed })}>
+        {completed ? (
+          <Check aria-hidden="true" />
+        ) : (
+          <Circle aria-hidden="true" />
+        )}
+      </span>
+    </div>
+  );
+}
+
+function ExerciseAction({
+  exercise,
+  isPending,
+  onAction,
+}: Readonly<{
+  exercise: TrainingExerciseExecution;
+  isPending: boolean;
+  onAction: (action: SessionAction) => void;
+}>) {
+  if (exercise.completedAt !== null) {
+    return (
+      <Button
+        isDisabled={isPending}
+        onPress={() =>
+          onAction({ exerciseId: exercise.id, type: 'restart-exercise' })
+        }
+        variant="secondary"
+      >
+        Reiniciar exercício
+      </Button>
+    );
+  }
+  if (exercise.type === 'pause' || exercise.type === 'duration') {
+    return (
+      <Button
+        isDisabled={isPending}
+        onPress={() =>
+          onAction({
+            exerciseId: exercise.id,
+            kind: exercise.type,
+            type: 'start-timer',
+          })
+        }
+      >
+        {exercise.type === 'pause' ? 'Iniciar descanso' : 'Iniciar cronômetro'}
+      </Button>
+    );
+  }
+  if (exercise.type === 'youtube-long') {
+    return (
+      <Button
+        isDisabled={isPending}
+        onPress={() =>
+          onAction({ exerciseId: exercise.id, type: 'complete-exercise' })
+        }
+      >
+        Concluir exercício
+      </Button>
+    );
+  }
+  return null;
+}
+
+function ExerciseSummary({
+  exercise,
+  preview = false,
+}: Readonly<{
+  exercise: TrainingExerciseExecution | TrainingExercisePreview;
+  preview?: boolean;
+}>) {
+  const metrics = useMemo(() => {
+    const values: string[] = [];
+    if ('bodyArea' in exercise) values.push(bodyAreaLabels[exercise.bodyArea]);
+    if (exercise.type === 'image' || exercise.type === 'youtube-short') {
+      values.push(`${exercise.sets} séries`);
+      values.push(`${exercise.repetitions} repetições`);
+      values.push(`${exercise.restSeconds} s de descanso`);
+      if (preview && 'lastLoadsKg' in exercise) {
+        const loads = [
+          ...new Set(exercise.lastLoadsKg.filter((load) => load !== null)),
+        ];
+        if (loads.length > 0) values.push(`${loads.join(' / ')} kg`);
+      }
+    } else if (exercise.type === 'pause') {
+      values.push(`${exercise.restSeconds} s`);
+    } else if (exercise.type === 'duration') {
+      values.push(`${exercise.durationMinutes} min`);
+    }
+    return values;
+  }, [exercise, preview]);
+  return (
+    <p className={styles.exerciseSummary()}>
+      {metrics.map((metric) => (
+        <span key={metric}>{metric}</span>
+      ))}
+    </p>
+  );
+}
+
+function draftKey(exerciseId: string, seriesNumber: number): string {
+  return `${exerciseId}:${seriesNumber}`;
+}
+
+function draftLoad(
+  drafts: Readonly<Record<string, number | null>>,
+  exerciseId: string,
+  series: Readonly<{ loadKg: number | null; number: number }>,
+): number | null {
+  const draft = drafts[draftKey(exerciseId, series.number)];
+  return draft === undefined ? series.loadKg : draft;
+}
+
+function actionDraftKeys(action: SessionAction): readonly string[] {
+  if (action.type === 'complete-series') {
+    return [draftKey(action.exerciseId, action.seriesNumber)];
+  }
+  if (action.type === 'complete-remaining') {
+    return action.loadsKg.map((_, index) =>
+      draftKey(action.exerciseId, index + 1),
+    );
+  }
+  return [];
+}
+
+function trainingActionName(
+  action: SessionAction,
+):
+  | 'complete_exercise'
+  | 'complete_series'
+  | 'resolve_timer'
+  | 'restart_exercise'
+  | 'save_load'
+  | 'start_timer' {
+  switch (action.type) {
+    case 'complete-series':
+    case 'complete-remaining':
+      return 'complete_series';
+    case 'start-timer':
+      return 'start_timer';
+    case 'resolve-timer':
+      return 'resolve_timer';
+    case 'restart-exercise':
+      return 'restart_exercise';
+    case 'complete-exercise':
+      return 'complete_exercise';
+    case 'load':
+      return 'save_load';
+  }
+}
+
+function sessionDrafts(
+  session: TrainingSession,
+): Record<string, number | null> {
+  const result: Record<string, number | null> = {};
+  for (const exercise of session.exercises) {
+    if (exercise.type !== 'image' && exercise.type !== 'youtube-short')
+      continue;
+    for (const series of exercise.series)
+      result[draftKey(exercise.id, series.number)] = series.loadKg;
+  }
+  return result;
+}
+
+function clearDebounces(timers: Map<string, number>): void {
+  for (const timer of timers.values()) window.clearTimeout(timer);
+  timers.clear();
+}

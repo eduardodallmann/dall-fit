@@ -1,0 +1,90 @@
+# Fluxo `Execução de treino`
+
+> Documentação funcional viva de uma jornada ponta a ponta.
+
+## Objetivo funcional
+
+- Ator: pessoa autenticada com um plano de treino ativo.
+- Problema resolvido: selecionar, executar, retomar e finalizar um workout com
+  acompanhamento por série, carga opcional e timers.
+- Resultado esperado: progresso efêmero retomável e resumo durável após a
+  finalização.
+
+## Entrada e pré-condições
+
+A pessoa escolheu exatamente uma entrada ativa em `/training-plan`. O plano pode
+ser próprio ou referência global viva. Somente um treino pode estar em andamento
+por pessoa.
+
+## Rotas e endpoints participantes
+
+| Ordem | Etapa               | Rota de UI                                 | Endpoint da API                                                |
+| ----: | ------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+|     1 | listar workouts     | `/training`                                | `GET /training`                                                |
+|     2 | revisar e iniciar   | `/training/workout/:workoutId`             | `GET /training/workouts/:workoutId`, `POST .../session`        |
+|     3 | executar ou retomar | `/training/workout/:workoutId`             | `GET /training/session` e mutações de série, timer e exercício |
+|     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
+|     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
+
+## Sequência e decisões
+
+1. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
+   concluído; uma sessão Redis existente prevalece e é marcada em andamento.
+2. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
+3. Iniciar cria um snapshot exclusivo com TTL absoluto de 24 horas. Se outro
+   workout já estiver ativo, a pessoa retoma ou confirma o descarte antes de criar
+   o novo.
+4. Cada mutation envia a versão canônica. Carga é inteira entre 0 e 9999 ou vazia;
+   concluir série aceita ambos atomicamente. Descansos e exercícios temporizados
+   usam timestamps do servidor.
+5. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
+   incompleto requer confirmação explícita para finalizar.
+6. A finalização grava execução e perfis no MongoDB, remove o snapshot Redis e
+   navega para o resumo semanal compartilhável.
+
+## Dados compartilhados
+
+| Dado                     | Origem      | Consumidores                           | Persistência                       | Observações                                      |
+| ------------------------ | ----------- | -------------------------------------- | ---------------------------------- | ------------------------------------------------ |
+| plano/workout/exercícios | plano ativo | API e três rotas                       | MongoDB + snapshot Redis           | snapshot isola a execução de edições posteriores |
+| versão da sessão         | Redis       | UI e API                               | snapshot Redis                     | começa em zero e avança por CAS                  |
+| cargas por série         | UI/API      | execução e próxima prévia              | Redis; perfil MongoDB ao finalizar | inteiro ou `null`                                |
+| timers                   | API         | overlay da UI                          | timestamps no Redis                | nenhum interval é persistido                     |
+| resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
+
+## Estados e exceções
+
+- Caminho completo: todos os exercícios concluídos, confirmação e resumo completo.
+- Interrupção ou retomada: reabrir a rota dentro de 24 horas lê o mesmo snapshot.
+- Erro recuperável: falha de mutation mantém a sessão canônica e permite nova ação.
+- Conflito: draft local é descartado, GET canônico prevalece e a UI avisa.
+- Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
+  preserva a sessão para repetição idempotente.
+
+## Cenários funcionais
+
+### Cenário 1 — iniciar e finalizar incompleto
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=workout-preview`
+- Given: prévia disponível e nenhuma sessão em andamento.
+- When: a pessoa inicia, conclui séries com carga vazia e confirma finalização
+  incompleta.
+- Then: a UI navega ao resumo, que diferencia conclusão parcial.
+
+### Cenário 2 — plano ausente
+
+- Link para testar: `http://localhost:3000/training?mockAuth=person&mockTraining=no-active-plan`
+- Given: nenhuma seleção ativa.
+- When: a rota é aberta.
+- Then: a UI orienta a pessoa a ir para Meus planos.
+
+## Cobertura automatizada
+
+- Regras e caminhos de negócio protegidos: fluxo E2E real em
+  `api/test/training-plan.e2e-spec.ts`, com MongoDB e Redis efêmeros.
+- Playwright: `ui/tests/integration/routes/training.spec.ts` valida listagem,
+  início, carga vazia, finalização parcial e confirmação de descarte contra MSW.
+- Handlers e fixtures MSW: `ui/src/mocks/handlers/training.ts` e
+  `ui/src/mocks/fixtures/training.ts`.
+- Cenários não automatizados: compartilhamento nativo depende da API do sistema
+  operacional e mantém fallback manualmente verificável por clipboard.

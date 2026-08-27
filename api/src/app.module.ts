@@ -10,6 +10,7 @@ import { PersonModule } from '~/person/person.module';
 import { RealtimeModule } from '~/realtime/realtime.module';
 import { RedisModule } from '~/redis/redis.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
+import { TrainingModule } from '~/training/training.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TrainingPlanModule } from '~/training-plan/training-plan.module';
     PersonModule,
     AuthModule,
     TrainingPlanModule,
+    TrainingModule,
   ],
 })
 export class AppModule {}

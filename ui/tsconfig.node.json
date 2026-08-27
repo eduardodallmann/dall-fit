@@ -20,5 +20,10 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["playwright.config.ts", "vite.config.ts"]
+  "include": [
+    "playwright.config.ts",
+    "playwright.sdd-screenshots.config.ts",
+    "playwright-shared-config.ts",
+    "vite.config.ts"
+  ]
 }

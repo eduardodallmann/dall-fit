@@ -76,6 +76,8 @@ excluir independentemente desses números. DELETE remove todas as referências e
 seleções daquele global, sem fallback; portanto pessoas podem ficar sem plano
 ativo. Keys presentes em snapshots de clone não terminal são retidas para que a
 exclusão do global não interrompa a clonagem e serão liberadas após o terminal.
+Excluir plano, workout ou exercício também remove os perfis de última carga ligados
+àquele escopo, sem apagar execuções históricas já consolidadas.
 
 ## Persistência e branches
 

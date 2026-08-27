@@ -120,6 +120,12 @@ comportamento coincide, mas rotas/services HTTP continuam separados. O source
 discriminado escolhe edição completa ou leitura completa; não existe matriz de
 capabilities controlada pelo cliente.
 
+O domínio `training` mantém servidor e draft de carga separados, serializa
+mutations pelo ID da sessão e substitui o cache pela resposta canônica. Em conflito
+de versão, sua exceção documentada ao coordenador genérico descarta o draft, refaz
+o GET e avisa a pessoa; a decisão é aceitável porque existe uma única sessão e a
+colisão depende de outro cliente. A sessão nunca é persistida no navegador.
+
 O client Axios vigente está em `src/core/http/api-client.ts`, usa `VITE_API_URL`
 como `baseURL`, `withCredentials=true`, timeout default de 15 segundos e erros de
 timeout discrimináveis. Upload de imagem usa override finito de 60 segundos. Não
