@@ -5,6 +5,103 @@ const referenceCatalogEntryId = '74b000000000000000000002';
 const workoutId = '64b000000000000000000101';
 
 test.describe('Rotas pessoais de planos de treino', () => {
+  test('Cenário 1 — inicia, responde e retoma a conversa do assistente', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-collecting',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    const items = page.getByRole('menuitem');
+    await expect(items).toHaveText([
+      'Criar novo plano',
+      'Copiar um plano',
+      'Me ajude a criar',
+    ]);
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    let dialog = page.getByRole('dialog', {
+      name: 'Me ajude a criar um plano',
+    });
+    await expect(
+      dialog.getByRole('region', { name: 'Histórico da conversa' }),
+    ).toContainText('Qual é o principal objetivo');
+    await dialog.getByRole('button', { name: 'Saúde geral' }).click();
+    await expect(
+      dialog.getByRole('region', { name: 'Histórico da conversa' }),
+    ).toContainText('Saúde geral');
+    await dialog.getByRole('button', { name: 'Fechar' }).click();
+
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-resumed',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    dialog = page.getByRole('dialog', { name: 'Me ajude a criar um plano' });
+    await expect(
+      dialog.getByRole('region', { name: 'Histórico da conversa' }),
+    ).toContainText('Saúde geral');
+  });
+
+  test('Cenário 6 — bloqueio e emergência não oferecem geração', async ({
+    page,
+  }) => {
+    for (const scenario of ['assistant-blocked', 'assistant-emergency']) {
+      await page.goto(
+        `/training-plan?mockAuth=person&mockTrainingPlans=${scenario}`,
+      );
+      await page.getByRole('button', { name: 'Novo plano' }).click();
+      await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+      const dialog = page.getByRole('dialog', {
+        name: 'Me ajude a criar um plano',
+      });
+      await expect(
+        dialog.getByText('Geração indisponível nesta sessão'),
+      ).toBeVisible();
+      await expect(
+        dialog.getByRole('button', { name: 'Gerar prévia' }),
+      ).toHaveCount(0);
+      await dialog.getByRole('button', { name: 'Fechar' }).click();
+    }
+  });
+
+  test('Cenário 8 — confirma a prévia e navega para o plano criado', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-preview',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Me ajude a criar um plano',
+    });
+    await expect(
+      dialog.getByRole('region', { name: 'Prévia do plano' }),
+    ).toContainText('Leg press sentado');
+    await dialog.getByRole('button', { name: 'Criar plano' }).click();
+    await expect(page).toHaveURL(/\/training-plan\/74b000000000000000000099/);
+  });
+
+  test('Cenário 14 — falha do provedor preserva sessão e oferece retry', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-provider-error',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Me ajude a criar um plano',
+    });
+    await dialog.getByRole('button', { name: 'Gerar prévia' }).click();
+    await expect(
+      dialog.getByText(/Seu texto e sua sessão foram preservados/),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Tentar novamente' }),
+    ).toBeVisible();
+  });
+
   test('mostra Meus planos para pessoa comum e administradora', async ({
     page,
   }) => {

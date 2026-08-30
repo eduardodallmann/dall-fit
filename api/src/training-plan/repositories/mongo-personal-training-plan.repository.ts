@@ -296,6 +296,35 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
     return result;
   }
 
+  async createOwnedEntryWithId(
+    catalogEntryId: string,
+    personId: string,
+    trainingPlanId: string,
+  ): Promise<void> {
+    this.logger.log(
+      'MongoPersonalTrainingPlanRepository -> createOwnedEntryWithId -> params:',
+      { params: { catalogEntryId, personId, trainingPlanId } },
+    );
+    await this.catalogModel
+      .updateOne(
+        { _id: catalogEntryId },
+        {
+          $setOnInsert: {
+            globalTrainingPlanId: null,
+            kind: 'owned',
+            personId,
+            trainingPlanId,
+          },
+        },
+        { runValidators: true, upsert: true },
+      )
+      .exec();
+    this.logger.log(
+      'MongoPersonalTrainingPlanRepository -> createOwnedEntryWithId -> completed:',
+      { data: { catalogEntryId, personId, trainingPlanId } },
+    );
+  }
+
   async createGlobalReference(
     personId: string,
     globalTrainingPlanId: string,

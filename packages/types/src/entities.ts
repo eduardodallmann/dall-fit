@@ -187,6 +187,66 @@ export type Exercise =
 
 export type ExerciseType = Exercise['type'];
 
+export type TrainingPlanAssistantStatus =
+  'collecting' | 'clarifying' | 'ready' | 'generating' | 'preview' | 'blocked';
+
+export type TrainingPlanAssistantScreeningOutcome =
+  | 'apto_para_fluxo_geral'
+  | 'precisa_esclarecimento'
+  | 'requer_avaliacao_profissional'
+  | 'emergencia'
+  | null;
+
+export interface TrainingPlanAssistantMessage {
+  id: EntityId;
+  role: 'assistant' | 'person';
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface TrainingPlanAssistantAnswerOption {
+  label: string;
+  value: string;
+}
+
+export interface TrainingPlanAssistantDraftExercise {
+  catalogKey: string;
+  name: string;
+  bodyArea: BodyArea;
+  type: 'youtube-short';
+  youtubeId: string;
+  sets: number;
+  repetitions: number;
+  restSeconds: number;
+}
+
+export interface TrainingPlanAssistantDraftWorkout {
+  name: string;
+  estimatedDurationMinutes: number;
+  exercises: readonly TrainingPlanAssistantDraftExercise[];
+}
+
+export interface TrainingPlanAssistantDraft {
+  planName: string;
+  description: string;
+  workouts: readonly TrainingPlanAssistantDraftWorkout[];
+}
+
+export interface TrainingPlanAssistantSession {
+  id: EntityId;
+  version: number;
+  status: TrainingPlanAssistantStatus;
+  messages: readonly TrainingPlanAssistantMessage[];
+  currentPrompt: string | null;
+  availableAnswers: readonly TrainingPlanAssistantAnswerOption[];
+  screeningOutcome: TrainingPlanAssistantScreeningOutcome;
+  draft: TrainingPlanAssistantDraft | null;
+  noticeVersion: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  expiresAt: Timestamp;
+}
+
 export interface TrainingPlanWorkoutDetails extends Entity {
   name: string;
   version: number;

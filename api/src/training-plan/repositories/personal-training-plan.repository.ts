@@ -23,6 +23,11 @@ export abstract class PersonalTrainingPlanRepository {
     personId: string,
     trainingPlanId: string,
   ): Promise<PersonalCatalogEntry>;
+  abstract createOwnedEntryWithId(
+    catalogEntryId: string,
+    personId: string,
+    trainingPlanId: string,
+  ): Promise<void>;
   abstract createGlobalReference(
     personId: string,
     globalTrainingPlanId: string,

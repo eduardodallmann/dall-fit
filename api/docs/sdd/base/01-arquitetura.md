@@ -75,6 +75,28 @@ snapshot e destinos já confirmados de jobs de clone não terminais.
 os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
 usa `syncIndexes()`.
 
+## Assistente de planos
+
+`TrainingPlanAssistantModule` é uma fronteira separada do CRUD. Sessões sensíveis
+ficam em `training_plan_assistant_sessions`, com índice parcial único por pessoa,
+CAS por versão, expiração lógica e TTL de sete dias. Confirmações removem a sessão
+e deixam por 24 horas somente um recibo com hash e IDs. Controllers e commands não
+acessam repository ou provider; `TrainingPlanAssistantSessionService` orquestra
+triagem, catálogo, estado, idempotência e o bridge de materialização.
+
+Conhecimento, catálogo de 75 vídeos e dois seeds globais são JSONs versionados e
+validados por Zod no runtime aquecido. O provider possui apenas interpretar,
+reformular e propor. Fake sustenta testes; Groq usa chave server-side, timeout,
+budget máximo de completion e saída estruturada. Modelos registrados como
+compatíveis recebem JSON Schema estrito ou best-effort; os demais usam JSON Object
+Mode. Em todos os modos o parse Zod e a triagem locais continuam soberanos. Erros
+transitórios de rede, `429` e `5xx` recebem no máximo um retry com espera limitada,
+e o circuit breaker compartilhado usa o singleton Redis sem alterar readiness.
+
+Produção/preview falham fechados quando a flag ativa não vier acompanhada de Groq,
+credencial, ZDR e aprovação de privacidade. A flag desligada impede nova sessão e
+chamada externa, mas não impede GET/DELETE e os fluxos manuais continuam intactos.
+
 ## Imports internos e compartilhados
 
 Imports de arquivos em `src/` usam `~/*`, resolvido para o `src/` exclusivo da
@@ -349,6 +371,9 @@ isolados em instâncias temporárias próprias sem acessar o diretório persiste
   - pares `RATE_LIMIT_*_LIMIT` e `RATE_LIMIT_*_WINDOW_MS` para início/callback
     Google, bypass local, sessão, mutações autenticadas e administrativas; aceitam
     somente inteiros positivos e as janelas têm mínimo de um segundo;
+  - `TRAINING_PLAN_ASSISTANT_*`, com flag, provider/modelo, chave Groq, timeout,
+    budget máximo de completion, confirmações de ZDR/privacidade e quotas próprias
+    de mensagem, draft e confirmação;
   - `UI_URL`, destino dos redirecionamentos após autenticação;
   - `GOOGLE_OAUTH_CREDENTIALS_BASE64`, JSON de cliente OAuth Web codificado em
     base64;

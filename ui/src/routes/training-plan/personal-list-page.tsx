@@ -37,6 +37,7 @@ import {
   startTrainingPlanClone,
 } from '~/routes/training-plan/personal-training-plan-service';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
+import { TrainingPlanAssistantModal } from '~/routes/training-plan/training-plan-assistant';
 import {
   personalTrainingPlanListQueryOptions,
   trainingPlanKeys,
@@ -67,6 +68,7 @@ export function PersonalTrainingPlanListPage({
   );
   const [creating, setCreating] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [libraryPage, setLibraryPage] = useState(1);
   const [pendingActiveCatalogEntryId, setPendingActiveCatalogEntryId] =
     useState<string>();
@@ -163,6 +165,7 @@ export function PersonalTrainingPlanListPage({
               onAction={(key) => {
                 if (key === 'create') setCreating(true);
                 if (key === 'copy') setCopying(true);
+                if (key === 'assistant') setAssistantOpen(true);
               }}
             >
               <Dropdown.Item id="create" textValue="Criar novo plano">
@@ -170,6 +173,9 @@ export function PersonalTrainingPlanListPage({
               </Dropdown.Item>
               <Dropdown.Item id="copy" textValue="Copiar um plano">
                 Copiar um plano
+              </Dropdown.Item>
+              <Dropdown.Item id="assistant" textValue="Me ajude a criar">
+                Me ajude a criar
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>
@@ -414,6 +420,11 @@ export function PersonalTrainingPlanListPage({
         referencingPlanId={
           referenceMutation.isPending ? referenceMutation.variables : undefined
         }
+      />
+      <TrainingPlanAssistantModal
+        mockTrainingPlans={mockTrainingPlans}
+        onOpenChange={setAssistantOpen}
+        open={assistantOpen}
       />
       <DeleteConfirmationDialog
         description={

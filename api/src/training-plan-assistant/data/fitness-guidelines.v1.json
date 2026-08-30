@@ -1,0 +1,260 @@
+{
+  "version": "fitness-guidelines.v1",
+  "catalogVersion": "exercise-catalog.v1",
+  "promptVersion": "training-plan-assistant.v1",
+  "noticeVersion": "assistant-notice.v1",
+  "sources": [
+    "https://www.gov.br/saude/pt-br/centrais-de-conteudo/publicacoes/guias-e-manuais/2021/guia-de-atividade-fisica-para-a-populacao-brasileira.pdf/view",
+    "https://www.who.int/publications/i/item/9789240015128",
+    "https://eparmedx.com/print-versions-of-par-q/"
+  ],
+  "questions": [
+    {
+      "key": "adult",
+      "prompt": "Você confirma que tem 18 anos ou mais?",
+      "options": [
+        { "label": "Sim", "value": "yes" },
+        { "label": "Não", "value": "no" },
+        { "label": "Não tenho certeza", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "goal",
+      "prompt": "Qual é o principal objetivo do seu plano?",
+      "options": [
+        { "label": "Saúde geral", "value": "general-health" },
+        { "label": "Condicionamento", "value": "conditioning" },
+        { "label": "Emagrecimento", "value": "weight-loss" },
+        { "label": "Hipertrofia", "value": "hypertrophy" },
+        { "label": "Retorno à rotina", "value": "return" }
+      ]
+    },
+    {
+      "key": "experience",
+      "prompt": "Como você descreve sua experiência com treino?",
+      "options": [
+        { "label": "Nunca treinei", "value": "never" },
+        { "label": "Iniciante", "value": "beginner" },
+        { "label": "Intermediário", "value": "intermediate" },
+        { "label": "Avançado", "value": "advanced" }
+      ]
+    },
+    {
+      "key": "interruption",
+      "prompt": "Há quanto tempo você está sem treinar?",
+      "options": [
+        { "label": "Estou treinando", "value": "none" },
+        { "label": "Até 3 meses", "value": "up-to-3-months" },
+        { "label": "De 3 a 12 meses", "value": "3-to-12-months" },
+        { "label": "Mais de 1 ano", "value": "over-1-year" }
+      ]
+    },
+    {
+      "key": "schedule",
+      "prompt": "Qual combinação de frequência e duração funciona para você?",
+      "options": [
+        { "label": "2 dias, 45 minutos", "value": "2-45" },
+        { "label": "3 dias, 45 minutos", "value": "3-45" },
+        { "label": "3 dias, 60 minutos", "value": "3-60" },
+        { "label": "4 dias, 60 minutos", "value": "4-60" },
+        { "label": "5 dias, 60 minutos", "value": "5-60" },
+        { "label": "6 dias, 45 minutos", "value": "6-45" }
+      ]
+    },
+    {
+      "key": "infrastructure",
+      "prompt": "Onde você treinará e quais equipamentos terá?",
+      "options": [
+        {
+          "label": "Academia completa: máquinas e pesos livres",
+          "value": "full-gym-all"
+        },
+        {
+          "label": "Academia simples: somente máquinas",
+          "value": "simple-gym-machines"
+        },
+        {
+          "label": "Academia simples: halteres e barras",
+          "value": "simple-gym-free-weights"
+        },
+        { "label": "Outro local ou não sei", "value": "other-unknown" }
+      ]
+    },
+    {
+      "key": "preferences",
+      "prompt": "Há algum movimento que você prefere ou não quer executar?",
+      "options": [
+        { "label": "Sem preferência", "value": "none" },
+        { "label": "Prefiro máquinas", "value": "machines" },
+        { "label": "Prefiro pesos livres", "value": "free-weights" }
+      ]
+    },
+    {
+      "key": "tolerance",
+      "prompt": "Como está sua tolerância atual a caminhada, bicicleta e impacto?",
+      "options": [
+        { "label": "Boa nas três", "value": "good" },
+        { "label": "Caminhada e bicicleta limitadas", "value": "limited" },
+        {
+          "label": "Caminho/pedalo, mas evito impacto",
+          "value": "avoid-impact"
+        },
+        { "label": "Não sei", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "pain",
+      "prompt": "Para evitar uma sugestão inadequada, você tem dor aguda, lesão ativa ou limitação importante agora?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim, leve ou sem gravidade definida", "value": "unclear" },
+        { "label": "Sim, aguda ou importante", "value": "active" }
+      ]
+    },
+    {
+      "key": "painClarification",
+      "prompt": "A limitação é leve e estável, sem dor aguda ou piora importante agora?",
+      "sensitive": true,
+      "when": { "key": "pain", "values": ["unclear"] },
+      "options": [
+        { "label": "Sim, leve e estável", "value": "mild" },
+        {
+          "label": "Não, há dor ou limitação importante",
+          "value": "important"
+        },
+        { "label": "Não tenho certeza", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "heartCondition",
+      "prompt": "Algum profissional já informou condição cardíaca ou pressão alta?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim, controlada", "value": "controlled" },
+        { "label": "Sim, não controlada ou não sei", "value": "uncontrolled" }
+      ]
+    },
+    {
+      "key": "heartClarification",
+      "prompt": "A condição está controlada e você recebeu orientação apropriada para atividade física?",
+      "sensitive": true,
+      "when": { "key": "heartCondition", "values": ["controlled"] },
+      "options": [
+        { "label": "Sim", "value": "yes" },
+        { "label": "Não", "value": "no" },
+        { "label": "Não tenho certeza", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "chestPain",
+      "prompt": "Você sente dor ou pressão no peito?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Agora ou em repouso", "value": "current" },
+        { "label": "No esforço", "value": "exertion" }
+      ]
+    },
+    {
+      "key": "fainting",
+      "prompt": "Você teve desmaio, perda de consciência, tontura importante ou perda de equilíbrio?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Está acontecendo agora", "value": "current" },
+        { "label": "Recentemente e sem avaliação", "value": "recent" }
+      ]
+    },
+    {
+      "key": "breathing",
+      "prompt": "Você tem falta de ar desproporcional?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Importante agora", "value": "current" },
+        { "label": "Ao esforço", "value": "exertion" }
+      ]
+    },
+    {
+      "key": "chronic",
+      "prompt": "Você possui condição crônica relevante? Não informe diagnóstico detalhado.",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim, controlada", "value": "controlled" },
+        { "label": "Sim, não controlada ou não sei", "value": "uncontrolled" }
+      ]
+    },
+    {
+      "key": "chronicClarification",
+      "prompt": "A condição está controlada e você recebeu orientação apropriada para atividade física?",
+      "sensitive": true,
+      "when": { "key": "chronic", "values": ["controlled"] },
+      "options": [
+        { "label": "Sim", "value": "yes" },
+        { "label": "Não", "value": "no" },
+        { "label": "Não tenho certeza", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "medication",
+      "prompt": "Usa medicamento contínuo que possa afetar atividade? Não informe o nome.",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim, com orientação", "value": "guided" },
+        { "label": "Sim, sem orientação ou não sei", "value": "unclear" }
+      ]
+    },
+    {
+      "key": "medicationClarification",
+      "prompt": "Você recebeu orientação apropriada sobre atividade física enquanto usa esse medicamento? Não informe o nome.",
+      "sensitive": true,
+      "when": { "key": "medication", "values": ["guided", "unclear"] },
+      "options": [
+        { "label": "Sim", "value": "yes" },
+        { "label": "Não", "value": "no" },
+        { "label": "Não tenho certeza", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "supervision",
+      "prompt": "Recebeu orientação para se exercitar somente sob supervisão?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim", "value": "yes" }
+      ]
+    },
+    {
+      "key": "pregnancy",
+      "prompt": "Você está em gestação ou pós-parto?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim", "value": "yes" },
+        { "label": "Prefiro não responder", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "otherReason",
+      "prompt": "Existe outra razão para não iniciar atividade agora?",
+      "sensitive": true,
+      "options": [
+        { "label": "Não", "value": "no" },
+        { "label": "Sim", "value": "yes" },
+        { "label": "Não sei", "value": "unknown" }
+      ]
+    },
+    {
+      "key": "notice",
+      "prompt": "Você está ciente de que esta sugestão é informativa e não substitui avaliação profissional?",
+      "options": [
+        { "label": "Sim, quero continuar", "value": "accepted" },
+        { "label": "Não", "value": "declined" }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import {
   listGlobalTrainingPlanLibrary,
   listPersonalTrainingPlans,
 } from '~/routes/training-plan/personal-training-plan-service';
+import { getTrainingPlanAssistantSession } from '~/routes/training-plan/training-plan-assistant-service';
 import {
   getGlobalTrainingPlan,
   getTrainingPlanWorkout,
@@ -14,6 +15,8 @@ import {
 
 export const trainingPlanKeys = {
   all: ['training-plans'] as const,
+  assistant: (scenario: MockTrainingPlansScenario) =>
+    [...trainingPlanKeys.all, 'assistant', scenario] as const,
   details: () => [...trainingPlanKeys.all, 'detail'] as const,
   detail: (trainingPlanId: string, scenario: MockTrainingPlansScenario) =>
     [...trainingPlanKeys.details(), trainingPlanId, scenario] as const,
@@ -50,6 +53,16 @@ export const trainingPlanKeys = {
   library: (page: number, scenario: MockTrainingPlansScenario) =>
     [...trainingPlanKeys.libraries(), page, scenario] as const,
 };
+
+export function trainingPlanAssistantQueryOptions(
+  scenario: MockTrainingPlansScenario,
+) {
+  return queryOptions({
+    queryKey: trainingPlanKeys.assistant(scenario),
+    queryFn: ({ signal }) => getTrainingPlanAssistantSession(scenario, signal),
+    retry: false,
+  });
+}
 
 export function trainingPlanListQueryOptions(
   page: number,

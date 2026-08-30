@@ -21,11 +21,16 @@ import {
 import type {
   GlobalTrainingPlanCollectionResponse,
   GlobalTrainingPlanLibraryResponse,
+  TrainingPlanAssistantSessionResponse,
   TrainingPlanDetailsResponse,
 } from '@dall-fit/types';
 
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
+import {
+  TrainingPlanAssistantReceiptDocument,
+  TrainingPlanAssistantSessionDocument,
+} from '~/training-plan-assistant/repositories/training-plan-assistant.schema';
 import { TrainingPlanCloneStarter } from '~/training-plan/adapters/training-plan-clone-starter';
 import {
   PersonalTrainingPlanActiveDocument,
@@ -61,6 +66,8 @@ describe('Global training plans (e2e)', () => {
   let redisServer: RedisMemoryServer;
   let trainingPlanModel: Model<TrainingPlanDocument>;
   let workoutExecutionModel: Model<WorkoutExecutionDocument>;
+  let assistantSessionModel: Model<TrainingPlanAssistantSessionDocument>;
+  let assistantReceiptModel: Model<TrainingPlanAssistantReceiptDocument>;
   const uploadedBlobs: Array<{ content: Buffer; key: string }> = [];
   const deletedBlobKeys: string[][] = [];
   const blobStorage = {
@@ -108,6 +115,8 @@ describe('Global training plans (e2e)', () => {
     process.env.AUTH_TEST_BYPASS_E2E_ENABLED = 'true';
     process.env.AUTH_TEST_BYPASS_KEY = testBypassKey;
     process.env.UI_URL = 'http://localhost:3000';
+    process.env.TRAINING_PLAN_ASSISTANT_ENABLED = 'true';
+    process.env.TRAINING_PLAN_ASSISTANT_PROVIDER = 'fake';
 
     const { AppModule } = await import('~/app.module.js');
     const moduleFixture = await Test.createTestingModule({
@@ -146,6 +155,12 @@ describe('Global training plans (e2e)', () => {
     workoutExecutionModel = app.get<Model<WorkoutExecutionDocument>>(
       getModelToken(WorkoutExecutionDocument.name),
     );
+    assistantSessionModel = app.get<
+      Model<TrainingPlanAssistantSessionDocument>
+    >(getModelToken(TrainingPlanAssistantSessionDocument.name));
+    assistantReceiptModel = app.get<
+      Model<TrainingPlanAssistantReceiptDocument>
+    >(getModelToken(TrainingPlanAssistantReceiptDocument.name));
     await Promise.all([
       personModel.syncIndexes(),
       trainingPlanModel.syncIndexes(),
@@ -154,6 +169,8 @@ describe('Global training plans (e2e)', () => {
       cloneJobModel.syncIndexes(),
       loadProfileModel.syncIndexes(),
       workoutExecutionModel.syncIndexes(),
+      assistantSessionModel.syncIndexes(),
+      assistantReceiptModel.syncIndexes(),
     ]);
     redisClient = new Redis(process.env.REDIS_URL);
   });
@@ -170,6 +187,8 @@ describe('Global training plans (e2e)', () => {
       cloneJobModel.deleteMany({}).exec(),
       loadProfileModel.deleteMany({}).exec(),
       workoutExecutionModel.deleteMany({}).exec(),
+      assistantSessionModel.deleteMany({}).exec(),
+      assistantReceiptModel.deleteMany({}).exec(),
       redisClient.flushdb(),
     ]);
   });
@@ -249,6 +268,145 @@ describe('Global training plans (e2e)', () => {
 
     return result;
   }
+
+  it('creates, resumes, drafts and idempotently materializes an assistant plan', async () => {
+    const agent = await login(false);
+    const empty = await agent
+      .get('/training-plan-assistant/session')
+      .expect(204);
+    expect(empty.headers['cache-control']).toBe('private, no-store');
+
+    const created = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session'),
+    )
+      .send({ noticeVersion: 'assistant-notice.v1' })
+      .expect(201);
+    let session = (created.body as TrainingPlanAssistantSessionResponse).data;
+
+    const resumed = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session'),
+    )
+      .send({ noticeVersion: 'assistant-notice.v1' })
+      .expect(200);
+    expect((resumed.body as TrainingPlanAssistantSessionResponse).data.id).toBe(
+      session.id,
+    );
+
+    let messageNumber = 0;
+    while (session.status === 'collecting') {
+      const answer = session.availableAnswers[0];
+      expect(answer).toBeDefined();
+      messageNumber += 1;
+      const response = await authenticatedMutation(
+        agent,
+        agent.post('/training-plan-assistant/session/messages'),
+      )
+        .set('X-Resource-Version', String(session.version))
+        .send({
+          clientMessageId: `123e4567-e89b-42d3-a456-${String(messageNumber).padStart(12, '0')}`,
+          text: answer?.value,
+        })
+        .expect(200);
+      session = (response.body as TrainingPlanAssistantSessionResponse).data;
+      expect(
+        session.messages.findLast((message) => message.role === 'person')?.text,
+      ).toBe(answer?.label);
+    }
+    expect(messageNumber).toBeLessThanOrEqual(20);
+    expect(session.status).toBe('ready');
+
+    const conflictResponse = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session/messages'),
+    )
+      .set('X-Resource-Version', String(session.version - 1))
+      .send({
+        clientMessageId: '123e4567-e89b-42d3-a456-999999999999',
+        text: 'general-health',
+      })
+      .expect(412);
+    expect((conflictResponse.body as { code: string }).code).toBe(
+      'ASSISTANT_SESSION_VERSION_CONFLICT',
+    );
+
+    const draftKey = '123e4567-e89b-42d3-a456-426614174001';
+    const draftResponse = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session/drafts'),
+    )
+      .set('Idempotency-Key', draftKey)
+      .set('X-Resource-Version', String(session.version))
+      .send({})
+      .expect(200);
+    session = (draftResponse.body as TrainingPlanAssistantSessionResponse).data;
+    expect(session.status).toBe('preview');
+    expect(session.draft?.workouts).toHaveLength(2);
+
+    const previewBeforeInvalidDraft = session.draft;
+    const invalidDraftResponse = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session/drafts'),
+    )
+      .set('Idempotency-Key', '123e4567-e89b-42d3-a456-426614174009')
+      .set('X-Resource-Version', String(session.version))
+      .send({ adjustment: 'assistant:draft-invalid' })
+      .expect(502);
+    expect((invalidDraftResponse.body as { code: string }).code).toBe(
+      'ASSISTANT_DRAFT_INVALID',
+    );
+    const recoveredPreview = await agent
+      .get('/training-plan-assistant/session')
+      .expect(200);
+    session = (recoveredPreview.body as TrainingPlanAssistantSessionResponse)
+      .data;
+    expect(session.status).toBe('preview');
+    expect(session.draft).toEqual(previewBeforeInvalidDraft);
+
+    const confirmationKey = '123e4567-e89b-42d3-a456-426614174002';
+    const confirmation = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session/confirm'),
+    )
+      .set('Idempotency-Key', confirmationKey)
+      .set('X-Resource-Version', String(session.version))
+      .send({})
+      .expect(201);
+    const confirmationData = (
+      confirmation.body as {
+        data: { catalogEntryId: string; trainingPlanId: string };
+      }
+    ).data;
+    expect(
+      await trainingPlanModel.countDocuments({
+        _id: confirmationData.trainingPlanId,
+      }),
+    ).toBe(1);
+    expect(
+      await catalogModel.countDocuments({
+        _id: confirmationData.catalogEntryId,
+      }),
+    ).toBe(1);
+    expect(await activeModel.countDocuments({})).toBe(0);
+    expect(await assistantSessionModel.countDocuments({})).toBe(0);
+
+    const replay = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session/confirm'),
+    )
+      .set('Idempotency-Key', confirmationKey)
+      .set('X-Resource-Version', String(session.version))
+      .send({})
+      .expect(200);
+    expect(
+      (
+        replay.body as {
+          data: { catalogEntryId: string; trainingPlanId: string };
+        }
+      ).data,
+    ).toEqual(confirmationData);
+  });
 
   it('protects and validates the realtime stream before opening it', async () => {
     await request(app.getHttpServer())

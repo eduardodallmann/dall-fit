@@ -407,3 +407,26 @@ export function reportSystemFailure(category: SystemFailureCategory): void {
     // Operational diagnostics are optional and never block recovery.
   }
 }
+
+export type TrainingPlanAssistantAnalyticsAction =
+  | 'assistant_abandon'
+  | 'assistant_adjust'
+  | 'assistant_confirm'
+  | 'assistant_message'
+  | 'assistant_open'
+  | 'assistant_preview'
+  | 'assistant_retry';
+
+export function trackTrainingPlanAssistantAction(
+  action: TrainingPlanAssistantAnalyticsAction,
+  outcome?: 'blocked' | 'cancelled' | 'error' | 'success',
+): void {
+  try {
+    track('training_plan_assistant', {
+      action,
+      ...(outcome === undefined ? {} : { outcome }),
+    });
+  } catch {
+    // Analytics is optional and never receives conversation content.
+  }
+}

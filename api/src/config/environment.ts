@@ -140,6 +140,28 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(60_000),
+  RATE_LIMIT_ASSISTANT_MESSAGE_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(20),
+  RATE_LIMIT_ASSISTANT_MESSAGE_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(600_000),
+  RATE_LIMIT_ASSISTANT_DRAFT_LIMIT: z.coerce.number().int().min(1).default(5),
+  RATE_LIMIT_ASSISTANT_DRAFT_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(600_000),
+  RATE_LIMIT_ASSISTANT_CONFIRM_LIMIT: z.coerce.number().int().min(1).default(5),
+  RATE_LIMIT_ASSISTANT_CONFIRM_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(600_000),
   YOUTUBE_VALIDATION_TIMEOUT_MS: z.coerce
     .number()
     .int()
@@ -157,6 +179,27 @@ const environmentSchema = z.looseObject({
     .min(100)
     .max(30_000)
     .default(5_000),
+  TRAINING_PLAN_ASSISTANT_ENABLED: booleanString.default(false),
+  TRAINING_PLAN_ASSISTANT_PROVIDER: z.enum(['fake', 'groq']).default('fake'),
+  TRAINING_PLAN_ASSISTANT_MODEL: z
+    .string()
+    .min(1)
+    .default('llama-3.3-70b-versatile'),
+  TRAINING_PLAN_ASSISTANT_GROQ_API_KEY: optionalNonEmptyString,
+  TRAINING_PLAN_ASSISTANT_ZDR_CONFIRMED: booleanString.default(false),
+  TRAINING_PLAN_ASSISTANT_PRIVACY_APPROVED: booleanString.default(false),
+  TRAINING_PLAN_ASSISTANT_PROVIDER_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(60_000)
+    .default(30_000),
+  TRAINING_PLAN_ASSISTANT_MAX_COMPLETION_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(256)
+    .max(8_192)
+    .default(4_096),
   GOOGLE_OAUTH_CREDENTIALS_BASE64: z.string().min(1),
   AUTH_SESSION_SECRET: z.string().min(32),
   AUTH_SESSION_ACTIVE_KEY_ID: z.string().min(1).default('active-v1'),
@@ -401,6 +444,32 @@ function throwValidationError(error: z.ZodError): never {
 }
 
 function validateSecurityCombinations(
+  config: ParsedEnvironment,
+  runtimeEnvironment: RuntimeEnvironment,
+): void {
+  validateAssistantSecurityCombination(config, runtimeEnvironment);
+  validateAuthSecurityCombinations(config, runtimeEnvironment);
+}
+
+function validateAssistantSecurityCombination(
+  config: ParsedEnvironment,
+  runtimeEnvironment: RuntimeEnvironment,
+): void {
+  if (
+    config.TRAINING_PLAN_ASSISTANT_ENABLED &&
+    (runtimeEnvironment === 'production' || runtimeEnvironment === 'preview') &&
+    (config.TRAINING_PLAN_ASSISTANT_PROVIDER !== 'groq' ||
+      config.TRAINING_PLAN_ASSISTANT_GROQ_API_KEY === undefined ||
+      !config.TRAINING_PLAN_ASSISTANT_ZDR_CONFIRMED ||
+      !config.TRAINING_PLAN_ASSISTANT_PRIVACY_APPROVED)
+  ) {
+    throw new Error(
+      'Invalid environment variables: the training plan assistant requires Groq credentials, ZDR confirmation and privacy approval in production and preview',
+    );
+  }
+}
+
+function validateAuthSecurityCombinations(
   config: ParsedEnvironment,
   runtimeEnvironment: RuntimeEnvironment,
 ): void {

@@ -6,6 +6,7 @@ import type { Exercise, TrainingPlanSummary } from '@dall-fit/types';
 
 import type { TrainingPlanCloneSnapshot } from '~/training-plan/domain/personal-training-plan.entity';
 import type {
+  CompleteTrainingPlanInput,
   ExerciseChanges,
   ImageWriteInput,
   NewTrainingPlan,
@@ -146,6 +147,46 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       data: { trainingPlanId: result.id },
     });
     return result;
+  }
+
+  async createComplete(plan: CompleteTrainingPlanInput): Promise<void> {
+    this.logger.log(
+      'MongoTrainingPlanRepository -> createComplete -> params:',
+      {
+        params: {
+          ownerIsGlobal: plan.ownerPersonId === null,
+          trainingPlanId: plan.id,
+          workoutCount: plan.workouts.length,
+        },
+      },
+    );
+    await this.trainingPlanModel
+      .updateOne(
+        { _id: plan.id },
+        {
+          $setOnInsert: {
+            description: plan.description,
+            name: plan.name,
+            ownerPersonId: plan.ownerPersonId,
+            version: 0,
+            workouts: plan.workouts.map((workout) => ({
+              _id: workout.id,
+              exercises: workout.exercises.map((exercise) => ({
+                ...exercise,
+                _id: exercise.id,
+                id: undefined,
+              })),
+              name: workout.name,
+            })),
+          },
+        },
+        { runValidators: true, upsert: true },
+      )
+      .exec();
+    this.logger.log(
+      'MongoTrainingPlanRepository -> createComplete -> completed:',
+      { data: { trainingPlanId: plan.id } },
+    );
   }
 
   async findById(

@@ -222,6 +222,16 @@ URLs fictícias expiradas e depois um
 novo par, enquanto um handler da origem privada responde `403` ou imagem mínima de
 acordo com a query fictícia. Delegation/signature dos mocks são marcadores
 determinísticos, nunca credenciais reais, e nenhuma request escapa para a rede.
+
+O mesmo seletor `mockTrainingPlans` controla o handler separado
+`training-plan-assistant.ts`. Os valores `assistant-collecting`,
+`assistant-resumed`, `assistant-multiple-answers`, `assistant-clarifying`,
+`assistant-health-clarification`, `assistant-blocked`, `assistant-emergency`,
+`assistant-preview`, `assistant-provider-error`, `assistant-version-conflict` e
+`assistant-abandon` cobrem a máquina pública sem chamar API ou provider reais.
+Estado mutável preserva versão e retomada por seletor, é limpo no setup global e
+valida `X-Resource-Version`, UUIDs e idempotência. As fixtures são sintéticas e o
+handler nunca grava conversa em storage nem envia conteúdo para Analytics.
 `csrf-refresh` rejeita o primeiro write protegido e aceita somente a repetição
 explícita com o token renovado; `timeout` mantém a leitura indefinida para testes
 com relógio/abort controlados.

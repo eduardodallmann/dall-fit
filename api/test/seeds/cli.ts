@@ -7,6 +7,10 @@ import {
   PersonSchema,
 } from '~/person/repositories/person.schema';
 import {
+  TrainingPlanAssistantSessionDocument,
+  TrainingPlanAssistantSessionSchema,
+} from '~/training-plan-assistant/repositories/training-plan-assistant.schema';
+import {
   PersonalTrainingPlanActiveDocument,
   PersonalTrainingPlanActiveSchema,
   PersonalTrainingPlanCatalogDocument,
@@ -45,6 +49,12 @@ const authScenarios = [
   'auth:person-theme-light',
 ] as const;
 
+const assistantScenarios = [
+  'assistant:confirm',
+  'assistant:draft-invalid',
+  'assistant:ready',
+] as const;
+
 function assertSeedCanRun(
   environment: string,
   mongodbUri: string,
@@ -60,6 +70,7 @@ function assertSeedCanRun(
   }
 
   const knownScenarios: readonly string[] = [
+    ...assistantScenarios,
     ...authScenarios,
     ...trainingPlanScenarios,
   ];
@@ -161,6 +172,8 @@ async function seedAuthenticationScenario(
   return false;
 }
 
+// The CLI keeps scenario selection and ownership-safe cleanup visible in one operational transaction.
+// eslint-disable-next-line sonarjs/cognitive-complexity
 async function main(): Promise<void> {
   const scenario = process.argv.slice(2).find((argument) => argument !== '--');
   const environment = process.env.NODE_ENV ?? 'development';
@@ -188,6 +201,10 @@ async function main(): Promise<void> {
     const cloneJobModel = model(
       TrainingPlanCloneJobDocument.name,
       TrainingPlanCloneJobSchema,
+    );
+    const assistantSessionModel = model(
+      TrainingPlanAssistantSessionDocument.name,
+      TrainingPlanAssistantSessionSchema,
     );
 
     if (!(await seedAuthenticationScenario(personModel, scenario))) {
@@ -339,6 +356,125 @@ async function main(): Promise<void> {
             state: 'failed',
             totalImages: 0,
           });
+      }
+
+      if (scenario?.startsWith('assistant:')) {
+        const personId = new Types.ObjectId('64b000000000000000000003');
+        await personModel
+          .findOneAndUpdate(
+            { _id: personId },
+            {
+              $set: {
+                email: 'assistant.runner@example.test',
+                googleSubject: 'google-person-001',
+                name: 'Assistant Runner',
+                photoUrl: null,
+              },
+              $unset: { isAdmin: 1 },
+            },
+            { new: true, setDefaultsOnInsert: true, upsert: true },
+          )
+          .exec();
+        await assistantSessionModel.deleteMany({ personId }).exec();
+        const preview = scenario === 'assistant:confirm';
+        const now = new Date();
+        await assistantSessionModel.create({
+          _id: new Types.ObjectId('94b000000000000000000001'),
+          active: true,
+          answers: {
+            adult: 'yes',
+            breathing: 'no',
+            chestPain: 'no',
+            chronic: 'no',
+            cyclingTolerance: 'good',
+            duration: '45',
+            equipment: 'machines-free-weights',
+            experience: 'beginner',
+            fainting: 'no',
+            frequency: '2',
+            goal: 'general-health',
+            heartCondition: 'no',
+            impactTolerance: 'good',
+            infrastructure: 'full-gym-all',
+            interruption: 'none',
+            location: 'full-gym',
+            medication: 'no',
+            notice: 'accepted',
+            otherReason: 'no',
+            pain: 'no',
+            preferences: 'none',
+            pregnancy: 'no',
+            schedule: '2-45',
+            supervision: 'no',
+            tolerance: 'good',
+            walkingTolerance: 'good',
+          },
+          catalogVersion: 'exercise-catalog.v1',
+          currentQuestionKey: null,
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          generatedDraft: preview
+            ? {
+                description: 'Prévia sintética para validar a confirmação.',
+                planName: 'Plano de confirmação',
+                workouts: [
+                  {
+                    estimatedDurationMinutes: 6,
+                    exercises: [
+                      {
+                        bodyArea: 'quadriceps',
+                        catalogKey: 'youtube-short:n4rakmCKJkg',
+                        name: 'Leg press sentado',
+                        repetitions: 12,
+                        restSeconds: 60,
+                        sets: 3,
+                        type: 'youtube-short',
+                        youtubeId: 'n4rakmCKJkg',
+                      },
+                    ],
+                    name: 'Treino A',
+                  },
+                  {
+                    estimatedDurationMinutes: 6,
+                    exercises: [
+                      {
+                        bodyArea: 'back',
+                        catalogKey: 'youtube-short:_c8NXVnlb8I',
+                        name: 'Remada curvada supinada',
+                        repetitions: 12,
+                        restSeconds: 60,
+                        sets: 3,
+                        type: 'youtube-short',
+                        youtubeId: '_c8NXVnlb8I',
+                      },
+                    ],
+                    name: 'Treino B',
+                  },
+                ],
+              }
+            : null,
+          invalidAttempts: {},
+          knowledgeVersion: 'fitness-guidelines.v1',
+          materialization: null,
+          messages: [
+            {
+              createdAt: now,
+              id: '123e4567-e89b-42d3-a456-426614174000',
+              role: 'assistant',
+              text: preview
+                ? 'Revise a prévia antes de confirmar.'
+                : 'As respostas obrigatórias foram concluídas.',
+            },
+          ],
+          model: 'fake-v1',
+          noticeVersion: 'assistant-notice.v1',
+          operationKeys: {},
+          personId,
+          promptVersion: 'training-plan-assistant.v1',
+          provider: 'fake',
+          screeningOutcome: 'apto_para_fluxo_geral',
+          status: preview ? 'preview' : 'ready',
+          version: 0,
+        });
       }
     }
 

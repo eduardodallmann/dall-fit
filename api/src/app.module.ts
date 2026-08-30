@@ -9,6 +9,7 @@ import { OperationalModule } from '~/operational/operational.module';
 import { PersonModule } from '~/person/person.module';
 import { RealtimeModule } from '~/realtime/realtime.module';
 import { RedisModule } from '~/redis/redis.module';
+import { TrainingPlanAssistantModule } from '~/training-plan-assistant/training-plan-assistant.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
 import { TrainingModule } from '~/training/training.module';
 
@@ -35,6 +36,7 @@ import { TrainingModule } from '~/training/training.module';
     PersonModule,
     AuthModule,
     TrainingPlanModule,
+    TrainingPlanAssistantModule,
     TrainingModule,
   ],
 })

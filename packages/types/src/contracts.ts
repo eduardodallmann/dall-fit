@@ -11,6 +11,7 @@ import type {
   PersonalTrainingPlanListItem,
   Theme,
   TrainingOverview,
+  TrainingPlanAssistantSession,
   TrainingPlanDetails,
   TrainingPlanSummary,
   TrainingPlanWorkoutDetails,
@@ -198,3 +199,24 @@ export interface CompleteTrainingSessionRequest {
   confirmIncomplete: boolean;
   timezone: string;
 }
+
+export type TrainingPlanAssistantSessionResponse =
+  ApiResponse<TrainingPlanAssistantSession>;
+
+export interface CreateTrainingPlanAssistantSessionRequest {
+  noticeVersion: string;
+}
+
+export interface SendTrainingPlanAssistantMessageRequest {
+  clientMessageId: string;
+  text: string;
+}
+
+export interface GenerateTrainingPlanAssistantDraftRequest {
+  adjustment?: string;
+}
+
+export type TrainingPlanAssistantConfirmationResponse = ApiResponse<{
+  catalogEntryId: string;
+  trainingPlanId: string;
+}>;

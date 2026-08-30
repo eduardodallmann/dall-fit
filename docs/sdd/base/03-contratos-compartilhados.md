@@ -152,3 +152,21 @@ request; o Workflow os lê no MongoDB.
   os sete dias da semana calculados no timezone informado na finalização.
 - respostas seguem `ApiResponse`; mutations de sessão devolvem a versão também no
   header `X-Resource-Version`.
+
+## Assistente de planos de treino
+
+- `TrainingPlanAssistantSession` é a projeção pública retomável. Expõe estado,
+  versão, histórico, pergunta/respostas rápidas, resultado público da triagem,
+  preview e timestamps ISO; answers estruturados, materialização, provider e
+  chaves de operação nunca atravessam HTTP.
+- `TrainingPlanAssistantStatus` limita a UI a `collecting`, `clarifying`, `ready`,
+  `generating`, `preview` ou `blocked`; `completed` é uma transição interna antes
+  da exclusão e não pertence ao contrato público.
+- `TrainingPlanAssistantDraft` publica apenas a estrutura revisável já resolvida
+  contra o catálogo: plano, workouts, duração estimada e exercícios tipados.
+- create/message/draft usam requests próprios. Mensagem leva
+  `clientMessageId`; draft leva ajuste opcional; versão e chave idempotente
+  permanecem headers HTTP.
+- `TrainingPlanAssistantConfirmationResponse` devolve somente
+  `catalogEntryId` e `trainingPlanId`. A entrada nasce `owned`, inativa e não
+  contém referência a provider, prompt ou resposta de saúde.

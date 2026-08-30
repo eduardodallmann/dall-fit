@@ -1,4 +1,5 @@
 import type {
+  CompleteTrainingPlanInput,
   ExerciseChanges,
   ImageWriteInput,
   NewTrainingPlan,
@@ -22,6 +23,7 @@ export abstract class TrainingPlanRepository {
     pageSize: number,
   ): Promise<TrainingPlanPage>;
   abstract create(plan: NewTrainingPlan): Promise<TrainingPlanEntity>;
+  abstract createComplete(plan: CompleteTrainingPlanInput): Promise<void>;
   abstract findById(
     id: string,
     scope: TrainingPlanAccessScope,

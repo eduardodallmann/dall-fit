@@ -24,6 +24,8 @@ somente quando constituir requisito funcional excepcional.
   administrativas, editor e métricas de impacto.
 - [`Planos de treino pessoais`](personal-training-plans.md): catálogo, referência,
   ativação e editor próprio.
+- [`Assistente de planos`](training-plan-assistant.md): sessão sensível,
+  triagem, preview e materialização idempotente.
 - [`Jobs de clonagem`](training-plan-clone-jobs.md): start, retry e cancelamento
   durável.
 - [`GET /realtime/events`](realtime-events.md): stream autenticado de invalidações.

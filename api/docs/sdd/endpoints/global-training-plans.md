@@ -69,6 +69,34 @@ expõe `thumbnailUrl`, `displayUrl` assinadas e `signedUrlExpiresAt`; keys,
 dimensões internas, pathnames, delegation token e original não atravessam HTTP.
 Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-store`.
 
+## Seeds globais do catálogo do assistente
+
+O cenário `assistant:global-training-plans` não passa pelos endpoints
+administrativos. `pnpm -C api seed:assistant-globals` valida MongoDB e os 45
+`catalogKey` e mostra `would-create` sem gravar. Para aplicar localmente:
+
+```bash
+pnpm -C api seed -- auth:person-admin
+pnpm -C api seed:assistant-globals -- --execute
+pnpm -C api seed:assistant-globals -- --execute
+curl --request POST http://localhost:4000/auth/test-login \
+  --header 'content-type: application/json' --header 'x-auth-test-key: <CHAVE_LOCAL>' \
+  --cookie-jar /tmp/dall-fit-fit73-admin.txt \
+  --data '{"googleSubject":"google-admin-001","name":"Admin Runner","email":"admin.runner@example.test","photoUrl":null,"isAdmin":true}' \
+&& curl --include 'http://localhost:4000/global/training-plans?page=1' \
+  --cookie /tmp/dall-fit-fit73-admin.txt
+```
+
+As duas execuções deixam somente dois planos com IDs
+determinísticos, 3/5 workouts, 18/27 exercícios e 45 vídeos distintos em 3×12/60;
+a segunda reporta `unchanged` e não sobrescreve edição. Em ambiente publicado, a
+aplicação exige também:
+
+```bash
+ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v1 \
+  pnpm -C api seed:assistant-globals -- --execute
+```
+
 Lista, detalhe e workout incluem `usage.linkedPeople` e `usage.activePeople`. O
 primeiro conta referências pessoais vivas; o segundo, referências que também são
 a seleção ativa. Clones concluídos não contam. A administração pode editar e

@@ -26,6 +26,7 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 |     6 | Executar clone  | não se aplica     | `POST /internal/training-plan-clone-runs` |
 |     7 | Navegar/editar  | detalhe e workout | `/training-plans/:catalogEntryId/**`      |
 |     8 | Marcar ativo    | lista             | `PUT /training-plans/active`              |
+|     9 | Pedir ajuda     | modal da lista    | `/training-plan-assistant/session/**`     |
 
 ## Sequência e decisões
 
@@ -43,15 +44,23 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca.
 8. Excluir próprio ou desvincular limpa a seleção se necessário, sem fallback.
 9. Excluir global remove vínculos/seleções, mas jobs continuam pelo snapshot.
+10. Pedir ajuda abre uma sessão separada e retomável. A API coleta uma pergunta
+    por vez, calcula triagem local e só chama o provider para operações restritas.
+    Bloqueio encerra a geração; pessoa apta revisa uma prévia antes de confirmar.
+11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
+    `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
+    catálogo jamais lista uma árvore parcial sem entrada.
 
 ## Dados compartilhados
 
-| Dado          | Origem       | Consumidores    | Persistência | Observações                   |
-| ------------- | ------------ | --------------- | ------------ | ----------------------------- |
-| catálogo      | API pessoal  | UI              | MongoDB      | owner ou referência           |
-| seleção ativa | pessoa       | API/UI/admin    | MongoDB      | zero ou uma por pessoa        |
-| snapshot/job  | API          | Workflow/UI     | MongoDB      | conteúdo imutável por geração |
-| mídia         | Blob privado | API/Workflow/UI | Vercel Blob  | duas variantes WebP           |
+| Dado                 | Origem       | Consumidores         | Persistência  | Observações                             |
+| -------------------- | ------------ | -------------------- | ------------- | --------------------------------------- |
+| catálogo             | API pessoal  | UI                   | MongoDB       | owner ou referência                     |
+| seleção ativa        | pessoa       | API/UI/admin         | MongoDB       | zero ou uma por pessoa                  |
+| snapshot/job         | API          | Workflow/UI          | MongoDB       | conteúdo imutável por geração           |
+| mídia                | Blob privado | API/Workflow/UI      | Vercel Blob   | duas variantes WebP                     |
+| sessão assistida     | API          | UI/provider restrito | MongoDB + TTL | sensível, sete dias e exclusão imediata |
+| recibo do assistente | API          | retry de confirmação | MongoDB + TTL | somente pessoa, hash e IDs por 24 horas |
 
 ## Estados e exceções
 
@@ -60,6 +69,9 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 - Erro recuperável: `start-failed`/`failed` com retry e cancelamento.
 - Erro não recuperável: catálogo/recurso ausente ou referência somente leitura.
 - Indisponibilidade: listagem mantém último cache; bridge retorna 503 sem apagar job.
+- Assistente: provider indisponível preserva a sessão/preview e criação manual
+  continua; conflito 412 força releitura, sem merge; desistência e expiração
+  apagam os dados sensíveis.
 
 ## Cenários funcionais
 
@@ -84,9 +96,30 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 - When: solicita retry ou cancelamento.
 - Then: a linha continua bloqueada e reflete a nova transição.
 
+### Cenário 4 — Assistente retomável e seguro
+
+- Link para testar: `http://localhost:3000/training-plan?mockAuth=person&mockTrainingPlans=assistant-collecting`
+- Given: existe uma sessão em coleta.
+- When: responde, recarrega e reabre “Me ajude a criar”.
+- Then: a API restaura a versão canônica; nenhuma resposta é guardada no storage
+  do navegador e Escape/backdrop apenas ocultam a modal.
+
+### Cenário 5 — Bloqueio e preview
+
+- Links para testar: usar `assistant-blocked`, `assistant-emergency` ou
+  `assistant-preview` no mesmo parâmetro `mockTrainingPlans`.
+- Given: a triagem local bloqueou ou concluiu apta.
+- When: a pessoa revisa o resultado.
+- Then: bloqueio não oferece geração; preview mostra estrutura completa e a
+  confirmação cria um plano próprio inativo e navega ao detalhe.
+
 ## Cobertura automatizada
 
 - API E2E: `api/test/training-plan.e2e-spec.ts`.
 - Workflow: specs de services e `workflow-spike.workflow.spec.ts`.
 - Playwright: `ui/tests/integration/routes/personal-training-plan.spec.ts`.
 - MSW: `ui/src/mocks/handlers/training-plans.ts`.
+- Assistente API: `api/test/training-plan.e2e-spec.ts` e
+  `api/docs/sdd/endpoints/training-plan-assistant.md`.
+- Assistente UI/MSW: `ui/src/mocks/handlers/training-plan-assistant.ts` e os
+  cenários Playwright da rota pessoal.
