@@ -47,6 +47,8 @@ describe('GroqTrainingPlanAssistantProvider', () => {
   it('uses strict JSON Schema for a compatible model and still validates locally', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       successfulResponse({
+        anticipatedAnswers: [],
+        clarification: null,
         extractedSchedule: { durationMinutes: null, frequency: null },
         kind: 'answer',
         suggestedValue: null,
@@ -56,6 +58,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
 
     await expect(
       createProvider('openai/gpt-oss-20b').interpret({
+        candidateQuestions: [],
         currentQuestion,
         existingAnswers: {},
         text: 'sim',
@@ -69,7 +72,13 @@ describe('GroqTrainingPlanAssistantProvider', () => {
         name: 'training_plan_assistant_interpret',
         schema: {
           additionalProperties: false,
-          required: ['kind', 'extractedSchedule', 'suggestedValue'],
+          required: [
+            'anticipatedAnswers',
+            'clarification',
+            'kind',
+            'extractedSchedule',
+            'suggestedValue',
+          ],
           type: 'object',
         },
         strict: true,
@@ -96,6 +105,8 @@ describe('GroqTrainingPlanAssistantProvider', () => {
   it('extracts a free schedule without forcing it into a quick answer', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       successfulResponse({
+        anticipatedAnswers: [],
+        clarification: null,
         extractedSchedule: { durationMinutes: 30, frequency: 7 },
         kind: 'clarification',
         suggestedValue: null,
@@ -105,6 +116,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
 
     await expect(
       createProvider('openai/gpt-oss-120b').interpret({
+        candidateQuestions: [],
         currentQuestion: {
           key: 'schedule',
           options: [{ label: '3 dias, 45 minutos', value: '3-45' }],

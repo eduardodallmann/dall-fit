@@ -301,9 +301,31 @@ describe('Global training plans (e2e)', () => {
       const isSchedule = session.currentPrompt?.includes(
         'frequência e duração',
       );
-      const text = isSchedule
-        ? 'consigo treinar 5 dias por semana, uns 45 minutos por dia'
-        : answer?.value;
+      const isExperience = session.currentPrompt?.includes(
+        'experiência com treino',
+      );
+      if (isExperience) {
+        messageNumber += 1;
+        const anticipatedResponse = await authenticatedMutation(
+          agent,
+          agent.post('/training-plan-assistant/session/messages'),
+        )
+          .set('X-Resource-Version', String(session.version))
+          .send({
+            clientMessageId: `123e4567-e89b-42d3-a456-${String(messageNumber).padStart(12, '0')}`,
+            text: 'já treinei por 1 ano, mas estou parado há 3 meses',
+          })
+          .expect(200);
+        session = (
+          anticipatedResponse.body as TrainingPlanAssistantSessionResponse
+        ).data;
+        expect(session.status).toBe('clarifying');
+        expect(session.messages.at(-1)?.text).toContain('Até 3 meses');
+      }
+      let text = answer?.value;
+      if (isSchedule)
+        text = 'consigo treinar 5 dias por semana, uns 45 minutos por dia';
+      if (isExperience) text = 'beginner';
       messageNumber += 1;
       const response = await authenticatedMutation(
         agent,
@@ -316,9 +338,11 @@ describe('Global training plans (e2e)', () => {
         })
         .expect(200);
       session = (response.body as TrainingPlanAssistantSessionResponse).data;
+      let expectedVisibleText = text === answer?.value ? answer?.label : text;
+      if (isExperience) expectedVisibleText = 'Iniciante';
       expect(
         session.messages.findLast((message) => message.role === 'person')?.text,
-      ).toBe(text === answer?.value ? answer?.label : text);
+      ).toBe(expectedVisibleText);
     }
     expect(messageNumber).toBeLessThanOrEqual(20);
     expect(session.status).toBe('ready');

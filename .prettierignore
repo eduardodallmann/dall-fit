@@ -1,5 +1,8 @@
 **/coverage
 **/dist
 **/node_modules
+**/.vercel
+**/.nitro
+**/*.md
 pnpm-lock.yaml
 ui/public

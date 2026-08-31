@@ -8,12 +8,18 @@ export type AssistantInterpretationKind =
   'answer' | 'clarification' | 'correction' | 'injection' | 'off_topic';
 
 export interface InterpretAssistantAnswerInput {
+  candidateQuestions: readonly AssistantQuestion[];
   currentQuestion: AssistantQuestion;
   existingAnswers: Readonly<Record<string, string>>;
   text: string;
 }
 
 export interface AssistantAnswerInterpretation {
+  anticipatedAnswers?: readonly {
+    questionKey: string;
+    suggestedValue: string;
+  }[];
+  clarification?: string;
   extractedSchedule?: {
     durationMinutes?: number;
     frequency?: number;

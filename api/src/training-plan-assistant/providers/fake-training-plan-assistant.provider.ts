@@ -26,10 +26,36 @@ export class FakeTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
         candidate.label.toLocaleLowerCase('pt-BR') === normalized ||
         candidate.value.toLocaleLowerCase('pt-BR') === normalized,
     );
+    const anticipatedAnswers = input.candidateQuestions
+      .filter((question) => question.key !== input.currentQuestion.key)
+      .flatMap((question) => {
+        const anticipated =
+          question.options.find((candidate) =>
+            normalized.includes(candidate.label.toLocaleLowerCase('pt-BR')),
+          ) ??
+          (question.key === 'interruption' && /\b3\s+meses\b/.test(normalized)
+            ? question.options.find(
+                (candidate) => candidate.value === 'up-to-3-months',
+              )
+            : undefined);
+        return anticipated === undefined
+          ? []
+          : [
+              {
+                questionKey: question.key,
+                suggestedValue: anticipated.value,
+              },
+            ];
+      });
     const result: AssistantAnswerInterpretation =
       option === undefined
-        ? { kind: 'clarification' }
+        ? {
+            anticipatedAnswers,
+            clarification: `Entendi parte da sua resposta. ${input.currentQuestion.prompt}`,
+            kind: 'clarification',
+          }
         : {
+            anticipatedAnswers,
             kind: 'answer',
             suggestedValue: option.value,
           };

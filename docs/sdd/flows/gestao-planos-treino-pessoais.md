@@ -48,8 +48,10 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     por vez, calcula triagem local e só chama o provider para operações restritas.
     Respostas rápidas são atalhos; paráfrases são interpretadas, campos parciais
     são preservados e frequência/duração aceitam combinações livres validadas de
-    2 a 7 dias e 15 a 120 minutos. Bloqueio encerra a geração; pessoa apta revisa
-    uma prévia antes de confirmar.
+    2 a 7 dias e 15 a 120 minutos. A mesma mensagem pode adiantar respostas
+    objetivas futuras não sensíveis, que são validadas pelo catálogo e evitam
+    perguntas repetidas; triagem, maioridade e aceite nunca são antecipados.
+    Bloqueio encerra a geração; pessoa apta revisa uma prévia antes de confirmar.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.

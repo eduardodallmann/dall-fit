@@ -39,6 +39,14 @@ workouts, exercícios, séries, repetições, descanso e duração estimada, per
 ajuste e só então confirmação. Sucesso invalida o catálogo e navega para o novo
 `catalogEntryId`.
 
+Quando uma mensagem adianta respostas objetivas de perguntas futuras não
+sensíveis, o histórico confirma pelos labels quais fatos foram registrados e a
+conversa não repete essas perguntas. Informação insuficiente para uma categoria
+subjetiva permanece pendente: tempo de prática não define sozinho experiência, e
+o esclarecimento reconhece o contexto antes de pedir somente a confirmação que
+falta. Perguntas clínicas, maioridade e aceite final sempre aparecem na sua etapa
+e não são preenchidos antecipadamente.
+
 A tabela possui Nome, Origem, Em uso, Atualização e Ações. O radio não é a primeira
 coluna, possui um único `name`, fica desabilitado no item ativo e nunca desmarca ao
 ser clicado. Pode não haver nenhum ativo. A seleção aplica imediatamente um realce

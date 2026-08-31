@@ -18,7 +18,7 @@ async function fetchIssues(project) {
   url.searchParams.set('ps', '100');
 
   const response = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${TOKEN}` },
+    headers: { Authorization: `Bearer ${TOKEN}` },
   });
 
   if (!response.ok) {
@@ -42,7 +42,9 @@ async function main() {
 
   for (const project of PROJECTS) {
     console.log(`\n## ${project}`);
-    console.log(`Source: https://sonarcloud.io/project/issues?organization=${ORG}&project=${project}`);
+    console.log(
+      `Source: https://sonarcloud.io/project/issues?organization=${ORG}&project=${project}`,
+    );
 
     try {
       const issues = await fetchIssues(project);
@@ -69,7 +71,9 @@ async function main() {
     }
   }
 
-  console.log(`\nTotal: ${totalIssues} code smells across ${PROJECTS.length} projects.\n`);
+  console.log(
+    `\nTotal: ${totalIssues} code smells across ${PROJECTS.length} projects.\n`,
+  );
 }
 
 main().catch((error) => {

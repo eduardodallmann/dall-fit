@@ -34,6 +34,15 @@ const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_PERSON_MESSAGES = 40;
 const OFF_TOPIC_RESPONSE =
   'Posso ajudar apenas a montar seu plano de treino. Vamos continuar:';
+const ANTICIPATABLE_QUESTION_KEYS = new Set([
+  'experience',
+  'goal',
+  'infrastructure',
+  'interruption',
+  'preferences',
+  'schedule',
+  'tolerance',
+]);
 
 @Injectable()
 export class TrainingPlanAssistantSessionService {
@@ -208,6 +217,8 @@ export class TrainingPlanAssistantSessionService {
     let currentQuestionKey = session.currentQuestionKey;
     let screeningOutcome = session.screeningOutcome;
     let assistantText = '';
+    let anticipatedAcknowledgement = '';
+    let contextualClarification = '';
 
     if (this.isUnsafeOrOffTopic(text)) {
       const question = this.catalog.getQuestion(currentQuestionKey);
@@ -227,6 +238,10 @@ export class TrainingPlanAssistantSessionService {
         (Object.keys(parsed).length === 0 || scheduleNeedsInterpretation)
       ) {
         const interpretation = await this.provider.interpret({
+          candidateQuestions: this.interpretableQuestions(
+            answers,
+            currentQuestion.key,
+          ),
           currentQuestion,
           existingAnswers: answers,
           text,
@@ -234,6 +249,7 @@ export class TrainingPlanAssistantSessionService {
         const suggestedOption = currentQuestion.options.find(
           (option) => option.value === interpretation.suggestedValue,
         );
+        contextualClarification = interpretation.clarification ?? '';
         if (
           interpretation.kind === 'answer' &&
           suggestedOption !== undefined &&
@@ -276,6 +292,22 @@ export class TrainingPlanAssistantSessionService {
           };
           parsed = this.completeSchedule(parsed, answers);
         }
+        if (
+          interpretation.kind !== 'injection' &&
+          interpretation.kind !== 'off_topic'
+        ) {
+          const anticipated = this.validatedAnticipatedAnswers(
+            interpretation.anticipatedAnswers ?? [],
+            answers,
+            currentQuestion.key,
+          );
+          if (Object.keys(anticipated).length > 0) {
+            answers = { ...answers, ...anticipated };
+            generatedDraft = null;
+            anticipatedAcknowledgement =
+              this.anticipatedAcknowledgement(anticipated);
+          }
+        }
       }
       if (Object.keys(parsed).length === 0) {
         if (currentQuestionKey === null || currentQuestion === null)
@@ -284,14 +316,18 @@ export class TrainingPlanAssistantSessionService {
           (invalidAttempts[currentQuestionKey] ?? 0) + 1;
         status = 'clarifying';
         if (assistantText.length === 0) {
-          const reformulation = await this.provider.reformulate({
-            currentQuestion,
-            invalidAttemptCount: invalidAttempts[currentQuestionKey] ?? 0,
-          });
-          assistantText =
-            (invalidAttempts[currentQuestionKey] ?? 0) >= 3
-              ? `Não consegui confirmar a resposta. ${reformulation.text}`
-              : reformulation.text;
+          if (contextualClarification.length > 0) {
+            assistantText = contextualClarification;
+          } else {
+            const reformulation = await this.provider.reformulate({
+              currentQuestion,
+              invalidAttemptCount: invalidAttempts[currentQuestionKey] ?? 0,
+            });
+            assistantText =
+              (invalidAttempts[currentQuestionKey] ?? 0) >= 3
+                ? `Não consegui confirmar a resposta. ${reformulation.text}`
+                : reformulation.text;
+          }
         }
       } else {
         const changedKeys = Object.keys(parsed).filter(
@@ -315,6 +351,10 @@ export class TrainingPlanAssistantSessionService {
           assistantText = transition.message;
         }
       }
+    }
+
+    if (anticipatedAcknowledgement.length > 0) {
+      assistantText = `${anticipatedAcknowledgement} ${assistantText}`.trim();
     }
 
     const draftSession: AssistantSessionEntity = {
@@ -752,6 +792,75 @@ export class TrainingPlanAssistantSessionService {
       return `Entendi que você dispõe de cerca de ${answers.duration ?? ''} minutos por sessão. Em quantos dias da semana você pretende treinar?`;
     }
     return `Entendi que você pretende treinar ${answers.frequency} dias por semana. Quanto tempo aproximadamente você dispõe por sessão?`;
+  }
+
+  private interpretableQuestions(
+    answers: Readonly<Record<string, string>>,
+    currentQuestionKey: string,
+  ) {
+    const result = this.catalog
+      .getKnowledge()
+      .questions.filter(
+        (question) =>
+          question.key !== currentQuestionKey &&
+          ANTICIPATABLE_QUESTION_KEYS.has(question.key) &&
+          question.sensitive !== true &&
+          question.when === undefined &&
+          answers[question.key] === undefined,
+      )
+      .map(({ key, options, prompt }) => ({ key, options, prompt }));
+    return result;
+  }
+
+  private validatedAnticipatedAnswers(
+    candidates: readonly {
+      questionKey: string;
+      suggestedValue: string;
+    }[],
+    existing: Readonly<Record<string, string>>,
+    currentQuestionKey: string,
+  ): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const candidate of candidates) {
+      const question = this.catalog.getQuestion(candidate.questionKey);
+      if (
+        question === null ||
+        question.key === currentQuestionKey ||
+        !ANTICIPATABLE_QUESTION_KEYS.has(question.key) ||
+        question.sensitive === true ||
+        question.when !== undefined ||
+        existing[question.key] !== undefined ||
+        !question.options.some(
+          (option) => option.value === candidate.suggestedValue,
+        )
+      ) {
+        continue;
+      }
+      Object.assign(
+        result,
+        this.parseAnswers(candidate.suggestedValue, question.key, {
+          ...existing,
+          ...result,
+        }),
+      );
+    }
+    return result;
+  }
+
+  private anticipatedAcknowledgement(
+    answers: Readonly<Record<string, string>>,
+  ): string {
+    const labels = Object.entries(answers).flatMap(([key, value]) => {
+      const option = this.catalog
+        .getQuestion(key)
+        ?.options.find((candidate) => candidate.value === value);
+      return option === undefined ? [] : [option.label];
+    });
+    const result =
+      labels.length === 0
+        ? ''
+        : `Também registrei o que você adiantou: ${labels.join(', ')}.`;
+    return result;
   }
 
   private screen(

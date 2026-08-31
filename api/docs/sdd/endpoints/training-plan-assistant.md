@@ -70,6 +70,16 @@ parcial, ambígua ou diferente dos atalhos produz esclarecimento contextual, nun
 `off_topic`; essa classificação fica reservada a conteúdo que não responde à
 pergunta.
 
+Uma mensagem pode responder também perguntas futuras. O provider devolve até
+cinco pares `questionKey/value`, e o service aceita somente keys antecipáveis
+explicitamente enumeradas, perguntas incondicionais não sensíveis, options reais
+do catálogo e campos ainda vazios. Experiência não é deduzida apenas pelo tempo de
+prática: esse histórico contextualiza o esclarecimento, enquanto fatos objetivos
+como a interrupção podem ser preservados e fazem a máquina pular a pergunta já
+respondida. Triagem clínica, maioridade, aceite final e perguntas condicionais
+nunca são preenchidos antecipadamente. A mensagem pública informa os labels que
+foram registrados.
+
 Na pergunta de agenda, a API aceita combinações livres de 2 a 7 dias semanais e
 15 a 120 minutos por sessão. O parser reconhece números antes ou depois de termos
 como dias/semana e expressões como meia hora, uma hora e uma hora e meia; o

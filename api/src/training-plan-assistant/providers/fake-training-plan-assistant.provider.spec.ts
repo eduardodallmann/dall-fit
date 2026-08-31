@@ -16,8 +16,17 @@ describe('FakeTrainingPlanAssistantProvider', () => {
     };
 
     await expect(
-      provider.interpret({ currentQuestion, existingAnswers: {}, text: 'Sim' }),
-    ).resolves.toEqual({ kind: 'answer', suggestedValue: 'yes' });
+      provider.interpret({
+        candidateQuestions: [],
+        currentQuestion,
+        existingAnswers: {},
+        text: 'Sim',
+      }),
+    ).resolves.toEqual({
+      anticipatedAnswers: [],
+      kind: 'answer',
+      suggestedValue: 'yes',
+    });
     const reformulation = await provider.reformulate({
       currentQuestion,
       invalidAttemptCount: 3,
@@ -48,5 +57,42 @@ describe('FakeTrainingPlanAssistantProvider', () => {
         workout.exercises.every((exercise) => allowed.has(exercise.catalogKey)),
       ),
     ).toBe(true);
+  });
+
+  it('preserves an anticipated non-sensitive answer while clarifying the current question', async () => {
+    const provider = new FakeTrainingPlanAssistantProvider();
+
+    await expect(
+      provider.interpret({
+        candidateQuestions: [
+          {
+            key: 'interruption',
+            options: [
+              { label: 'Até 3 meses', value: 'up-to-3-months' },
+              { label: 'Mais de 1 ano', value: 'over-1-year' },
+            ],
+            prompt: 'Há quanto tempo você está sem treinar?',
+          },
+        ],
+        currentQuestion: {
+          key: 'experience',
+          options: [
+            { label: 'Iniciante', value: 'beginner' },
+            { label: 'Intermediário', value: 'intermediate' },
+          ],
+          prompt: 'Como você descreve sua experiência com treino?',
+        },
+        existingAnswers: {},
+        text: 'Já treinei por 1 ano, mas estou parado há 3 meses.',
+      }),
+    ).resolves.toMatchObject({
+      anticipatedAnswers: [
+        {
+          questionKey: 'interruption',
+          suggestedValue: 'up-to-3-months',
+        },
+      ],
+      kind: 'clarification',
+    });
   });
 });
