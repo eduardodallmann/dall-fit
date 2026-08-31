@@ -219,9 +219,16 @@ export class TrainingPlanAssistantSessionService {
     } else {
       let parsed = this.parseAnswers(text, currentQuestionKey, answers);
       const currentQuestion = this.catalog.getQuestion(currentQuestionKey);
-      if (Object.keys(parsed).length === 0 && currentQuestion !== null) {
+      const scheduleNeedsInterpretation =
+        currentQuestionKey === 'schedule' &&
+        !this.hasCompleteSchedule({ ...answers, ...parsed });
+      if (
+        currentQuestion !== null &&
+        (Object.keys(parsed).length === 0 || scheduleNeedsInterpretation)
+      ) {
         const interpretation = await this.provider.interpret({
           currentQuestion,
+          existingAnswers: answers,
           text,
         });
         const suggestedOption = currentQuestion.options.find(
@@ -232,12 +239,42 @@ export class TrainingPlanAssistantSessionService {
           suggestedOption !== undefined &&
           currentQuestionKey !== null
         ) {
-          parsed = { [currentQuestionKey]: suggestedOption.value };
+          parsed = {
+            ...parsed,
+            ...this.parseAnswers(
+              suggestedOption.value,
+              currentQuestionKey,
+              answers,
+            ),
+          };
         } else if (
           interpretation.kind === 'injection' ||
           interpretation.kind === 'off_topic'
         ) {
           assistantText = `${OFF_TOPIC_RESPONSE} ${currentQuestion.prompt}`;
+          parsed = {};
+        }
+        if (
+          currentQuestionKey === 'schedule' &&
+          interpretation.kind !== 'injection' &&
+          interpretation.kind !== 'off_topic'
+        ) {
+          parsed = {
+            ...parsed,
+            ...(interpretation.extractedSchedule?.durationMinutes === undefined
+              ? {}
+              : {
+                  duration: String(
+                    interpretation.extractedSchedule.durationMinutes,
+                  ),
+                }),
+            ...(interpretation.extractedSchedule?.frequency === undefined
+              ? {}
+              : {
+                  frequency: String(interpretation.extractedSchedule.frequency),
+                }),
+          };
+          parsed = this.completeSchedule(parsed, answers);
         }
       }
       if (Object.keys(parsed).length === 0) {
@@ -264,11 +301,19 @@ export class TrainingPlanAssistantSessionService {
         if (changedKeys.length > 0 || session.generatedDraft !== null) {
           generatedDraft = null;
         }
-        screeningOutcome = this.screen(answers);
-        const transition = this.resolveTransition(answers, screeningOutcome);
-        status = transition.status;
-        currentQuestionKey = transition.questionKey;
-        assistantText = transition.message;
+        if (
+          currentQuestionKey === 'schedule' &&
+          !this.hasCompleteSchedule(answers)
+        ) {
+          status = 'clarifying';
+          assistantText = this.scheduleClarification(answers);
+        } else {
+          screeningOutcome = this.screen(answers);
+          const transition = this.resolveTransition(answers, screeningOutcome);
+          status = transition.status;
+          currentQuestionKey = transition.questionKey;
+          assistantText = transition.message;
+        }
       }
     }
 
@@ -619,12 +664,18 @@ export class TrainingPlanAssistantSessionService {
           direct.value === 'avoid-impact' ? 'avoid' : direct.value;
       }
     }
-    const frequency = normalized.match(
-      /(?:frequ[eê]ncia|treinar|semana)\D{0,12}([2-6])/,
-    );
+    const frequency =
+      normalized.match(/\b([2-7])\s*(?:dias?|vezes?)(?:\s+por)?\s+semana\b/) ??
+      normalized.match(/(?:frequ[eê]ncia|treinar|semana)\D{0,12}([2-7])/);
     if (frequency?.[1] !== undefined) result.frequency = frequency[1];
-    const duration = normalized.match(/(20|30|40|45|50|60|75|90|120)\s*min/);
+    const duration = normalized.match(
+      /\b(15|20|30|40|45|50|60|75|90|120)\s*min/,
+    );
     if (duration?.[1] !== undefined) result.duration = duration[1];
+    else if (/\b(?:uma\s+)?hora\s+e\s+meia\b/.test(normalized))
+      result.duration = '90';
+    else if (/\bmeia\s+hora\b/.test(normalized)) result.duration = '30';
+    else if (/\b(?:uma|1)\s+hora\b/.test(normalized)) result.duration = '60';
     const goals: readonly [string, string][] = [
       ['hipertrof', 'hypertrophy'],
       ['emagrec', 'weight-loss'],
@@ -638,7 +689,7 @@ export class TrainingPlanAssistantSessionService {
     }
     if (normalized.includes('corrig')) {
       const correctedFrequency = normalized.match(
-        /(?:frequ[eê]ncia|dias?)\D{0,8}([2-6])/,
+        /(?:frequ[eê]ncia|dias?)\D{0,8}([2-7])/,
       );
       if (correctedFrequency?.[1] !== undefined)
         result.frequency = correctedFrequency[1];
@@ -666,7 +717,41 @@ export class TrainingPlanAssistantSessionService {
     ) {
       delete result[currentQuestionKey];
     }
+    return currentQuestionKey === 'schedule'
+      ? this.completeSchedule(result, existing)
+      : result;
+  }
+
+  private completeSchedule(
+    parsed: Readonly<Record<string, string>>,
+    existing: Readonly<Record<string, string>>,
+  ): Record<string, string> {
+    const result = { ...parsed };
+    const frequency = result.frequency ?? existing.frequency;
+    const duration = result.duration ?? existing.duration;
+    if (frequency !== undefined && duration !== undefined) {
+      result.schedule = `${frequency}-${duration}`;
+    }
     return result;
+  }
+
+  private hasCompleteSchedule(
+    answers: Readonly<Record<string, string>>,
+  ): boolean {
+    return (
+      answers.schedule !== undefined &&
+      answers.frequency !== undefined &&
+      answers.duration !== undefined
+    );
+  }
+
+  private scheduleClarification(
+    answers: Readonly<Record<string, string>>,
+  ): string {
+    if (answers.frequency === undefined) {
+      return `Entendi que você dispõe de cerca de ${answers.duration ?? ''} minutos por sessão. Em quantos dias da semana você pretende treinar?`;
+    }
+    return `Entendi que você pretende treinar ${answers.frequency} dias por semana. Quanto tempo aproximadamente você dispõe por sessão?`;
   }
 
   private screen(

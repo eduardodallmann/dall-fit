@@ -22,8 +22,13 @@ restaura histórico, pergunta, respostas rápidas, estado e preview. Escape,
 backdrop, fechar ou reload não apagam; “Desistir” usa AlertDialog e exclusão
 confirmada. Nenhuma resposta vai para storage, cache PWA ou Analytics.
 
-A conversa mostra uma pergunta por vez, opções e campo livre irmãos. Somente o
-novo turno é anunciado em live region separada; histórico, pergunta, envio,
+A conversa mostra uma pergunta por vez, opções e campo livre irmãos. As opções são
+atalhos e o texto livre pode usar paráfrases ou, na agenda, combinações próprias de
+2 a 7 dias e 15 a 120 minutos. Frequência ou duração informada isoladamente é
+preservada e a conversa pergunta somente o dado ausente; expressões como meia
+hora, uma hora e uma hora e meia são aceitas. Resposta relacionada mas diferente
+dos atalhos não recebe mensagem de assunto fora do escopo. Somente o novo turno é
+anunciado em live region separada; histórico, pergunta, envio,
 loading, erro e preview têm nomes/estados acessíveis. O histórico apresenta o label
 humano de uma resposta rápida, nunca seu valor interno. Pending bloqueia novos
 envios e navegação/reload, exceto a navegação canônica iniciada pela própria

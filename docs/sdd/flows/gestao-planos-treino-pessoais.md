@@ -46,7 +46,10 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 9. Excluir global remove vínculos/seleções, mas jobs continuam pelo snapshot.
 10. Pedir ajuda abre uma sessão separada e retomável. A API coleta uma pergunta
     por vez, calcula triagem local e só chama o provider para operações restritas.
-    Bloqueio encerra a geração; pessoa apta revisa uma prévia antes de confirmar.
+    Respostas rápidas são atalhos; paráfrases são interpretadas, campos parciais
+    são preservados e frequência/duração aceitam combinações livres validadas de
+    2 a 7 dias e 15 a 120 minutos. Bloqueio encerra a geração; pessoa apta revisa
+    uma prévia antes de confirmar.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.

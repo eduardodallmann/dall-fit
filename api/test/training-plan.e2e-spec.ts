@@ -298,6 +298,12 @@ describe('Global training plans (e2e)', () => {
     while (session.status === 'collecting') {
       const answer = session.availableAnswers[0];
       expect(answer).toBeDefined();
+      const isSchedule = session.currentPrompt?.includes(
+        'frequência e duração',
+      );
+      const text = isSchedule
+        ? 'consigo treinar 5 dias por semana, uns 45 minutos por dia'
+        : answer?.value;
       messageNumber += 1;
       const response = await authenticatedMutation(
         agent,
@@ -306,13 +312,13 @@ describe('Global training plans (e2e)', () => {
         .set('X-Resource-Version', String(session.version))
         .send({
           clientMessageId: `123e4567-e89b-42d3-a456-${String(messageNumber).padStart(12, '0')}`,
-          text: answer?.value,
+          text,
         })
         .expect(200);
       session = (response.body as TrainingPlanAssistantSessionResponse).data;
       expect(
         session.messages.findLast((message) => message.role === 'person')?.text,
-      ).toBe(answer?.label);
+      ).toBe(text === answer?.value ? answer?.label : text);
     }
     expect(messageNumber).toBeLessThanOrEqual(20);
     expect(session.status).toBe('ready');
@@ -342,7 +348,7 @@ describe('Global training plans (e2e)', () => {
       .expect(200);
     session = (draftResponse.body as TrainingPlanAssistantSessionResponse).data;
     expect(session.status).toBe('preview');
-    expect(session.draft?.workouts).toHaveLength(2);
+    expect(session.draft?.workouts).toHaveLength(5);
 
     const previewBeforeInvalidDraft = session.draft;
     const invalidDraftResponse = await authenticatedMutation(

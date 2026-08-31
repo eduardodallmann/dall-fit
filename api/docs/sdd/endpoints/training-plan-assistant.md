@@ -63,9 +63,21 @@ pessoa pelo repository; leitura vencida apaga o documento antes de retornar 410.
 Na criação, o service verifica flag/configuração, notice e catálogo. Retoma a
 sessão não vencida ou persiste `collecting` com a primeira pergunta. Em mensagem,
 confere replay antes do CAS, normaliza e tenta parser determinístico; conteúdo
-fora do domínio/injection mantém a pergunta. Uma interpretação do provider é só
-sugestão e precisa coincidir com opção local. O motor recalcula completude e um
-dos resultados de triagem; `blocked` nunca volta a `ready` na mesma sessão.
+fora do domínio/injection mantém a pergunta. Respostas rápidas são atalhos, não o
+único vocabulário aceito: o provider interpreta paráfrases da pergunta atual e sua
+saída estruturada só é aplicada depois da validação local. Resposta relacionada,
+parcial, ambígua ou diferente dos atalhos produz esclarecimento contextual, nunca
+`off_topic`; essa classificação fica reservada a conteúdo que não responde à
+pergunta.
+
+Na pergunta de agenda, a API aceita combinações livres de 2 a 7 dias semanais e
+15 a 120 minutos por sessão. O parser reconhece números antes ou depois de termos
+como dias/semana e expressões como meia hora, uma hora e uma hora e meia; o
+provider pode completar a estrutura quando a formulação não for determinística.
+Frequência ou duração isolada é preservada e a próxima mensagem solicita somente
+o campo ausente. Quando ambos existem, `schedule` é montado mesmo sem opção rápida
+equivalente. O motor então recalcula completude e triagem; `blocked` nunca volta a
+`ready` na mesma sessão.
 
 Em draft, o service exige `ready|preview` e triagem apta, reserva `generating` por
 CAS, filtra catálogo e chama o provider por `AssistantProviderService`. O adapter

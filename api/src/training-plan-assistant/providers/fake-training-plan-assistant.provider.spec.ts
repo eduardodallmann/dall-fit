@@ -16,7 +16,7 @@ describe('FakeTrainingPlanAssistantProvider', () => {
     };
 
     await expect(
-      provider.interpret({ currentQuestion, text: 'Sim' }),
+      provider.interpret({ currentQuestion, existingAnswers: {}, text: 'Sim' }),
     ).resolves.toEqual({ kind: 'answer', suggestedValue: 'yes' });
     const reformulation = await provider.reformulate({
       currentQuestion,

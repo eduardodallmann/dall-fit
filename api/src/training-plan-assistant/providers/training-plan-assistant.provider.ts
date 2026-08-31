@@ -9,10 +9,15 @@ export type AssistantInterpretationKind =
 
 export interface InterpretAssistantAnswerInput {
   currentQuestion: AssistantQuestion;
+  existingAnswers: Readonly<Record<string, string>>;
   text: string;
 }
 
 export interface AssistantAnswerInterpretation {
+  extractedSchedule?: {
+    durationMinutes?: number;
+    frequency?: number;
+  };
   kind: AssistantInterpretationKind;
   suggestedValue?: string;
 }

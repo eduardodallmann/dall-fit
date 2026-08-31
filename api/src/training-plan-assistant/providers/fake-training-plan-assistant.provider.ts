@@ -29,7 +29,10 @@ export class FakeTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
     const result: AssistantAnswerInterpretation =
       option === undefined
         ? { kind: 'clarification' }
-        : { kind: 'answer', suggestedValue: option.value };
+        : {
+            kind: 'answer',
+            suggestedValue: option.value,
+          };
     return Promise.resolve(result);
   }
 

@@ -45,16 +45,19 @@ describe('GroqTrainingPlanAssistantProvider', () => {
   });
 
   it('uses strict JSON Schema for a compatible model and still validates locally', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        successfulResponse({ kind: 'answer', suggestedValue: null }),
-      );
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      successfulResponse({
+        extractedSchedule: { durationMinutes: null, frequency: null },
+        kind: 'answer',
+        suggestedValue: null,
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
       createProvider('openai/gpt-oss-20b').interpret({
         currentQuestion,
+        existingAnswers: {},
         text: 'sim',
       }),
     ).resolves.toEqual({ kind: 'answer' });
@@ -66,7 +69,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
         name: 'training_plan_assistant_interpret',
         schema: {
           additionalProperties: false,
-          required: ['kind', 'suggestedValue'],
+          required: ['kind', 'extractedSchedule', 'suggestedValue'],
           type: 'object',
         },
         strict: true,
@@ -88,6 +91,36 @@ describe('GroqTrainingPlanAssistantProvider', () => {
 
     const request = requestBody(fetchMock);
     expect(request.response_format).toEqual({ type: 'json_object' });
+  });
+
+  it('extracts a free schedule without forcing it into a quick answer', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      successfulResponse({
+        extractedSchedule: { durationMinutes: 30, frequency: 7 },
+        kind: 'clarification',
+        suggestedValue: null,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      createProvider('openai/gpt-oss-120b').interpret({
+        currentQuestion: {
+          key: 'schedule',
+          options: [{ label: '3 dias, 45 minutos', value: '3-45' }],
+          prompt: 'Qual combinação funciona para você?',
+        },
+        existingAnswers: {},
+        text: 'sete dias por semana, meia hora por dia',
+      }),
+    ).resolves.toEqual({
+      extractedSchedule: { durationMinutes: 30, frequency: 7 },
+      kind: 'clarification',
+    });
+
+    const request = requestBody(fetchMock);
+    const messages = request.messages as { content: string }[];
+    expect(messages[0]?.content).toContain('nunca trate isso como off_topic');
   });
 
   it.each([
