@@ -313,7 +313,7 @@ describe('Global training plans (e2e)', () => {
           .set('X-Resource-Version', String(session.version))
           .send({
             clientMessageId: `123e4567-e89b-42d3-a456-${String(messageNumber).padStart(12, '0')}`,
-            text: 'já treinei por 1 ano, mas estou parado há 3 meses',
+            text: 'já treinei por um ano inteiro, mas estou parado a 3 meses',
           })
           .expect(200);
         session = (
@@ -321,6 +321,10 @@ describe('Global training plans (e2e)', () => {
         ).data;
         expect(session.status).toBe('clarifying');
         expect(session.messages.at(-1)?.text).toContain('Até 3 meses');
+        expect(session.messages.at(-1)?.text).toContain(
+          'familiaridade com os exercícios',
+        );
+        expect(session.currentPrompt).toContain('experiência com treino');
       }
       let text = answer?.value;
       if (isSchedule)

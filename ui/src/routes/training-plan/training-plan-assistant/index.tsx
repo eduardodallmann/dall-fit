@@ -254,9 +254,21 @@ export function TrainingPlanAssistantModal({
     trackTrainingPlanAssistantAction('assistant_retry');
   };
 
+  const handleModalOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      onOpenChange(true);
+      return;
+    }
+    if (session?.status === 'blocked') {
+      if (!abandonMutation.isPending) abandonMutation.mutate();
+      return;
+    }
+    onOpenChange(false);
+  };
+
   return (
     <>
-      <Modal isOpen={open} onOpenChange={onOpenChange}>
+      <Modal isOpen={open} onOpenChange={handleModalOpenChange}>
         <Modal.Backdrop>
           <Modal.Container scroll="inside" size="cover">
             <Modal.Dialog>
@@ -480,7 +492,7 @@ export function TrainingPlanAssistantModal({
                 ) : null}
                 <Button
                   isDisabled={pending}
-                  onPress={() => onOpenChange(false)}
+                  onPress={() => handleModalOpenChange(false)}
                   variant="secondary"
                 >
                   Fechar

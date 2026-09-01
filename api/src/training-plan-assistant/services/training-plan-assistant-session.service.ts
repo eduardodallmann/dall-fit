@@ -237,6 +237,11 @@ export class TrainingPlanAssistantSessionService {
         currentQuestion !== null &&
         (Object.keys(parsed).length === 0 || scheduleNeedsInterpretation)
       ) {
+        const deterministicAnticipated =
+          this.deterministicAnticipatedAnswers(text);
+        const describesTrainingHistory =
+          currentQuestion.key === 'experience' &&
+          this.describesTrainingHistory(text);
         const interpretation = await this.provider.interpret({
           candidateQuestions: this.interpretableQuestions(
             answers,
@@ -253,7 +258,8 @@ export class TrainingPlanAssistantSessionService {
         if (
           interpretation.kind === 'answer' &&
           suggestedOption !== undefined &&
-          currentQuestionKey !== null
+          currentQuestionKey !== null &&
+          this.canAcceptSuggestedOption(currentQuestion.key, text)
         ) {
           parsed = {
             ...parsed,
@@ -263,12 +269,19 @@ export class TrainingPlanAssistantSessionService {
               answers,
             ),
           };
+        } else if (interpretation.kind === 'injection') {
+          assistantText = `${OFF_TOPIC_RESPONSE} ${currentQuestion.prompt}`;
+          parsed = {};
         } else if (
-          interpretation.kind === 'injection' ||
-          interpretation.kind === 'off_topic'
+          interpretation.kind === 'off_topic' &&
+          deterministicAnticipated.length === 0 &&
+          !describesTrainingHistory
         ) {
           assistantText = `${OFF_TOPIC_RESPONSE} ${currentQuestion.prompt}`;
           parsed = {};
+        }
+        if (describesTrainingHistory && parsed.experience === undefined) {
+          contextualClarification = this.experienceClarification(text);
         }
         if (
           currentQuestionKey === 'schedule' &&
@@ -294,10 +307,15 @@ export class TrainingPlanAssistantSessionService {
         }
         if (
           interpretation.kind !== 'injection' &&
-          interpretation.kind !== 'off_topic'
+          (interpretation.kind !== 'off_topic' ||
+            deterministicAnticipated.length > 0 ||
+            describesTrainingHistory)
         ) {
           const anticipated = this.validatedAnticipatedAnswers(
-            interpretation.anticipatedAnswers ?? [],
+            [
+              ...(interpretation.anticipatedAnswers ?? []),
+              ...deterministicAnticipated,
+            ],
             answers,
             currentQuestion.key,
           );
@@ -354,7 +372,11 @@ export class TrainingPlanAssistantSessionService {
     }
 
     if (anticipatedAcknowledgement.length > 0) {
-      assistantText = `${anticipatedAcknowledgement} ${assistantText}`.trim();
+      assistantText =
+        contextualClarification.length > 0 &&
+        assistantText === contextualClarification
+          ? `${assistantText} ${anticipatedAcknowledgement}`.trim()
+          : `${anticipatedAcknowledgement} ${assistantText}`.trim();
     }
 
     const draftSession: AssistantSessionEntity = {
@@ -809,6 +831,71 @@ export class TrainingPlanAssistantSessionService {
           answers[question.key] === undefined,
       )
       .map(({ key, options, prompt }) => ({ key, options, prompt }));
+    return result;
+  }
+
+  private canAcceptSuggestedOption(questionKey: string, text: string): boolean {
+    if (questionKey !== 'experience') return true;
+    const normalized = this.normalizedText(text);
+    const result =
+      /\b(?:iniciante|intermedi[aá]ri[oa]|avan[cç]ad[oa])\b/.test(normalized) ||
+      /\b(?:nunca|jamais)\s+(?:treinei|treinou|fiz\s+treino)\b/.test(
+        normalized,
+      );
+    return result;
+  }
+
+  private describesTrainingHistory(text: string): boolean {
+    const normalized = this.normalizedText(text);
+    const result =
+      /\b(?:j[aá]\s+)?treinei\b/.test(normalized) ||
+      /\b(?:treino|treinamento|academia)\b[^.!?]{0,30}\b(?:mes(?:es)?|ano(?:s)?)\b/.test(
+        normalized,
+      );
+    return result;
+  }
+
+  private experienceClarification(text: string): string {
+    const normalized = this.normalizedText(text);
+    const duration = normalized.match(
+      /\b(?:treinei|treinava|treino)\b[^.!?]{0,24}\b(?:por\s+)?(\d+|um|uma)\s+(m[eê]s(?:es)?|ano(?:s)?)\b/,
+    );
+    const amount = duration?.[1];
+    const unit = duration?.[2];
+    const history =
+      amount === undefined || unit === undefined
+        ? 'Entendi seu histórico de treino.'
+        : `Entendi que você treinou por cerca de ${amount === '1' ? 'um' : amount} ${unit}.`;
+    const result = `${history} Pensando na sua familiaridade com os exercícios e no uso dos equipamentos, você se considera iniciante, intermediário ou avançado?`;
+    return result;
+  }
+
+  private deterministicAnticipatedAnswers(text: string): {
+    questionKey: string;
+    suggestedValue: string;
+  }[] {
+    const normalized = this.normalizedText(text);
+    const stoppedThenDuration = normalized.match(
+      /\b(?:parad[oa]|sem\s+treinar|parei|interrompi)\b[^.!?]{0,32}?\b(?:h[aá]|a|faz)?\s*(\d+|um|uma)\s*(m[eê]s(?:es)?|ano(?:s)?)\b/,
+    );
+    const durationThenStopped = normalized.match(
+      /\b(?:h[aá]|faz)\s*(\d+|um|uma)\s*(m[eê]s(?:es)?|ano(?:s)?)\b[^.!?]{0,32}?\b(?:parad[oa]|sem\s+treinar|parei|interrompi)\b/,
+    );
+    const duration = stoppedThenDuration ?? durationThenStopped;
+    if (duration?.[1] === undefined || duration[2] === undefined) return [];
+    const numericAmount =
+      duration[1] === 'um' || duration[1] === 'uma' ? 1 : Number(duration[1]);
+    const months = duration[2].startsWith('ano')
+      ? numericAmount * 12
+      : numericAmount;
+    let suggestedValue = 'over-1-year';
+    if (months <= 3) suggestedValue = 'up-to-3-months';
+    else if (months <= 12) suggestedValue = '3-to-12-months';
+    return [{ questionKey: 'interruption', suggestedValue }];
+  }
+
+  private normalizedText(text: string): string {
+    const result = text.normalize('NFKC').toLocaleLowerCase('pt-BR');
     return result;
   }
 

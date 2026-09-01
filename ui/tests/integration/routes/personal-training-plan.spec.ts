@@ -61,6 +61,18 @@ test.describe('Rotas pessoais de planos de treino', () => {
         dialog.getByRole('button', { name: 'Gerar prévia' }),
       ).toHaveCount(0);
       await dialog.getByRole('button', { name: 'Fechar' }).click();
+      await expect(dialog).toHaveCount(0);
+      await page.getByRole('button', { name: 'Novo plano' }).click();
+      await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+      const restartedDialog = page.getByRole('dialog', {
+        name: 'Me ajude a criar um plano',
+      });
+      await expect(
+        restartedDialog.getByText(
+          /Suas respostas podem incluir dados de saúde/,
+        ),
+      ).toBeVisible();
+      await restartedDialog.getByRole('button', { name: 'Agora não' }).click();
     }
   });
 

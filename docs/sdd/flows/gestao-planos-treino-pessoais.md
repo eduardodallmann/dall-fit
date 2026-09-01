@@ -51,7 +51,13 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     2 a 7 dias e 15 a 120 minutos. A mesma mensagem pode adiantar respostas
     objetivas futuras não sensíveis, que são validadas pelo catálogo e evitam
     perguntas repetidas; triagem, maioridade e aceite nunca são antecipados.
-    Bloqueio encerra a geração; pessoa apta revisa uma prévia antes de confirmar.
+    Histórico de prática não vira nível de experiência por inferência: a API
+    mantém a pergunta subjetiva, contextualiza a confirmação e extrai localmente
+    uma interrupção objetiva informada na mesma frase, mesmo se o provider omitir
+    esse dado.
+    Bloqueio encerra a geração e mantém a orientação visível até o fechamento do
+    modal; ao fechar, a UI exclui a sessão terminal para que a próxima abertura
+    comece uma conversa nova. Pessoa apta revisa uma prévia antes de confirmar.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.

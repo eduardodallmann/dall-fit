@@ -47,6 +47,19 @@ o esclarecimento reconhece o contexto antes de pedir somente a confirmação que
 falta. Perguntas clínicas, maioridade e aceite final sempre aparecem na sua etapa
 e não são preenchidos antecipadamente.
 
+Na experiência, relatos como “treinei por um ano, mas estou parado há três meses”
+mantêm a pergunta atual e recebem um esclarecimento sobre familiaridade com
+exercícios e equipamentos; a interrupção objetiva é registrada e sua pergunta não
+é repetida depois. O comportamento também vale quando o provider tenta inferir um
+nível ou deixa de devolver a resposta antecipada.
+
+Uma sessão bloqueada continua visível enquanto o modal permanece aberto para que
+a pessoa leia a orientação terminal. Fechar o modal por qualquer mecanismo nesse
+estado abandona e exclui a sessão; a próxima abertura retorna ao aceite inicial e
+inicia uma conversa nova. Sessões ainda continuáveis permanecem retomáveis ao
+fechar normalmente, e “Desistir” continua sendo a exclusão explícita em qualquer
+estado.
+
 A tabela possui Nome, Origem, Em uso, Atualização e Ações. O radio não é a primeira
 coluna, possui um único `name`, fica desabilitado no item ativo e nunca desmarca ao
 ser clicado. Pode não haver nenhum ativo. A seleção aplica imediatamente um realce

@@ -80,6 +80,15 @@ respondida. Triagem clínica, maioridade, aceite final e perguntas condicionais
 nunca são preenchidos antecipadamente. A mensagem pública informa os labels que
 foram registrados.
 
+Essa separação não depende apenas da saída do provider. Na pergunta de experiência,
+o service só aceita a categoria sugerida quando o texto se autodeclara iniciante,
+intermediário ou avançado, ou informa que nunca treinou; duração histórica isolada
+não autoriza inferência de nível. Expressões objetivas de interrupção como “parado
+há 3 meses”, inclusive a variante coloquial “parado a 3 meses”, são extraídas
+localmente e prevalecem caso o provider as omita. Nesse caso, a resposta reconhece
+o histórico e pergunta pela familiaridade com exercícios e equipamentos antes de
+avançar.
+
 Na pergunta de agenda, a API aceita combinações livres de 2 a 7 dias semanais e
 15 a 120 minutos por sessão. O parser reconhece números antes ou depois de termos
 como dias/semana e expressões como meia hora, uma hora e uma hora e meia; o

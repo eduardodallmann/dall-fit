@@ -47,6 +47,17 @@ export class FakeTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
               },
             ];
       });
+    if (
+      input.currentQuestion.key === 'experience' &&
+      /\btreinei\b[^.!?]{0,30}\b(?:1|um)\s+ano\s+inteiro\b/.test(normalized)
+    ) {
+      const result: AssistantAnswerInterpretation = {
+        anticipatedAnswers: [],
+        kind: 'answer',
+        suggestedValue: 'intermediate',
+      };
+      return Promise.resolve(result);
+    }
     const result: AssistantAnswerInterpretation =
       option === undefined
         ? {
