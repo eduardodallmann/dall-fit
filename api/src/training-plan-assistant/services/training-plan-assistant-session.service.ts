@@ -488,6 +488,9 @@ export class TrainingPlanAssistantSessionService {
         answers: session.answers,
         candidates,
         catalogVersion: session.catalogVersion,
+        ...(session.generatedDraft === null
+          ? {}
+          : { currentDraft: session.generatedDraft }),
         knowledgeVersion: session.knowledgeVersion,
         promptVersion: session.promptVersion,
       });

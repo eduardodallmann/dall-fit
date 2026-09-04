@@ -88,6 +88,9 @@ test.describe('Rotas pessoais de planos de treino', () => {
       name: 'Me ajude a criar um plano',
     });
     await expect(
+      dialog.getByRole('region', { name: 'Histórico da conversa' }),
+    ).toHaveCount(0);
+    await expect(
       dialog.getByRole('region', { name: 'Prévia do plano' }),
     ).toContainText('Leg press sentado');
     await dialog.getByRole('button', { name: 'Criar plano' }).click();
@@ -105,6 +108,14 @@ test.describe('Rotas pessoais de planos de treino', () => {
     const dialog = page.getByRole('dialog', {
       name: 'Me ajude a criar um plano',
     });
+    await expect(
+      dialog.getByRole('textbox', {
+        name: 'Sua resposta à pergunta atual',
+      }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole('button', { name: 'Enviar resposta' }),
+    ).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Gerar prévia' }).click();
     await expect(
       dialog.getByText(/Seu texto e sua sessão foram preservados/),

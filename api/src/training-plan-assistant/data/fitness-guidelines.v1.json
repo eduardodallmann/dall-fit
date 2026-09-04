@@ -169,12 +169,12 @@
     },
     {
       "key": "breathing",
-      "prompt": "Você tem falta de ar desproporcional?",
+      "prompt": "Você está com falta de ar fora do normal?",
       "sensitive": true,
       "options": [
         { "label": "Não", "value": "no" },
-        { "label": "Importante agora", "value": "current" },
-        { "label": "Ao esforço", "value": "exertion" }
+        { "label": "Sim, mesmo em repouso", "value": "current" },
+        { "label": "Sim, com esforço leve", "value": "exertion" }
       ]
     },
     {

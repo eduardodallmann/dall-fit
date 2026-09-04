@@ -25,6 +25,7 @@ import {
   generateTrainingPlanAssistantDraft,
   sendTrainingPlanAssistantMessage,
 } from '~/routes/training-plan/training-plan-assistant-service';
+import { commitAssistantSession } from '~/routes/training-plan/training-plan-assistant/session-cache';
 import { assistantStyles } from '~/routes/training-plan/training-plan-assistant/styles';
 import {
   trainingPlanAssistantQueryOptions,
@@ -81,12 +82,17 @@ export function TrainingPlanAssistantModal({
     if (open) allowInternalNavigation.current = false;
   }, [open]);
 
+  const cancelSessionRead = async () => {
+    await queryClient.cancelQueries({ queryKey: queryOptions.queryKey });
+  };
+
   const setSession = (session: TrainingPlanAssistantSession | null) => {
-    queryClient.setQueryData(queryOptions.queryKey, session);
+    commitAssistantSession(queryClient, queryOptions.queryKey, session);
   };
 
   const startMutation = useMutation({
     mutationFn: () => createTrainingPlanAssistantSession(mockTrainingPlans),
+    onMutate: cancelSessionRead,
     onSuccess: (session) => {
       setSession(session);
       setPersistentError(undefined);
@@ -100,6 +106,7 @@ export function TrainingPlanAssistantModal({
         clientMessageId: variables.id,
         text: variables.text,
       }),
+    onMutate: cancelSessionRead,
     onSuccess: (session) => {
       setSession(session);
       form.reset();
@@ -125,6 +132,7 @@ export function TrainingPlanAssistantModal({
           ? {}
           : { adjustment: variables.adjustment },
       ),
+    onMutate: cancelSessionRead,
     onSuccess: (session) => {
       setSession(session);
       form.reset();
@@ -147,6 +155,7 @@ export function TrainingPlanAssistantModal({
         variables.version,
         variables.key,
       ),
+    onMutate: cancelSessionRead,
     onSuccess: async (confirmation) => {
       setSession(null);
       setPersistentError(undefined);
@@ -170,6 +179,7 @@ export function TrainingPlanAssistantModal({
   });
   const abandonMutation = useMutation({
     mutationFn: () => abandonTrainingPlanAssistantSession(mockTrainingPlans),
+    onMutate: cancelSessionRead,
     onSuccess: () => {
       setSession(null);
       setAbandonOpen(false);
@@ -192,6 +202,9 @@ export function TrainingPlanAssistantModal({
     withResolver: true,
   });
   const session = query.data;
+  const canAnswer =
+    session?.status === 'collecting' || session?.status === 'clarifying';
+  const previewVisible = session?.status === 'preview';
   const form = useForm({
     defaultValues: { text: '' },
     onSubmit: async ({ value }) => {
@@ -280,7 +293,7 @@ export function TrainingPlanAssistantModal({
                   avaliação profissional.
                 </p>
               </Modal.Header>
-              <Modal.Body>
+              <Modal.Body className={styles.body()}>
                 {query.isLoading ? <p>Carregando sua sessão…</p> : null}
                 {query.isError ? (
                   <Alert status="danger">
@@ -337,20 +350,22 @@ export function TrainingPlanAssistantModal({
                 ) : null}
                 {session === undefined || session === null ? null : (
                   <div className={styles.layout()}>
-                    <section
-                      aria-label="Histórico da conversa"
-                      className={styles.conversation()}
-                    >
-                      {session.messages.map((message) => (
-                        <p
-                          className={styles.message()}
-                          data-role={message.role}
-                          key={message.id}
-                        >
-                          {message.text}
-                        </p>
-                      ))}
-                    </section>
+                    {previewVisible ? null : (
+                      <section
+                        aria-label="Histórico da conversa"
+                        className={styles.conversation()}
+                      >
+                        {session.messages.map((message) => (
+                          <p
+                            className={styles.message()}
+                            data-role={message.role}
+                            key={message.id}
+                          >
+                            {message.text}
+                          </p>
+                        ))}
+                      </section>
+                    )}
                     <p
                       aria-atomic="true"
                       aria-live="polite"
@@ -361,7 +376,7 @@ export function TrainingPlanAssistantModal({
                     </p>
                     <section
                       aria-label="Resposta e prévia"
-                      className={styles.form()}
+                      className={styles.response({ preview: previewVisible })}
                     >
                       {session.currentPrompt === null ? null : (
                         <p className={styles.prompt()}>
@@ -406,8 +421,12 @@ export function TrainingPlanAssistantModal({
                       {session.draft === null ? null : (
                         <AssistantDraftPreview session={session} />
                       )}
-                      {session.status === 'blocked' ? null : (
-                        <form className={styles.form()} onSubmit={handleSubmit}>
+                      {canAnswer || session.status === 'preview' ? (
+                        <form
+                          className={styles.form()}
+                          id="training-plan-assistant-response-form"
+                          onSubmit={handleSubmit}
+                        >
                           <form.Field name="text">
                             {(field) => (
                               <TextField isDisabled={pending}>
@@ -432,51 +451,65 @@ export function TrainingPlanAssistantModal({
                               </TextField>
                             )}
                           </form.Field>
-                          <div className={styles.actions()}>
-                            <Button
-                              isDisabled={pending}
-                              isPending={
-                                messageMutation.isPending ||
-                                draftMutation.isPending
-                              }
-                              type="submit"
-                            >
-                              {session.status === 'preview'
-                                ? 'Ajustar prévia'
-                                : 'Enviar resposta'}
-                            </Button>
-                            {session.status === 'ready' ? (
+                          {session.status === 'preview' ? (
+                            <div className={styles.actions()}>
                               <Button
+                                isDisabled={pending}
                                 isPending={draftMutation.isPending}
-                                onPress={() =>
-                                  draftMutation.mutate({
-                                    key: crypto.randomUUID(),
-                                    version: session.version,
-                                  })
-                                }
-                                type="button"
-                                variant="secondary"
+                                type="submit"
                               >
-                                Gerar prévia
+                                Ajustar prévia
                               </Button>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
                         </form>
-                      )}
+                      ) : null}
                     </section>
                   </div>
                 )}
               </Modal.Body>
-              <Modal.Footer>
-                {session === undefined || session === null ? null : (
+              <Modal.Footer className={styles.footer()}>
+                <div className={styles.footerActions()}>
+                  {session === undefined || session === null ? null : (
+                    <Button
+                      isDisabled={pending}
+                      onPress={() => setAbandonOpen(true)}
+                      variant="danger"
+                    >
+                      Desistir
+                    </Button>
+                  )}
                   <Button
                     isDisabled={pending}
-                    onPress={() => setAbandonOpen(true)}
-                    variant="danger"
+                    onPress={() => handleModalOpenChange(false)}
+                    variant="secondary"
                   >
-                    Desistir
+                    Fechar
                   </Button>
-                )}
+                </div>
+                {canAnswer ? (
+                  <Button
+                    form="training-plan-assistant-response-form"
+                    isDisabled={pending}
+                    isPending={messageMutation.isPending}
+                    type="submit"
+                  >
+                    Enviar resposta
+                  </Button>
+                ) : null}
+                {session?.status === 'ready' ? (
+                  <Button
+                    isPending={draftMutation.isPending}
+                    onPress={() =>
+                      draftMutation.mutate({
+                        key: crypto.randomUUID(),
+                        version: session.version,
+                      })
+                    }
+                  >
+                    Gerar prévia
+                  </Button>
+                ) : null}
                 {session?.status === 'preview' ? (
                   <Button
                     isPending={confirmMutation.isPending}
@@ -490,13 +523,6 @@ export function TrainingPlanAssistantModal({
                     Criar plano
                   </Button>
                 ) : null}
-                <Button
-                  isDisabled={pending}
-                  onPress={() => handleModalOpenChange(false)}
-                  variant="secondary"
-                >
-                  Fechar
-                </Button>
               </Modal.Footer>
             </Modal.Dialog>
           </Modal.Container>
@@ -567,7 +593,10 @@ function AssistantDraftPreview({
   const draft = session.draft;
   if (draft === null) return null;
   return (
-    <section aria-label="Prévia do plano" className={styles.draft()}>
+    <section
+      aria-label="Prévia do plano"
+      className={styles.draft({ preview: true })}
+    >
       <div>
         <h3>{draft.planName}</h3>
         <p>{draft.description}</p>

@@ -102,6 +102,122 @@ describe('GroqTrainingPlanAssistantProvider', () => {
     expect(request.response_format).toEqual({ type: 'json_object' });
   });
 
+  it('sends every locally enforced proposal rule to the provider', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      successfulResponse({
+        description: 'Plano geral.',
+        planName: 'Meu plano',
+        workouts: [
+          {
+            exercises: [
+              {
+                catalogKey: 'youtube-short:exercise-1',
+                repetitions: 12,
+                restSeconds: 60,
+                sets: 3,
+              },
+            ],
+            name: 'Treino A',
+          },
+          {
+            exercises: [
+              {
+                catalogKey: 'youtube-short:exercise-1',
+                repetitions: 12,
+                restSeconds: 60,
+                sets: 3,
+              },
+            ],
+            name: 'Treino B',
+          },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createProvider('openai/gpt-oss-120b').propose({
+      answers: { duration: '45', frequency: '2' },
+      candidates: [
+        {
+          active: true,
+          bodyArea: 'back',
+          equipment: ['machine'],
+          goalTags: ['general-health'],
+          impact: 'none',
+          instructions: 'Execute de forma controlada.',
+          key: 'youtube-short:exercise-1',
+          level: 'beginner',
+          movementPattern: 'pull',
+          name: 'Puxada',
+          notes: '',
+          requiresSupport: false,
+          type: 'youtube-short',
+          youtubeId: 'exercise-1',
+        },
+      ],
+      catalogVersion: 'exercise-catalog.v1',
+      currentDraft: {
+        description: 'Prévia original.',
+        planName: 'Plano original',
+        workouts: [
+          {
+            estimatedDurationMinutes: 5,
+            exercises: [
+              {
+                bodyArea: 'back',
+                catalogKey: 'youtube-short:exercise-1',
+                name: 'Puxada',
+                repetitions: 12,
+                restSeconds: 60,
+                sets: 3,
+                type: 'youtube-short',
+                youtubeId: 'exercise-1',
+              },
+            ],
+            name: 'Treino A',
+          },
+        ],
+      },
+      knowledgeVersion: 'fitness-guidelines.v1',
+      promptVersion: 'training-plan-assistant.v1',
+    });
+
+    const request = requestBody(fetchMock);
+    const messages = request.messages as { content: string }[];
+    const payload = JSON.parse(messages[1]?.content ?? '{}') as {
+      untrustedData?: { generationRules?: Record<string, unknown> };
+    };
+    expect(payload.untrustedData?.generationRules).toMatchObject({
+      maxDurationMinutes: 45,
+      maxExercisesPerWorkout: 7,
+      minExercisesPerWorkout: 1,
+      requiredWorkoutCount: 2,
+      uniqueCatalogKeyWithinWorkout: true,
+    });
+    expect(payload.untrustedData).toMatchObject({
+      currentDraft: {
+        description: 'Prévia original.',
+        planName: 'Plano original',
+        workouts: [
+          {
+            exercises: [
+              {
+                catalogKey: 'youtube-short:exercise-1',
+                repetitions: 12,
+                restSeconds: 60,
+                sets: 3,
+              },
+            ],
+            name: 'Treino A',
+          },
+        ],
+      },
+    });
+    expect(messages[0]?.content).toContain(
+      'preserve integralmente tudo que o adjustment não pedir para mudar',
+    );
+  });
+
   it('extracts a free schedule without forcing it into a quick answer', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       successfulResponse({

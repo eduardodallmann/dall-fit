@@ -34,10 +34,23 @@ humano de uma resposta rápida, nunca seu valor interno. Pending bloqueia novos
 envios e navegação/reload, exceto a navegação canônica iniciada pela própria
 confirmação concluída. Falha mantém texto e oferece retry com a mesma intenção;
 conflito 412 refaz GET e não mescla. `blocked` mostra a mensagem canônica e não
-renderiza geração/criação. `ready` oferece gerar preview; `preview` mostra plano,
-workouts, exercícios, séries, repetições, descanso e duração estimada, permite
-ajuste e só então confirmação. Sucesso invalida o catálogo e navega para o novo
-`catalogEntryId`.
+renderiza geração/criação. O histórico é a única região rolável da conversa;
+pergunta, respostas e campo permanecem fixos abaixo dele. No rodapé, “Desistir” e
+“Fechar” ficam agrupados à esquerda, enquanto a ação principal fica à direita.
+`collecting|clarifying` mostram campo e “Enviar resposta”; ao chegar a `ready`,
+ambos desaparecem e a mesma posição passa a oferecer “Gerar prévia”. `preview`
+oculta o histórico, ocupa o corpo disponível com o plano e torna a própria prévia
+rolável, mantendo o rodapé fixo. Ela mostra workouts, exercícios, séries,
+repetições, descanso e duração estimada, permite ajuste e só então confirmação.
+O contêiner reserva espaço para que bordas e indicadores de foco do campo de ajuste
+não sejam recortados. Um ajuste modifica a prévia corrente e preserva toda parte
+que não foi mencionada no pedido, em vez de gerar outro plano do zero.
+Sucesso invalida o catálogo e navega para o novo `catalogEntryId`.
+
+Antes de qualquer mutation, a tela cancela a leitura da sessão que ainda estiver
+em voo. O cache aceita somente a sessão retornada com versão igual ou superior à
+já exibida; assim, uma resposta atrasada não pode fazer pergunta e respostas
+rápidas regredirem enquanto o histórico permanece em um turno mais novo.
 
 Quando uma mensagem adianta respostas objetivas de perguntas futuras não
 sensíveis, o histórico confirma pelos labels quais fatos foram registrados e a
@@ -46,6 +59,10 @@ subjetiva permanece pendente: tempo de prática não define sozinho experiência
 o esclarecimento reconhece o contexto antes de pedir somente a confirmação que
 falta. Perguntas clínicas, maioridade e aceite final sempre aparecem na sua etapa
 e não são preenchidos antecipadamente.
+
+A pergunta respiratória usa “Você está com falta de ar fora do normal?” e oferece
+“Não”, “Sim, mesmo em repouso” e “Sim, com esforço leve”, evitando confundir a
+triagem conservadora com o cansaço esperado de esforço intenso.
 
 Na experiência, relatos como “treinei por um ano, mas estou parado há três meses”
 mantêm a pergunta atual e recebem um esclarecimento sobre familiaridade com

@@ -709,11 +709,14 @@ describe('Authentication (e2e)', () => {
       .set('Access-Control-Request-Method', 'PATCH')
       .set(
         'Access-Control-Request-Headers',
-        'Content-Type, X-Resource-Version, X-CSRF-Token, X-Request-Id',
+        'Content-Type, Idempotency-Key, X-Resource-Version, X-CSRF-Token, X-Request-Id',
       );
     expect(mutationPreflight.status).toBe(204);
     expect(mutationPreflight.headers['access-control-allow-headers']).toContain(
       'X-Resource-Version',
+    );
+    expect(mutationPreflight.headers['access-control-allow-headers']).toContain(
+      'Idempotency-Key',
     );
     expect(
       mutationPreflight.headers['access-control-allow-headers'],

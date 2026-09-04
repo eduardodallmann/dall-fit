@@ -165,7 +165,7 @@ export class GroqTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
   async propose(input: ProposeTrainingPlanInput): Promise<AssistantProposal> {
     const result = await this.request(
       'propose',
-      'Monte apenas uma estrutura de treino geral. Use exclusivamente catalogKey fornecida, não dê orientação clínica e retorne JSON.',
+      'Monte apenas uma estrutura de treino geral. Quando currentDraft existir, edite essa prévia e preserve integralmente tudo que o adjustment não pedir para mudar. Obedeça integralmente a generationRules, use exclusivamente catalogKey fornecida, não repita catalogKey no mesmo treino, não dê orientação clínica e retorne JSON.',
       {
         adjustment: input.adjustment,
         answers: input.answers,
@@ -174,7 +174,31 @@ export class GroqTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
           key: candidate.key,
           name: candidate.name,
         })),
-        requiredWorkoutCount: Number(input.answers.frequency),
+        currentDraft:
+          input.currentDraft === undefined
+            ? null
+            : {
+                description: input.currentDraft.description,
+                planName: input.currentDraft.planName,
+                workouts: input.currentDraft.workouts.map((workout) => ({
+                  exercises: workout.exercises.map((exercise) => ({
+                    catalogKey: exercise.catalogKey,
+                    repetitions: exercise.repetitions,
+                    restSeconds: exercise.restSeconds,
+                    sets: exercise.sets,
+                  })),
+                  name: workout.name,
+                })),
+              },
+        generationRules: {
+          durationEstimate:
+            'Para cada exercício, ceil(sets * (repetitions * 4 + restSeconds) / 60); a soma do treino não pode superar maxDurationMinutes.',
+          maxDurationMinutes: Number(input.answers.duration),
+          maxExercisesPerWorkout: 7,
+          minExercisesPerWorkout: 1,
+          requiredWorkoutCount: Number(input.answers.frequency),
+          uniqueCatalogKeyWithinWorkout: true,
+        },
         versions: {
           catalog: input.catalogVersion,
           knowledge: input.knowledgeVersion,

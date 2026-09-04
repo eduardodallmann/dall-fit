@@ -41,8 +41,10 @@ Toda response, inclusive `204`, redirect, erro e preflight, devolve
 `x-request-id`. A API aceita o valor recebido apenas quando há exatamente um
 header e ele possui de 1 a 128 caracteres ASCII no formato
 `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`; ausência, repetição, combinação pelo parser
-ou formato inválido gera UUID novo. O CORS permite `X-Request-Id` na request e o
-expõe na response sem ampliar origem ou métodos.
+ou formato inválido gera UUID novo. O CORS permite `X-Request-Id` e os headers
+funcionais declarados pelos contratos, incluindo `Idempotency-Key`, na request;
+expõe somente `X-Request-Id` e `X-Resource-Version` na response, sem ampliar origem
+ou métodos.
 
 O `ValidationPipe` global transforma entradas, mantém somente propriedades dos
 DTOs e rejeita campos adicionais. Toda falha de query, param ou body validado por

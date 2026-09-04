@@ -450,8 +450,9 @@ Google aceita 10/10min/IP; callback 30/10min/IP; bypass 5/min/IP; CSRF e logout
 30/min/sessão+IP; mutações autenticadas comuns 60/min/pessoa+IP; administrativas
 30/min/admin+IP. Preflight não consome quota. Excesso responde `429` estruturado e
 `Retry-After`. Depois da correlação da request, a API usa Helmet e parser de
-cookies; CORS credenciado mantém origem e métodos exatos, permite e expõe somente o
-header adicional `X-Request-Id`, e `trust proxy` permanece explícito.
+cookies; CORS credenciado mantém origem e métodos exatos, aceita somente os headers
+contratados, inclusive `Idempotency-Key`, e expõe apenas `X-Request-Id` e
+`X-Resource-Version`; `trust proxy` permanece explícito.
 
 No callback OAuth, somente negação de consentimento, callback ausente ou
 divergente, `invalid_grant`, ID token ausente e rejeições OIDC conhecidas retornam

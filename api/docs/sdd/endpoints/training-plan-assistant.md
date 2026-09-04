@@ -43,6 +43,11 @@ mesma chave e conteúdo repetem a resposta, enquanto conteúdo diferente retorna
 valor de uma resposta rápida da pergunta atual, a mensagem pública/persistida usa
 seu label humano; a decisão continua usando o valor canônico.
 
+Na triagem respiratória, a pergunta pública é “Você está com falta de ar fora do
+normal?” e diferencia explicitamente ausência, ocorrência mesmo em repouso e
+ocorrência com esforço leve. Os valores canônicos e seus branches conservadores
+permanecem `no`, `current` e `exertion`.
+
 A sessão pública contém somente ID técnico, versão, estado, mensagens, pergunta,
 respostas rápidas, resultado público da triagem, preview e timestamps. Answers,
 configuração do provider, materialização e chaves permanecem internos. Erros
@@ -102,9 +107,15 @@ Em draft, o service exige `ready|preview` e triagem apta, reserva `generating` p
 CAS, filtra catálogo e chama o provider por `AssistantProviderService`. O adapter
 recebe contexto mínimo e nenhuma tool. Na Groq, modelos compatíveis recebem o JSON
 Schema da operação em modo estrito ou best-effort; os demais recebem JSON Object
-Mode. O budget de completion é explícito, o retorno sempre passa novamente pelo
-Zod local e somente rede, `429` ou `5xx` recebem um único retry com backoff
-limitado. A proposta inteira é rejeitada se contiver key não candidata,
+Mode. O payload explicita a quantidade exata de treinos, limites de exercícios,
+unicidade de `catalogKey` e a mesma fórmula/limite de duração aplicada localmente.
+Em ajuste, o provider recebe também a proposta lógica corrente e deve preservar
+integralmente nomes, distribuição, exercícios e parâmetros não mencionados no
+pedido; a prévia persistida continua sendo substituída somente depois da validação
+integral da nova resposta.
+O budget de completion é explícito, o retorno sempre passa novamente pelo Zod
+local e somente rede, `429` ou `5xx` recebem um único retry com backoff limitado.
+A proposta inteira é rejeitada se contiver key não candidata,
 duplicação, frequência ou quantidade incompatível, campo fora do schema ou duração
 acima da resposta. Falha restaura `ready|preview` e preserva a sessão.
 

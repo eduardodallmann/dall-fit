@@ -1,3 +1,5 @@
+import type { TrainingPlanAssistantDraft } from '@dall-fit/types';
+
 import type {
   AssistantCatalogExercise,
   AssistantProposal,
@@ -42,6 +44,7 @@ export interface ProposeTrainingPlanInput {
   answers: Readonly<Record<string, string>>;
   candidates: readonly AssistantCatalogExercise[];
   catalogVersion: string;
+  currentDraft?: TrainingPlanAssistantDraft;
   knowledgeVersion: string;
   promptVersion: string;
 }

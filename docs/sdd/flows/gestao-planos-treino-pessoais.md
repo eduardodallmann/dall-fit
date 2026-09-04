@@ -55,9 +55,11 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     mantém a pergunta subjetiva, contextualiza a confirmação e extrai localmente
     uma interrupção objetiva informada na mesma frase, mesmo se o provider omitir
     esse dado.
-    Bloqueio encerra a geração e mantém a orientação visível até o fechamento do
-    modal; ao fechar, a UI exclui a sessão terminal para que a próxima abertura
-    comece uma conversa nova. Pessoa apta revisa uma prévia antes de confirmar.
+    Na triagem respiratória, a tela distingue falta de ar fora do normal em
+    repouso daquela que ocorre com esforço leve. Bloqueio encerra a geração e
+    mantém a orientação visível até o fechamento do modal; ao fechar, a UI exclui
+    a sessão terminal para que a próxima abertura comece uma conversa nova.
+    Pessoa apta revisa uma prévia antes de confirmar.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.
