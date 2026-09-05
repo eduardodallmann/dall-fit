@@ -1,5 +1,11 @@
 # Rota `/training-plan/:catalogEntryId/workout/:workoutId`
 
+Acesso direto sem sessão segue a
+[retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação):
+a UI apresenta o login e volta a esta rota após autenticar na mesma aba, com path,
+parâmetros válidos e fragmento. Permissões e disponibilidade do recurso continuam
+sendo verificadas; nenhum draft ou operação anterior é recuperado.
+
 ## Objetivo funcional
 
 Exibir um workout próprio editável ou o conteúdo completo de uma referência global

@@ -28,6 +28,57 @@ Palavras de um mesmo segmento são separadas por hífen; não usar `camelCase`,
 `PascalCase`, `snake_case` ou espaços. A regra vale para a declaração da rota e
 para todos os links, redirects e navegações que apontam para ela.
 
+## Retomada após autenticação
+
+Uma entrada efetiva em rota privada impedida por `401` guarda o destino e substitui
+a URL por `/`. Depois do login Google, o callback continua chegando a `/dash`;
+a UI confirma pessoa e CSRF e retoma o destino com `replace`, antes de apresentar
+o dashboard. O probe autenticado de `/` também prioriza uma intenção válida e
+reutiliza a pessoa confirmada na proteção do destino. Sem intenção, usa `/dash`.
+
+O destino contém somente path, parâmetros aceitos pelos validadores da rota e
+fragmento. A árvore manual determina quais paths são privados; URL externa,
+protocolo, path público/desconhecido, caracteres de controle, barras invertidas e
+codificações que alterem a origem ou o reconhecimento do path são rejeitados.
+Canonicalização de paginação continua pertencendo à listagem. Parâmetros
+arbitrários não são guardados. `mockAuth` não faz parte do destino; seletores de
+dados `mock*` só são conservados com MSW habilitado no desenvolvimento.
+
+`src/auth/auth-return-to.ts` guarda uma intenção por aba em
+`sessionStorage`, na chave `dall-fit:auth-return-to`, com `href` relativo e
+`capturedAt` em milissegundos. A validade é de 30 minutos desde a captura, sem
+renovação por leitura, recarga ou retry OAuth. Recarregar o login ou receber
+`authError=oauth_failed` mantém a intenção válida. O dado não contém pessoa,
+credencial, CSRF, cache, draft ou payload; não é enviado à API ou ao Google.
+
+A última navegação efetiva bloqueada prevalece. Preload, navegação cancelada e
+resposta de navegação anterior não gravam nem consomem a intenção. A resolução
+usa `location` do guard e uma sequência da navegação corrente. Uma revalidação da
+tela já montada que expira encerra a sessão sem criar retomada. O teardown elimina
+intenções antigas e coordena a captura da nova entrada bloqueada antes de navegar.
+Um `401` público sem geração ativa preserva a intenção existente; a entrada
+intermediária em `/dash` também não a substitui durante falha do callback bootstrap.
+
+A decisão de retomada revalida e consome a intenção uma vez. Destino igual ao atual
+é somente removido; entrar autenticado explicitamente em outra rota privada
+elimina a intenção antiga. Logout, inclusive falha remota, troca de identidade e
+expiração de tela já montada descartam a intenção. O bypass transitório da raiz
+continua impedindo que um teardown seja desfeito por novo probe no mesmo ciclo.
+Falha técnica antes da decisão mantém o destino para retry; não vira ausência de
+sessão. Storage indisponível ou destino inválido/expirado usa `/dash` como fallback
+sem bloquear login. Falha de remoção desabilita retomada no documento atual.
+
+Todos os guards e contratos do destino continuam sendo aplicados: pessoa comum
+que tentou uma rota administrativa termina em `/dash` sem logout; recurso
+inexistente/alheio ou execução encerrada segue os estados próprios da tela. Não
+restaurar trabalho local nem repetir writes. A intenção não reaparece após consumo,
+recarregamento ou Voltar, e redirects automáticos não emitem interação humana nem
+transportam a URL bruta para telemetria.
+
+O storage é local à origem e à aba. Abas independentes não compartilham destinos;
+abas abertas com `opener` podem começar com cópia do storage do navegador. Não há
+sincronização entre abas ou garantia de retomada em outro dispositivo.
+
 ## Documentação viva
 
 Cada arquivo em `routes/` representa o estado atual de uma tela ou rota navegável.

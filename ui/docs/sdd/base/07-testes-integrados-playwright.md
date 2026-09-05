@@ -44,7 +44,12 @@ somente a resposta da fronteira de rede é interceptada.
 A única exceção técnica é a navegação top-level de
 `GET /api/auth/google`: service workers não interceptam essa navegação como uma
 request Axios. O Vite, já controlado pelo `webServer` do Playwright e somente com
-mocks habilitados, responde `302 /dash`. Não há `page.route`, acesso à API real ou
+mocks habilitados, responde `302 /dash` em sucesso ou
+`302 /?authError=oauth_failed` no cenário de erro recuperável. Os cookies fictícios
+de sessão/resultado seguem
+[Mocks de API](05-mocks-de-api.md#sessão-fictícia-através-da-navegação-oauth).
+A resposta de sucesso não conhece o destino pendente: o Router real deve retomá-lo,
+permitindo testar recarga, query/hash, autorização e isolamento entre abas. Não há `page.route`, acesso à API real ou
 atalho no componente; a UI percorre a mesma URL top-level de produção.
 
 Quando a UI possuir uma variável para a URL da API, a configuração Playwright

@@ -9,6 +9,7 @@ import {
 import axios from 'axios';
 
 import { configureAdminAccessHandler } from '~/auth/admin-access-lifecycle';
+import { authReturnTo, parseAuthReturnUrl } from '~/auth/auth-return-to';
 import { ensureCsrfToken, type MockAuthScenario } from '~/auth/auth-service';
 import { clearCsrfToken } from '~/auth/csrf-token';
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
@@ -19,6 +20,7 @@ import {
   consumeSessionReturnBypass,
   endSession,
   getActiveSessionMockAuth,
+  getActiveSessionSignal,
 } from '~/auth/session-lifecycle';
 import { queryClient } from '~/context/query-client';
 import {
@@ -71,7 +73,20 @@ interface TrainingSearch extends DashSearch {
   mockTraining?: MockTrainingScenario;
 }
 
+let navigationSequence = 0;
+let navigationHref: string | undefined;
+let pendingAuthentication:
+  { href: string; isCurrent: () => boolean } | undefined;
+
 const rootRoute = createRootRouteWithContext<RouterContext>()({
+  beforeLoad: ({ preload, location }) => {
+    if (!preload && location.href !== navigationHref) {
+      navigationSequence += 1;
+      navigationHref = location.href;
+      pendingAuthentication = undefined;
+    }
+    return { navigationSequence };
+  },
   component: Outlet,
 });
 
@@ -85,7 +100,14 @@ const homeRoute = createRoute({
       mockAuth: scenario,
       queryClient: context.queryClient,
     });
-    if (decision === 'replace-with-dash' && !abortController.signal.aborted)
+    if (
+      decision === 'replace-with-dash' &&
+      !abortController.signal.aborted &&
+      context.navigationSequence === navigationSequence
+    ) {
+      const destination = authReturnTo.consume(normalizeAuthReturnTo);
+      if (destination !== undefined)
+        redirect({ href: destination, replace: true, throw: true });
       redirect({
         replace: true,
         search:
@@ -93,6 +115,7 @@ const homeRoute = createRoute({
         throw: true,
         to: '/dash',
       });
+    }
   },
   validateSearch: (search: Record<string, unknown>): HomeSearch => {
     const result: HomeSearch = {};
@@ -115,30 +138,55 @@ const homeRoute = createRoute({
 const authenticatedRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: '_authenticated',
-  beforeLoad: async ({ context, location }) => {
+  beforeLoad: async ({ abortController, context, location, preload }) => {
     const mockAuth = parseMockAuthScenario(location.searchStr);
+    const options = currentPersonQueryOptions(mockAuth);
+    if (preload) {
+      const person = context.queryClient.getQueryData(options.queryKey);
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router uses redirects to stop preloading.
+      if (person === undefined) throw redirect({ to: '/' });
+      return { mockAuth, person };
+    }
+    const isCurrent = () =>
+      !abortController.signal.aborted &&
+      context.navigationSequence === navigationSequence;
+    const attempt = { href: location.href, isCurrent };
+    // A revalidation of the mounted screen remains a terminal expiry, not a new intent.
+    if (location.href !== router.state.resolvedLocation?.href)
+      pendingAuthentication = attempt;
 
     try {
-      const person = await context.queryClient.fetchQuery(
-        currentPersonQueryOptions(mockAuth),
-      );
+      const person = await context.queryClient.fetchQuery(options);
+      assertCurrentNavigation(isCurrent);
       await activateSession(person.id, mockAuth);
+      assertCurrentNavigation(isCurrent);
       context.queryClient.setQueryData(
         currentPersonQueryOptions(mockAuth).queryKey,
         person,
       );
       await ensureCsrfToken(mockAuth);
+      assertCurrentNavigation(isCurrent);
+      finishAuthenticatedNavigation(location);
       const result = { mockAuth, person };
 
       return result;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+      if (
+        axios.isAxiosError(error) &&
+        error.response?.status === 401 &&
+        isCurrent()
+      ) {
         await endSession('expired');
+        if (!isCurrent()) throw error;
+        if (pendingAuthentication === attempt)
+          captureAuthReturnTo(location.href);
         armSessionReturnBypass();
         redirect({ replace: true, throw: true, to: '/' });
       }
 
       throw error;
+    } finally {
+      releaseAuthenticationAttempt(attempt);
     }
   },
   component: AuthenticatedRouteComponent,
@@ -296,9 +344,13 @@ export const router = createRouter({
 
 configureSessionEndHandler(async (reason, generation) => {
   clearCsrfToken();
+  const attempt = pendingAuthentication;
+  if (reason !== 'expired' || generation !== undefined) authReturnTo.clear();
   if (generation === undefined) return;
   await queryClient.cancelQueries(undefined, { silent: true });
   queryClient.clear();
+  if (reason === 'expired' && attempt?.isCurrent())
+    captureAuthReturnTo(attempt.href);
   if (reason !== 'identity_changed')
     await router.navigate({ replace: true, to: '/' });
 });
@@ -314,6 +366,95 @@ configureAdminAccessHandler(async () => {
   if (person.isAdmin !== true)
     await router.navigate({ replace: true, to: '/dash' });
 });
+
+function releaseAuthenticationAttempt(attempt: {
+  href: string;
+  isCurrent: () => boolean;
+}): void {
+  // Teardown aborts the query before its terminal handler reads this intent.
+  if (pendingAuthentication === attempt && !getActiveSessionSignal()?.aborted)
+    pendingAuthentication = undefined;
+}
+
+function assertCurrentNavigation(isCurrent: () => boolean): void {
+  if (!isCurrent())
+    throw new DOMException('Navigation cancelled.', 'AbortError');
+}
+
+function normalizeAuthReturnTo(href: string): string | undefined {
+  const url = parseAuthReturnUrl(href);
+  if (url === undefined) return undefined;
+  const { foundRoute, matchedRoutes, routeParams } = router.getMatchedRoutes(
+    url.pathname,
+  );
+  if (
+    foundRoute === undefined ||
+    routeParams['**'] !== undefined ||
+    !matchedRoutes.some((route) => route.id === authenticatedRoute.id)
+  )
+    return undefined;
+  if (
+    foundRoute.id === trainingPlanListRoute.id &&
+    canonicalTrainingPlanPage(url.searchParams.get('page')).shouldReplace
+  )
+    url.searchParams.delete('page');
+  return validatedReturnHref(url, matchedRoutes);
+}
+
+function validatedReturnHref(
+  url: URL,
+  routes: readonly { options: { validateSearch?: unknown } }[],
+): string {
+  const rawSearch = Object.fromEntries(url.searchParams.entries());
+  const search: Record<string, unknown> = {};
+  for (const route of routes) {
+    const validate = route.options.validateSearch;
+    if (typeof validate !== 'function') continue;
+    const validated: unknown = (
+      validate as (input: Record<string, unknown>) => unknown
+    )(rawSearch);
+    if (typeof validated === 'object' && validated !== null)
+      Object.assign(search, validated);
+  }
+  url.search = '';
+  for (const [key, value] of Object.entries(search)) {
+    if (!isReturnSearchValue(key, value)) continue;
+    url.searchParams.set(key, String(value));
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function isReturnSearchValue(key: string, value: unknown): boolean {
+  if (key === 'mockAuth') return false;
+  if (typeof value !== 'string' && typeof value !== 'number') return false;
+  return (
+    !key.startsWith('mock') ||
+    (import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true')
+  );
+}
+
+function finishAuthenticatedNavigation(location: {
+  pathname: string;
+  href: string;
+}): void {
+  if (location.pathname !== '/dash') {
+    authReturnTo.clear();
+    return;
+  }
+  const destination = authReturnTo.consume(normalizeAuthReturnTo);
+  if (destination !== undefined && destination !== location.href)
+    redirect({ href: destination, replace: true, throw: true });
+}
+
+function captureAuthReturnTo(href: string): void {
+  // A failed callback bootstrap must not replace the original intent with /dash.
+  if (
+    parseAuthReturnUrl(href)?.pathname === '/dash' &&
+    authReturnTo.read(normalizeAuthReturnTo) !== undefined
+  )
+    return;
+  authReturnTo.save(href, normalizeAuthReturnTo);
+}
 
 function parseMockAuthScenario(search: string): MockAuthScenario {
   const value = new URLSearchParams(search).get('mockAuth');

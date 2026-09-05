@@ -484,13 +484,22 @@ qualquer filho. A query da pessoa permanece observada no shell, com `staleTime` 
 30 segundos, refetch em foco/reconexão e intervalo de cinco minutos somente com o
 documento visível.
 
-- `401` limpa CSRF/cache privado e lança redirect tipado para `/`;
+- `401` limpa CSRF/cache privado e lança redirect tipado para `/`; uma entrada
+  efetiva bloqueada preserva a intenção de destino conforme a
+  [retomada após autenticação](02-rotas-e-comportamento.md#retomada-após-autenticação);
 - falha exclusiva do bootstrap CSRF permanece recuperável e não transforma uma
   pessoa autenticada em anônima;
 - outros erros permanecem erros da rota e são apresentados pelo componente de erro;
 - o contexto autenticado entrega a `Person` inicial aos guards; o shell observa a
   mesma key sem duplicar o request fresco do `beforeLoad`;
 - a proteção da UI é navegação e privacidade visual, nunca substitui o guard da API.
+
+`src/auth/auth-return-to.ts` concentra a persistência temporária da intenção de
+navegação em `sessionStorage`, sem dados de sessão. O Router valida o path contra
+sua árvore e reutiliza os validadores de search da rota para guardar apenas seus
+parâmetros aceitos. A raiz e `/dash` consomem a intenção; o handler de encerramento
+de sessão coordena sua limpeza com a captura da entrada bloqueada. Preloads usam
+somente a pessoa já cacheada e não ativam sessão, obtêm CSRF ou alteram a intenção.
 
 Novas rotas privadas são adicionadas como filhas desse layout. Rotas públicas
 continuam filhas diretas da root route.

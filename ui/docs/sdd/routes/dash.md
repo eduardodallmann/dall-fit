@@ -30,6 +30,13 @@ atende as rotas pessoais e administrativas sem conexão duplicada.
 - Permissões: sessão válida e pessoa existente. A rota é comum e não pertence ao
   layout administrativo.
 
+Ao chegar do callback, depois da confirmação de pessoa e CSRF, `/dash` consome o
+destino pendente válido e o Router substitui a URL antes de apresentar o dashboard
+como tela final. Sem intenção, com valor inválido/expirado ou sem storage confiável,
+permanece neste dashboard. A regra completa de validação, duração e consumo vive em
+[retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação).
+O destino não muda o redirect HTTP do callback nem dispensa os guards da rota final.
+
 ## Elementos e conteúdo
 
 Depois da proteção, o layout autenticado apresenta:
@@ -88,7 +95,8 @@ enquanto o dashboard permanece intencionalmente vazio.
 
 - Condição: API responde `401`.
 - Comportamento: `beforeLoad` redireciona com substituição de histórico para `/`
-  antes do shell.
+  antes do shell. A entrada efetiva bloqueada guarda a intenção de navegação;
+  uma revalidação da tela já montada não cria intenção de retomada.
 - Resultado: menu, botão e dados pessoais não são renderizados.
 
 ### Alternativa 2 — Falha técnica
@@ -538,3 +546,18 @@ Não se aplica — não existem imagens em `routes/assets/dash/`.
   conferido no browser sem referência de screenshot; o valor integral e a regra de
   iniciais possuem cobertura unitária. `pnpm test:pwa-update` cobre dois builds e
   duas abas reais, porque o Playwright com MSW Browser mantém o Workbox desabilitado.
+
+## Cenários de retomada
+
+- Link para testar: `http://localhost:3000/dash` com intenção válida `/training`
+  preparada pelo cenário e sessão autenticada.
+- Given: o callback retornou à entrada privada.
+- When: pessoa e CSRF são confirmados.
+- Then: a UI substitui a URL por `/training` e consome a intenção uma única vez;
+  destino ausente/inválido/expirado mantém `/dash`.
+- And: falha técnica mantém a recuperação atual; `401` durante o bootstrap não
+  substitui a intenção original por `/dash`. Logout, inclusive falha remota,
+  descarta qualquer intenção e preserva a entrada pública no ciclo terminal.
+
+Vitest: `src/routes/auth-return-navigation.test.ts`; Playwright: flow de login e
+spec da rota para destino inválido. A retomada reutiliza pessoa e CSRF frescos.

@@ -38,10 +38,24 @@ const mockOAuthNavigationPlugin: Plugin = {
         return;
       }
 
+      const cookies = Object.fromEntries(
+        (request.headers.cookie ?? '').split(';').map((entry) => {
+          const [name, value] = entry.trim().split('=');
+          return [name, value];
+        }),
+      );
+      const outcome = cookies['dall-fit-mock-login'];
       response.statusCode = 302;
-      response.setHeader('Location', '/dash');
+      response.setHeader(
+        'Location',
+        outcome === 'oauth-failed' ? '/?authError=oauth_failed' : '/dash',
+      );
       response.setHeader('x-request-id', MOCK_REQUEST_ID);
-      response.setHeader('Set-Cookie', 'dall-fit-revoked=; Path=/; Max-Age=0');
+      if (outcome !== 'oauth-failed')
+        response.setHeader('Set-Cookie', [
+          'dall-fit-revoked=; Path=/; Max-Age=0',
+          `dall-fit-mock-session=${outcome === 'admin' ? 'admin' : 'authenticated'}; Path=/; SameSite=Lax`,
+        ]);
       response.end();
     });
   },

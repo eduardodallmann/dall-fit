@@ -6,16 +6,22 @@
 
 - Ator: pessoa que deseja acessar recursos privados do Dall Fit.
 - Problema resolvido: identificar a pessoa sem cadastro manual e estabelecer uma
-  sessão reconhecida pela API e pela UI.
+  sessão reconhecida pela API e pela UI, preservando o destino de uma entrada
+  privada bloqueada.
 - Resultado esperado: após consentimento válido, a pessoa possui cadastro
-  persistido e entra em `/dash`, onde o menu autenticado apresenta sua identidade
-  e a navegação inicial.
+  persistido e entra na rota privada solicitada antes do login ou, sem destino
+  pendente válido, em `/dash`, com o menu autenticado.
 
 ## Entrada e pré-condições
 
-A jornada começa em `http://localhost:3000/`, que permanece pública. Ao carregar a
-raiz, um probe de sessão executa `GET /auth/me` em `beforeLoad`: com sessão válida,
-o router substitui a URL para `/dash` sem renderizar a entrada. Com sessão inválida,
+A jornada começa em `http://localhost:3000/`, que permanece pública, ou em um
+link privado. Sem sessão, esse link leva a `/` e guarda uma intenção temporária
+por até 30 minutos na mesma aba. A regra de armazenamento, validação, concorrência
+e consumo pertence à
+[UI](../../../ui/docs/sdd/base/02-rotas-e-comportamento.md#retomada-após-autenticação).
+Ao carregar a raiz, um probe de sessão executa `GET /auth/me` em `beforeLoad`: com sessão válida,
+o router substitui a URL pelo destino pendente válido ou `/dash` sem renderizar a
+entrada. Com sessão inválida,
 a entrada pública é exibida e o visitante pode iniciar login. Após logout ou
 expiração, um bypass one-shot permite que a navegação terminal volte à raiz e mostre
 a entrada pública sem novo probe. Em desenvolvimento integrado, MSW simula requests
@@ -38,8 +44,10 @@ middleware de teste do Vite, sem acessar a API real.
 
 ## Sequência e decisões
 
-1. A pessoa acessa `/`. O probe de sessão verifica `GET /auth/me` via MSW; com
-   sessão válida, redireciona silenciosamente para `/dash`. Com sessão inválida,
+1. A pessoa acessa `/`. O probe de sessão verifica `GET /auth/me` pelo cliente
+   HTTP; MSW simula a resposta somente no desenvolvimento/teste. Com
+   sessão válida, retoma o destino pendente válido ou redireciona para `/dash`.
+   Com sessão inválida,
    renderiza a entrada pública.
 2. A pessoa autenticada que atinge `/dash` reutiliza o dado cacheado pelo probe,
    sem nova requisição a `GET /auth/me`.
@@ -77,10 +85,14 @@ middleware de teste do Vite, sem acessar a API real.
     redireciona a `/`. O shell mantém `GET /auth/me` observado, revalida em foco,
     reconexão e a cada cinco minutos enquanto visível, refletindo expiração, pessoa
     removida ou mudança de privilégio sem cache indefinido.
-12. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
+12. Com pessoa e CSRF confirmados na chegada a `/dash`, a UI consome o destino
+    pendente válido e navega com `replace` para ele. Os guards de permissão e as
+    consultas do destino continuam decidindo seu conteúdo; a pessoa fresca e o
+    token CSRF são reutilizados. Sem intenção válida, permanece em `/dash`.
+13. `Sair` em qualquer apresentação do menu envia `POST /auth/logout` com Origin e
     CSRF. Sucesso ou falha remota encerra localmente uma única geração: aborta
     requests, reseta recursos privados, limpa CSRF/cache e navega com replace para
-    `/`; a falha também mostra feedback acessível.
+    `/`; descarta a intenção de navegação e a falha também mostra feedback acessível.
 
 `401` concorrentes compartilham a mesma transição. `CSRF_VALIDATION_FAILED` renova
 o token sem repetir a mutation; `ADMIN_ACCESS_REQUIRED` revalida a pessoa, atualiza
@@ -126,8 +138,10 @@ devem acompanhar a reversão.
 ## Estados e exceções
 
 - Caminho completo: consentimento aceito, claims válidas, cadastro encontrado ou
-  criado, sessão emitida e `/dash` carregada com o menu autenticado.
-- Interrupção ou retomada: negar consentimento, callback incompleto/divergente,
+  criado, sessão emitida e destino privado ou `/dash` carregado com o menu
+  autenticado.
+- Interrupção ou retomada: a intenção válida sobrevive à recarga do login e a
+  falhas OAuth recuperáveis. Negar consentimento, callback incompleto/divergente,
   `invalid_grant`, ID token ausente ou rejeição OIDC conhecida retorna a `/` sem
   sessão; um novo acionamento reinicia o fluxo.
 - Erro recuperável: sessão ausente/expirada redireciona à entrada pública; falha
@@ -167,7 +181,8 @@ devem acompanhar a reversão.
   `http://127.0.0.1:3100/dash?mockAuth=unauthenticated`
 - Given: o handler de pessoa atual responde `401`
 - When: a rota-pai protegida valida a sessão
-- Then: a UI redireciona para `/` sem renderizar dados privados
+- Then: a UI redireciona para `/` sem renderizar dados privados e preserva a
+  intenção de voltar à rota após login na mesma aba
 
 ### Cenário 4 — Perfil assume a fonte do tema após o login
 
@@ -187,6 +202,33 @@ devem acompanhar a reversão.
 - When: o perfil é reconciliado
 - Then: a UI remove a chave anterior e usa `light` pelo sistema
 
+### Cenários de retomada após login
+
+Os cenários 6 a 13 do spec `ui/tests/integration/flows/login-google.spec.ts` usam
+Vite/MSW com cookie fictício `dall-fit-mock-session=unauthenticated`; o callback
+simulado continua retornando a `/dash`. A UI executa toda a retomada.
+
+| Cenário | Link para testar (iniciar sem sessão) | Ação | Resultado |
+| --- | --- | --- | --- |
+| 6 — Link privado seguido de login | `http://localhost:3000/training-plan` | Concluir login | Retoma Meus planos sem requests duplicadas de pessoa/CSRF |
+| 7 — Query e fragmento | `http://localhost:3000/global/training-plan?mockTrainingPlans=two-pages&page=2#planos` | Login como admin com fixture de duas páginas | Conserva página 2 e fragmento |
+| 8 — Workout dinâmico | `http://localhost:3000/global/training-plan/64b000000000000000000001/workout/64b000000000000000000101` | Login como admin | Abre o mesmo workout |
+| 9 — Recarga, erro OAuth e retry | `http://localhost:3000/training` | Recarregar o login, simular falha OAuth e repetir | Retoma Treinar após sucesso |
+| 10 — Permissão insuficiente | `http://localhost:3000/global/training-plan` | Login como pessoa comum | Termina em `/dash`, sem logout ou loop |
+| 11 — Logout e novo login | `http://localhost:3000/training-plan` | Retomar, sair e entrar novamente | Novo login termina em `/dash` |
+| 12 — Última tentativa | `http://localhost:3000/training-plan` | Ainda sem sessão, abrir `/training` e concluir login | Retoma `/training` |
+| 13 — Abas independentes | `http://localhost:3000/training-plan` e `http://localhost:3000/training` | Abrir sem `opener`, concluir login e recarregar a outra aba | Cada aba retoma seu destino |
+
+### Cenário 14 — Navegação bloqueada durante sessão ativa preserva a nova intenção
+
+- Link para testar: `http://localhost:3000/dash`, com sessão inicialmente ativa.
+- Given: o shell já está montado e a sessão expirou antes de uma nova navegação.
+- When: a pessoa aciona `Treinar` e a proteção da nova entrada recebe `401`.
+- Then: o teardown preserva a nova intenção `/training`, mesmo que o cancelamento
+  da query preceda sua conclusão; depois do login, a pessoa chega a Treinar.
+- Cobertura: cenário 14 do flow Playwright. A expiração detectada apenas pela
+  revalidação da tela já montada continua sem criar nova intenção.
+
 ## Cobertura automatizada
 
 - Regras e caminhos de negócio protegidos: primeiro cadastro, reutilização,
@@ -194,6 +236,9 @@ devem acompanhar a reversão.
 - Unitários e componentes da UI: home, consulta de pessoa, autorização
   administrativa, bootstrap/reconciliação do tema, rollback, iniciais e
   apresentação comum/administrativa do menu.
+- Destino temporário: `auth-return-to.test.ts` cobre segurança, duração e falhas
+  de storage; `auth-return-navigation.test.ts` cobre a árvore real, consumo,
+  preload, cancelamento, fallback e recuperação de CSRF.
 - Unitários de probe e lifecycle: `root-session-probe.test.ts` e
   `session-lifecycle.test.ts` cobrem decisão do probe, reuso de cache e bypass
   one-shot após logout/expiração.

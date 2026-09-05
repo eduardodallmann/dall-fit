@@ -238,3 +238,22 @@ com relógio/abort controlados.
 IDs criados são determinísticos; multipart exige um `File` no campo `file` e nunca
 é convertido em JSON/base64. Upload devolve signed URLs fictícias e expiração ISO
 conforme `ExerciseImage`.
+
+## Sessão fictícia através da navegação OAuth
+
+Para jornadas que atravessam documentos, o cookie exclusivamente fictício
+`dall-fit-mock-session` aceita `unauthenticated`, `authenticated` ou `admin`.
+Handlers de autenticação usam esse estado quando o seletor de request é ausente
+ou `authenticated`; outros seletores explícitos preservam seus cenários existentes.
+A preparação de Playwright define esse cookie no contexto, sem alterar componentes
+ou requests de produção. O estado é isolado por contexto do navegador.
+
+O middleware OAuth do Vite consulta `dall-fit-mock-login`: `admin` escolhe a pessoa
+administradora, `oauth-failed` retorna a `/?authError=oauth_failed` sem autenticar,
+e ausência/outro valor conclui como pessoa comum. Sucesso define a sessão fictícia,
+limpa a revogação fictícia e continua respondendo `302 /dash`. A intenção é retomada
+somente pelo Router real. Falha preserva a sessão fictícia anterior e a intenção
+local válida; mudar o cookie de preparação permite testar nova tentativa.
+`mockAuth` não é restaurado como parte do destino, evitando reintroduzir um seletor
+permanente de anonimato depois de autenticar. Seletores de dados das rotas continuam
+sendo usados somente com mocks habilitados.

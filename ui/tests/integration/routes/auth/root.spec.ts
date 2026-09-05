@@ -67,3 +67,20 @@ test.describe('Rota /', () => {
     await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
   });
 });
+
+test('Cenário 8 — Probe retoma intenção de outra entrada', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      'dall-fit:auth-return-to',
+      JSON.stringify({ href: '/training', capturedAt: Date.now() }),
+    );
+  });
+  await page.goto('/');
+  await expect(page).toHaveURL('/training');
+  await expect(
+    page.getByRole('link', { name: 'Treinar', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('button', { name: 'Entrar com Google' }),
+  ).not.toBeVisible();
+});

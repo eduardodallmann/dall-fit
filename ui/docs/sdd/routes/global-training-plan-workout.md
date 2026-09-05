@@ -1,5 +1,11 @@
 # Rota `/global/training-plan/:trainingPlanId/workout/:workoutId`
 
+Acesso direto sem sessão segue a
+[retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação):
+a UI apresenta o login e volta a esta rota após autenticar na mesma aba, com path,
+parâmetros válidos e fragmento. Permissões e disponibilidade do recurso continuam
+sendo verificadas; nenhum draft ou operação anterior é recuperado.
+
 O editor administrativo apresenta também o resumo de pessoas vinculadas e ativas
 do plano pai. A métrica não altera nenhuma capability do editor e se atualiza após
 mudanças de referência/seleção recebidas pelo stream.
