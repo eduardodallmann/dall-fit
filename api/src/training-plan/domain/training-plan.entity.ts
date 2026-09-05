@@ -19,6 +19,15 @@ export interface NewTrainingPlan {
   description: string;
 }
 
+export interface CompleteTrainingPlanInput extends NewTrainingPlan {
+  id: string;
+  workouts: readonly {
+    id: string;
+    name: string;
+    exercises: readonly Extract<StoredExercise, { type: 'youtube-short' }>[];
+  }[];
+}
+
 export interface TrainingPlanAccessScope {
   ownerPersonId: string | null;
 }

@@ -164,6 +164,21 @@ uma vez no drop e recarga de conflito é retry.
 11. URL expirada e renovação: acrescentar
     `mockTrainingPlans=image-signed-url-expired`.
 
+## Modelos globais originados pelo catálogo do assistente
+
+Dois modelos versionados — musculação básica de três e cinco dias — são
+materializados exclusivamente pelo comando `pnpm -C api seed:assistant-globals`.
+O dry-run é o padrão; `--execute` aplica `set-on-insert` com IDs determinísticos.
+O comando não roda no startup, não sobrescreve edição administrativa e interrompe
+ao encontrar identidade divergente. Em ambiente publicado exige também
+`ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v1`.
+
+O catálogo v1 é a única origem dos 45 exercícios distintos. Cada árvore possui
+respectivamente 3/18 e 5/27 workouts/exercícios, owner global nulo e parâmetros
+3×12 com 60 segundos. O cenário operacional `assistant:global-training-plans`
+executa dry-run, aplicação e nova aplicação; a segunda execução reporta os mesmos
+dois planos como inalterados.
+
 ## Cobertura automatizada
 
 - E2E Nest/MongoDB/Redis: `api/test/training-plan.e2e-spec.ts`, incluindo versões

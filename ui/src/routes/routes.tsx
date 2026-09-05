@@ -352,6 +352,16 @@ function parseTrainingPlanSearch(
     ? search.mockAuth
     : undefined;
   const scenarios: readonly MockTrainingPlansScenario[] = [
+    'assistant-abandon',
+    'assistant-blocked',
+    'assistant-clarifying',
+    'assistant-collecting',
+    'assistant-emergency',
+    'assistant-health-clarification',
+    'assistant-multiple-answers',
+    'assistant-preview',
+    'assistant-provider-error',
+    'assistant-version-conflict',
     'create-error',
     'create-success',
     'create-workout-error',

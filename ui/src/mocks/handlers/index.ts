@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { authHandlers } from '~/mocks/handlers/auth';
 import { realtimeHandlers } from '~/mocks/handlers/realtime';
 import { trainingHandlers } from '~/mocks/handlers/training';
+import { trainingPlanAssistantHandlers } from '~/mocks/handlers/training-plan-assistant';
 import { trainingPlanHandlers } from '~/mocks/handlers/training-plans';
 import {
   createMockApiError,
@@ -15,6 +16,7 @@ export const handlers = [
   ...authHandlers,
   ...realtimeHandlers,
   ...trainingPlanHandlers,
+  ...trainingPlanAssistantHandlers,
   ...trainingHandlers,
   http.all(`${apiBaseUrl}/*`, () => {
     const result = HttpResponse.json(

@@ -12,6 +12,7 @@ export class RedisKeyService {
 
   create(
     subject:
+      | 'assistant-provider-circuit'
       | 'rate'
       | 'realtime'
       | 'session'

@@ -75,12 +75,13 @@ desatualizado ou sem contexto de licença.
 
 ### API e dados
 
-| Tecnologia | Fonte oficial                                       | Consultar quando                                                                               |
-| ---------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Mongoose   | [`llms.txt`](https://mongoosejs.com/llms.txt)       | Schemas, models, queries, índices, middleware, validação, timestamps e integração TypeScript   |
-| MongoDB    | [`llms.txt`](https://www.mongodb.com/docs/llms.txt) | Semântica do banco, operadores, índices, atomicidade, transações e compatibilidade do servidor |
-| Redis      | [`llms.txt`](https://redis.io/llms.txt)             | Comandos, tipos de dados, TTL, atomicidade, locks, persistência e compatibilidade do servidor  |
-| Zod        | [`llms.txt`](https://zod.dev/llms.txt)              | Schemas, parsing, refinements, transformação e inferência de tipos                             |
+| Tecnologia | Fonte oficial                                                                                               | Consultar quando                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mongoose   | [`llms.txt`](https://mongoosejs.com/llms.txt)                                                               | Schemas, models, queries, índices, middleware, validação, timestamps e integração TypeScript                                                          |
+| MongoDB    | [`llms.txt`](https://www.mongodb.com/docs/llms.txt)                                                         | Semântica do banco, operadores, índices, atomicidade, transações e compatibilidade do servidor                                                        |
+| Redis      | [`llms.txt`](https://redis.io/llms.txt)                                                                     | Comandos, tipos de dados, TTL, atomicidade, locks, persistência e compatibilidade do servidor                                                         |
+| Zod        | [`llms.txt`](https://zod.dev/llms.txt)                                                                      | Schemas, parsing, refinements, transformação e inferência de tipos                                                                                    |
+| Groq API   | [`llms.txt`](https://console.groq.com/llms.txt) e [`llms-full.txt`](https://console.groq.com/llms-full.txt) | Usar o índice curto para localizar a página específica; consultar o corpus completo apenas quando o índice e a página selecionada forem insuficientes |
 
 Mongoose é a fonte primária para o código de persistência porque a API não consome
 o MongoDB Node.js Driver diretamente. O

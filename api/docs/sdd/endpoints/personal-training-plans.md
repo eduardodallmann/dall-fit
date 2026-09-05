@@ -60,6 +60,13 @@ adicionais: `TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND`,
 `GLOBAL_TRAINING_PLAN_REFERENCE_DUPLICATE` e
 `GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`.
 
+A confirmação do assistente reutiliza esta modelagem por
+`AssistantTrainingPlanMaterializationService`: reserva `trainingPlanId` e
+`catalogEntryId`, faz `set-on-insert` do aggregate embutido completo e depois da
+entrada `owned`. O plano nasce v0, inativo e invisível até o catálogo existir;
+provider, prompt e triagem não são copiados. O fluxo HTTP proprietário está em
+[`training-plan-assistant.md`](training-plan-assistant.md).
+
 ## Cenários reproduzíveis
 
 ### Cenário 1 — catálogo misto e seleção ativa

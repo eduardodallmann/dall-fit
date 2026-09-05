@@ -41,6 +41,7 @@ import {
   TrainingPlanDocument,
   TrainingPlanSchema,
 } from '~/training-plan/repositories/training-plan.schema';
+import { AssistantTrainingPlanMaterializationService } from '~/training-plan/services/assistant-training-plan-materialization.service';
 import { BlobStorageService } from '~/training-plan/services/blob-storage.service';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
@@ -98,6 +99,7 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
     MongoTrainingPlanRepository,
     MongoPersonalTrainingPlanRepository,
     PersonalTrainingPlanService,
+    AssistantTrainingPlanMaterializationService,
     TrainingPlanService,
     BlobStorageService,
     ExerciseImageService,
@@ -127,6 +129,7 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
     },
   ],
   exports: [
+    AssistantTrainingPlanMaterializationService,
     ExerciseImageService,
     PersonalTrainingPlanService,
     TrainingLoadProfileService,

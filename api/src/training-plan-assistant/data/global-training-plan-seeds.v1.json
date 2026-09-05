@@ -1,0 +1,104 @@
+{
+  "version": "assistant-global-training-plans.v1",
+  "plans": [
+    {
+      "id": "73b000000000000000000001",
+      "name": "Plano básico de musculação - 3 dias",
+      "description": "Divisão simples para quem está começando ou retomando, com pernas, costas/bíceps e peito/tríceps.",
+      "workouts": [
+        {
+          "name": "A — Pernas",
+          "catalogKeys": [
+            "youtube-short:n4rakmCKJkg",
+            "youtube-short:1XTX22zHV-U",
+            "youtube-short:T18xxjCw33I",
+            "youtube-short:46_uWo2yVKw",
+            "youtube-short:XMewm1W-ECY",
+            "youtube-short:sJgUYTJWncw"
+          ]
+        },
+        {
+          "name": "B — Costas e bíceps",
+          "catalogKeys": [
+            "youtube-short:WiOlNR2g3rA",
+            "youtube-short:EXAikbHGpJ4",
+            "youtube-short:Nfft0NAOMfo",
+            "youtube-short:zZJK_aglDFY",
+            "youtube-short:PH3atYH2vns",
+            "youtube-short:_YaUOyLeXOU"
+          ]
+        },
+        {
+          "name": "C — Peito e tríceps",
+          "catalogKeys": [
+            "youtube-short:hqdrlc4Jgqc",
+            "youtube-short:erggHEES3tg",
+            "youtube-short:FSe7LTfIFUg",
+            "youtube-short:WRtKbvjUWyw",
+            "youtube-short:4h_WrfU9NTI",
+            "youtube-short:YUnL8IFg7sc"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73b000000000000000000002",
+      "name": "Plano completo de musculação - 5 dias",
+      "description": "Divisão por grupos musculares para pessoa com maior disponibilidade e experiência.",
+      "workouts": [
+        {
+          "name": "A — Pernas",
+          "catalogKeys": [
+            "youtube-short:ZxiI-W391ds",
+            "youtube-short:sEY9GRdpHVU",
+            "youtube-short:RKnynl1Xt7o",
+            "youtube-short:YaGW1J7aIC8",
+            "youtube-short:gSZXyLd8YNI",
+            "youtube-short:5WHXKjq7isA"
+          ]
+        },
+        {
+          "name": "B — Costas",
+          "catalogKeys": [
+            "youtube-short:V2mOGF6yp6g",
+            "youtube-short:_c8NXVnlb8I",
+            "youtube-short:5Nb-KZ6gOaQ",
+            "youtube-short:dPsAetF50Bg",
+            "youtube-short:h8-mLauzygA",
+            "youtube-short:kRws_E6AoSQ"
+          ]
+        },
+        {
+          "name": "C — Peito",
+          "catalogKeys": [
+            "youtube-short:K3M6pAbaUDw",
+            "youtube-short:WXqdVnQd8Vc",
+            "youtube-short:5jDnoAOKlYQ",
+            "youtube-short:ueMZZ4iv_Rc",
+            "youtube-short:KKgvoYD15XM"
+          ]
+        },
+        {
+          "name": "D — Bíceps",
+          "catalogKeys": [
+            "youtube-short:KiFCxrczVao",
+            "youtube-short:xOX9DRiQ3BQ",
+            "youtube-short:o0dVK46WVIs",
+            "youtube-short:lKMu652A0H4",
+            "youtube-short:NIlDUWXwC58"
+          ]
+        },
+        {
+          "name": "E — Tríceps",
+          "catalogKeys": [
+            "youtube-short:GalcGw9Pfw8",
+            "youtube-short:jY5tG4O8BjM",
+            "youtube-short:TVlQeGLMjwc",
+            "youtube-short:qYCd9Qg9Nmc",
+            "youtube-short:Ng4Vf2rmamE"
+          ]
+        }
+      ]
+    }
+  ]
+}

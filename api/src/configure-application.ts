@@ -25,6 +25,7 @@ export function configureApplication(app: INestApplication): void {
   app.enableCors({
     allowedHeaders: [
       'Content-Type',
+      'Idempotency-Key',
       'X-Resource-Version',
       'X-CSRF-Token',
       'X-Client-Instance-Id',

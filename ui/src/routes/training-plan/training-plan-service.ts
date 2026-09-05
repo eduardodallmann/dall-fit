@@ -26,6 +26,17 @@ import type {
 import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
 
 export type MockTrainingPlansScenario =
+  | 'assistant-abandon'
+  | 'assistant-blocked'
+  | 'assistant-clarifying'
+  | 'assistant-collecting'
+  | 'assistant-emergency'
+  | 'assistant-health-clarification'
+  | 'assistant-multiple-answers'
+  | 'assistant-preview'
+  | 'assistant-provider-error'
+  | 'assistant-resumed'
+  | 'assistant-version-conflict'
   | 'create-error'
   | 'create-success'
   | 'create-workout-error'

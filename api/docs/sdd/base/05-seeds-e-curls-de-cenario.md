@@ -76,6 +76,12 @@ Identificadores vigentes incluem:
   `training-plans:update`, `training-plans:delete`,
   `training-plans:create-workout`, `training-plans:delete-workout` e
   `training-plans:not-found`.
+- `assistant:ready`, `assistant:draft-invalid` e `assistant:confirm`.
+
+Os dois planos globais versionados usam um comando operacional próprio, pois
+podem ser aplicados fora de local/teste: `pnpm -C api seed:assistant-globals` faz
+dry-run e `--execute` aplica. Ambiente publicado exige a confirmação exata
+documentada em `endpoints/global-training-plans.md`; ele nunca roda no startup.
 
 O identificador é estável, usa `kebab-case` em cada segmento e pertence ao cenário
 documentado. Renomear ou remover um cenário atualiza atomicamente seed, documento e
