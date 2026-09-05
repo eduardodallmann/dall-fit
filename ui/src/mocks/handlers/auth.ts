@@ -18,6 +18,22 @@ import {
 const personState = new Map<string, Person>();
 const authRequestCount = new Map<string, number>();
 const revokedSessions = new Set<string>();
+function getAuthScenario(
+  request: Request,
+  cookies: Record<string, string | undefined>,
+): string | null {
+  const scenario = request.headers.get('x-dall-fit-mock-auth');
+  const session = cookies['dall-fit-mock-session'];
+  if (
+    (scenario === null || scenario === 'authenticated') &&
+    (session === 'unauthenticated' ||
+      session === 'authenticated' ||
+      session === 'admin')
+  )
+    return session;
+  return scenario;
+}
+
 const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
@@ -124,8 +140,8 @@ export const authHandlers = [
 
     return result;
   }),
-  http.get('*/auth/csrf', async ({ request }) => {
-    const scenario = request.headers.get('x-dall-fit-mock-auth');
+  http.get('*/auth/csrf', async ({ request, cookies }) => {
+    const scenario = getAuthScenario(request, cookies);
     await delay(75);
     if (scenario === 'unauthenticated') {
       return HttpResponse.json(
@@ -161,8 +177,8 @@ export const authHandlers = [
       createMockResponseInit({ headers: { 'Cache-Control': 'no-store' } }),
     );
   }),
-  http.post('*/auth/logout', async ({ request }) => {
-    const scenario = request.headers.get('x-dall-fit-mock-auth');
+  http.post('*/auth/logout', async ({ request, cookies }) => {
+    const scenario = getAuthScenario(request, cookies);
     await delay(75);
     if (scenario === 'logout-error') {
       return HttpResponse.json(
@@ -185,8 +201,8 @@ export const authHandlers = [
       status: 204,
     });
   }),
-  http.get('*/auth/me', async ({ request }) => {
-    const scenario = request.headers.get('x-dall-fit-mock-auth');
+  http.get('*/auth/me', async ({ request, cookies }) => {
+    const scenario = getAuthScenario(request, cookies);
     await delay(75);
 
     if (scenario === 'unauthenticated') {
@@ -247,8 +263,8 @@ export const authHandlers = [
 
     return result;
   }),
-  http.patch('*/auth/me/configs', async ({ request }) => {
-    const scenario = request.headers.get('x-dall-fit-mock-auth');
+  http.patch('*/auth/me/configs', async ({ request, cookies }) => {
+    const scenario = getAuthScenario(request, cookies);
     await delay(75);
 
     if (request.headers.get('x-csrf-token') !== mockCsrfToken) {

@@ -307,3 +307,17 @@ test.describe('Rota /dash', () => {
     ).toBeHidden();
   });
 });
+
+test('Destino inválido mantém o dashboard autenticado', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      'dall-fit:auth-return-to',
+      JSON.stringify({ href: '//example.test', capturedAt: Date.now() }),
+    );
+  });
+  await page.goto('/dash');
+  await expect(
+    page.getByRole('link', { name: 'Home', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL('/dash');
+});

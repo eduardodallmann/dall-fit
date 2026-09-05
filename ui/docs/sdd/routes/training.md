@@ -1,5 +1,11 @@
 # Rota `/training`
 
+Acesso direto sem sessão segue a
+[retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação):
+a UI apresenta o login e volta a esta rota após autenticar na mesma aba, com path,
+parâmetros válidos e fragmento. Permissões e disponibilidade do recurso continuam
+sendo verificadas; nenhum draft ou operação anterior é recuperado.
+
 ## Objetivo funcional
 
 - Problema resolvido: escolher um workout do plano em uso ou retomar a sessão.

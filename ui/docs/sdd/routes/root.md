@@ -13,14 +13,16 @@
 - Path e query params: `/`; query opcional `authError=oauth_failed` e `mockAuth`
   (desenvolvimento apenas).
 - Contexto e estado persistido: não exige sessão; pode usar somente a preferência
-  local `dall-fit:theme` com valor `light | dark`.
+  local `dall-fit:theme` com valor `light | dark` e a intenção temporária de
+  navegação descrita em
+  [retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação).
 - Permissões: pública.
 
 Antes de renderizar, a rota executa um probe de sessão em `beforeLoad`. Quando a
-sessão é válida, autenticada ou revogada/recuperada, o router substitui a URL por
-`/dash` sem renderizar a entrada pública. Um bypass one-shot permite que a navegação
-terminal (logout, expiração) volte à raiz e renderize a entrada pública sem novo
-probe. Consulte `../../api/docs/sdd/endpoints/auth.md` e
+sessão é válida, o router substitui a URL pelo destino privado pendente válido
+ou por `/dash` sem renderizar a entrada pública. Um bypass one-shot permite que a
+navegação terminal (logout, expiração) volte à raiz e renderize a entrada pública sem novo
+probe. Consulte `../../../../api/docs/sdd/endpoints/auth.md` e
 `../../../../docs/sdd/flows/login-google.md`.
 
 ## Elementos e conteúdo
@@ -42,8 +44,8 @@ preferência atualizam a rota sem escrever no armazenamento.
 ## Caminho feliz
 
 1. O visitante acessa `/`.
-2. O probe de sessão confa requisição `GET /auth/me`; com sessão válida, o router
-   substitui a URL para `/dash`.
+2. O probe de sessão executa a requisição `GET /auth/me`; com sessão válida, o router
+   substitui a URL pelo destino pendente válido ou por `/dash`.
 3. Com sessão inválida, a entrada pública é renderizada.
 4. O visitante aciona `Entrar com Google`.
 5. O browser navega o documento para `GET ${VITE_API_URL}/auth/google`.
@@ -52,11 +54,11 @@ Resultado esperado: a API inicia o fluxo OAuth.
 
 ## Caminhos alternativos
 
-### Alternativa 1 — Sessão válida redireciona para `/dash`
+### Alternativa 1 — Sessão válida retoma o destino ou abre `/dash`
 
 - Condição: o probe de sessão obtém `200` de `GET /auth/me`.
-- Comportamento: o router substitui a URL para `/dash` e a rota pública não é
-  renderizada.
+- Comportamento: o router substitui a URL pelo destino pendente válido ou por
+  `/dash`, sem renderizar a rota pública.
 - Resultado: usuários autenticados não veem a entrada pública.
 
 ### Alternativa 2 — Login falhou
@@ -98,7 +100,9 @@ Resultado esperado: a API inicia o fluxo OAuth.
 
 ## Validações
 
-Não se aplica — não há formulário nem entrada local.
+Não há formulário. A intenção de navegação é revalidada conforme
+[retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação);
+destinos inválidos ou expirados não são usados.
 
 ## Estados
 
@@ -108,7 +112,7 @@ Não se aplica — não há formulário nem entrada local.
   `role="status"`).
 - Vazio: não se aplica.
 - Sucesso: card de entrada e ação visíveis (usuário sem sessão) ou redirecionado
-  para `/dash` (usuário autenticado).
+  para o destino pendente ou `/dash` (usuário autenticado).
 - Erro recuperável: alerta após falha OAuth esperada no callback ou falha na
   preparação.
 - Erro não recuperável: não se aplica.
@@ -135,10 +139,13 @@ Não se aplica — não há formulário nem entrada local.
 ## Navegação
 
 - Entrada: direta ou redirect.
-- Avanço: endpoint externo da API e, após conclusão, `/dash`.
+- Avanço: endpoint externo da API; o callback chega a `/dash`, onde a proteção
+  retoma o destino privado pendente ou mantém o dashboard.
 - Retorno: browser pode voltar à entrada pública.
 - Botão voltar do navegador: comportamento normal.
-- Dados preservados: nenhum dado pessoal na UI pública.
+- Dados preservados: somente intenção de navegação validada por até 30 minutos
+  na mesma aba, sobrevivendo à recarga e ao erro OAuth recuperável; nenhum dado
+  pessoal ou credencial é armazenado por esse mecanismo.
 
 ## Acessibilidade e interação
 
@@ -234,7 +241,7 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 ### Cenário 6 — Sessão ativa redireciona da raiz
 
 - Link para testar: `http://localhost:3000/`
-- Given: o probe obtém `200` de `GET /auth/me`
+- Given: não há intenção pendente e o probe obtém `200` de `GET /auth/me`
 - When: a raiz resolve o `beforeLoad`
 - Then: o router substitui a URL para `/dash` sem renderizar a entrada pública
 - And: a rota `/dash` reutiliza o dado cacheado do probe sem nova requisição
@@ -247,11 +254,23 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 - Then: o bypass one-shot permite a entrada pública sem novo probe
 - And: uma navegação subsequente à raiz mantém a entrada pública (sessão revogada)
 
+### Cenário 8 — Probe retoma intenção de outra entrada
+
+- Link para testar: `http://localhost:3000/`, com destino válido `/training`
+  capturado anteriormente na mesma aba e sessão confirmada pelo MSW.
+- Given: a entrada privada foi bloqueada e a sessão tornou-se válida.
+- When: a raiz executa o probe.
+- Then: substitui a URL por `/training`, consome a intenção e reutiliza a pessoa
+  confirmada, obtendo CSRF antes do conteúdo privado.
+- And: com intenção inválida ou expirada usa `/dash`; falha OAuth sem sessão
+  preserva a intenção ainda válida para nova tentativa.
+
 ## Estrutura técnica relevante
 
 - Arquivo da rota: `src/routes/routes.tsx` (homeRoute `beforeLoad`, `validateSearch`,
   `pendingComponent`, `pendingMs`)
 - Probe de sessão: `src/routes/root-session-probe.ts`
+- Destino temporário: `src/auth/auth-return-to.ts`, coordenado por `routes.tsx`
 - Lifecycle de sessão: `src/auth/session-lifecycle.ts`
 - Componentes de entrada: `src/routes/route-components.tsx`
   (`HomeRouteComponent`, `HomeRoutePending`)
@@ -276,6 +295,9 @@ Não se aplica — não existem imagens em `routes/assets/root/`.
 | mudança do sistema            | theme provider                        | rota root    |
 | probe redireciona autenticado | root-session-probe, session-lifecycle | rota root    |
 | bypass one-shot após logout   | app, session-lifecycle                | rota root    |
+
+- Retomada: Vitest em `src/routes/auth-return-navigation.test.ts` e Playwright
+  no flow de login, incluindo recarga, erro OAuth e abas independentes.
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts`.
 - Spec Playwright da rota: `tests/integration/routes/auth/root.spec.ts`.
