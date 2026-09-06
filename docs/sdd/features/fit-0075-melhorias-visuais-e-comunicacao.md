@@ -81,6 +81,16 @@
     suportados.
 17. Corrigir contraste e legibilidade dos chips dos cards de `/training` nos
     temas claro e escuro usando tokens semânticos do design system.
+18. Reestruturar o layout responsivo do cabeçalho dos cards de exercício na tela
+    `/training/workout/:workoutId` (nos estados expandido e recolhido/fechado),
+    garantindo que em viewports mobile (ex.: 390px) o nome, número, ícone de mídia,
+    área muscular e resumo de séries/repetições fiquem acomodados sem estourar
+    as margens nem quebrar o layout.
+19. Reorganizar a composição da linha de cada série dentro do card de exercício
+    expandido para assegurar espaçamento e alinhamento adequados entre o rótulo
+    ("Série X"), a contagem de repetições ("12 repetições"), o campo de input da
+    carga e o indicador/botão de conclusão, impedindo que o texto de repetições se
+    amontoe ou colida com o campo de input em telas menores.
 
 ### Não incluído
 
@@ -151,6 +161,10 @@
 11. Todos os estados vazios, pending, erro e retry das novas interações são
     acessíveis, preservam o draft recuperável e não usam mensagem como regra de
     decisão.
+12. Em viewports mobile (ex.: 390px), o cabeçalho do card de exercício (expandido
+    e recolhido) e as linhas de séries em `/training/workout/:workoutId` contêm
+    espaçamento e distribuição de layout que impedem estouro de texto nas bordas do
+    card e colisão da palavra "repetições" com o campo de entrada da carga.
 
 ## Requisitos não funcionais
 
@@ -197,14 +211,13 @@
 - Then: o exercício expande/recolhe, o input recebe foco e a navegação por teclado
   mantém o mesmo comportamento.
 
-### Cenário 4 — Execução responsiva e overlays
+### Cenário 4 — Execução responsiva, cards e overlays
 
 - Forma de validar: Playwright em 390px e 1440px.
 - Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=session-running`.
-- Given: a pessoa abre descanso, duração ou vídeo YouTube Short.
-- When: o overlay aparece em mobile e desktop.
-- Then: mobile cola o drawer ao fundo, desktop preserva a proporção 9:16 do
-  Short, e nenhum título ou controle é cortado.
+- Given: a pessoa visualiza a execução e abre descanso, duração ou vídeo YouTube Short.
+- When: os cards de exercício (expandidos e recolhidos) e os overlays aparecem em mobile e desktop.
+- Then: em mobile o drawer cola ao fundo, no desktop o Short preserva a proporção 9:16, nenhum título ou controle é cortado, e no card do exercício o cabeçalho e as linhas de séries mantêm o rótulo de repetições e o campo de carga alinhados sem amontoamentos ou estouro de margem em 390px.
 
 ### Cenário 5 — Mutations de carga independentes
 
