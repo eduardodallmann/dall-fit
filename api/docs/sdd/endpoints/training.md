@@ -58,6 +58,8 @@ resolve a seleção ativa, busca a última execução do plano e marca o workout
 seguinte ciclicamente como `current`. Ausência de seleção retorna plano nulo e lista
 vazia. A prévia exige workout pertencente ao plano ativo, lê os perfis da pessoa e
 hidrata signed URLs somente na resposta; nenhuma URL temporária é persistida.
+Atividades por duração preservam instrução curta e vídeo demonstrativo opcional
+tanto na prévia quanto no snapshot da execução.
 
 ### Criação, leitura e abandono
 

@@ -11,6 +11,7 @@ export const assistantStyles = tv({
     draft: 'flex flex-col gap-4',
     exercise:
       'grid gap-1 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto]',
+    activityDetails: 'text-sm text-muted sm:col-span-2',
     footer: 'flex items-center justify-between gap-3',
     footerActions: 'flex flex-wrap items-center gap-2',
     form: 'flex shrink-0 flex-col gap-3',

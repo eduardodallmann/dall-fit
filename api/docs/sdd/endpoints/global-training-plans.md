@@ -64,7 +64,9 @@ o header de origem sem expô-lo na resposta.
 GET do workout retorna plano mínimo, timestamps e exercícios na ordem física. Os
 tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
 25 workouts, 50 exercícios, números finitos, 16 body areas. Página 101 é inválida.
-YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Imagem
+YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Exercícios
+de duração gerados pelo assistente podem retornar também instrução curta e ID
+opcional de demonstração; esses metadados não são editáveis pelo CRUD. Imagem
 expõe `thumbnailUrl`, `displayUrl` assinadas e `signedUrlExpiresAt`; keys,
 dimensões internas, pathnames, delegation token e original não atravessam HTTP.
 Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-store`.

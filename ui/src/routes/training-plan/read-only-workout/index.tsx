@@ -86,7 +86,8 @@ function ReadOnlyExerciseCard({
   const hasMedia =
     exercise.type === 'image' ||
     exercise.type === 'youtube-long' ||
-    exercise.type === 'youtube-short';
+    exercise.type === 'youtube-short' ||
+    (exercise.type === 'duration' && exercise.youtubeId !== undefined);
   const exerciseName = exercise.type === 'pause' ? 'Pausa' : exercise.name;
 
   return (
@@ -99,6 +100,9 @@ function ReadOnlyExerciseCard({
           <TypeIcon aria-hidden="true" className={styles.icon()} />
           <div className={styles.cardText()}>
             <h2 className={styles.cardTitle()}>{exerciseName}</h2>
+            {exercise.type === 'duration' && exercise.instructions ? (
+              <p>{exercise.instructions}</p>
+            ) : null}
             {'bodyArea' in exercise ? (
               <p className={styles.bodyArea()}>
                 {bodyAreaLabels[exercise.bodyArea]}
@@ -196,7 +200,7 @@ function ExerciseMedia({
     );
   }
 
-  if (exercise.type === 'youtube-long' || exercise.type === 'youtube-short') {
+  if ('youtubeId' in exercise && exercise.youtubeId !== undefined) {
     if (exercise.youtubeId.length === 0)
       return (
         <div className={styles.mediaPlaceholder()} role="status">

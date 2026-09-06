@@ -8,13 +8,13 @@ import type {
   TrainingPlanAssistantSession,
 } from '@dall-fit/types';
 
+import { mapAssistantProposal } from '~/training-plan-assistant/domain/assistant-proposal';
 import type {
   AssistantProposal,
   AssistantSessionEntity,
 } from '~/training-plan-assistant/domain/training-plan-assistant.types';
 import {
   assistantCatalogMismatch,
-  assistantDraftInvalid,
   assistantIdempotencyReused,
   assistantInvalidState,
   assistantMessageLimit,
@@ -511,6 +511,7 @@ export class TrainingPlanAssistantSessionService {
         proposal,
         candidates,
         session.answers,
+        session.generatedDraft === null,
       );
     } catch (error: unknown) {
       await this.repository.save(
@@ -830,7 +831,9 @@ export class TrainingPlanAssistantSessionService {
           question.key !== currentQuestionKey &&
           ANTICIPATABLE_QUESTION_KEYS.has(question.key) &&
           question.sensitive !== true &&
-          question.when === undefined &&
+          (question.when === undefined ||
+            (question.key === 'interruption' &&
+              question.when.key === currentQuestionKey)) &&
           answers[question.key] === undefined,
       )
       .map(({ key, options, prompt }) => ({ key, options, prompt }));
@@ -918,7 +921,11 @@ export class TrainingPlanAssistantSessionService {
         question.key === currentQuestionKey ||
         !ANTICIPATABLE_QUESTION_KEYS.has(question.key) ||
         question.sensitive === true ||
-        question.when !== undefined ||
+        (question.when !== undefined &&
+          !(
+            question.key === 'interruption' &&
+            question.when.key === currentQuestionKey
+          )) ||
         existing[question.key] !== undefined ||
         !question.options.some(
           (option) => option.value === candidate.suggestedValue,
@@ -1053,54 +1060,22 @@ export class TrainingPlanAssistantSessionService {
     proposal: AssistantProposal,
     candidates: ReturnType<AssistantCatalogService['candidates']>,
     answers: Readonly<Record<string, string>>,
+    requireActivities: boolean,
   ): TrainingPlanAssistantDraft {
-    const frequency = Number(answers.frequency);
-    if (proposal.workouts.length !== frequency) throw assistantDraftInvalid();
-    const allowed = new Map(
-      candidates.map((candidate) => [candidate.key, candidate]),
+    this.logger.log(
+      'TrainingPlanAssistantSessionService -> validateAndMapProposal -> params:',
+      { params: { candidateCount: candidates.length } },
     );
-    const durationLimit = Number(answers.duration);
-    const workouts = proposal.workouts.map((workout) => {
-      if (workout.exercises.length < 1 || workout.exercises.length > 7)
-        throw assistantDraftInvalid();
-      const uniqueKeys = new Set(
-        workout.exercises.map((exercise) => exercise.catalogKey),
-      );
-      if (uniqueKeys.size !== workout.exercises.length)
-        throw assistantDraftInvalid();
-      const exercises = workout.exercises.map((exercise) => {
-        const catalogExercise = allowed.get(exercise.catalogKey);
-        if (catalogExercise === undefined) throw assistantDraftInvalid();
-        return {
-          bodyArea: catalogExercise.bodyArea,
-          catalogKey: catalogExercise.key,
-          name: catalogExercise.name,
-          repetitions: exercise.repetitions,
-          restSeconds: exercise.restSeconds,
-          sets: exercise.sets,
-          type: 'youtube-short' as const,
-          youtubeId: catalogExercise.youtubeId,
-        };
-      });
-      const estimatedDurationMinutes = exercises.reduce(
-        (total, exercise) =>
-          total +
-          Math.ceil(
-            (exercise.sets *
-              (exercise.repetitions * 4 + exercise.restSeconds)) /
-              60,
-          ),
-        0,
-      );
-      if (estimatedDurationMinutes > durationLimit)
-        throw assistantDraftInvalid();
-      return { estimatedDurationMinutes, exercises, name: workout.name };
-    });
-    const result = {
-      description: proposal.description,
-      planName: proposal.planName,
-      workouts,
-    };
+    const result = mapAssistantProposal(
+      proposal,
+      candidates,
+      answers,
+      requireActivities,
+    );
+    this.logger.log(
+      'TrainingPlanAssistantSessionService -> validateAndMapProposal -> return:',
+      { data: { workoutCount: result.workouts.length } },
+    );
     return result;
   }
 

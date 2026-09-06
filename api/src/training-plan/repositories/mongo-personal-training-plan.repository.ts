@@ -56,6 +56,7 @@ interface PlainExercise {
   _id: Types.ObjectId;
   bodyArea?: string;
   durationMinutes?: number;
+  instructions?: string;
   image?: {
     display: PlainImageVariant;
     thumbnail: PlainImageVariant;
@@ -876,6 +877,12 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
         ...common,
         ...named,
         durationMinutes: exercise.durationMinutes ?? 1,
+        ...(exercise.instructions === undefined
+          ? {}
+          : { instructions: exercise.instructions }),
+        ...(exercise.youtubeId === undefined
+          ? {}
+          : { youtubeId: exercise.youtubeId }),
         type: 'duration',
       };
     if (exercise.type === 'youtube-long')

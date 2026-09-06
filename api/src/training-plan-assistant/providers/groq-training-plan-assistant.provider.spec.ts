@@ -140,6 +140,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
       candidates: [
         {
           active: true,
+          category: 'strength',
           bodyArea: 'back',
           equipment: ['machine'],
           goalTags: ['general-health'],
@@ -155,7 +156,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
           youtubeId: 'exercise-1',
         },
       ],
-      catalogVersion: 'exercise-catalog.v1',
+      catalogVersion: 'exercise-catalog.v2',
       currentDraft: {
         description: 'Prévia original.',
         planName: 'Plano original',
@@ -178,8 +179,8 @@ describe('GroqTrainingPlanAssistantProvider', () => {
           },
         ],
       },
-      knowledgeVersion: 'fitness-guidelines.v1',
-      promptVersion: 'training-plan-assistant.v1',
+      knowledgeVersion: 'fitness-guidelines.v2',
+      promptVersion: 'training-plan-assistant.v2',
     });
 
     const request = requestBody(fetchMock);
@@ -189,8 +190,9 @@ describe('GroqTrainingPlanAssistantProvider', () => {
     };
     expect(payload.untrustedData?.generationRules).toMatchObject({
       maxDurationMinutes: 45,
-      maxExercisesPerWorkout: 7,
+      maxExercisesPerWorkout: 12,
       minExercisesPerWorkout: 1,
+      outputLocale: 'pt-BR',
       requiredWorkoutCount: 2,
       uniqueCatalogKeyWithinWorkout: true,
     });
@@ -213,9 +215,82 @@ describe('GroqTrainingPlanAssistantProvider', () => {
         ],
       },
     });
+    expect(messages[0]?.content).toContain('português do Brasil');
     expect(messages[0]?.content).toContain(
       'preserve integralmente tudo que o adjustment não pedir para mudar',
     );
+  });
+
+  it('retries once to translate generated presentation text to pt-BR', async () => {
+    const exercises = [
+      {
+        catalogKey: 'youtube-short:exercise-1',
+        repetitions: 12,
+        restSeconds: 60,
+        sets: 3,
+      },
+    ];
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        successfulResponse({
+          description: 'This workout builds strength for the whole body.',
+          planName: 'Balanced fitness plan',
+          workouts: [
+            { exercises, name: 'Upper body' },
+            { exercises, name: 'Lower body' },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        successfulResponse({
+          description:
+            'Plano equilibrado para desenvolver força no corpo todo.',
+          planName: 'Evolução equilibrada',
+          workouts: [
+            { exercises, name: 'Força de tronco' },
+            { exercises, name: 'Base de pernas' },
+          ],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await createProvider('openai/gpt-oss-120b').propose({
+      answers: { duration: '45', frequency: '2' },
+      candidates: [
+        {
+          active: true,
+          bodyArea: 'back',
+          category: 'strength',
+          equipment: ['machine'],
+          goalTags: ['general-health'],
+          impact: 'none',
+          instructions: 'Execute de forma controlada.',
+          key: 'youtube-short:exercise-1',
+          level: 'beginner',
+          movementPattern: 'pull',
+          name: 'Puxada',
+          notes: '',
+          requiresSupport: false,
+          type: 'youtube-short',
+          youtubeId: 'exercise-1',
+        },
+      ],
+      catalogVersion: 'exercise-catalog.v2',
+      knowledgeVersion: 'fitness-guidelines.v2',
+      promptVersion: 'training-plan-assistant.v2',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({
+      description: 'Plano equilibrado para desenvolver força no corpo todo.',
+      planName: 'Evolução equilibrada',
+      workouts: [{ name: 'Força de tronco' }, { name: 'Base de pernas' }],
+    });
+    const secondBody = fetchMock.mock.calls[1]?.[1]?.body;
+    expect(typeof secondBody).toBe('string');
+    expect(secondBody).toContain('previousProposal');
+    expect(secondBody).toContain('reescreva somente');
   });
 
   it('extracts a free schedule without forcing it into a quick answer', async () => {

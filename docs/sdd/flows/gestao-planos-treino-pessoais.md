@@ -123,8 +123,11 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
   `assistant-preview` no mesmo parâmetro `mockTrainingPlans`.
 - Given: a triagem local bloqueou ou concluiu apta.
 - When: a pessoa revisa o resultado.
-- Then: bloqueio não oferece geração; preview mostra estrutura completa e a
-  confirmação cria um plano próprio inativo e navega ao detalhe.
+- Then: bloqueio não oferece geração; preview mostra descrição e títulos
+  específicos criados pelo agente em português, além da estrutura completa com
+  aquecimento, força, cardio elegível, desaquecimento e alongamento dentro da
+  duração informada; a confirmação cria um plano próprio inativo e navega ao
+  detalhe.
 
 ## Cobertura automatizada
 

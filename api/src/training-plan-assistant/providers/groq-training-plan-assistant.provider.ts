@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 
+import {
+  proposalSchema,
+  proposalUsesPtBR,
+} from '~/training-plan-assistant/domain/assistant-proposal';
 import type { AssistantProposal } from '~/training-plan-assistant/domain/training-plan-assistant.types';
 import { assistantProviderUnavailable } from '~/training-plan-assistant/errors/training-plan-assistant.errors';
 import {
@@ -39,30 +43,6 @@ const interpretationSchema = z.strictObject({
 
 const reformulationSchema = z.strictObject({
   text: z.string().min(1).max(300),
-});
-
-const proposalSchema = z.strictObject({
-  description: z.string().min(1).max(1000),
-  planName: z.string().min(1).max(120),
-  workouts: z
-    .array(
-      z.strictObject({
-        exercises: z
-          .array(
-            z.strictObject({
-              catalogKey: z.string().min(1),
-              repetitions: z.number().int().min(1).max(1000),
-              restSeconds: z.number().int().min(0).max(3600),
-              sets: z.number().int().min(1).max(100),
-            }),
-          )
-          .min(1)
-          .max(7),
-        name: z.string().min(1).max(120),
-      }),
-    )
-    .min(2)
-    .max(7),
 });
 
 interface GroqResponse {
@@ -163,50 +143,88 @@ export class GroqTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
   }
 
   async propose(input: ProposeTrainingPlanInput): Promise<AssistantProposal> {
-    const result = await this.request(
-      'propose',
-      'Monte apenas uma estrutura de treino geral. Quando currentDraft existir, edite essa prévia e preserve integralmente tudo que o adjustment não pedir para mudar. Obedeça integralmente a generationRules, use exclusivamente catalogKey fornecida, não repita catalogKey no mesmo treino, não dê orientação clínica e retorne JSON.',
-      {
-        adjustment: input.adjustment,
-        answers: input.answers,
-        candidates: input.candidates.map((candidate) => ({
-          bodyArea: candidate.bodyArea,
-          key: candidate.key,
-          name: candidate.name,
-        })),
-        currentDraft:
-          input.currentDraft === undefined
-            ? null
-            : {
-                description: input.currentDraft.description,
-                planName: input.currentDraft.planName,
-                workouts: input.currentDraft.workouts.map((workout) => ({
-                  exercises: workout.exercises.map((exercise) => ({
-                    catalogKey: exercise.catalogKey,
-                    repetitions: exercise.repetitions,
-                    restSeconds: exercise.restSeconds,
-                    sets: exercise.sets,
-                  })),
-                  name: workout.name,
+    const instruction =
+      'Crie títulos específicos e uma descrição útil para este plano. Escreva obrigatoriamente planName, description e todos os nomes de treinos em português do Brasil, mesmo quando o pedido contiver termos em inglês. Não use títulos como Upper Body, Lower Body, Push, Pull ou Full Body: use os equivalentes em português. Monte apenas uma estrutura de treino geral. Quando currentDraft existir, edite essa prévia e preserve integralmente tudo que o adjustment não pedir para mudar. Obedeça integralmente a generationRules, use exclusivamente catalogKey fornecida, não repita catalogKey no mesmo treino, não dê orientação clínica e retorne JSON.';
+    const payload = {
+      adjustment: input.adjustment,
+      answers: input.answers,
+      candidates: input.candidates.map((candidate) => ({
+        bodyArea: candidate.bodyArea,
+        key: candidate.key,
+        name: candidate.name,
+        type: candidate.type,
+        category: candidate.category,
+        instructions: candidate.instructions,
+        ...(candidate.type === 'duration'
+          ? {
+              minDurationMinutes: candidate.minDurationMinutes,
+              maxDurationMinutes: candidate.maxDurationMinutes,
+            }
+          : {}),
+      })),
+      currentDraft:
+        input.currentDraft === undefined
+          ? null
+          : {
+              description: input.currentDraft.description,
+              planName: input.currentDraft.planName,
+              workouts: input.currentDraft.workouts.map((workout) => ({
+                exercises: workout.exercises.map((exercise) => ({
+                  catalogKey: exercise.catalogKey,
+                  ...(exercise.type === 'duration'
+                    ? { durationMinutes: exercise.durationMinutes }
+                    : {
+                        repetitions: exercise.repetitions,
+                        restSeconds: exercise.restSeconds,
+                        sets: exercise.sets,
+                      }),
                 })),
-              },
-        generationRules: {
-          durationEstimate:
-            'Para cada exercício, ceil(sets * (repetitions * 4 + restSeconds) / 60); a soma do treino não pode superar maxDurationMinutes.',
-          maxDurationMinutes: Number(input.answers.duration),
-          maxExercisesPerWorkout: 7,
-          minExercisesPerWorkout: 1,
-          requiredWorkoutCount: Number(input.answers.frequency),
-          uniqueCatalogKeyWithinWorkout: true,
-        },
-        versions: {
-          catalog: input.catalogVersion,
-          knowledge: input.knowledgeVersion,
-          prompt: input.promptVersion,
-        },
+                name: workout.name,
+              })),
+            },
+      generationRules: {
+        durationEstimate:
+          'Para força: ceil(sets * (repetitions * 4 + restSeconds) / 60). Para duration: durationMinutes. Some aquecimento, força, cardio, desaquecimento e alongamento; o total não pode superar maxDurationMinutes.',
+        maxDurationMinutes: Number(input.answers.duration),
+        maxExercisesPerWorkout: 12,
+        activityGuidance: [
+          'Estruture nesta ordem: aquecimento leve (5–10 min), força (no máximo 7 exercícios), cardio principal, desaquecimento (5–10 min se houver cardio) e 1–2 alongamentos estáticos ao final (2 min cada, contando os dois lados e transições).',
+          'Inclua caminhada ou bicicleta quando elegíveis e houver tempo; com pelo menos 30 min disponíveis, reserve espaço para cardio em ao menos um treino do plano inicial. Não remova toda a força para abrir espaço.',
+          'Iniciantes ou retorno: cardio principal de 5–10 min; demais: 10–30 min, limitado pelo catálogo e tempo total. Estes são limites conservadores do produto, não metas clínicas.',
+          'Prefira cardio mais longo nos treinos com menor volume de pernas. Se metade ou mais dos exercícios de força envolver quadríceps, posteriores, glúteos, panturrilhas ou adutores, limite o cardio principal a 10 min e não use corrida.',
+          'Corrida apenas para quem já corre regularmente e tolera impacto, sem pausa atual. Não deduza hábito de corrida da experiência com musculação. Não prescreva tiros, velocidade fixa nem inclinação obrigatória.',
+          'Não proíba caminhada/bicicleta leve no dia de pernas. Separe sessões exigentes quando possível e explique recuperação na descrição, sem inventar dias livres que a pessoa não informou.',
+          'A referência semanal de 150 min moderados ou 75 vigorosos não é uma dose inicial nem deve ser forçada dentro destas sessões. Não afirme que o plano atinge a meta se não atingir.',
+        ],
+        minExercisesPerWorkout: 1,
+        outputLocale: 'pt-BR',
+        requiredWorkoutCount: Number(input.answers.frequency),
+        uniqueCatalogKeyWithinWorkout: true,
       },
+      versions: {
+        catalog: input.catalogVersion,
+        knowledge: input.knowledgeVersion,
+        prompt: input.promptVersion,
+      },
+    };
+    let result = await this.request(
+      'propose',
+      instruction,
+      payload,
       proposalSchema,
     );
+    if (!proposalUsesPtBR(result)) {
+      this.logger.warn(
+        'GroqTrainingPlanAssistantProvider -> propose -> languageCorrection branch:',
+        { data: { expectedLocale: 'pt-BR' } },
+      );
+      result = await this.request(
+        'propose',
+        `${instruction} A proposta anterior violou o idioma obrigatório. Preserve exercícios, parâmetros e estrutura; reescreva somente planName, description e nomes dos treinos em português do Brasil.`,
+        { ...payload, previousProposal: result },
+        proposalSchema,
+      );
+    }
     return result;
   }
 

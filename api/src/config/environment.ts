@@ -144,7 +144,7 @@ const environmentSchema = z.looseObject({
     .number()
     .int()
     .min(1)
-    .default(20),
+    .default(40),
   RATE_LIMIT_ASSISTANT_MESSAGE_WINDOW_MS: z.coerce
     .number()
     .int()

@@ -49,6 +49,7 @@ interface PlainExercise {
   sets?: number;
   repetitions?: number;
   durationMinutes?: number;
+  instructions?: string;
 }
 
 interface PlainWorkout {
@@ -1145,6 +1146,12 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             { type: 'duration' }
           >['bodyArea'],
           durationMinutes: exercise.durationMinutes ?? 1,
+          ...(exercise.instructions === undefined
+            ? {}
+            : { instructions: exercise.instructions }),
+          ...(exercise.youtubeId === undefined
+            ? {}
+            : { youtubeId: exercise.youtubeId }),
         };
         break;
     }

@@ -1,6 +1,10 @@
 {
-  "version": "exercise-catalog.v1",
-  "sources": ["FIT-0073 Apêndice A"],
+  "version": "exercise-catalog.v2",
+  "sources": [
+    "FIT-0073 Apêndice A",
+    "https://www.youtube.com/@strongrunnerapp/videos",
+    "https://www.heart.org/en/healthy-living/exercise-and-physical-activity/fitness-basics/flexibility-exercise-stretching"
+  ],
   "entries": [
     {
       "key": "youtube-short:h8-mLauzygA",
@@ -22,7 +26,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:_c8NXVnlb8I",
@@ -44,7 +49,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Nfft0NAOMfo",
@@ -66,7 +72,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:V2mOGF6yp6g",
@@ -88,7 +95,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:kRws_E6AoSQ",
@@ -110,7 +118,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:5WHXKjq7isA",
@@ -132,7 +141,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:ssc8-WgGH1c",
@@ -154,7 +164,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:8DksEpvZBNM",
@@ -176,7 +187,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:K3M6pAbaUDw",
@@ -198,7 +210,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:GalcGw9Pfw8",
@@ -220,7 +233,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:gqQAu1Y7Q4k",
@@ -242,7 +256,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:19JmtPaN_k4",
@@ -264,7 +279,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:WXqdVnQd8Vc",
@@ -286,7 +302,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:6pG7_UjjJzo",
@@ -308,7 +325,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:jY5tG4O8BjM",
@@ -330,7 +348,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Fxc0UMrgBmo",
@@ -352,7 +371,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:5jDnoAOKlYQ",
@@ -374,7 +394,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:ueMZZ4iv_Rc",
@@ -396,7 +417,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:erggHEES3tg",
@@ -418,7 +440,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:_eehIUQuGB0",
@@ -440,7 +463,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:_YaUOyLeXOU",
@@ -462,7 +486,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:KiFCxrczVao",
@@ -484,7 +509,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:5Nb-KZ6gOaQ",
@@ -506,7 +532,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:dPsAetF50Bg",
@@ -528,7 +555,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Irb6l1iSmrU",
@@ -550,7 +578,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:YaGW1J7aIC8",
@@ -572,7 +601,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:sEY9GRdpHVU",
@@ -594,7 +624,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:RKnynl1Xt7o",
@@ -616,7 +647,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:XSqeC0u8Qdo",
@@ -638,7 +670,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:ZxiI-W391ds",
@@ -660,7 +693,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Mfu-m391YFs",
@@ -682,7 +716,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:vSCnLUN3z4g",
@@ -704,7 +739,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:hKnT97d10WM",
@@ -726,7 +762,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:tF4yilwuCzk",
@@ -748,7 +785,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:KKgvoYD15XM",
@@ -770,7 +808,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:NaISfa9G26s",
@@ -792,7 +831,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:gSZXyLd8YNI",
@@ -814,7 +854,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:O5qg1SS_M30",
@@ -836,7 +877,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:nTEntkr9X4g",
@@ -858,7 +900,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:T18xxjCw33I",
@@ -880,7 +923,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:alrantdX7z4",
@@ -902,7 +946,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:46_uWo2yVKw",
@@ -924,7 +969,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:XMewm1W-ECY",
@@ -946,7 +992,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:1XTX22zHV-U",
@@ -968,7 +1015,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:gGe_a1aCYCU",
@@ -990,7 +1038,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:bpoDDqwzVGQ",
@@ -1012,7 +1061,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:55y8j6ZonjE",
@@ -1034,7 +1084,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:WRtKbvjUWyw",
@@ -1056,7 +1107,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:hqdrlc4Jgqc",
@@ -1078,7 +1130,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:LZxcm2C-tck",
@@ -1100,7 +1153,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:r8I9a14aLD4",
@@ -1122,7 +1176,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:LpGu57FI7B8",
@@ -1144,7 +1199,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:YUnL8IFg7sc",
@@ -1166,7 +1222,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:TVlQeGLMjwc",
@@ -1188,7 +1245,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:FOEBktrbFhM",
@@ -1210,7 +1268,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:WSo0G3ZUadY",
@@ -1232,7 +1291,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Ikak7TMeygc",
@@ -1254,7 +1314,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:xOX9DRiQ3BQ",
@@ -1276,7 +1337,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:o0dVK46WVIs",
@@ -1298,7 +1360,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:PH3atYH2vns",
@@ -1320,7 +1383,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:EXAikbHGpJ4",
@@ -1342,7 +1406,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:zZJK_aglDFY",
@@ -1364,7 +1429,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:n4rakmCKJkg",
@@ -1386,7 +1452,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:sJgUYTJWncw",
@@ -1408,7 +1475,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:vgXbs-Htp5s",
@@ -1430,7 +1498,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:FSe7LTfIFUg",
@@ -1452,7 +1521,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:4h_WrfU9NTI",
@@ -1474,7 +1544,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:XENvpyrW1lg",
@@ -1496,7 +1567,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:qYCd9Qg9Nmc",
@@ -1518,7 +1590,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:Ng4Vf2rmamE",
@@ -1540,7 +1613,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:WiOlNR2g3rA",
@@ -1562,7 +1636,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:p57O4yOkh3E",
@@ -1584,7 +1659,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:lKMu652A0H4",
@@ -1606,7 +1682,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:NIlDUWXwC58",
@@ -1628,7 +1705,8 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
     },
     {
       "key": "youtube-short:S4i4bxvExVw",
@@ -1650,7 +1728,203 @@
       ],
       "instructions": "Execute de forma controlada, respeitando amplitude e carga confortáveis.",
       "notes": "Interrompa o exercício se houver dor ou mal-estar.",
-      "active": true
+      "active": true,
+      "category": "strength"
+    },
+    {
+      "active": true,
+      "bodyArea": "cardio",
+      "equipment": ["bodyweight"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "low",
+      "instructions": "Caminhe devagar, aumentando o ritmo gradualmente, sem se cansar antes da musculação. Pode ser no chão ou na esteira.",
+      "key": "duration:warmup-walk",
+      "level": "beginner",
+      "movementPattern": "warmup",
+      "name": "Aquecimento: caminhada leve",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "warmup",
+      "minDurationMinutes": 5,
+      "maxDurationMinutes": 10
+    },
+    {
+      "active": true,
+      "bodyArea": "cardio",
+      "equipment": ["treadmill"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "low",
+      "instructions": "Ritmo confortável a moderado: consiga conversar. Reduza ritmo se houver fadiga. Não há velocidade ou inclinação obrigatória.",
+      "key": "duration:treadmill-walk",
+      "level": "beginner",
+      "movementPattern": "cardio",
+      "name": "Esteira: caminhada",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "cardio",
+      "minDurationMinutes": 5,
+      "maxDurationMinutes": 30
+    },
+    {
+      "active": true,
+      "bodyArea": "cardio",
+      "equipment": ["stationary-bike"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "low",
+      "instructions": "Pedale com resistência leve a moderada, conseguindo conversar. Não use carga alta para compensar uma sessão curta.",
+      "key": "duration:stationary-bike",
+      "level": "beginner",
+      "movementPattern": "cardio",
+      "name": "Bicicleta ergométrica",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "cardio",
+      "minDurationMinutes": 5,
+      "maxDurationMinutes": 30
+    },
+    {
+      "active": true,
+      "bodyArea": "cardio",
+      "equipment": ["treadmill"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "high",
+      "instructions": "Corrida confortável, sem tiros. Use apenas se já corre regularmente e tolera impacto; reduza para caminhada se o esforço deixar de ser confortável.",
+      "key": "duration:treadmill-run",
+      "level": "beginner",
+      "movementPattern": "cardio",
+      "name": "Esteira: corrida confortável",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "cardio",
+      "minDurationMinutes": 5,
+      "maxDurationMinutes": 20
+    },
+    {
+      "active": true,
+      "bodyArea": "cardio",
+      "equipment": ["bodyweight"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "low",
+      "instructions": "Reduza o ritmo gradualmente até caminhar devagar antes de parar. Não é um bloco de cardio intenso.",
+      "key": "duration:cooldown-walk",
+      "level": "beginner",
+      "movementPattern": "cooldown",
+      "name": "Desaquecimento: caminhada leve",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "cooldown",
+      "minDurationMinutes": 5,
+      "maxDurationMinutes": 10
+    },
+    {
+      "active": true,
+      "bodyArea": "quadriceps",
+      "equipment": ["bodyweight"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "none",
+      "instructions": "Ao final, sustente suavemente por 10–20 s, solte e repita 3 vezes por lado (ou 3 vezes na posição bilateral), dentro dos 2 min. Respire, sem balanços nem dor. O vídeo demonstra a posição; não siga um ritmo diferente do indicado aqui.",
+      "key": "duration:quadriceps-stretch",
+      "level": "beginner",
+      "movementPattern": "stretching",
+      "name": "Alongamento de quadríceps",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "stretching",
+      "minDurationMinutes": 2,
+      "maxDurationMinutes": 2,
+      "youtubeId": "yFvf_tdVook"
+    },
+    {
+      "active": true,
+      "bodyArea": "glutes",
+      "equipment": ["bodyweight"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "none",
+      "instructions": "Ao final, sustente suavemente por 10–20 s, solte e repita 3 vezes por lado (ou 3 vezes na posição bilateral), dentro dos 2 min. Respire, sem balanços nem dor. O vídeo demonstra a posição; não siga um ritmo diferente do indicado aqui.",
+      "key": "duration:glute-stretch",
+      "level": "beginner",
+      "movementPattern": "stretching",
+      "name": "Alongamento de glúteos",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "stretching",
+      "minDurationMinutes": 2,
+      "maxDurationMinutes": 2,
+      "youtubeId": "kDucxHZe5jk"
+    },
+    {
+      "active": true,
+      "bodyArea": "adductor",
+      "equipment": ["bodyweight"],
+      "goalTags": [
+        "general-health",
+        "conditioning",
+        "weight-loss",
+        "hypertrophy",
+        "return"
+      ],
+      "impact": "none",
+      "instructions": "Ao final, sustente suavemente por 10–20 s, solte e repita 3 vezes por lado (ou 3 vezes na posição bilateral), dentro dos 2 min. Respire, sem balanços nem dor. O vídeo demonstra a posição; não siga um ritmo diferente do indicado aqui.",
+      "key": "duration:adductor-stretch",
+      "level": "beginner",
+      "movementPattern": "stretching",
+      "name": "Alongamento de adutores",
+      "notes": "Sugestão geral; respeitar tolerância, recuperação e tempo total disponível.",
+      "requiresSupport": false,
+      "type": "duration",
+      "category": "stretching",
+      "minDurationMinutes": 2,
+      "maxDurationMinutes": 2,
+      "youtubeId": "ir-XXTWVm7g"
     }
   ]
 }

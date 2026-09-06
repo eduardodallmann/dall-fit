@@ -614,9 +614,26 @@ function AssistantDraftPreview({
             <div className={styles.exercise()} key={exercise.catalogKey}>
               <strong>{exercise.name}</strong>
               <span>
-                {exercise.sets} × {exercise.repetitions} · descanso de{' '}
-                {exercise.restSeconds}s
+                {exercise.type === 'duration'
+                  ? `${exercise.durationMinutes} min`
+                  : `${exercise.sets} × ${exercise.repetitions} · descanso de ${exercise.restSeconds}s`}
               </span>
+              {exercise.type === 'duration' ? (
+                <p className={styles.activityDetails()}>
+                  {exercise.instructions}
+                </p>
+              ) : null}
+              {exercise.type === 'duration' &&
+              exercise.youtubeId !== undefined ? (
+                <a
+                  className={styles.activityDetails()}
+                  href={`https://www.youtube.com/watch?v=${exercise.youtubeId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ver demonstração de {exercise.name}
+                </a>
+              ) : null}
             </div>
           ))}
         </article>

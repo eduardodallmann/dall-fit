@@ -24,7 +24,7 @@ export interface CompleteTrainingPlanInput extends NewTrainingPlan {
   workouts: readonly {
     id: string;
     name: string;
-    exercises: readonly Extract<StoredExercise, { type: 'youtube-short' }>[];
+    exercises: readonly StoredExercise[];
   }[];
 }
 

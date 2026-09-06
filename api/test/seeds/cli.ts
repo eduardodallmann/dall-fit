@@ -387,6 +387,8 @@ async function main(): Promise<void> {
             chestPain: 'no',
             chronic: 'no',
             cyclingTolerance: 'good',
+            cardioEquipment: 'both',
+            runningHabit: 'no',
             duration: '45',
             equipment: 'machines-free-weights',
             experience: 'beginner',
@@ -409,7 +411,7 @@ async function main(): Promise<void> {
             tolerance: 'good',
             walkingTolerance: 'good',
           },
-          catalogVersion: 'exercise-catalog.v1',
+          catalogVersion: 'exercise-catalog.v2',
           currentQuestionKey: null,
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           generatedDraft: preview
@@ -453,7 +455,7 @@ async function main(): Promise<void> {
               }
             : null,
           invalidAttempts: {},
-          knowledgeVersion: 'fitness-guidelines.v1',
+          knowledgeVersion: 'fitness-guidelines.v2',
           materialization: null,
           messages: [
             {
@@ -469,7 +471,7 @@ async function main(): Promise<void> {
           noticeVersion: 'assistant-notice.v1',
           operationKeys: {},
           personId,
-          promptVersion: 'training-plan-assistant.v1',
+          promptVersion: 'training-plan-assistant.v2',
           provider: 'fake',
           screeningOutcome: 'apto_para_fluxo_geral',
           status: preview ? 'preview' : 'ready',

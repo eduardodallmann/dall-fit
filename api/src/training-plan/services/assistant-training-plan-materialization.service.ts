@@ -60,16 +60,12 @@ export class AssistantTrainingPlanMaterializationService {
       name: draft.planName,
       ownerPersonId: personId,
       workouts: draft.workouts.map((workout) => ({
-        exercises: workout.exercises.map((exercise) => ({
-          bodyArea: exercise.bodyArea,
-          id: randomBytes(12).toString('hex'),
-          name: exercise.name,
-          repetitions: exercise.repetitions,
-          restSeconds: exercise.restSeconds,
-          sets: exercise.sets,
-          type: 'youtube-short',
-          youtubeId: exercise.youtubeId,
-        })),
+        exercises: workout.exercises.map(
+          ({ catalogKey: _catalogKey, ...exercise }) => ({
+            ...exercise,
+            id: randomBytes(12).toString('hex'),
+          }),
+        ),
         id: randomBytes(12).toString('hex'),
         name: workout.name,
       })),

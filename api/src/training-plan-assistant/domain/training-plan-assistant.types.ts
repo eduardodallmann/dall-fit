@@ -6,7 +6,7 @@ import type {
   TrainingPlanAssistantStatus,
 } from '@dall-fit/types';
 
-export interface AssistantCatalogExercise {
+interface AssistantCatalogBase {
   active: boolean;
   bodyArea: BodyArea;
   equipment: readonly string[];
@@ -19,9 +19,19 @@ export interface AssistantCatalogExercise {
   name: string;
   notes: string;
   requiresSupport: boolean;
-  type: 'youtube-short';
-  youtubeId: string;
+  category: 'strength' | 'warmup' | 'cardio' | 'cooldown' | 'stretching';
 }
+
+export type AssistantCatalogExercise = AssistantCatalogBase &
+  (
+    | { type: 'youtube-short'; youtubeId: string }
+    | {
+        type: 'duration';
+        youtubeId?: string;
+        minDurationMinutes: number;
+        maxDurationMinutes: number;
+      }
+  );
 
 export interface AssistantQuestion {
   key: string;
@@ -80,12 +90,10 @@ export interface AssistantSessionEntity {
   version: number;
 }
 
-export interface AssistantProposalExercise {
-  catalogKey: string;
-  repetitions: number;
-  restSeconds: number;
-  sets: number;
-}
+export type AssistantProposalExercise = { catalogKey: string } & (
+  | { repetitions: number; restSeconds: number; sets: number }
+  | { durationMinutes: number }
+);
 
 export interface AssistantProposalWorkout {
   exercises: readonly AssistantProposalExercise[];

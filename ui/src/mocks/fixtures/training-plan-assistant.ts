@@ -73,8 +73,15 @@ function createPreviewDraft(): NonNullable<
     planName: 'Meu plano personalizado',
     workouts: [
       {
-        estimatedDurationMinutes: 35,
+        estimatedDurationMinutes: 23,
         exercises: [
+          {
+            catalogKey: 'duration:warmup-walk',
+            type: 'duration',
+            bodyArea: 'cardio',
+            name: 'Aquecimento: caminhada leve',
+            durationMinutes: 5,
+          },
           {
             bodyArea: 'quadriceps',
             catalogKey: 'youtube-short:n4rakmCKJkg',
@@ -84,6 +91,31 @@ function createPreviewDraft(): NonNullable<
             sets: 3,
             type: 'youtube-short',
             youtubeId: 'n4rakmCKJkg',
+          },
+          {
+            catalogKey: 'duration:stationary-bike',
+            type: 'duration',
+            bodyArea: 'cardio',
+            name: 'Bicicleta ergométrica',
+            durationMinutes: 5,
+            instructions: 'Pedale em ritmo confortável, conseguindo conversar.',
+          },
+          {
+            catalogKey: 'duration:cooldown-walk',
+            type: 'duration',
+            bodyArea: 'cardio',
+            name: 'Desaquecimento: caminhada leve',
+            durationMinutes: 5,
+          },
+          {
+            catalogKey: 'duration:quadriceps-stretch',
+            type: 'duration',
+            bodyArea: 'quadriceps',
+            name: 'Alongamento de quadríceps',
+            durationMinutes: 2,
+            youtubeId: 'yFvf_tdVook',
+            instructions:
+              'Sustente por 10–20 s, 3 vezes por lado, sem dor, dentro dos 2 min.',
           },
         ],
         name: 'Treino A',

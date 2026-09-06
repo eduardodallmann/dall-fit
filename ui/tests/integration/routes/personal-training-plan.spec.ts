@@ -93,6 +93,17 @@ test.describe('Rotas pessoais de planos de treino', () => {
     await expect(
       dialog.getByRole('region', { name: 'Prévia do plano' }),
     ).toContainText('Leg press sentado');
+    await expect(
+      dialog.getByRole('region', { name: 'Prévia do plano' }),
+    ).toContainText('Bicicleta ergométrica');
+    await expect(
+      dialog.getByRole('region', { name: 'Prévia do plano' }),
+    ).toContainText('10–20 s');
+    await expect(
+      dialog.getByRole('link', {
+        name: 'Ver demonstração de Alongamento de quadríceps',
+      }),
+    ).toHaveAttribute('href', 'https://www.youtube.com/watch?v=yFvf_tdVook');
     await dialog.getByRole('button', { name: 'Criar plano' }).click();
     await expect(page).toHaveURL(/\/training-plan\/74b000000000000000000099/);
   });

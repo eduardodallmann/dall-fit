@@ -348,7 +348,7 @@ describe('Global training plans (e2e)', () => {
         session.messages.findLast((message) => message.role === 'person')?.text,
       ).toBe(expectedVisibleText);
     }
-    expect(messageNumber).toBeLessThanOrEqual(20);
+    expect(messageNumber).toBeLessThanOrEqual(22);
     expect(session.status).toBe('ready');
 
     const conflictResponse = await authenticatedMutation(
@@ -440,6 +440,82 @@ describe('Global training plans (e2e)', () => {
         }
       ).data,
     ).toEqual(confirmationData);
+
+    const detail = await agent
+      .get(`/training-plans/${confirmationData.catalogEntryId}`)
+      .expect(200);
+    const workout = (detail.body as { data: { workouts: { id: string }[] } })
+      .data.workouts[0];
+    expect(workout).toBeDefined();
+    const workoutResponse = await agent
+      .get(
+        `/training-plans/${confirmationData.catalogEntryId}/workouts/${workout?.id}`,
+      )
+      .expect(200);
+    const savedExercises = (
+      workoutResponse.body as {
+        data: {
+          exercises: {
+            id: string;
+            type: string;
+            durationMinutes?: number;
+            instructions?: string;
+            youtubeId?: string;
+          }[];
+        };
+      }
+    ).data.exercises;
+    expect(savedExercises).toContainEqual(
+      expect.objectContaining({
+        type: 'duration',
+        durationMinutes: 5,
+        name: 'Esteira: caminhada',
+      }),
+    );
+    const savedStretch = savedExercises.find(
+      (exercise) => exercise.youtubeId === 'yFvf_tdVook',
+    );
+    expect(savedStretch).toMatchObject({
+      type: 'duration',
+      durationMinutes: 2,
+    });
+    expect(savedStretch?.instructions).toContain('10–20 s');
+    await authenticatedMutation(agent, agent.put('/training-plans/active'))
+      .send({ catalogEntryId: confirmationData.catalogEntryId })
+      .expect(200);
+    const execution = await authenticatedMutation(
+      agent,
+      agent.post(`/training/workouts/${workout?.id}/session`),
+    )
+      .send({})
+      .expect(201);
+    const executionBody = execution.body as {
+      data: {
+        exercises: {
+          type: string;
+          durationMinutes?: number;
+          youtubeId?: string;
+        }[];
+      };
+    };
+    expect(executionBody.data.exercises).toContainEqual(
+      expect.objectContaining({
+        type: 'duration',
+        durationMinutes: 2,
+        youtubeId: 'yFvf_tdVook',
+      }),
+    );
+    const warmup = savedExercises[0];
+    const timer = await authenticatedMutation(
+      agent,
+      agent.post(`/training/session/exercises/${warmup?.id}/timer`),
+    )
+      .set('X-Resource-Version', '0')
+      .send({ kind: 'duration' })
+      .expect(201);
+    expect(timer.body).toMatchObject({
+      data: { activeTimer: { kind: 'duration' } },
+    });
   });
 
   it('protects and validates the realtime stream before opening it', async () => {

@@ -123,6 +123,12 @@ if (exercisePath instanceof MongooseSchema.Types.DocumentArray) {
       {
         ...namedFields,
         durationMinutes: { max: 1440, min: 1, required: true, type: Number },
+        instructions: { maxlength: 300, required: false, type: String },
+        youtubeId: {
+          match: /^[A-Za-z0-9_-]{11}$/,
+          required: false,
+          type: String,
+        },
       },
       { _id: true, versionKey: false },
     ),

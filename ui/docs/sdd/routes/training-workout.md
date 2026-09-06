@@ -34,7 +34,9 @@ a carga atual atomicamente; concluir restantes envia o vetor completo. A ação 
 conclusão cancela o debounce correspondente para impedir write tardio.
 
 `pause` e `duration` abrem timer; descanso de série/pausa pode ser pulado, duração
-pode ser finalizada ou cancelada. Timestamps do servidor dirigem o contador.
+pode ser finalizada ou cancelada. Atividade por duração apresenta também sua
+instrução e demonstração em vídeo quando fornecidas pelo plano. Timestamps do
+servidor dirigem o contador.
 `youtube-long` conclui manualmente. Exercício concluído pode ser reiniciado sem
 apagar cargas. Mídia e timers usam Drawer inferior em mobile e Modal em desktop.
 

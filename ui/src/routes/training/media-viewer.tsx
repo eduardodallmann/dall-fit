@@ -27,7 +27,8 @@ export function TrainingMediaViewer({
   const state = useOverlayState();
   const hasImage = exercise.type === 'image' && exercise.image !== null;
   const hasVideo =
-    (exercise.type === 'youtube-long' || exercise.type === 'youtube-short') &&
+    'youtubeId' in exercise &&
+    exercise.youtubeId !== undefined &&
     exercise.youtubeId.length > 0;
 
   if (!hasImage && !hasVideo) {
@@ -118,7 +119,7 @@ function MediaThumbnail({
       />
     );
   }
-  if (exercise.type === 'youtube-long' || exercise.type === 'youtube-short') {
+  if ('youtubeId' in exercise && exercise.youtubeId !== undefined) {
     return (
       <img
         alt=""
@@ -144,7 +145,7 @@ function MediaContent({
       />
     );
   }
-  if (exercise.type === 'youtube-long' || exercise.type === 'youtube-short') {
+  if ('youtubeId' in exercise && exercise.youtubeId !== undefined) {
     return (
       <div className={styles.playerFrame()}>
         <Suspense fallback={<Spinner aria-label="Carregando vídeo" />}>

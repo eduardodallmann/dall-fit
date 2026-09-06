@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type {
   AssistantCatalogExercise,
   AssistantProposal,
+  AssistantProposalExercise,
 } from '~/training-plan-assistant/domain/training-plan-assistant.types';
 import {
   TrainingPlanAssistantProvider,
@@ -91,20 +92,64 @@ export class FakeTrainingPlanAssistantProvider extends TrainingPlanAssistantProv
       },
     });
     const frequency = Number(input.answers.frequency);
-    const selected = this.selectBalanced(input.candidates, frequency * 5);
+    const selected = this.selectBalanced(
+      input.candidates.filter((entry) => entry.type === 'youtube-short'),
+      frequency * 5,
+    );
     if (selected.length < frequency) {
       throw new Error('Not enough eligible exercises for a proposal.');
     }
     const workouts = Array.from({ length: frequency }, (_, workoutIndex) => {
-      const exercises = selected
-        .filter((_, index) => index % frequency === workoutIndex)
-        .slice(0, 7)
-        .map((exercise) => ({
-          catalogKey: exercise.key,
-          repetitions: 12,
-          restSeconds: 60,
-          sets: input.answers.experience === 'advanced' ? 4 : 3,
-        }));
+      const limit = Number(input.answers.duration ?? 45);
+      const warmup = input.candidates.find(
+        (entry) => entry.category === 'warmup',
+      );
+      const cooldown = input.candidates.find(
+        (entry) => entry.category === 'cooldown',
+      );
+      const stretches = input.candidates.filter(
+        (entry) => entry.category === 'stretching',
+      );
+      const stretch = stretches[workoutIndex % Math.max(stretches.length, 1)];
+      const cardioChoices = input.candidates.filter(
+        (entry) => entry.category === 'cardio' && entry.impact !== 'high',
+      );
+      const cardio =
+        limit >= 30
+          ? cardioChoices[workoutIndex % Math.max(cardioChoices.length, 1)]
+          : undefined;
+      const reserved =
+        (warmup === undefined ? 0 : 5) +
+        (stretch === undefined ? 0 : 2) +
+        (cardio === undefined ? 0 : 10);
+      const sets = limit < 30 ? 1 : 3;
+      const exerciseMinutes = Math.ceil((sets * (12 * 4 + 60)) / 60);
+      const count = Math.max(
+        1,
+        Math.min(5, Math.floor((limit - reserved) / exerciseMinutes)),
+      );
+      const exercises: AssistantProposalExercise[] = [];
+      if (warmup !== undefined)
+        exercises.push({ catalogKey: warmup.key, durationMinutes: 5 });
+      exercises.push(
+        ...selected
+          .filter((_, index) => index % frequency === workoutIndex)
+          .slice(0, count)
+          .map((exercise) => ({
+            catalogKey: exercise.key,
+            repetitions: 12,
+            restSeconds: 60,
+            sets,
+          })),
+      );
+      if (cardio !== undefined && cooldown !== undefined) {
+        exercises.push(
+          { catalogKey: cardio.key, durationMinutes: 5 },
+          { catalogKey: cooldown.key, durationMinutes: 5 },
+        );
+      }
+      if (stretch !== undefined)
+        exercises.push({ catalogKey: stretch.key, durationMinutes: 2 });
       return {
         exercises,
         name: `Treino ${String.fromCharCode(65 + workoutIndex)}`,

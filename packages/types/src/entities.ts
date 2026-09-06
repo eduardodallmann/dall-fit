@@ -176,6 +176,8 @@ export interface PauseExercise {
 export interface DurationExercise extends NamedExercise {
   type: 'duration';
   durationMinutes: number;
+  instructions?: string;
+  youtubeId?: string;
 }
 
 export type Exercise =
@@ -209,16 +211,9 @@ export interface TrainingPlanAssistantAnswerOption {
   value: string;
 }
 
-export interface TrainingPlanAssistantDraftExercise {
-  catalogKey: string;
-  name: string;
-  bodyArea: BodyArea;
-  type: 'youtube-short';
-  youtubeId: string;
-  sets: number;
-  repetitions: number;
-  restSeconds: number;
-}
+export type TrainingPlanAssistantDraftExercise = { catalogKey: string } & (
+  Omit<YoutubeShortExercise, 'id'> | Omit<DurationExercise, 'id'>
+);
 
 export interface TrainingPlanAssistantDraftWorkout {
   name: string;

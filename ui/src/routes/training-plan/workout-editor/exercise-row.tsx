@@ -354,7 +354,7 @@ function ExerciseInformationFields({
       ) : (
         nameField
       )}
-      {'youtubeId' in exercise ? (
+      {exercise.type === 'youtube-long' || exercise.type === 'youtube-short' ? (
         <div className={styles.videoMediaGroup()}>
           <TextInput
             className={styles.flexibleField()}

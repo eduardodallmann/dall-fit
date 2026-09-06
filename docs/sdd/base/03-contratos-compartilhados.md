@@ -88,6 +88,9 @@ audiência, identidade e conteúdo permanecem internos da API.
   discriminada por `type` entre `youtube-short`, `image`, `youtube-long`, `pause`
   e `duration`; campos alheios ao discriminador não existem e somente
   `ImageExercise.image` aceita `null`.
+- `DurationExercise` exige minutos e pode transportar instrução curta e ID de
+  vídeo demonstrativo. Ambos são opcionais para manter compatibilidade com os
+  exercícios por duração já existentes.
 - requests do editor cobrem nome do treino, criação por tipo, PATCH parcial do
   exercício, ordem final completa e imagem. Respostas de mutação expõem o recurso
   público; leituras e sucessos que preservam o aggregate transportam a versão
@@ -163,7 +166,9 @@ request; o Workflow os lê no MongoDB.
   `generating`, `preview` ou `blocked`; `completed` é uma transição interna antes
   da exclusão e não pertence ao contrato público.
 - `TrainingPlanAssistantDraft` publica apenas a estrutura revisável já resolvida
-  contra o catálogo: plano, workouts, duração estimada e exercícios tipados.
+  contra o catálogo: plano, workouts, duração estimada e exercícios tipados. Os
+  itens podem ser exercícios por séries ou atividades por duração; uma atividade
+  por duração pode incluir instrução curta e vídeo demonstrativo opcional.
 - create/message/draft usam requests próprios. Mensagem leva
   `clientMessageId`; draft leva ajuste opcional; versão e chave idempotente
   permanecem headers HTTP.

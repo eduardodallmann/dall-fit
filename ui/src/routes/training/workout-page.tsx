@@ -706,6 +706,9 @@ function ExpandedExerciseContent({
   return (
     <div className={styles.exerciseContent()}>
       <div className={styles.actionRow()}>
+        {exercise.type === 'duration' && exercise.instructions ? (
+          <p>{exercise.instructions}</p>
+        ) : null}
         <TrainingMediaViewer exercise={exercise} />
         <Chip size="sm" variant="soft">
           {exerciseTypeLabels[exercise.type]}

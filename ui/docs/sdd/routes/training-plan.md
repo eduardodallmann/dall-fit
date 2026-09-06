@@ -47,7 +47,11 @@ pergunta, respostas e campo permanecem fixos abaixo dele. No rodapé, “Desisti
 ambos desaparecem e a mesma posição passa a oferecer “Gerar prévia”. `preview`
 oculta o histórico, ocupa o corpo disponível com o plano e torna a própria prévia
 rolável, mantendo o rodapé fixo. Ela mostra workouts, exercícios, séries,
-repetições, descanso e duração estimada, permite ajuste e só então confirmação.
+repetições, descanso e duração estimada, além dos minutos e instruções de
+atividades cronometradas. Alongamentos com vídeo oferecem link acessível de
+demonstração. A descrição e os títulos específicos do plano e dos treinos são
+criados pelo agente e apresentados em português do Brasil. A prévia permite
+ajuste e só então confirmação.
 O contêiner reserva espaço para que bordas e indicadores de foco do campo de ajuste
 não sejam recortados. Um ajuste modifica a prévia corrente e preserva toda parte
 que não foi mencionada no pedido, em vez de gerar outro plano do zero.

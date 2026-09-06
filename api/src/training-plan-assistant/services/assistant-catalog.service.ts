@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { BODY_AREAS } from '@dall-fit/types';
 
-import catalogDocument from '~/training-plan-assistant/data/exercise-catalog.v1.json';
-import knowledgeDocument from '~/training-plan-assistant/data/fitness-guidelines.v1.json';
+import catalogDocument from '~/training-plan-assistant/data/exercise-catalog.v2.json';
+import knowledgeDocument from '~/training-plan-assistant/data/fitness-guidelines.v2.json';
 import type {
   AssistantCatalogExercise,
   AssistantKnowledge,
@@ -16,7 +16,7 @@ const optionSchema = z.strictObject({
 });
 
 const knowledgeSchema = z.strictObject({
-  catalogVersion: z.literal('exercise-catalog.v1'),
+  catalogVersion: z.literal('exercise-catalog.v2'),
   noticeVersion: z.string().min(1),
   promptVersion: z.string().min(1),
   questions: z
@@ -36,32 +36,49 @@ const knowledgeSchema = z.strictObject({
     )
     .min(1),
   sources: z.array(z.url()).min(1),
-  version: z.literal('fitness-guidelines.v1'),
+  version: z.literal('fitness-guidelines.v2'),
 });
 
+const catalogBase = {
+  active: z.boolean(),
+  bodyArea: z.enum(BODY_AREAS),
+  category: z.enum(['strength', 'warmup', 'cardio', 'cooldown', 'stretching']),
+  equipment: z.array(z.string().min(1)).min(1),
+  goalTags: z.array(z.string().min(1)).min(1),
+  impact: z.enum(['high', 'low', 'none']),
+  instructions: z.string().min(1).max(300),
+  level: z.enum(['advanced', 'beginner', 'intermediate']),
+  movementPattern: z.string().min(1),
+  name: z.string().min(1).max(40),
+  notes: z.string().min(1).max(300),
+  requiresSupport: z.boolean(),
+};
 const rawCatalogSchema = z.strictObject({
   entries: z
     .array(
-      z.strictObject({
-        active: z.boolean(),
-        bodyArea: z.enum(BODY_AREAS),
-        equipment: z.array(z.string().min(1)).min(1),
-        goalTags: z.array(z.string().min(1)).min(1),
-        impact: z.enum(['high', 'low', 'none']),
-        instructions: z.string().min(1).max(300),
-        key: z.string().regex(/^youtube-short:[A-Za-z0-9_-]{11}$/),
-        level: z.enum(['advanced', 'beginner', 'intermediate']),
-        movementPattern: z.string().min(1),
-        name: z.string().min(1).max(40),
-        notes: z.string().min(1).max(300),
-        requiresSupport: z.boolean(),
-        type: z.literal('youtube-short'),
-        youtubeId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
-      }),
+      z.discriminatedUnion('type', [
+        z.strictObject({
+          ...catalogBase,
+          type: z.literal('youtube-short'),
+          key: z.string().regex(/^youtube-short:[A-Za-z0-9_-]{11}$/),
+          youtubeId: z.string().regex(/^[A-Za-z0-9_-]{11}$/),
+        }),
+        z.strictObject({
+          ...catalogBase,
+          type: z.literal('duration'),
+          key: z.string().regex(/^duration:[a-z0-9-]+$/),
+          youtubeId: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]{11}$/)
+            .optional(),
+          minDurationMinutes: z.number().int().min(1).max(30),
+          maxDurationMinutes: z.number().int().min(1).max(30),
+        }),
+      ]),
     )
-    .length(75),
+    .min(1),
   sources: z.array(z.string().min(1)).min(1),
-  version: z.literal('exercise-catalog.v1'),
+  version: z.literal('exercise-catalog.v2'),
 });
 
 @Injectable()
@@ -77,14 +94,23 @@ export class AssistantCatalogService {
     const knowledge = knowledgeSchema.parse(knowledgeDocument);
     const rawCatalog = rawCatalogSchema.parse(catalogDocument);
     const youtubeIds = new Set(
-      rawCatalog.entries.map((entry) => entry.youtubeId),
+      rawCatalog.entries.flatMap((entry) =>
+        entry.youtubeId === undefined ? [] : [entry.youtubeId],
+      ),
     );
-    if (youtubeIds.size !== rawCatalog.entries.length) {
+    if (
+      youtubeIds.size !==
+      rawCatalog.entries.filter((entry) => entry.youtubeId !== undefined).length
+    ) {
       throw new Error('Assistant exercise catalog contains duplicate videos.');
     }
     if (
       rawCatalog.entries.some(
-        (entry) => entry.key !== `youtube-short:${entry.youtubeId}`,
+        (entry) =>
+          (entry.type === 'youtube-short' &&
+            entry.key !== `youtube-short:${entry.youtubeId}`) ||
+          (entry.type === 'duration' &&
+            entry.minDurationMinutes > entry.maxDurationMinutes),
       )
     ) {
       throw new Error(
@@ -166,6 +192,7 @@ export class AssistantCatalogService {
     const simpleGym = answers.location === 'simple-gym';
     const avoidFreeWeights = answers.preferences === 'machines';
     const result = this.catalog.filter((entry) => {
+      if (!this.isTimedActivityEligible(entry, answers)) return false;
       if (!entry.active) return false;
       if (simpleGym && entry.equipment.includes('specialized-machine'))
         return false;
@@ -176,6 +203,35 @@ export class AssistantCatalogService {
     this.logger.log('AssistantCatalogService -> candidates -> return:', {
       data: { candidateCount: result.length },
     });
+    return result;
+  }
+
+  private isTimedActivityEligible(
+    entry: AssistantCatalogExercise,
+    answers: Readonly<Record<string, string>>,
+  ): boolean {
+    if (entry.type !== 'duration') return true;
+    const cardioToleranceAccepted =
+      answers.tolerance === 'good' || answers.tolerance === 'avoid-impact';
+    if (entry.category === 'cardio' && !cardioToleranceAccepted) return false;
+    const equipment = answers.cardioEquipment ?? '';
+    if (
+      entry.equipment.includes('treadmill') &&
+      equipment !== 'both' &&
+      equipment !== 'treadmill'
+    )
+      return false;
+    if (
+      entry.equipment.includes('stationary-bike') &&
+      equipment !== 'both' &&
+      equipment !== 'bike'
+    )
+      return false;
+    const canRun =
+      answers.runningHabit === 'yes' &&
+      answers.tolerance === 'good' &&
+      answers.interruption === 'none';
+    const result = entry.impact !== 'high' || canRun;
     return result;
   }
 

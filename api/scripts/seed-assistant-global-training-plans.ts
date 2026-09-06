@@ -4,7 +4,7 @@ import 'dotenv/config';
 
 import mongoose from 'mongoose';
 
-import catalogDocument from '../src/training-plan-assistant/data/exercise-catalog.v1.json';
+import catalogDocument from '../src/training-plan-assistant/data/exercise-catalog.v2.json';
 import seedDocument from '../src/training-plan-assistant/data/global-training-plan-seeds.v1.json';
 import {
   TrainingPlanDocument,

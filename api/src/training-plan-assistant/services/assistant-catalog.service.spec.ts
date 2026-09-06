@@ -6,32 +6,62 @@ import seedDocument from '~/training-plan-assistant/data/global-training-plan-se
 import { AssistantCatalogService } from '~/training-plan-assistant/services/assistant-catalog.service';
 
 describe('AssistantCatalogService', () => {
-  it('loads the versioned knowledge and 75 unique approved videos', () => {
+  it('loads strength videos and timed activities with valid media and keys', () => {
     const service = new AssistantCatalogService();
 
     const catalog = service.all();
     const knowledge = service.getKnowledge();
 
-    expect(catalog).toHaveLength(75);
-    expect(new Set(catalog.map((entry) => entry.youtubeId)).size).toBe(75);
-    expect(catalog.every((entry) => entry.youtubeId.length === 11)).toBe(true);
+    expect(catalog).toHaveLength(83);
+    const videos = catalog.flatMap((entry) =>
+      entry.youtubeId === undefined ? [] : [entry.youtubeId],
+    );
+    expect(new Set(videos).size).toBe(78);
+    expect(videos.every((id) => id.length === 11)).toBe(true);
     expect(catalog.every((entry) => BODY_AREAS.includes(entry.bodyArea))).toBe(
       true,
     );
     expect(
       knowledge.questions.filter((question) => question.when === undefined),
     ).toHaveLength(19);
-    expect(knowledge.catalogVersion).toBe('exercise-catalog.v1');
+    expect(knowledge.catalogVersion).toBe('exercise-catalog.v2');
     expect(
       catalog.every(
         (entry) =>
-          entry.key === `youtube-short:${entry.youtubeId}` &&
+          (entry.type === 'duration' ||
+            entry.key === `youtube-short:${entry.youtubeId}`) &&
           entry.equipment.length > 0 &&
           entry.goalTags.length > 0 &&
           entry.instructions.length > 0 &&
           entry.notes.length > 0,
       ),
     ).toBe(true);
+  });
+
+  it('skips the interruption question when the person has never trained', () => {
+    const service = new AssistantCatalogService();
+    const questions = service.getKnowledge().questions;
+    const interruptionIndex = questions.findIndex(
+      (question) => question.key === 'interruption',
+    );
+    const answersBeforeInterruption = Object.fromEntries(
+      questions
+        .slice(0, interruptionIndex)
+        .map((question) => [question.key, question.options[0]?.value ?? '']),
+    );
+
+    expect(
+      service.nextQuestion({
+        ...answersBeforeInterruption,
+        experience: 'never',
+      })?.key,
+    ).toBe('schedule');
+    expect(
+      service.nextQuestion({
+        ...answersBeforeInterruption,
+        experience: 'beginner',
+      })?.key,
+    ).toBe('interruption');
   });
 
   it('asks a conditional health clarification without making it universal', () => {
@@ -43,9 +73,15 @@ describe('AssistantCatalogService', () => {
         .map((question) => [question.key, question.options[0]?.value ?? '']),
     );
 
-    expect(service.nextQuestion(answers)).toBeNull();
     expect(
-      service.nextQuestion({ ...answers, chronic: 'controlled' })?.key,
+      service.nextQuestion({ ...answers, cardioEquipment: 'none' }),
+    ).toBeNull();
+    expect(
+      service.nextQuestion({
+        ...answers,
+        cardioEquipment: 'none',
+        chronic: 'controlled',
+      })?.key,
     ).toBe('chronicClarification');
   });
 
@@ -61,6 +97,41 @@ describe('AssistantCatalogService', () => {
     expect(
       candidates.every((entry) => !entry.equipment.includes('free-weight')),
     ).toBe(true);
+  });
+
+  it('requires explicit equipment and established running before offering those activities', () => {
+    const service = new AssistantCatalogService();
+    const base = {
+      tolerance: 'good',
+      interruption: 'none',
+      runningHabit: 'yes',
+    };
+    const keys = (answers: Record<string, string>) =>
+      service.candidates(answers).map((entry) => entry.key);
+    expect(keys(base)).not.toContain('duration:treadmill-walk');
+    expect(keys({ ...base, cardioEquipment: 'bike' })).toContain(
+      'duration:stationary-bike',
+    );
+    expect(keys({ ...base, cardioEquipment: 'bike' })).not.toContain(
+      'duration:treadmill-run',
+    );
+    expect(keys({ ...base, cardioEquipment: 'both' })).toContain(
+      'duration:treadmill-run',
+    );
+    for (const changes of [
+      { runningHabit: 'no' },
+      { tolerance: 'avoid-impact' },
+      { interruption: 'up-to-3-months' },
+    ]) {
+      expect(
+        keys({ ...base, cardioEquipment: 'both', ...changes }),
+      ).not.toContain('duration:treadmill-run');
+    }
+    expect(
+      service
+        .candidates({ ...base, cardioEquipment: 'both', tolerance: 'limited' })
+        .some((entry) => entry.category === 'cardio'),
+    ).toBe(false);
   });
 
   it('keeps the two global seeds on 45 distinct catalog entries with 3x12/60 materialization', () => {

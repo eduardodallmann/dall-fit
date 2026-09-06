@@ -84,8 +84,10 @@ e deixam por 24 horas somente um recibo com hash e IDs. Controllers e commands n
 acessam repository ou provider; `TrainingPlanAssistantSessionService` orquestra
 triagem, catálogo, estado, idempotência e o bridge de materialização.
 
-Conhecimento, catálogo de 75 vídeos e dois seeds globais são JSONs versionados e
-validados por Zod no runtime aquecido. O provider possui apenas interpretar,
+Conhecimento, catálogo de força e atividades cronometradas e dois seeds globais
+são JSONs versionados e validados por Zod no runtime aquecido. O catálogo contém
+vídeos de força, cardio sem mídia e alongamentos com demonstração opcional. O
+provider possui apenas interpretar,
 reformular e propor. Fake sustenta testes; Groq usa chave server-side, timeout,
 budget máximo de completion e saída estruturada. Modelos registrados como
 compatíveis recebem JSON Schema estrito ou best-effort; os demais usam JSON Object
