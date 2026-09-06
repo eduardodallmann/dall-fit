@@ -6,12 +6,22 @@ import {
   completeRemainingTrainingSeries,
   completeTrainingSeries,
   saveTrainingLoad,
+  trainingMockSearch,
 } from '~/routes/training/training-service';
 
 const exerciseId = '64b000000000000000000201';
 
 describe('training service', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('does not expose the mock scenario in production navigation', () => {
+    vi.stubEnv('DEV', false);
+
+    expect(trainingMockSearch('active-plan')).toEqual({});
+  });
 
   it('serializes an empty load as null with the canonical session version', async () => {
     const put = vi.spyOn(apiClient, 'put').mockResolvedValue({

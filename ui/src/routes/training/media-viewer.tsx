@@ -147,7 +147,11 @@ function MediaContent({
   }
   if ('youtubeId' in exercise && exercise.youtubeId !== undefined) {
     return (
-      <div className={styles.playerFrame()}>
+      <div
+        className={styles.playerFrame({
+          mediaAspect: exercise.type === 'youtube-short' ? 'short' : 'long',
+        })}
+      >
         <Suspense fallback={<Spinner aria-label="Carregando vídeo" />}>
           <ReactPlayer
             className={styles.player()}

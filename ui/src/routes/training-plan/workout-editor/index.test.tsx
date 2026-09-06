@@ -104,6 +104,40 @@ describe('WorkoutEditor workout name', () => {
       screen.getByRole('heading', { name: 'Primeiro nome salvo' }),
     ).toBeVisible();
   });
+
+  it('saves the inline workout title with Ctrl+Enter', async () => {
+    const user = userEvent.setup();
+    vi.mocked(updateTrainingPlanWorkout).mockResolvedValue({
+      data: {
+        id: workout.id,
+        name: 'Nome pelo teclado',
+        updatedAt: '2026-08-01T12:01:00.000Z',
+      },
+      version: 1,
+    });
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WorkoutEditor
+          data={workout}
+          mockScenario="success"
+          onImageLoadError={vi.fn()}
+          onRetryImage={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Editar nome do treino' }),
+    );
+    const name = screen.getByRole('textbox', { name: 'Nome do treino' });
+    await user.clear(name);
+    await user.type(name, 'Nome pelo teclado');
+    await user.keyboard('{Control>}{Enter}{/Control}');
+
+    await screen.findByRole('heading', { name: 'Nome pelo teclado' });
+    expect(updateTrainingPlanWorkout).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('WorkoutEditor presentation', () => {

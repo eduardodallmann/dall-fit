@@ -47,6 +47,7 @@ import {
   trainingPlanMockSearch,
   type MockTrainingPlansScenario,
 } from '~/routes/training-plan/training-plan-service';
+import { trainingKeys } from '~/routes/training/training-queries';
 
 const styles = trainingPlanStyles();
 
@@ -100,7 +101,11 @@ export function PersonalTrainingPlanListPage({
         item.source === 'owned' ? item.version : undefined,
         mockTrainingPlans,
       ),
-    onSuccess: invalidateCatalog,
+    onSuccess: async (_, item) => {
+      if (item.active)
+        queryClient.removeQueries({ queryKey: trainingKeys.all });
+      await invalidateCatalog();
+    },
   });
   const cloneMutation = useMutation({
     mutationFn: (globalTrainingPlanId: string) =>
@@ -149,8 +154,7 @@ export function PersonalTrainingPlanListPage({
         <div className={styles.titleGroup()}>
           <h1 className={styles.title()}>Meus planos</h1>
           <p className={styles.description()}>
-            Crie planos próprios ou use modelos globais disponibilizados pela
-            administração.
+            Crie planos próprios ou use modelos disponibilizados.
           </p>
         </div>
         <Dropdown>
@@ -207,7 +211,7 @@ export function PersonalTrainingPlanListPage({
                 items={rows}
                 renderEmptyState={() => (
                   <TrainingPlanTableState
-                    description="Crie um plano ou escolha um modelo global."
+                    description="Crie um plano ou escolha um modelo disponibilizado."
                     kind="empty"
                     title={
                       query.isLoading ? 'Carregando planos' : 'Nenhum plano'
@@ -296,7 +300,9 @@ export function PersonalTrainingPlanListPage({
                         </Link>
                       </Table.Cell>
                       <Table.Cell>
-                        {item.source === 'owned' ? 'Próprio' : 'Plano global'}
+                        {item.source === 'owned'
+                          ? 'Próprio'
+                          : 'Modelo disponibilizado'}
                       </Table.Cell>
                       <Table.Cell>
                         <input
@@ -390,6 +396,7 @@ export function PersonalTrainingPlanListPage({
       </section>
       {creating ? (
         <TrainingPlanFormModal
+          hideLegend
           onOpenChange={setCreating}
           onSubmit={async (input) => {
             await createMutation.mutateAsync(input);
@@ -429,7 +436,7 @@ export function PersonalTrainingPlanListPage({
       <DeleteConfirmationDialog
         description={
           deleteItem?.source === 'global-reference'
-            ? 'O plano global será removido da sua lista. O modelo original não será excluído.'
+            ? 'O modelo disponibilizado será removido da sua lista. O original não será excluído.'
             : 'O plano e todos os seus treinos serão excluídos.'
         }
         onConfirm={async () => {
@@ -485,10 +492,18 @@ function TrainingPlanLibraryModal({
         <Modal.Container>
           <Modal.Dialog>
             <Modal.Header>
-              <Modal.Heading>Copiar um plano global</Modal.Heading>
+              <Modal.Heading>Copiar um modelo</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
               <div className={styles.libraryList()}>
+                {query.isSuccess && query.data.data.length === 0 ? (
+                  <div className={styles.emptyContent()}>
+                    <h3>Nenhum modelo disponível</h3>
+                    <p className={styles.description()}>
+                      Feche esta janela e tente novamente mais tarde.
+                    </p>
+                  </div>
+                ) : null}
                 {query.data?.data.map((plan) => {
                   const clonePending = cloningPlanId === plan.id;
                   const referencePending = referencingPlanId === plan.id;
@@ -550,7 +565,7 @@ function TrainingPlanLibraryModal({
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>
-                      Não foi possível carregar os planos globais.
+                      Não foi possível carregar os modelos disponíveis.
                     </Alert.Title>
                   </Alert.Content>
                 </Alert>

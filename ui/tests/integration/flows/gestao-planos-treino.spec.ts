@@ -47,7 +47,7 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     );
     await expect(page).toHaveURL(/page=2/);
     await expect(
-      page.getByRole('link', { name: 'Plano global 21' }),
+      page.getByRole('link', { name: 'Modelo de treino 21' }),
     ).toBeVisible();
     await expect(
       page
@@ -290,7 +290,7 @@ test.describe('Fluxo Gestão de planos de treino globais', () => {
     await expect(page).toHaveURL(/page=2/);
     await expect(page.getByText('Página 2 de 2')).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Plano global 21' }),
+      page.getByRole('link', { name: 'Modelo de treino 21' }),
     ).toBeVisible();
     await expect(page.getByText('Nenhum plano de treino')).not.toBeVisible();
   });

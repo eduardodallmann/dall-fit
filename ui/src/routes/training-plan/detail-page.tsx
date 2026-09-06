@@ -285,7 +285,7 @@ export function TrainingPlanDetailPage({
       <Alert status={plan.usage.linkedPeople > 0 ? 'warning' : 'default'}>
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Impacto deste plano global</Alert.Title>
+          <Alert.Title>Impacto deste modelo</Alert.Title>
           <Alert.Description>
             {plan.usage.linkedPeople} pessoa(s) vinculada(s), sendo{' '}
             {plan.usage.activePeople} com este plano ativo.

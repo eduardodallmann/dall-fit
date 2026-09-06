@@ -9,7 +9,10 @@ import { trackTrainingAction } from '~/core/analytics';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
 import { trainingStyles } from '~/routes/training/styles';
 import { trainingOverviewQueryOptions } from '~/routes/training/training-queries';
-import type { MockTrainingScenario } from '~/routes/training/training-service';
+import {
+  trainingMockSearch,
+  type MockTrainingScenario,
+} from '~/routes/training/training-service';
 
 const styles = trainingStyles();
 
@@ -95,7 +98,7 @@ export function TrainingOverviewPage({
                   trackTrainingAction('training', 'select_workout')
                 }
                 params={{ workoutId: workout.id }}
-                search={{ mockTraining }}
+                search={trainingMockSearch(mockTraining)}
                 to="/training/workout/$workoutId"
               >
                 <WorkoutCard workout={workout} />
@@ -117,7 +120,7 @@ function WorkoutCard({ workout }: Readonly<{ workout: TrainingWorkoutCard }>) {
           <h2 className={styles.cardTitle()}>{workout.name}</h2>
           <div className={styles.bodyAreas()}>
             {workout.bodyAreas.map((bodyArea) => (
-              <Chip key={bodyArea} size="sm" variant="soft">
+              <Chip color="accent" key={bodyArea} size="sm" variant="soft">
                 {bodyAreaLabels[bodyArea]}
               </Chip>
             ))}
@@ -158,7 +161,9 @@ function WorkoutMedia({ workout }: Readonly<{ workout: TrainingWorkoutCard }>) {
           referrerPolicy="no-referrer"
           src={`https://img.youtube.com/vi/${workout.media.youtubeId}/mqdefault.jpg`}
         />
-        <Play aria-hidden="true" className={styles.icon()} />
+        <span aria-hidden="true" className={styles.mediaOverlay()}>
+          <Play className={styles.icon()} />
+        </span>
       </div>
     );
   }

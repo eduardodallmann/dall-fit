@@ -105,6 +105,10 @@ fronteira global de reload. Mutations pendentes também bloqueiam por TanStack
 Query. A atualização PWA pronta permanece silenciosa e só prossegue depois de
 salvar, cancelar ou descartar o último trabalho recuperável.
 
+`Ctrl+Enter` confirma a edição inline do título pela mesma validação e mutation da
+ação de salvar. A comunicação visível chama o recurso compartilhado de modelo;
+`global` permanece somente em rotas, contratos e conceitos técnicos.
+
 ## Analytics
 
 - breadcrumbs e nomes de treino emitem `ui_navigation_selected` com destino
@@ -121,8 +125,10 @@ salvar, cancelar ou descartar o último trabalho recuperável.
 
 ## Referências visuais de layout
 
-Não se aplica — não existem imagens em
-`routes/assets/global-training-plan-detail/`.
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/global-training-plan-detail/desktop-1440-success.png` | `1440x900` | detalhe administrativo do modelo |
+| `assets/global-training-plan-detail/mobile-390-success.png` | `390x844` | detalhe administrativo mobile |
 
 ## Cenários funcionais e cobertura
 

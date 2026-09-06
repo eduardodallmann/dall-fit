@@ -31,7 +31,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     await expect(
       page
         .getByRole('navigation', { name: 'Navegação principal' })
-        .getByRole('link', { name: 'Planos globais', exact: true }),
+        .getByRole('link', { name: 'Modelos de treino', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
     await expect(page.getByText('Página 1 de 2')).toBeVisible();
   });
@@ -94,7 +94,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     );
 
     const table = page.getByRole('grid', {
-      name: 'Planos de treino globais',
+      name: 'Modelos de treino',
     });
     await expect(
       table.getByRole('heading', {
@@ -114,7 +114,7 @@ test.describe('Rotas administrativas de planos de treino', () => {
     );
 
     const table = page.getByRole('grid', {
-      name: 'Planos de treino globais',
+      name: 'Modelos de treino',
     });
     const emptyState = table.locator('[data-slot="empty-state"]');
     await expect(

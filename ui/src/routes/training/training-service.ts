@@ -21,6 +21,7 @@ export type MockTrainingScenario =
   | 'active-plan'
   | 'duration-running'
   | 'exercise-completed'
+  | 'load-pending'
   | 'no-active-plan'
   | 'pause-running'
   | 'series-running'
@@ -30,6 +31,14 @@ export type MockTrainingScenario =
   | 'workout-incomplete'
   | 'workout-preview'
   | 'youtube-long-running';
+
+export function trainingMockSearch(scenario: MockTrainingScenario): {
+  mockTraining?: MockTrainingScenario;
+} {
+  return import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
+    ? { mockTraining: scenario }
+    : {};
+}
 
 const resourceVersionHeader = 'X-Resource-Version';
 

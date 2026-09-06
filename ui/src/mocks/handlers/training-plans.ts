@@ -804,7 +804,8 @@ export const trainingPlanHandlers = [
     const scenario = getScenario(request);
     const state = getState(scenario);
     const page = Number(new URL(request.url).searchParams.get('page') ?? 1);
-    const plans = state.plans.map((plan): GlobalTrainingPlanLibraryItem => ({
+    const availablePlans = scenario === 'library-empty' ? [] : state.plans;
+    const plans = availablePlans.map((plan): GlobalTrainingPlanLibraryItem => ({
       ...plan,
       cloneBlocked: state.cloneJobs.some(
         (item) =>

@@ -8,18 +8,25 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 
 ## Objetivo funcional
 
-Catálogo de planos de qualquer pessoa autenticada, inclusive admin. Reúne planos
-próprios, referências globais e linhas transitórias de clonagem; nenhum global
-aparece sem a pessoa usar ou clonar. A query `page` segue paginação canônica de 20.
+Catálogo de planos de qualquer pessoa autenticada, inclusive admin. A apresentação
+usa “modelo disponibilizado” para o conteúdo oferecido pela administração e
+reserva `global-reference` aos contratos técnicos. Reúne planos próprios,
+referências e linhas transitórias de clonagem; nenhum modelo aparece sem a pessoa
+usar ou clonar. A query `page` segue paginação canônica de 20.
 
 ## Elementos, ações e estados
 
-O cabeçalho “Meus planos” possui dropdown “Novo plano”: “Criar novo plano” abre o
-formulário existente; “Copiar um plano” abre a biblioteca global paginada com
+O cabeçalho mostra `Crie planos próprios ou use modelos disponibilizados.` e possui
+dropdown “Novo plano”, que não quebra ícones e texto: “Criar novo plano” abre o
+formulário sem a legenda visual redundante `Identificação do plano`; “Copiar um
+plano” abre a biblioteca paginada com
 resumo de workouts/exercícios e ações “Clonar”/“Usar esse plano”. Ao iniciar uma
 dessas ações, ambas ficam imediatamente bloqueadas somente para a mesma origem
 enquanto o request estiver pendente. Uma origem com clone ativo da mesma pessoa
 continua bloqueada na modal após a confirmação do job.
+
+Quando a biblioteca está vazia, a modal exibe `Nenhum modelo disponível`, orienta
+fechar e tentar mais tarde e não renderiza ações de uso ou clonagem.
 
 O mesmo dropdown mantém em terceiro lugar “Me ajude a criar”. A opção abre uma
 Modal HeroUI ampla e consulta primeiro a sessão canônica. Sem sessão, exibe aviso
@@ -43,6 +50,9 @@ conflito 412 refaz GET e não mescla. `blocked` mostra a mensagem canônica e n�
 renderiza geração/criação. O histórico é a única região rolável da conversa;
 pergunta, respostas e campo permanecem fixos abaixo dele. No rodapé, “Desistir” e
 “Fechar” ficam agrupados à esquerda, enquanto a ação principal fica à direita.
+Enquanto a pessoa acompanha o fim, loading e resposta confirmada ancoram a região
+no turno mais novo sem mover controles fixos nem roubar foco. Se ela rolar para
+consultar mensagens antigas, novas respostas não forçam o retorno ao final.
 `collecting|clarifying` mostram campo e “Enviar resposta”; ao chegar a `ready`,
 ambos desaparecem e a mesma posição passa a oferecer “Gerar prévia”. `preview`
 oculta o histórico, ocupa o corpo disponível com o plano e torna a própria prévia
@@ -94,6 +104,8 @@ discreto e persistente às células da linha ativa; falha restaura o destaque
 confirmado anterior. Plano próprio oferece editar/excluir; referência oferece
 navegação e “Excluir”, que visualmente remove o item mas envia desvinculação sem
 versão.
+Excluir a entrada ativa remove imediatamente as queries de `/training`; a próxima
+visita refaz a leitura e não exibe por um instante o plano excluído.
 
 Job aparece como linha não navegável “Clonando”, com estado/progresso. Em
 `failed|start-failed` oferece retry; enquanto não terminal oferece cancelar. A
@@ -147,7 +159,7 @@ interação que atrase a leitura.
 1. `?mockAuth=person&mockTrainingPlans=personal-mixed`: próprio e referência na
    mesma tabela; troca do radio mantém somente um ativo.
 2. `?mockAuth=admin&mockTrainingPlans=personal-mixed`: admin também vê “Meus
-   planos”, mantendo “Planos globais” separado no menu.
+   planos”, mantendo “Modelos de treino” separado no menu.
 3. `?mockAuth=person&mockTrainingPlans=clone-running`: ações mutuamente bloqueadas
    durante o início, linha bloqueada, progresso e cancelamento.
 4. `?mockAuth=person&mockTrainingPlans=clone-failed`: retry e cancelamento.
@@ -160,6 +172,7 @@ interação que atrase a leitura.
 8. `assistant-preview`: estrutura completa, ajuste, confirmação e navegação.
 9. `assistant-provider-error`: erro persistente e retry; `assistant-abandon`:
    exclusão confirmada.
+10. `library-empty`: empty state sem ações de uso ou clonagem.
 
 Implementação em `personal-list-page.tsx`, service/queries da rota; MSW em
 `src/mocks/handlers/training-plans.ts`; Playwright em
@@ -167,4 +180,11 @@ Implementação em `personal-list-page.tsx`, service/queries da rota; MSW em
 `training-plan-assistant-service.ts`, componente route-owned em
 `training-plan-assistant/` e handler/fixture homônimos. Analytics emite somente as
 ações enumeradas `assistant_open|message|retry|abandon|preview|adjust|confirm` e
-`outcome`, sem IDs ou conteúdo. Não há referência visual.
+`outcome`, sem IDs ou conteúdo.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/training-plan/desktop-1440-mixed.png` | `1440x900` | catálogo misto em tema claro |
+| `assets/training-plan/mobile-390-mixed.png` | `390x844` | catálogo misto mobile em tema claro |

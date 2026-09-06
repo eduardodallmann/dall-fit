@@ -31,7 +31,8 @@ export const trainingPlanStyles = tv({
     libraryList: 'flex max-h-[60vh] flex-col gap-3 overflow-y-auto',
     libraryPreview: 'text-xs leading-5 text-muted',
     newPlanTrigger:
-      'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-focus',
+      'inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-accent px-4 text-sm font-medium text-accent-foreground outline-none transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-focus',
+    newPlanButton: 'shrink-0 whitespace-nowrap',
     page: 'mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-6 lg:p-8',
     pageHeader:
       'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between',

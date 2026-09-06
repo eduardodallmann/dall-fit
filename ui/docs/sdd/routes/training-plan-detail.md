@@ -16,7 +16,8 @@ são obrigatórios; o parâmetro identifica a entrada, não diretamente a árvor
 Em `owned`, a composição reutiliza formulário, tabela e confirmações do fluxo
 global: editar nome/descrição, criar workout e excluir workout usam CAS e
 `X-Resource-Version`. Em `global-reference`, um alerta explica que o conteúdo
-acompanha a administração; não são renderizados editar, criar ou excluir. Os
+é um `Modelo disponibilizado em modo de leitura`; não são renderizados editar,
+criar ou excluir. Os
 workouts continuam navegáveis e a coluna Ações informa “Somente leitura”. Não há
 booleans independentes de capability: a união `source` escolhe uma composição
 inteira.
@@ -33,6 +34,10 @@ mesmo prefixo. Breadcrumbs ligam Home → Meus planos → plano; workout avança
 `/training-plan/:catalogEntryId/workout/:workoutId`. Formulários e dialogs mantêm
 labels, foco e teclado dos componentes compartilhados.
 
+No plano próprio, `Ctrl+Enter` confirma a edição inline do título. Criar workout
+só navega depois do sucesso e usa o ID canônico retornado para abrir diretamente
+`/training-plan/:catalogEntryId/workout/:workoutId`; falha mantém o detalhe.
+
 No plano `owned`, edição inline alterada ou preservada após falha registra um owner
 na fronteira global de segurança de reload, e mutations pendentes são agregadas
 pelo provider transversal. A atualização PWA espera silenciosamente até salvar,
@@ -47,4 +52,11 @@ cria bloqueador por navegação ou consulta.
 - `...?mockAuth=person&mockTrainingPlans=detail-error`: erro recuperável.
 
 Implementação em `personal-detail-page.tsx`; handlers/fixtures MSW compartilhados;
-Playwright em `personal-training-plan.spec.ts`. Não há referência visual.
+Playwright em `personal-training-plan.spec.ts`.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/training-plan-detail/desktop-1440-read-only.png` | `1440x900` | modelo disponibilizado em leitura |
+| `assets/training-plan-detail/mobile-390-read-only.png` | `390x844` | modelo disponibilizado em leitura mobile |

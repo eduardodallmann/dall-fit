@@ -70,6 +70,8 @@ export function TrainingPlanAssistantModal({
   const queryOptions = trainingPlanAssistantQueryOptions(mockTrainingPlans);
   const query = useQuery({ ...queryOptions, enabled: open });
   const allowInternalNavigation = useRef(false);
+  const conversationRef = useRef<HTMLElement>(null);
+  const followConversation = useRef(true);
   const [abandonOpen, setAbandonOpen] = useState(false);
   const [persistentError, setPersistentError] = useState<string>();
   const [lastRetry, setLastRetry] = useState<
@@ -79,7 +81,10 @@ export function TrainingPlanAssistantModal({
   >();
 
   useEffect(() => {
-    if (open) allowInternalNavigation.current = false;
+    if (open) {
+      allowInternalNavigation.current = false;
+      followConversation.current = true;
+    }
   }, [open]);
 
   const cancelSessionRead = async () => {
@@ -205,6 +210,19 @@ export function TrainingPlanAssistantModal({
   const canAnswer =
     session?.status === 'collecting' || session?.status === 'clarifying';
   const previewVisible = session?.status === 'preview';
+  useEffect(() => {
+    if (!open || previewVisible || !followConversation.current) return;
+    window.requestAnimationFrame(() => {
+      const conversation = conversationRef.current;
+      if (conversation !== null)
+        conversation.scrollTop = conversation.scrollHeight;
+    });
+  }, [
+    messageMutation.isPending,
+    open,
+    previewVisible,
+    session?.messages.length,
+  ]);
   const form = useForm({
     defaultValues: { text: '' },
     onSubmit: async ({ value }) => {
@@ -354,6 +372,15 @@ export function TrainingPlanAssistantModal({
                       <section
                         aria-label="Histórico da conversa"
                         className={styles.conversation()}
+                        onScroll={(event) => {
+                          const element = event.currentTarget;
+                          followConversation.current =
+                            element.scrollHeight -
+                              element.scrollTop -
+                              element.clientHeight <=
+                            48;
+                        }}
+                        ref={conversationRef}
                       >
                         {session.messages.map((message) => (
                           <p
@@ -393,13 +420,13 @@ export function TrainingPlanAssistantModal({
                             <Button
                               isDisabled={pending}
                               key={answer.value}
-                              onPress={() =>
+                              onPress={() => {
                                 messageMutation.mutate({
                                   id: crypto.randomUUID(),
                                   text: answer.value,
                                   version: session.version,
-                                })
-                              }
+                                });
+                              }}
                               size="sm"
                               variant="secondary"
                             >

@@ -42,6 +42,48 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toContainText('Saúde geral');
   });
 
+  test('FIT-75 — acompanha a conversa no fim sem tirar quem consulta mensagens antigas', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-resumed',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Me ajude a criar um plano',
+    });
+    const conversation = dialog.getByRole('region', {
+      name: 'Histórico da conversa',
+    });
+    await conversation.evaluate((element) => {
+      element.style.height = '48px';
+      element.style.flex = 'none';
+      element.scrollTop = element.scrollHeight;
+      element.dispatchEvent(new Event('scroll'));
+    });
+    await dialog.getByRole('button', { name: 'Condicionamento' }).click();
+    await expect(conversation).toContainText('Condicionamento');
+    await expect
+      .poll(() =>
+        conversation.evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+
+    await conversation.evaluate((element) => {
+      element.scrollTop = 0;
+      element.dispatchEvent(new Event('scroll'));
+    });
+    await dialog.getByRole('button', { name: 'Hipertrofia' }).click();
+    await expect(conversation).toContainText('Hipertrofia');
+    await expect
+      .poll(() => conversation.evaluate((element) => element.scrollTop))
+      .toBe(0);
+  });
+
   test('Cenário 6 — bloqueio e emergência não oferecem geração', async ({
     page,
   }) => {
@@ -149,13 +191,13 @@ test.describe('Rotas pessoais de planos de treino', () => {
         .getByRole('link', { name: 'Meus planos' }),
     ).toHaveAttribute('aria-current', 'page');
     await expect(
-      page.getByRole('link', { name: 'Planos globais' }),
+      page.getByRole('link', { name: 'Modelos de treino' }),
     ).toHaveCount(0);
 
     await page.goto('/training-plan?mockAuth=admin&mockTrainingPlans=empty');
     await expect(page.getByRole('link', { name: 'Meus planos' })).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Planos globais' }),
+      page.getByRole('link', { name: 'Modelos de treino' }),
     ).toBeVisible();
   });
 
@@ -170,14 +212,17 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toBeVisible();
     await expect(page.getByRole('gridcell', { name: 'Próprio' })).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { exact: true, name: 'Plano global' }),
+      page.getByRole('gridcell', {
+        exact: true,
+        name: 'Modelo disponibilizado',
+      }),
     ).toBeVisible();
     const radios = page.getByRole('radio');
     await expect(radios).toHaveCount(2);
     const firstRow = page.getByRole('row', {
       name: /Hipertrofia iniciante/,
     });
-    const secondRow = page.getByRole('row', { name: /Plano global/ });
+    const secondRow = page.getByRole('row', { name: /Modelo de treino 2/ });
     const firstCell = firstRow.getByRole('gridcell').first();
     const secondCell = secondRow.getByRole('gridcell').first();
     const idleBackground = await firstCell.evaluate(
@@ -222,14 +267,14 @@ test.describe('Rotas pessoais de planos de treino', () => {
     );
     await page.getByRole('button', { name: 'Novo plano' }).click();
     await page.getByRole('menuitem', { name: 'Copiar um plano' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Copiar um plano global' });
+    const dialog = page.getByRole('dialog', { name: 'Copiar um modelo' });
     await expect(dialog.getByText('Treino A:')).toBeVisible();
     await expect(
       dialog.getByRole('button', { name: 'Clonar' }).first(),
     ).toBeDisabled();
     const availablePlan = dialog
       .locator('article')
-      .filter({ hasText: 'Plano global 3' });
+      .filter({ hasText: 'Modelo de treino 3' });
     const useButton = availablePlan.getByRole('button', {
       name: 'Usar esse plano',
     });
@@ -247,7 +292,7 @@ test.describe('Rotas pessoais de planos de treino', () => {
       `/training-plan/${referenceCatalogEntryId}?mockAuth=person&mockTrainingPlans=personal-reference`,
     );
     await expect(
-      page.getByText('Plano global em modo de leitura.'),
+      page.getByText('Modelo disponibilizado em modo de leitura.'),
     ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Editar plano' }),
@@ -307,6 +352,81 @@ test.describe('Rotas pessoais de planos de treino', () => {
       imageDialog.getByRole('img', { name: 'Imagem de Supino' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Fechar imagem' }).click();
+  });
+
+  test('FIT-75 — criação pessoal omite legenda redundante e abre o treino criado', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=personal-mixed',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Criar novo plano' }).click();
+    const createDialog = page.getByRole('dialog', {
+      name: 'Novo plano de treino',
+    });
+    await expect(createDialog.getByText('Identificação do plano')).toHaveCount(
+      0,
+    );
+    await createDialog.getByRole('button', { name: 'Cancelar' }).click();
+
+    await page.getByRole('link', { name: 'Hipertrofia iniciante' }).click();
+    await page.getByRole('button', { name: 'Novo treino' }).click();
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/training-plan/${ownedCatalogEntryId}/workout/64b000000000000000000199`,
+      ),
+    );
+    await expect(page.getByRole('heading', { name: 'Treino A' })).toBeVisible();
+  });
+
+  test('FIT-75 — biblioteca vazia orienta sem oferecer ações', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=library-empty',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Copiar um plano' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Copiar um modelo' });
+    await expect(
+      dialog.getByRole('heading', { name: 'Nenhum modelo disponível' }),
+    ).toBeVisible();
+    await expect(dialog.getByText(/tente novamente mais tarde/)).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Usar esse plano' }),
+    ).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Clonar' })).toHaveCount(0);
+  });
+
+  test('FIT-75 — excluir o plano ativo força nova leitura ao voltar para Treinar', async ({
+    page,
+  }) => {
+    let trainingReads = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname.endsWith('/training')
+      )
+        trainingReads += 1;
+    });
+    await page.goto('/training?mockAuth=person&mockTraining=active-plan');
+    await expect(
+      page.getByRole('heading', { name: 'Plano ABC 1' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Meus planos' }).click();
+    const row = page.getByRole('row', { name: /Hipertrofia iniciante/ });
+    await row.getByRole('radio').click();
+    await row.getByRole('button', { name: /Ações de Hipertrofia/ }).click();
+    await page.getByRole('menuitem', { name: 'Excluir' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Excluir plano?' })
+      .getByRole('button', { name: 'Excluir' })
+      .click();
+    await expect(page.getByText('Plano excluído.')).toBeVisible();
+    const readsBeforeReturn = trainingReads;
+    await page.getByRole('link', { name: 'Treinar' }).click();
+    await expect.poll(() => trainingReads).toBeGreaterThan(readsBeforeReturn);
   });
 
   test('mantém o editor completo para um plano próprio', async ({ page }) => {

@@ -61,7 +61,7 @@ Depois da proteção, o layout autenticado apresenta:
 - botão HeroUI icon-only que mostra `Sun` no escuro com nome `Ativar tema claro`
   ou `Moon` no claro com nome `Ativar tema escuro`;
 - `Home` marcado visualmente e com `aria-current="page"`;
-- somente para `Person.isAdmin === true`, link `Planos globais` com ícone
+- somente para `Person.isAdmin === true`, link `Modelos de treino` com ícone
   `Dumbbell`, destino `/global/training-plan` e estado ativo nos descendentes;
 - seção `Aplicativo` no menu com instalação nativa quando o navegador oferece o
   prompt ou orientação manual expansível quando ele não está disponível;
@@ -349,7 +349,10 @@ móvel não o reabre.
 
 ## Referências visuais de layout — opcional
 
-Não se aplica — não existem imagens em `routes/assets/dash/`.
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/dash/desktop-1440-menu.png` | `1440x900` | menu administrativo persistente |
+| `assets/dash/mobile-390-menu-open.png` | `390x844` | drawer administrativo aberto |
 
 ## Cenários funcionais
 

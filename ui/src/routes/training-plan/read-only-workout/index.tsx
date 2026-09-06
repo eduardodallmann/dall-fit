@@ -40,8 +40,9 @@ export function ReadOnlyWorkout({
         <div className={styles.titleGroup()}>
           <h1 className={styles.title()}>{workout.name}</h1>
           <p className={styles.description()}>
-            Exercícios definidos no plano global. Nenhuma informação pode ser
-            alterada neste vínculo, mas você pode consultar imagens e vídeos.
+            Exercícios definidos no modelo disponibilizado. Nenhuma informação
+            pode ser alterada neste vínculo, mas você pode consultar imagens e
+            vídeos.
           </p>
         </div>
         <Chip color="accent" size="sm" variant="soft">

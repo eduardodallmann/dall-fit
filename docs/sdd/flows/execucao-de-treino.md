@@ -31,12 +31,17 @@ por pessoa.
 1. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento.
 2. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
+   Antes de iniciar, a pessoa pode retornar à seleção por um link próprio; ele não
+   aparece durante a sessão.
 3. Iniciar cria um snapshot exclusivo com TTL absoluto de 24 horas. Se outro
    workout já estiver ativo, a pessoa retoma ou confirma o descarte antes de criar
    o novo.
 4. Cada mutation envia a versão canônica. Carga é inteira entre 0 e 9999 ou vazia;
    concluir série aceita ambos atomicamente. Descansos e exercícios temporizados
-   usam timestamps do servidor.
+   usam timestamps do servidor. Salvar carga e concluir compartilham uma fila FIFO
+   por sessão, lendo a versão somente ao chegar à cabeça. Um PUT de carga pendente
+   não bloqueia campos incompletos nem ações de conclusão; a ação usa o draft mais
+   novo e respostas antigas não o sobrescrevem.
 5. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
    incompleto requer confirmação explícita para finalizar.
 6. A finalização grava execução e perfis no MongoDB, remove o snapshot Redis e
@@ -60,6 +65,9 @@ por pessoa.
 - Conflito: draft local é descartado, GET canônico prevalece e a UI avisa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
   preserva a sessão para repetição idempotente.
+- Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
+  sobrepor ou criar rolagem horizontal; Drawer fica encostado ao rodapé e Short
+  usa 9:16.
 
 ## Cenários funcionais
 
@@ -83,7 +91,8 @@ por pessoa.
 - Regras e caminhos de negócio protegidos: fluxo E2E real em
   `api/test/training-plan.e2e-spec.ts`, com MongoDB e Redis efêmeros.
 - Playwright: `ui/tests/integration/routes/training.spec.ts` valida listagem,
-  início, carga vazia, finalização parcial e confirmação de descarte contra MSW.
+  início, carga vazia, concorrência com PUT atrasado, responsividade, mídia,
+  finalização parcial e confirmação de descarte contra MSW.
 - Handlers e fixtures MSW: `ui/src/mocks/handlers/training.ts` e
   `ui/src/mocks/fixtures/training.ts`.
 - Cenários não automatizados: compartilhamento nativo depende da API do sistema

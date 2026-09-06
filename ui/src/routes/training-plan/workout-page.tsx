@@ -219,7 +219,7 @@ export function TrainingPlanWorkoutPage({
         <Alert status={workout.usage.linkedPeople > 0 ? 'warning' : 'default'}>
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Impacto deste plano global</Alert.Title>
+            <Alert.Title>Impacto deste modelo</Alert.Title>
             <Alert.Description>
               {workout.usage.linkedPeople} pessoa(s) vinculada(s), sendo{' '}
               {workout.usage.activePeople} com este plano ativo.

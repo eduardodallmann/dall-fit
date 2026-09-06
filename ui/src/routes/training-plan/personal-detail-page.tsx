@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Alert, Button, Table, toast } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Pencil, Plus } from 'lucide-react';
 
 import type { CreateTrainingPlanRequest } from '@dall-fit/types';
@@ -42,6 +42,7 @@ export function PersonalTrainingPlanDetailPage({
   mockTrainingPlans,
 }: Readonly<PersonalDetailPageProps>) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const query = useQuery(
     personalTrainingPlanDetailQueryOptions(catalogEntryId, mockTrainingPlans),
   );
@@ -79,7 +80,15 @@ export function PersonalTrainingPlanDetailPage({
         mockTrainingPlans,
         'personal',
       ),
-    onSuccess: invalidate,
+    onSuccess: async (result) => {
+      await invalidate();
+      toast.success('Treino criado.');
+      await navigate({
+        params: { catalogEntryId, workoutId: result.data.id },
+        search: { mockAuth, ...mockSearch },
+        to: '/training-plan/$catalogEntryId/workout/$workoutId',
+      });
+    },
   });
   const deleteWorkoutMutation = useMutation({
     mutationFn: (workoutId: string) =>
@@ -124,7 +133,9 @@ export function PersonalTrainingPlanDetailPage({
         <Alert status="accent">
           <Alert.Indicator />
           <Alert.Content>
-            <Alert.Title>Plano global em modo de leitura.</Alert.Title>
+            <Alert.Title>
+              Modelo disponibilizado em modo de leitura.
+            </Alert.Title>
             <Alert.Description>
               Este conteúdo acompanha automaticamente as alterações feitas pela
               administração.
@@ -169,18 +180,14 @@ export function PersonalTrainingPlanDetailPage({
             <h2>Treinos</h2>
             <p className={styles.description()}>
               {readOnly
-                ? 'Consulte os treinos e exercícios deste modelo global.'
+                ? 'Consulte os treinos e exercícios deste modelo disponibilizado.'
                 : 'Organize os treinos que pertencem a este plano.'}
             </p>
           </div>
           {readOnly ? null : (
             <Button
               isPending={createWorkoutMutation.isPending}
-              onPress={() =>
-                void createWorkoutMutation
-                  .mutateAsync()
-                  .then(() => toast.success('Treino criado.'))
-              }
+              onPress={() => createWorkoutMutation.mutate()}
             >
               <Plus aria-hidden="true" className={styles.icon()} />
               Novo treino

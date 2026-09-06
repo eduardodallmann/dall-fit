@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 
 import type {
   TrainingExerciseExecution,
@@ -39,6 +39,7 @@ function stateFor(name: string): TrainingState {
   const running = [
     'duration-running',
     'exercise-completed',
+    'load-pending',
     'pause-running',
     'series-running',
     'session-running',
@@ -158,9 +159,11 @@ export const trainingHandlers = [
   http.put(
     `${apiBaseUrl}/training/session/exercises/:exerciseId/series/:seriesNumber/load`,
     async ({ params, request }) => {
-      const state = stateFor(scenario(request));
+      const scenarioName = scenario(request);
+      const state = stateFor(scenarioName);
       if (state.session === null)
         return error('WORKOUT_SESSION_NOT_FOUND', 'Session not found.', 404);
+      if (scenarioName === 'load-pending') await delay(800);
       const invalid = validateVersion(request, state.session);
       if (invalid !== null) return invalid;
       const body = (await request.json()) as { loadKg: number | null };

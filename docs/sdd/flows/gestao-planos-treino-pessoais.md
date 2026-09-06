@@ -9,6 +9,9 @@
 - Resultado esperado: catálogo único com conteúdo próprio, referências globais
   vivas e operações de clone bloqueadas até conclusão.
 
+Na comunicação da UI, essas referências são apresentadas como modelos
+disponibilizados; `global` permanece no domínio técnico e nos contratos.
+
 ## Entrada e pré-condições
 
 Sessão e CSRF válidos. Rotas globais continuam exigindo `isAdmin`; rotas pessoais
@@ -33,6 +36,8 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 1. A lista pagina 20 itens e intercala entradas de catálogo válidas com jobs
    visíveis por criação, sem expor destino parcial.
 2. Criar persiste árvore própria e catálogo, sem ativação automática.
+   O formulário pessoal usa somente o heading principal, sem repetir
+   `Identificação do plano`.
 3. Usar persiste só a referência; toda leitura resolve o global atual e toda
    mutação retorna `GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`.
 4. Clonar captura snapshot, persiste job e só então chama o bridge assinado.
@@ -43,6 +48,8 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
    retry/cancelamento. Timeout ambíguo mantém geração e permite reentrega.
 7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca.
 8. Excluir próprio ou desvincular limpa a seleção se necessário, sem fallback.
+   Se a entrada era ativa, a UI remove o cache de `/training` para obrigar leitura
+   canônica na próxima visita.
 9. Excluir global remove vínculos/seleções, mas jobs continuam pelo snapshot.
 10. Pedir ajuda abre uma sessão separada e retomável. A API coleta uma pergunta
     por vez, calcula triagem local e só chama o provider para operações restritas.
@@ -60,9 +67,16 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     mantém a orientação visível até o fechamento do modal; ao fechar, a UI exclui
     a sessão terminal para que a próxima abertura comece uma conversa nova.
     Pessoa apta revisa uma prévia antes de confirmar.
+    O histórico acompanha o turno novo somente quando a pessoa já está próxima ao
+    final; a leitura de mensagens antigas não sofre scroll forçado.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.
+12. Criar um treino em plano próprio permanece no detalhe durante pending ou erro;
+    somente o sucesso navega ao workout pelo ID devolvido. `Ctrl+Enter` salva os
+    títulos inline de plano e treino pela mesma mutation dos botões.
+13. Biblioteca sem resultados mostra `Nenhum modelo disponível`, orienta tentar
+    mais tarde e omite as ações de uso e clone.
 
 ## Dados compartilhados
 
@@ -128,6 +142,14 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
   aquecimento, força, cardio elegível, desaquecimento e alongamento dentro da
   duração informada; a confirmação cria um plano próprio inativo e navega ao
   detalhe.
+
+### Cenário 6 — Biblioteca vazia e criação de treino
+
+- Link para testar: `http://localhost:3000/training-plan?mockAuth=person&mockTrainingPlans=library-empty`
+- Given: nenhum modelo está disponível.
+- When: abre “Copiar um plano”.
+- Then: recebe orientação sem ações; no plano próprio, criar workout navega somente
+  após sucesso ao ID canônico retornado.
 
 ## Cobertura automatizada
 

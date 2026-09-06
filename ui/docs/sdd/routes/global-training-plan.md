@@ -34,7 +34,8 @@ repete ambos e informa que pessoas podem ficar sem plano ativo; confirmar contin
 permitido.
 
 - breadcrumb semântico e tipado `Home / Planos de treino`;
-- título, descrição e ação `Novo plano`;
+- título, descrição sobre modelos disponibilizados e ação `Novo plano`, cujo
+  conteúdo não quebra entre linhas;
 - `Table` HeroUI com nome, descrição, atualização e dropdown de ações;
 - nome como `Link` tipado para o detalhe, com cor de ação e sublinhado persistente
   para tornar a navegação evidente sem depender de hover;
@@ -182,7 +183,10 @@ modal, confirmação ou alerta.
 
 ## Referências visuais de layout
 
-Não se aplica — não existem imagens em `routes/assets/global-training-plan/`.
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/global-training-plan/desktop-1440-success.png` | `1440x900` | listagem administrativa de modelos |
+| `assets/global-training-plan/mobile-390-success.png` | `390x844` | listagem administrativa mobile |
 
 ## Cenários funcionais
 

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 
 import {
   Alert,
@@ -72,6 +72,11 @@ export function TrainingPlanInlineForm({
     event.stopPropagation();
     void form.handleSubmit().catch(() => undefined);
   };
+  const handleTitleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!event.ctrlKey || event.key !== 'Enter') return;
+    event.preventDefault();
+    void form.handleSubmit().catch(() => undefined);
+  };
 
   return (
     <form className={styles.inlineEditor()} onSubmit={handleSubmit}>
@@ -104,6 +109,7 @@ export function TrainingPlanInlineForm({
                 }}
                 onChange={(event) => field.handleChange(event.target.value)}
                 onFocus={() => trackFieldFocus('name')}
+                onKeyDown={handleTitleKeyDown}
                 value={field.state.value}
               />
               <FieldError className={styles.fieldError()}>

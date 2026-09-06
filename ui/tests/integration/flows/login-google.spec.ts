@@ -103,7 +103,7 @@ test.describe('Fluxo Login com Google — retomada da rota', () => {
       '/global/training-plan?mockTrainingPlans=two-pages&page=2#planos',
     );
     await expect(
-      page.getByRole('link', { name: 'Planos globais', exact: true }),
+      page.getByRole('link', { name: 'Modelos de treino', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
   });
 
@@ -159,7 +159,7 @@ test.describe('Fluxo Login com Google — retomada da rota', () => {
     await page.getByRole('button', { name: 'Entrar com Google' }).click();
     await expect(page).toHaveURL('/dash');
     await expect(
-      page.getByRole('link', { name: 'Planos globais', exact: true }),
+      page.getByRole('link', { name: 'Modelos de treino', exact: true }),
     ).not.toBeVisible();
     await page.reload();
     await expect(page).toHaveURL('/dash');

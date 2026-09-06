@@ -176,7 +176,7 @@ export function ApplicationMenu({
               className={styles.navigationIcon()}
               focusable="false"
             />
-            <span>Planos globais</span>
+            <span>Modelos de treino</span>
           </Link>
         ) : null}
       </nav>

@@ -7,7 +7,10 @@ import { trackTrainingAction } from '~/core/analytics';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
 import { trainingStyles } from '~/routes/training/styles';
 import { trainingCompletionQueryOptions } from '~/routes/training/training-queries';
-import type { MockTrainingScenario } from '~/routes/training/training-service';
+import {
+  trainingMockSearch,
+  type MockTrainingScenario,
+} from '~/routes/training/training-service';
 
 const styles = trainingStyles();
 const weekdayLabels = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'] as const;
@@ -150,7 +153,7 @@ export function TrainingCompletionPage({
           onPress={() =>
             void navigate({
               replace: true,
-              search: { mockTraining },
+              search: trainingMockSearch(mockTraining),
               to: '/training',
             })
           }

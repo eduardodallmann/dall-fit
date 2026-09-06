@@ -11,7 +11,7 @@ import {
   toast,
 } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Check, ChevronDown, ChevronUp, Circle } from 'lucide-react';
 
 import type {
@@ -47,6 +47,7 @@ import {
   saveTrainingLoad,
   startTrainingSession,
   startTrainingTimer,
+  trainingMockSearch,
   type MockTrainingScenario,
 } from '~/routes/training/training-service';
 
@@ -133,7 +134,7 @@ export function TrainingWorkoutPage({
     toast.warning('Seu treino em andamento expirou');
     void navigate({
       replace: true,
-      search: { mockTraining: 'active-plan' },
+      search: trainingMockSearch('active-plan'),
       to: '/training',
     });
   }, [navigate, sessionExpired]);
@@ -173,6 +174,13 @@ export function TrainingWorkoutPage({
   if (session !== undefined && session.workout.id !== workoutId) {
     return (
       <main className={styles.page()}>
+        <Link
+          className={styles.backLink()}
+          search={trainingMockSearch(mockTraining)}
+          to="/training"
+        >
+          Voltar para treinos
+        </Link>
         <header className={styles.header()}>
           <h1 className={styles.title()}>{previewQuery.data.workout.name}</h1>
           <p className={styles.subtitle()}>
@@ -184,7 +192,7 @@ export function TrainingWorkoutPage({
             onPress={() =>
               void navigate({
                 params: { workoutId: session.workout.id },
-                search: { mockTraining },
+                search: trainingMockSearch(mockTraining),
                 to: '/training/workout/$workoutId',
               })
             }
@@ -238,6 +246,13 @@ export function TrainingWorkoutPage({
 
   return (
     <main className={styles.page()}>
+      <Link
+        className={styles.backLink()}
+        search={trainingMockSearch(mockTraining)}
+        to="/training"
+      >
+        Voltar para treinos
+      </Link>
       <header className={styles.header()}>
         <h1 className={styles.title()}>{previewQuery.data.workout.name}</h1>
         <p className={styles.subtitle()}>
@@ -314,118 +329,133 @@ function ActiveWorkout({
   const debounceTimers = useRef(new Map<string, number>());
   const [hasPendingDraft, setHasPendingDraft] = useState(false);
 
-  const sessionMutation = useMutation({
-    mutationFn: async (action: SessionAction) => {
-      const current =
-        queryClient.getQueryData<TrainingSession>(sessionQueryKey);
-      const version = current?.version ?? session.version;
-      switch (action.type) {
-        case 'load':
-          return saveTrainingLoad(
-            action.exerciseId,
-            action.seriesNumber,
-            action.loadKg,
-            version,
-            mockTraining,
-          );
-        case 'complete-series':
-          return completeTrainingSeries(
-            action.exerciseId,
-            action.seriesNumber,
-            action.loadKg,
-            version,
-            mockTraining,
-          );
-        case 'complete-remaining':
-          return completeRemainingTrainingSeries(
-            action.exerciseId,
-            action.loadsKg,
-            version,
-            mockTraining,
-          );
-        case 'start-timer':
-          return startTrainingTimer(
-            action.exerciseId,
-            action.kind,
-            version,
-            mockTraining,
-          );
-        case 'resolve-timer':
-          return resolveTrainingTimer(action.outcome, version, mockTraining);
-        case 'complete-exercise':
-          return completeTrainingExercise(
-            action.exerciseId,
-            version,
-            mockTraining,
-          );
-        case 'restart-exercise':
-          return restartTrainingExercise(
-            action.exerciseId,
-            version,
-            mockTraining,
-          );
-      }
-    },
+  const executeSessionAction = async (action: SessionAction) => {
+    const current = queryClient.getQueryData<TrainingSession>(sessionQueryKey);
+    const version = current?.version ?? session.version;
+    switch (action.type) {
+      case 'load':
+        return saveTrainingLoad(
+          action.exerciseId,
+          action.seriesNumber,
+          action.loadKg,
+          version,
+          mockTraining,
+        );
+      case 'complete-series':
+        return completeTrainingSeries(
+          action.exerciseId,
+          action.seriesNumber,
+          action.loadKg,
+          version,
+          mockTraining,
+        );
+      case 'complete-remaining':
+        return completeRemainingTrainingSeries(
+          action.exerciseId,
+          action.loadsKg,
+          version,
+          mockTraining,
+        );
+      case 'start-timer':
+        return startTrainingTimer(
+          action.exerciseId,
+          action.kind,
+          version,
+          mockTraining,
+        );
+      case 'resolve-timer':
+        return resolveTrainingTimer(action.outcome, version, mockTraining);
+      case 'complete-exercise':
+        return completeTrainingExercise(
+          action.exerciseId,
+          version,
+          mockTraining,
+        );
+      case 'restart-exercise':
+        return restartTrainingExercise(
+          action.exerciseId,
+          version,
+          mockTraining,
+        );
+    }
+  };
+  const handleSessionSuccess = (
+    data: TrainingSession,
+    action: SessionAction,
+  ) => {
+    trackTrainingAction(
+      'training_workout',
+      trainingActionName(action),
+      'success',
+    );
+    queryClient.setQueryData(sessionQueryKey, data);
+    const completed = data.exercises.find(
+      (exercise) => exercise.id === expandedId,
+    )?.completedAt;
+    if (completed !== null && completed !== undefined) {
+      const next = data.exercises.find(
+        (exercise) => exercise.completedAt === null,
+      );
+      setExpandedId(next?.id ?? null);
+      if (next !== undefined)
+        window.requestAnimationFrame(() =>
+          document.getElementById(`training-exercise-${next.id}`)?.focus(),
+        );
+    }
+    if (data.exercises.every((exercise) => exercise.completedAt !== null))
+      setFinishOpen(true);
+  };
+  const handleSessionError = async (error: unknown, action: SessionAction) => {
+    trackTrainingAction(
+      'training_workout',
+      trainingActionName(action),
+      'error',
+    );
+    if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
+      const canonical = await queryClient.fetchQuery({
+        ...trainingSessionQueryOptions(mockTraining),
+        staleTime: 0,
+      });
+      setDrafts(sessionDrafts(canonical));
+      clearDebounces(debounceTimers.current);
+      setHasPendingDraft(false);
+      toast.warning('O treino foi atualizado em outro lugar.');
+      return;
+    }
+    toast.danger('Não foi possível salvar o progresso.');
+  };
+  const loadMutation = useMutation({
+    mutationFn: executeSessionAction,
     mutationKey: ['training-session-write', session.id],
     scope: { id: session.id },
-    onSuccess: (data, action) => {
-      trackTrainingAction(
-        'training_workout',
-        trainingActionName(action),
-        'success',
-      );
-      queryClient.setQueryData(sessionQueryKey, data);
-      const completed = data.exercises.find(
-        (exercise) => exercise.id === expandedId,
-      )?.completedAt;
-      if (completed !== null && completed !== undefined) {
-        const next = data.exercises.find(
-          (exercise) => exercise.completedAt === null,
-        );
-        setExpandedId(next?.id ?? null);
-        if (next !== undefined)
-          window.requestAnimationFrame(() =>
-            document.getElementById(`training-exercise-${next.id}`)?.focus(),
-          );
-      }
-      if (data.exercises.every((exercise) => exercise.completedAt !== null))
-        setFinishOpen(true);
-    },
-    onError: async (error, action) => {
-      trackTrainingAction(
-        'training_workout',
-        trainingActionName(action),
-        'error',
-      );
-      if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
-        const canonical = await queryClient.fetchQuery({
-          ...trainingSessionQueryOptions(mockTraining),
-          staleTime: 0,
-        });
-        setDrafts(sessionDrafts(canonical));
-        clearDebounces(debounceTimers.current);
-        setHasPendingDraft(false);
-        toast.warning('O treino foi atualizado em outro lugar.');
-        return;
-      }
-      toast.danger('Não foi possível salvar o progresso.');
-    },
+    onError: handleSessionError,
+    onSuccess: handleSessionSuccess,
+  });
+  const actionMutation = useMutation({
+    mutationFn: executeSessionAction,
+    mutationKey: ['training-session-write', session.id],
+    scope: { id: session.id },
+    onError: handleSessionError,
+    onSuccess: handleSessionSuccess,
   });
   const completeMutation = useMutation({
     mutationFn: (confirmIncomplete: boolean) =>
       completeTrainingSession(
         confirmIncomplete,
         Intl.DateTimeFormat().resolvedOptions().timeZone,
-        session.version,
+        queryClient.getQueryData<TrainingSession>(sessionQueryKey)?.version ??
+          session.version,
         mockTraining,
       ),
+    mutationKey: ['training-session-write', session.id],
+    scope: { id: session.id },
     onSuccess: (completion) => {
       queryClient.removeQueries({ queryKey: sessionQueryKey });
       void queryClient.invalidateQueries({ queryKey: trainingKeys.all });
       void navigate({
         params: { workoutExecutionId: completion.id },
         replace: true,
-        search: { mockTraining },
+        search: trainingMockSearch(mockTraining),
         to: '/training/completion/$workoutExecutionId',
       });
       trackTrainingAction('training_workout', 'complete_workout', 'success');
@@ -448,7 +478,10 @@ function ActiveWorkout({
     },
   });
   useReloadBlocker(
-    hasPendingDraft || sessionMutation.isPending || completeMutation.isPending,
+    hasPendingDraft ||
+      loadMutation.isPending ||
+      actionMutation.isPending ||
+      completeMutation.isPending,
   );
 
   useEffect(() => () => clearDebounces(debounceTimers.current), []);
@@ -465,7 +498,7 @@ function ActiveWorkout({
     const timer = window.setTimeout(() => {
       debounceTimers.current.delete(key);
       setHasPendingDraft(debounceTimers.current.size > 0);
-      sessionMutation.mutate({
+      loadMutation.mutate({
         exerciseId,
         loadKg,
         seriesNumber,
@@ -486,7 +519,7 @@ function ActiveWorkout({
     window.clearTimeout(timer);
     debounceTimers.current.delete(key);
     setHasPendingDraft(debounceTimers.current.size > 0);
-    sessionMutation.mutate({
+    loadMutation.mutate({
       exerciseId,
       loadKg,
       seriesNumber,
@@ -502,7 +535,7 @@ function ActiveWorkout({
       debounceTimers.current.delete(key);
     }
     setHasPendingDraft(debounceTimers.current.size > 0);
-    sessionMutation.mutate(action);
+    actionMutation.mutate(action);
   };
   const allComplete = session.exercises.every(
     (exercise) => exercise.completedAt !== null,
@@ -528,7 +561,7 @@ function ActiveWorkout({
               exercise={exercise}
               expanded={expandedId === exercise.id}
               index={index}
-              isPending={sessionMutation.isPending}
+              isPending={actionMutation.isPending}
               onAction={submitAction}
               onExpand={() =>
                 setExpandedId((current) => {
@@ -551,9 +584,9 @@ function ActiveWorkout({
       </Button>
       {session.activeTimer === null ? null : (
         <TrainingTimerOverlay
-          isPending={sessionMutation.isPending}
+          isPending={actionMutation.isPending}
           onResolve={(outcome) =>
-            sessionMutation.mutate({ outcome, type: 'resolve-timer' })
+            actionMutation.mutate({ outcome, type: 'resolve-timer' })
           }
           serverNow={session.serverNow}
           timer={session.activeTimer}
@@ -833,8 +866,10 @@ function SeriesRow({
   const completed = series.completedAt !== null;
   return (
     <div className={styles.seriesRow()}>
-      <strong>Série {series.number}</strong>
-      <span>{series.repetitions} repetições</span>
+      <strong className={styles.seriesLabel()}>Série {series.number}</strong>
+      <span className={styles.seriesRepetitions()}>
+        {series.repetitions} repetições
+      </span>
       <NumberField
         aria-label={`Carga da série ${series.number}`}
         className={styles.loadField()}
@@ -851,8 +886,9 @@ function SeriesRow({
         step={1}
         value={load ?? Number.NaN}
       >
-        <NumberField.Group>
+        <NumberField.Group className={styles.loadFieldGroup()}>
           <NumberField.Input
+            className={styles.loadFieldInput()}
             onBlur={(event) => {
               const next = event.relatedTarget;
               if (

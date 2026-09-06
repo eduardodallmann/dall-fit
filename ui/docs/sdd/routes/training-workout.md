@@ -23,9 +23,12 @@ horas. Existe no máximo uma sessão por pessoa.
 ## Conteúdo e caminho feliz
 
 Antes do início, todos os exercícios aparecem em ordem com tipo e métricas; mídia
-é somente preview. `Iniciar treino` cria a sessão. Durante a execução, somente um
-card fica expandido, o próximo incompleto começa aberto e conclusão avança/foca o
-próximo.
+é somente preview e `Voltar para treinos` retorna à seleção. Esse retorno deixa de
+ser renderizado após o início. `Iniciar treino` cria a sessão. Durante a execução,
+somente um card fica expandido, o próximo incompleto começa aberto e conclusão
+avança/foca o próximo. Toda a superfície do cabeçalho é um botão com
+`aria-expanded` e operação por teclado. Em `390px`, nome e metadados quebram linha
+sem corte, sobreposição ou overflow horizontal, tanto aberto quanto recolhido.
 
 Exercícios `image` e `youtube-short` mostram séries. `NumberField` não possui
 botões de incremento/decremento, aceita somente inteiro entre 0 e 9999 ou vazio e
@@ -33,12 +36,21 @@ salva após 500 ms ou blur. Vazio não bloqueia conclusão: concluir uma série 
 a carga atual atomicamente; concluir restantes envia o vetor completo. A ação de
 conclusão cancela o debounce correspondente para impedir write tardio.
 
+Enquanto uma gravação de carga está em voo, os campos incompletos e as ações de
+conclusão continuam utilizáveis. Gravações e conclusões compartilham a mesma fila
+FIFO por sessão; cada item lê a versão quando chega à cabeça. A conclusão captura
+o draft mais recente e respostas antigas atualizam apenas o cache canônico sem
+sobrescrever um draft local posterior. Em mobile, rótulo, repetições, carga e
+estado reorganizam-se em duas linhas.
+
 `pause` e `duration` abrem timer; descanso de série/pausa pode ser pulado, duração
 pode ser finalizada ou cancelada. Atividade por duração apresenta também sua
 instrução e demonstração em vídeo quando fornecidas pelo plano. Timestamps do
 servidor dirigem o contador.
 `youtube-long` conclui manualmente. Exercício concluído pode ser reiniciado sem
-apagar cargas. Mídia e timers usam Drawer inferior em mobile e Modal em desktop.
+apagar cargas. Mídia e timers usam Drawer encostado ao rodapé em mobile e Modal em
+desktop. YouTube Short preserva 9:16; vídeo longo preserva 16:9; títulos podem
+quebrar sem serem cortados.
 
 ## Alternativas, validações e erros
 
@@ -69,6 +81,9 @@ foco segue ao primeiro exercício incompleto. Reload safety cobre draft ainda n�
 confirmado. A página de conclusão é o avanço; voltar antes de finalizar preserva a
 sessão no backend.
 
+O `NumberField` aceita foco pelo clique em qualquer ponto de sua superfície
+visível, não apenas sobre os glifos do valor.
+
 ## Analytics
 
 Pageview normalizado: `/training/workout/:workoutId`. Eventos
@@ -92,6 +107,14 @@ body area, tempo exato e erros de campo são proibidos.
 - Given: Treino A está em andamento.
 - When: tenta abrir Treino B e aciona descarte.
 - Then: AlertDialog permite manter ou confirmar perda antes de iniciar B.
+
+### Cenário 3 — carga pendente e layout mobile
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=load-pending`
+- Given: sessão em andamento em viewport de `390px` e PUT de carga atrasado.
+- When: edita novamente a carga e conclui a série durante a primeira request.
+- Then: o valor mais novo é preservado, a conclusão respeita a fila e a tela não
+  produz corte, sobreposição ou rolagem horizontal.
 
 ## Estrutura e cobertura
 

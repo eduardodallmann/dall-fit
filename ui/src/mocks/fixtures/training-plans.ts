@@ -16,11 +16,12 @@ export const trainingPlanFixtures: readonly TrainingPlanSummary[] = Array.from(
     ).toISOString();
     const result: TrainingPlanSummary = {
       id: `64b0000000000000000000${String(number).padStart(2, '0')}`,
-      name: number === 1 ? 'Hipertrofia iniciante' : `Plano global ${number}`,
+      name:
+        number === 1 ? 'Hipertrofia iniciante' : `Modelo de treino ${number}`,
       description:
         number === 1
-          ? 'Plano global para uma rotina inicial de hipertrofia.'
-          : `Descrição do plano global ${number}.`,
+          ? 'Modelo disponibilizado para uma rotina inicial de hipertrofia.'
+          : `Descrição do modelo de treino ${number}.`,
       version: 0,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -39,7 +40,7 @@ export const largeTrainingPlanFixtures: readonly TrainingPlanSummary[] =
     return {
       ...base,
       id: `large-training-plan-${number}`,
-      name: `Plano global ${number}`,
+      name: `Modelo de treino ${number}`,
     };
   });
 

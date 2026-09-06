@@ -970,6 +970,12 @@ export function WorkoutEditor({
                   aria-label="Nome do treino"
                   autoFocus
                   maxLength={120}
+                  onKeyDown={(event) => {
+                    if (event.ctrlKey && event.key === 'Enter') {
+                      event.preventDefault();
+                      saveName();
+                    }
+                  }}
                   onChange={(event) => {
                     setNameDraft(event.target.value);
                     if (nameStatus === 'error') setNameStatus('idle');

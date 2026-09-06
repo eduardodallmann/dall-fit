@@ -16,6 +16,9 @@ Editor administrativo completo de um workout global e sua lista ordenada de até
 50 exercícios. A rota é filha de `adminRoute` e faz uma única leitura projetada em
 `GET /global/training-plans/:trainingPlanId/workouts/:workoutId`.
 
+Na comunicação visível, o recurso compartilhado é chamado de modelo; o termo
+`global` fica restrito a rotas, contratos e conceitos técnicos.
+
 ## Entrada, cabeçalho e estados
 
 Breadcrumb resolvido: `Home / Planos de treino / <plano> / <treino>`. IDs nunca
@@ -50,6 +53,9 @@ de adição; o estado desaparece ao existir uma linha. O acionador
 `Adicionar exercício` fica depois da lista, centralizado entre dois `Separator`,
 possui indicador de expansão e abre Dropdown no qual cada tipo combina ícone
 Lucide, nome e descrição.
+
+O nome do workout pode ser editado inline; `Ctrl+Enter` confirma pela mesma fila
+e pelas mesmas validações da ação de salvar.
 
 Cada card possui cabeçalho com handle e ícone do tipo à esquerda, `Chip` e ação de
 exclusão à direita. Identificação, mídia e body area ocupam a linha seguinte;
@@ -228,8 +234,14 @@ upload/drop, estados pendentes e ciclo de montagem dos modais de mídia;
 Playwright cobre os cinco tipos, mídia privada/renovação/pending/rollback, empty state/menu informativo, layouts desktop e
 móvel, duas adições consecutivas com propagação de versão, retorno sem cache antigo,
 autosave, conflito, exclusão durante debounce, ordem por teclado/cancelamento/
-rollback e proteção acessível. E2E separado cobre API/MongoDB. Não há referência visual em
-`routes/assets/global-training-plan-workout/`.
+rollback e proteção acessível. E2E separado cobre API/MongoDB.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado validado |
+| --- | ---: | --- |
+| `assets/global-training-plan-workout/desktop-1440-success.png` | `1440x900` | editor administrativo do workout |
+| `assets/global-training-plan-workout/mobile-390-success.png` | `390x844` | editor administrativo mobile |
 
 Arquivos: `workout-page.tsx`, `workout-editor/`, `training-plan-service.ts`,
 queries e handlers/fixtures `training-plans.ts`.

@@ -236,7 +236,7 @@ export function TrainingPlanListPage({
   };
   let emptyState = (
     <TrainingPlanTableState
-      description="Crie o primeiro plano global para começar."
+      description="Crie o primeiro modelo de treino para começar."
       kind="empty"
       title="Nenhum plano de treino"
     />
@@ -275,10 +275,11 @@ export function TrainingPlanListPage({
         <div className={styles.titleGroup()}>
           <h1 className={styles.title()}>Planos de treino</h1>
           <p className={styles.description()}>
-            Crie e mantenha os modelos globais disponíveis para administração.
+            Crie e mantenha os modelos disponibilizados no aplicativo.
           </p>
         </div>
         <Button
+          className={styles.newPlanButton()}
           onPress={() => {
             trackUiEvent({
               control: 'new_plan',
@@ -325,10 +326,10 @@ export function TrainingPlanListPage({
           reason={aggregate.pauseReason}
         />
       ) : null}
-      <section aria-label="Planos globais" className={styles.section()}>
+      <section aria-label="Modelos de treino" className={styles.section()}>
         <Table>
           <Table.ScrollContainer>
-            <Table.Content aria-label="Planos de treino globais">
+            <Table.Content aria-label="Modelos de treino">
               <Table.Header>
                 <Table.Column isRowHeader>Nome</Table.Column>
                 <Table.Column>Descrição</Table.Column>

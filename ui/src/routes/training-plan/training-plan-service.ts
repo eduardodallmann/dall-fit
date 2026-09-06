@@ -49,6 +49,7 @@ export type MockTrainingPlansScenario =
   | 'empty-workout'
   | 'list-error'
   | 'large-pagination'
+  | 'library-empty'
   | 'loading'
   | 'not-found'
   | 'personal-mixed'

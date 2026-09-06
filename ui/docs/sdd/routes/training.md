@@ -27,9 +27,15 @@ distintas e, quando aplicável, `Atual` ou `Em andamento`. O primeiro workout é
 atual sem histórico; depois, o atual é o seguinte ao último concluído de forma
 cíclica. Sessão em andamento prevalece sobre seleção e histórico.
 
+A grade possui uma coluna em `390px` e `900px` e no máximo duas em `1440px`. O
+play de vídeo fica centralizado sobre a thumbnail. Os chips usam tokens semânticos
+com contraste legível nos temas claro e escuro; nomes podem ocupar duas linhas.
+
 Sem plano, mostra `Nenhum plano em uso`, explicação e `Ir para Meus planos`. Plano
 sem workouts possui empty state próprio. Loading usa skeletons. Falha mostra Alert
-e retry explícito. A navegação do card conserva somente o seletor MSW local.
+e retry explícito. A navegação do card conserva o seletor MSW somente quando os
+mocks locais estão habilitados; uma build de produção nunca propaga
+`mockTraining` para a URL.
 
 ## Integração
 

@@ -172,7 +172,7 @@ export function TrainingPlanBreadcrumbs({
 
 interface TrainingPlanFormProps {
   defaultValues?: CreateTrainingPlanRequest;
-  legend: string;
+  legend?: string;
   mode: 'create' | 'edit' | 'inline_edit';
   onCancel?: () => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
@@ -232,7 +232,9 @@ export function TrainingPlanForm({
         {(isDefaultValue) => <ReloadBlocker active={!isDefaultValue} />}
       </form.Subscribe>
       <Fieldset>
-        <Fieldset.Legend>{legend}</Fieldset.Legend>
+        {legend === undefined ? null : (
+          <Fieldset.Legend>{legend}</Fieldset.Legend>
+        )}
         <Fieldset.Group>
           <form.Field
             name="name"
@@ -340,6 +342,7 @@ export function TrainingPlanForm({
 }
 
 interface FormModalProps {
+  hideLegend?: boolean;
   isWritePaused?: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSubmit: (value: CreateTrainingPlanRequest) => Promise<void>;
@@ -348,6 +351,7 @@ interface FormModalProps {
 }
 
 export function TrainingPlanFormModal({
+  hideLegend = false,
   isWritePaused = false,
   onOpenChange,
   onSubmit,
@@ -393,7 +397,7 @@ export function TrainingPlanFormModal({
                     ? undefined
                     : { description: plan.description, name: plan.name }
                 }
-                legend="Identificação do plano"
+                legend={hideLegend ? undefined : 'Identificação do plano'}
                 isWritePaused={isWritePaused || submitting}
                 mode={mode}
                 onCancel={() => close('cancel')}
