@@ -190,6 +190,19 @@ test.describe('Fluxo Treinar', () => {
     await expect(header).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('Space');
     await expect(header).toHaveAttribute('aria-expanded', 'false');
+    const pressedBox = await header.boundingBox();
+    expect(pressedBox).not.toBeNull();
+    if (pressedBox !== null) {
+      await page.mouse.move(
+        pressedBox.x + pressedBox.width / 2,
+        pressedBox.y + pressedBox.height / 2,
+      );
+      await page.mouse.down();
+      await expect(header).toHaveAttribute('data-pressed', 'true');
+      await expect(header).toHaveCSS('transform', 'none');
+      await page.mouse.up();
+      await expect(header).toHaveAttribute('aria-expanded', 'true');
+    }
   });
 
   test('FIT-76 — centraliza a carga e aceita conclusão durante o salvamento', async ({
@@ -238,6 +251,22 @@ test.describe('Fluxo Treinar', () => {
         ),
       )
       .toBe(true);
+  });
+
+  test('Cenário 4 — autosave sem blur nem conclusão', async ({ page }) => {
+    await page.goto(
+      `/training/workout/${workoutId}?mockAuth=person&mockTraining=load-pending`,
+    );
+    const input = page.getByRole('textbox', { name: 'Carga da série 2' });
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        response.url().endsWith('/series/2/load') &&
+        response.status() === 200,
+    );
+    await input.fill('50');
+    await saveResponse;
+    await expect(input).toHaveValue('50');
   });
 
   test('FIT-76 — posiciona o handle sem deslocar o título do drawer', async ({

@@ -8,7 +8,7 @@ export const trainingStyles = tv({
     bodyAreas: 'flex flex-wrap gap-1.5',
     card: 'overflow-hidden border border-border',
     cardButton:
-      'flex h-auto min-h-16 w-full items-center justify-between gap-3 whitespace-normal rounded-none px-4 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
+      'flex h-auto min-h-16 w-full items-center justify-between gap-3 whitespace-normal rounded-none px-4 py-4 text-left outline-none active:transform-none! data-[pressed=true]:transform-none! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
     cardHeader: 'flex min-w-0 items-center gap-3',
     cardList: 'grid grid-cols-1 gap-4 lg:grid-cols-2',
     cardLink:

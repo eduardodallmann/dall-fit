@@ -81,6 +81,27 @@ describe('ReloadSafetyProvider', () => {
     expect(screen.getByText('safe')).toBeInTheDocument();
   });
 
+  it('prevents a manual document unload only while work is recoverable', async () => {
+    const user = userEvent.setup();
+    renderSafety(<Harness />);
+
+    expect(
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true })),
+    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'first' }));
+
+    expect(
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true })),
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'first' }));
+
+    expect(
+      window.dispatchEvent(new Event('beforeunload', { cancelable: true })),
+    ).toBe(true);
+  });
+
   it('blocks reload while any TanStack mutation is pending', async () => {
     const user = userEvent.setup();
     renderSafety(<MutationHarness />);

@@ -227,6 +227,12 @@ estarem pendentes. Estados de espera, erro, retry, cancelamento e bloqueio usam
 nomes acessíveis, foco previsível, anúncio apropriado e controles disabled de forma
 coerente com sua semântica.
 
+O `ReloadSafetyProvider` aplica a mesma fronteira ao recarregamento ou fechamento
+manual do documento por `beforeunload`, registrando o listener somente enquanto
+existir ao menos um bloqueador. O diálogo nativo protege o trabalho ainda não
+confirmado; depois que drafts, debounces e mutations terminam, o listener é
+removido para não interferir em recargas seguras.
+
 ### Mutações de aggregates versionados
 
 Quando a API exigir uma precondição de versão e múltiplas mutations puderem alterar

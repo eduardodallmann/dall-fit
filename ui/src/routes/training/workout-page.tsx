@@ -495,6 +495,11 @@ function ActiveWorkout({
     setDrafts((current) => ({ ...current, [key]: loadKg }));
     const previous = debounceTimers.current.get(key);
     if (previous !== undefined) window.clearTimeout(previous);
+    if (!isValidLoad(loadKg)) {
+      debounceTimers.current.delete(key);
+      setHasPendingDraft(true);
+      return;
+    }
     const timer = window.setTimeout(() => {
       debounceTimers.current.delete(key);
       setHasPendingDraft(debounceTimers.current.size > 0);
@@ -790,10 +795,7 @@ function SeriesEditor({
   const loads = exercise.series.map((series) =>
     draftLoad(drafts, exercise.id, series),
   );
-  const invalid = loads.some(
-    (load) =>
-      load !== null && (!Number.isInteger(load) || load < 0 || load > 9999),
-  );
+  const invalid = loads.some((load) => !isValidLoad(load));
   const current = exercise.series.find((series) => series.completedAt === null);
   return (
     <div className={styles.series()}>
@@ -878,13 +880,6 @@ function SeriesRow({
         isDisabled={completed || isPending}
         maxValue={9999}
         minValue={0}
-        onChange={(value) =>
-          onLoadChange(
-            exerciseId,
-            series.number,
-            Number.isNaN(value) ? null : value,
-          )
-        }
         step={1}
         value={load ?? Number.NaN}
       >
@@ -900,6 +895,13 @@ function SeriesRow({
                 return;
               onLoadBlur(exerciseId, series.number, load);
             }}
+            onInput={(event) =>
+              onLoadChange(
+                exerciseId,
+                series.number,
+                parseLoadInput(event.currentTarget.value),
+              )
+            }
           />
         </NumberField.Group>
       </NumberField>
@@ -1005,6 +1007,20 @@ function ExerciseSummary({
 
 function draftKey(exerciseId: string, seriesNumber: number): string {
   return `${exerciseId}:${seriesNumber}`;
+}
+
+function parseLoadInput(value: string): number | null {
+  const normalized = value.trim().replace(',', '.');
+  if (normalized === '') return null;
+  const result = Number(normalized);
+  return result;
+}
+
+function isValidLoad(loadKg: number | null): boolean {
+  return (
+    loadKg === null ||
+    (Number.isInteger(loadKg) && loadKg >= 0 && loadKg <= 9999)
+  );
 }
 
 function draftLoad(

@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useState, type PropsWithChildren } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 
 import { useIsMutating } from '@tanstack/react-query';
 
@@ -39,6 +45,19 @@ export function ReloadSafetyProvider({
     () => ({ isBlocked: blockers.size > 0, setBlocker }),
     [blockers.size, setBlocker],
   );
+
+  useEffect(() => {
+    if (!value.isBlocked) return;
+
+    const preventUnsafeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+
+    window.addEventListener('beforeunload', preventUnsafeUnload);
+    return () =>
+      window.removeEventListener('beforeunload', preventUnsafeUnload);
+  }, [value.isBlocked]);
 
   return (
     <ReloadSafetyContext value={value}>

@@ -27,16 +27,18 @@ Antes do início, todos os exercícios aparecem em ordem com tipo e métricas; m
 ser renderizado após o início. `Iniciar treino` cria a sessão. Durante a execução,
 somente um card fica expandido, o próximo incompleto começa aberto e conclusão
 avança/foca o próximo. Toda a superfície do cabeçalho é um botão com
-`aria-expanded`, operação por teclado e feedback visual de pressão em toda a
-largura do card, inclusive nas margens internas aparentes. O botão cresce com o
-conteúdo em vez de conservar a altura fixa do componente base. Em `390px`, nome e
-metadados quebram linha dentro dessa superfície, sem corte, sobreposição ou
+`aria-expanded`, operação por teclado e feedback visual de hover e active em toda
+a largura do card, inclusive nas margens internas aparentes. A interação mantém a
+cor desses estados sem aplicar escala ou efeito de afundamento. O botão cresce com
+o conteúdo em vez de conservar a altura fixa do componente base. Em `390px`, nome
+e metadados quebram linha dentro dessa superfície, sem corte, sobreposição ou
 overflow horizontal, tanto aberto quanto recolhido.
 
 Exercícios `image` e `youtube-short` mostram séries. `NumberField` não possui
 botões de incremento/decremento, aceita somente inteiro entre 0 e 9999 ou vazio e
-salva após 500 ms ou blur. Vazio não bloqueia conclusão: concluir uma série envia
-a carga atual atomicamente; concluir restantes envia o vetor completo. A ação de
+captura o texto a cada edição para salvar após 500 ms ou blur, sem depender do
+commit interno do campo. Vazio não bloqueia conclusão: concluir uma série envia a
+carga atual atomicamente; concluir restantes envia o vetor completo. A ação de
 conclusão cancela o debounce correspondente para impedir write tardio. Sem os
 steppers, o grupo do `NumberField` usa uma única coluna: o input ocupa e recebe
 clique em toda a largura visível. A altura e a linha do input acompanham os 36 px
@@ -70,7 +72,10 @@ absoluto para não ocupar espaço nem deslocar o título.
 - Falha comum: mantém representação canônica, encerra pending e mostra toast.
 - Finalização incompleta: exige confirmação `Finalizar mesmo assim`.
 - Conclusão integral: abre confirmação com `Parabéns!` e bloqueia dismiss acidental.
-- Draft com debounce pendente: bloqueia finalização e reload até resolução.
+- Draft com debounce pendente bloqueia finalização. Draft inválido, debounce ou
+  mutation pendente apresenta a confirmação nativa antes de reload ou fechamento
+  manual; cancelar a saída mantém a tela até a gravação terminar ou o valor ser
+  corrigido.
 - Carga decimal, negativa ou acima de 9999 é inválida; carga vazia é válida.
 
 ## Integrações e coordenação
@@ -124,6 +129,14 @@ body area, tempo exato e erros de campo são proibidos.
 - When: edita novamente a carga e conclui a série durante a primeira request.
 - Then: o valor mais novo é preservado, a conclusão respeita a fila e a tela não
   produz corte, sobreposição ou rolagem horizontal.
+
+### Cenário 4 — autosave sem blur nem conclusão
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=load-pending`
+- Given: sessão em andamento e campo de carga da série ainda focado.
+- When: digita uma carga válida e aguarda o debounce sem desfocar o campo nem
+  concluir a série.
+- Then: a UI envia o PUT da carga e mantém o valor digitado.
 
 ## Estrutura e cobertura
 
