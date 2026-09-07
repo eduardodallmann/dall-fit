@@ -137,7 +137,7 @@ export function TrainingTimerOverlay({
       <Drawer.Backdrop isDismissable={timer.kind === 'series-rest'}>
         <Drawer.Content className={styles.drawerContent()} placement="bottom">
           <Drawer.Dialog aria-label={title} className={styles.drawerDialog()}>
-            <Drawer.Handle />
+            <Drawer.Handle className={styles.drawerHandle()} />
             <Drawer.Body className={styles.drawerBody()}>{content}</Drawer.Body>
           </Drawer.Dialog>
         </Drawer.Content>
