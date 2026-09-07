@@ -196,7 +196,13 @@ ações enumeradas `assistant_open|message|retry|abandon|preview|adjust|confirm`
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/training-plan/desktop-1440-mixed.png` | `1440x900` | catálogo misto em tema claro |
-| `assets/training-plan/mobile-390-mixed.png` | `390x844` | catálogo misto mobile em tema claro |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training-plan/desktop-1440-mixed.png` | `1440x900` | `personal-mixed` | catálogo misto em tema claro no desktop |
+| `assets/training-plan/mobile-390-mixed.png` | `390x844` | `personal-mixed` | catálogo misto em tema claro no mobile |
+| `assets/training-plan/desktop-1440-library-modal.png` | `1440x900` | `personal-mixed`, biblioteca aberta | lista paginada de modelos e ações no desktop |
+| `assets/training-plan/mobile-390-library-modal.png` | `390x844` | `personal-mixed`, biblioteca aberta | cards e rodapé fixo da biblioteca no mobile |
+| `assets/training-plan/desktop-1440-assistant-collecting-modal.png` | `1440x900` | `assistant-collecting` | histórico, pergunta, respostas e rodapé do assistente |
+| `assets/training-plan/mobile-390-assistant-collecting-modal.png` | `390x844` | `assistant-collecting` | composição vertical da coleta no mobile |
+| `assets/training-plan/desktop-1440-assistant-preview-modal.png` | `1440x900` | `assistant-preview` | prévia rolável, ajuste e ações no desktop |
+| `assets/training-plan/mobile-390-assistant-preview-modal.png` | `390x844` | `assistant-preview` | prévia e rodapé fixo no mobile |

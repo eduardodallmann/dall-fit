@@ -57,4 +57,10 @@ altera share, clipboard, toast ou navegação.
 - MSW: completion fixture e handler de leitura.
 - Playwright: conclusão alcançada em `ui/tests/integration/routes/training.spec.ts`.
 - Web Share/clipboard requer verificação manual do navegador hospedeiro.
-- Referências visuais: não se aplica; não existe pasta de assets desta rota.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training-completion/desktop-1440-training-completion.png` | `1440x900` | `sdd-workout-complete` | resumo, semana, métricas e ações no desktop |
+| `assets/training-completion/mobile-390-training-completion.png` | `390x844` | `sdd-workout-complete` | resumo e semana reorganizados no mobile |

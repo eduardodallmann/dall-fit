@@ -193,7 +193,10 @@ destinos inválidos ou expirados não são usados.
 
 ## Referências visuais de layout — opcional
 
-Não se aplica — não existem imagens em `routes/assets/root/`.
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/root/desktop-1440-login.png` | `1440x900` | `mockAuth=unauthenticated` | card de entrada centralizado no desktop |
+| `assets/root/mobile-390-login.png` | `390x844` | `mockAuth=unauthenticated` | card de entrada e ação no mobile |
 
 ## Cenários funcionais
 

@@ -56,7 +56,8 @@ Playwright em `personal-training-plan.spec.ts`.
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/training-plan-detail/desktop-1440-read-only.png` | `1440x900` | modelo disponibilizado em leitura |
-| `assets/training-plan-detail/mobile-390-read-only.png` | `390x844` | modelo disponibilizado em leitura mobile |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training-plan-detail/desktop-1440-read-only.png` | `1440x900` | `personal-reference` | modelo disponibilizado em leitura no desktop |
+| `assets/training-plan-detail/mobile-390-read-only.png` | `390x844` | `personal-reference` | detalhe somente leitura no mobile |
+| `assets/training-plan-detail/desktop-1440-owned.png` | `1440x900` | `personal-mixed`, entrada própria | controles de edição e tabela do plano próprio |

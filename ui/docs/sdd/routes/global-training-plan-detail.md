@@ -125,10 +125,11 @@ ação de salvar. A comunicação visível chama o recurso compartilhado de mode
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/global-training-plan-detail/desktop-1440-success.png` | `1440x900` | detalhe administrativo do modelo |
-| `assets/global-training-plan-detail/mobile-390-success.png` | `390x844` | detalhe administrativo mobile |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/global-training-plan-detail/desktop-1440-success.png` | `1440x900` | `success` | detalhe, impacto e tabela de treinos no desktop |
+| `assets/global-training-plan-detail/mobile-390-success.png` | `390x844` | `success` | detalhe e tabela no mobile |
+| `assets/global-training-plan-detail/desktop-1440-delete-workout-dialog.png` | `1440x900` | `success`, exclusão de treino aberta | AlertDialog destrutivo, backdrop e contexto preservado |
 
 ## Cenários funcionais e cobertura
 

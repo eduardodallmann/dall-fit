@@ -46,7 +46,8 @@ da rota pessoal cobrem ambos os modos.
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/training-plan-workout/desktop-1440-read-only.png` | `1440x900` | workout do modelo em leitura |
-| `assets/training-plan-workout/mobile-390-read-only.png` | `390x844` | cards de leitura no mobile |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training-plan-workout/desktop-1440-read-only.png` | `1440x900` | `personal-reference` | workout do modelo em leitura no desktop |
+| `assets/training-plan-workout/mobile-390-read-only.png` | `390x844` | `personal-reference` | cards de leitura e mídia no mobile |
+| `assets/training-plan-workout/desktop-1440-owned.png` | `1440x900` | `personal-mixed`, entrada própria | editor completo reutilizado pelo plano pessoal |

@@ -238,10 +238,13 @@ rollback e proteção acessível. E2E separado cobre API/MongoDB.
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/global-training-plan-workout/desktop-1440-success.png` | `1440x900` | editor administrativo do workout |
-| `assets/global-training-plan-workout/mobile-390-success.png` | `390x844` | editor administrativo mobile |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/global-training-plan-workout/desktop-1440-success.png` | `1440x900` | `success` | editor e cinco tipos de exercício no desktop |
+| `assets/global-training-plan-workout/mobile-390-success.png` | `390x844` | `success` | empilhamento dos campos e cards no mobile |
+| `assets/global-training-plan-workout/desktop-1440-image-modal.png` | `1440x900` | `image-ready`, imagem aberta | modal amplo, header separado e mídia contida |
+| `assets/global-training-plan-workout/mobile-390-image-modal.png` | `390x844` | `image-ready`, imagem aberta | modal de imagem dentro do viewport móvel |
+| `assets/global-training-plan-workout/desktop-1440-delete-popover.png` | `1440x900` | `success`, exclusão de exercício aberta | ancoragem e alinhamento do Popover no card |
 
 Arquivos: `workout-page.tsx`, `workout-editor/`, `training-plan-service.ts`,
 queries e handlers/fixtures `training-plans.ts`.

@@ -183,10 +183,13 @@ modal, confirmação ou alerta.
 
 ## Referências visuais de layout
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/global-training-plan/desktop-1440-success.png` | `1440x900` | listagem administrativa de modelos |
-| `assets/global-training-plan/mobile-390-success.png` | `390x844` | listagem administrativa mobile |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/global-training-plan/desktop-1440-success.png` | `1440x900` | `success` | tabela administrativa completa no desktop |
+| `assets/global-training-plan/mobile-390-success.png` | `390x844` | `success` | tabela e overflow horizontal no mobile |
+| `assets/global-training-plan/desktop-1440-empty.png` | `1440x900` | `empty` | empty state centralizado dentro da tabela |
+| `assets/global-training-plan/desktop-1440-create-modal.png` | `1440x900` | `success`, modal de criação aberto | formulário, backdrop e ações no desktop |
+| `assets/global-training-plan/mobile-390-create-modal.png` | `390x844` | `success`, modal de criação aberto | formulário e ações ajustados ao viewport móvel |
 
 ## Cenários funcionais
 

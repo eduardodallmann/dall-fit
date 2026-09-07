@@ -239,6 +239,13 @@ IDs criados são determinísticos; multipart exige um `File` no campo `file` e n
 é convertido em JSON/base64. Upload devolve signed URLs fictícias e expiração ISO
 conforme `ExerciseImage`.
 
+O seletor `mockTraining` cobre visão geral, prévia, sessão, timer e conclusão do
+fluxo Treinar. Os cenários `sdd-session-running`, `sdd-pause-running` e
+`sdd-workout-complete` reutilizam respectivamente os estados funcionais homônimos
+sem o prefixo, mas fixam o relógio da fixture em `2026-08-01T12:00:00.000Z`. Eles
+existem exclusivamente para produzir referências visuais determinísticas; testes
+comportamentais continuam usando os cenários temporais normais.
+
 ## Sessão fictícia através da navegação OAuth
 
 Para jornadas que atravessam documentos, o cookie exclusivamente fictício

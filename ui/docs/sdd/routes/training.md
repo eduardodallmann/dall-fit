@@ -93,4 +93,11 @@ O pageview usa `/training`. Seleção emite `ui_training_action` com
 - Tipos: `TrainingOverview`, `TrainingWorkoutCard`.
 - MSW: `ui/src/mocks/handlers/training.ts` e fixture homônima.
 - Playwright: `ui/tests/integration/routes/training.spec.ts`.
-- Referências visuais: não se aplica; não existe pasta de assets desta rota.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training/desktop-1440-training.png` | `1440x900` | `active-plan` | plano em uso e grade limitada a duas colunas |
+| `assets/training/mobile-390-training.png` | `390x844` | `active-plan` | cards em coluna única no mobile |
+| `assets/training/mobile-390-no-active-plan.png` | `390x844` | `no-active-plan` | empty state e ação para Meus planos |

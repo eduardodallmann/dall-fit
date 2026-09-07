@@ -349,10 +349,10 @@ móvel não o reabre.
 
 ## Referências visuais de layout — opcional
 
-| Arquivo | Viewport | Estado validado |
-| --- | ---: | --- |
-| `assets/dash/desktop-1440-menu.png` | `1440x900` | menu administrativo persistente |
-| `assets/dash/mobile-390-menu-open.png` | `390x844` | drawer administrativo aberto |
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/dash/desktop-1440-menu.png` | `1440x900` | `mockAuth=admin` | menu administrativo persistente e região principal |
+| `assets/dash/mobile-390-menu-open.png` | `390x844` | `mockAuth=admin` | drawer administrativo, backdrop e navegação móvel |
 
 ## Cenários funcionais
 

@@ -42,6 +42,8 @@ function scenario(request: Request): string {
 function stateFor(name: string): TrainingState {
   const existing = states.get(name);
   if (existing !== undefined) return existing;
+  const isSddCapture = name.startsWith('sdd-');
+  const fixtureScenario = isSddCapture ? name.slice(4) : name;
   const running = [
     'duration-running',
     'exercise-completed',
@@ -52,10 +54,15 @@ function stateFor(name: string): TrainingState {
     'workout-complete',
     'workout-incomplete',
     'youtube-long-running',
-  ].includes(name);
+  ].includes(fixtureScenario);
+  const fixedNow = isSddCapture
+    ? new Date('2026-08-01T12:00:00.000Z')
+    : undefined;
   const result = {
-    completion: createWorkoutCompletionFixture(),
-    session: running ? createTrainingSessionFixture(name) : null,
+    completion: createWorkoutCompletionFixture(fixedNow),
+    session: running
+      ? createTrainingSessionFixture(fixtureScenario, fixedNow)
+      : null,
   };
   states.set(name, result);
   return result;

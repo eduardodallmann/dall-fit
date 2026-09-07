@@ -147,4 +147,17 @@ body area, tempo exato e erros de campo são proibidos.
 - Tipos: `TrainingWorkoutPreview`, `TrainingSession`, unions de exercício/timer.
 - MSW: handlers mutáveis e versionados em `ui/src/mocks/handlers/training.ts`.
 - Playwright: `ui/tests/integration/routes/training.spec.ts`.
-- Referências visuais: não se aplica; não existe pasta de assets desta rota.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/training-workout/desktop-1440-training-workout.png` | `1440x900` | `workout-preview` | prévia completa e ação de início no desktop |
+| `assets/training-workout/mobile-390-training-workout.png` | `390x844` | `workout-preview` | prévia empilhada no mobile |
+| `assets/training-workout/desktop-1440-session-running.png` | `1440x900` | `sdd-session-running` | sessão, card expandido e demais exercícios |
+| `assets/training-workout/mobile-390-session-running.png` | `390x844` | `sdd-session-running` | séries em duas linhas e cards móveis |
+| `assets/training-workout/desktop-1440-media-modal.png` | `1440x900` | `sdd-session-running`, mídia aberta | modal, header e proporção 9:16 no desktop |
+| `assets/training-workout/mobile-390-media-drawer.png` | `390x844` | `sdd-session-running`, mídia aberta | Drawer inferior, handle e mídia no mobile |
+| `assets/training-workout/desktop-1440-timer-modal.png` | `1440x900` | `sdd-pause-running` | timer em Modal com progresso e ação |
+| `assets/training-workout/mobile-390-timer-drawer.png` | `390x844` | `sdd-pause-running` | timer em Drawer encostado ao rodapé |
+| `assets/training-workout/mobile-390-finish-incomplete-dialog.png` | `390x844` | `sdd-session-running`, finalização aberta | confirmação incompleta e ações sem corte |

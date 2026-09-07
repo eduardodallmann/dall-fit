@@ -73,6 +73,27 @@ Screenshots não são fonte de verdade para:
 Valores exatos permanecem descritos em texto e implementados com os tokens do
 projeto. Não medir pixels da imagem para inventar regras ausentes.
 
+## Profundidade e seleção da matriz
+
+A matriz visual cobre estados representativos, não todas as combinações funcionais
+da aplicação. Cada rota navegável recebe uma referência base nos viewports móvel
+`390x844` e desktop `1440x900`. Referências adicionais entram somente quando
+acrescentarem uma diferença material de composição, hierarquia, dimensão ou
+responsividade, especialmente:
+
+- `Modal`, `Drawer`, `AlertDialog` ou `Popover` com superfície própria;
+- modos de leitura e edição que alterem controles ou regiões inteiras;
+- estados vazio, erro ou loading que substituam estruturalmente o conteúdo;
+- etapas de uma superfície complexa, como coleta e prévia, quando sua composição
+  for diferente.
+
+Não criar uma referência separada apenas para variar texto, valor, toast, pending,
+erro interno ou confirmação visualmente equivalente. Foco, teclado, concorrência,
+rollback, transições e regras funcionais continuam nos testes comportamentais. Uma
+rota simples normalmente conserva apenas o par base; rotas com overlays ou estados
+estruturais mantêm somente as variações não redundantes necessárias para comunicar
+o layout.
+
 ## Organização
 
 Exemplo:
@@ -176,6 +197,13 @@ assets locais ou mockados visíveis, reduz movimento, encerra animações e usa 
 de um pixel por CSS pixel. Miniaturas remotas do YouTube são ocultadas somente no
 bitmap candidato, preservando sua área de layout sem tornar conteúdo externo uma
 fonte instável.
+
+Capturas base usam a página inteira para registrar conteúdo que ultrapasse o
+viewport. Overlays são capturados somente no viewport, preservando backdrop,
+ancoragem e dimensões do painel sem estender artificialmente a camada modal pela
+altura total do documento. Cenários curados usam tema e timestamps determinísticos;
+seletores MSW exclusivos `sdd-*` podem fixar dados temporais sem alterar contratos
+ou comportamento de produção.
 
 É possível gerar apenas parte da matriz pelo título da captura:
 

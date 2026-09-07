@@ -115,8 +115,8 @@ export function createTrainingOverviewFixture(
 
 export function createTrainingSessionFixture(
   scenario: string,
+  now = new Date(),
 ): TrainingSession {
-  const now = new Date();
   const exercises = createTrainingPreviewFixture().exercises.map(
     (exercise): TrainingExerciseExecution => {
       if (exercise.type === 'image' || exercise.type === 'youtube-short') {
@@ -206,8 +206,9 @@ function fixtureTimer(
   };
 }
 
-export function createWorkoutCompletionFixture(): WorkoutExecutionSummary {
-  const now = new Date();
+export function createWorkoutCompletionFixture(
+  now = new Date(),
+): WorkoutExecutionSummary {
   const day = now.getDay() || 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day + 1);
