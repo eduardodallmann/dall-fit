@@ -52,7 +52,9 @@ pergunta, respostas e campo permanecem fixos abaixo dele. No rodapé, “Desisti
 “Fechar” ficam agrupados à esquerda, enquanto a ação principal fica à direita.
 Enquanto a pessoa acompanha o fim, loading e resposta confirmada ancoram a região
 no turno mais novo sem mover controles fixos nem roubar foco. Se ela rolar para
-consultar mensagens antigas, novas respostas não forçam o retorno ao final.
+consultar mensagens antigas, atualizações passivas não forçam o retorno ao final;
+uma nova interação local — resposta rápida, envio livre ou retry — retoma
+imediatamente o acompanhamento e leva a conversa completamente ao fim.
 `collecting|clarifying` mostram campo e “Enviar resposta”; ao chegar a `ready`,
 ambos desaparecem e a mesma posição passa a oferecer “Gerar prévia”. `preview`
 oculta o histórico, ocupa o corpo disponível com o plano e torna a própria prévia
@@ -84,6 +86,12 @@ A pergunta respiratória usa “Você está com falta de ar fora do normal?” e
 “Não”, “Sim, mesmo em repouso” e “Sim, com esforço leve”, evitando confundir a
 triagem conservadora com o cansaço esperado de esforço intenso.
 
+A triagem não infere sexo, gênero, capacidade reprodutiva ou condição clínica a
+partir do nome. Em vez de perguntar diretamente sobre gestação, usa a formulação
+neutra “Existe alguma situação que exija acompanhamento profissional para você
+começar a se exercitar, como gestação, pós-parto ou outra condição específica?”.
+“Sim” e “Não sei” levam ao bloqueio conservador; “Não” permite continuar.
+
 Na experiência, relatos como “treinei por um ano, mas estou parado há três meses”
 mantêm a pergunta atual e recebem um esclarecimento sobre familiaridade com
 exercícios e equipamentos; a interrupção objetiva é registrada e sua pergunta não
@@ -104,6 +112,9 @@ discreto e persistente às células da linha ativa; falha restaura o destaque
 confirmado anterior. Plano próprio oferece editar/excluir; referência oferece
 navegação e “Excluir”, que visualmente remove o item mas envia desvinculação sem
 versão.
+Marcar qualquer entrada como ativa remove as queries do domínio `/training` antes
+de invalidar o catálogo; assim, uma visita anterior sem plano não pode reaparecer
+do cache ao navegar novamente para Treinar.
 Excluir a entrada ativa remove imediatamente as queries de `/training`; a próxima
 visita refaz a leitura e não exibe por um instante o plano excluído.
 
@@ -168,7 +179,8 @@ interação que atrase a leitura.
    `assistant-version-conflict`: verdade canônica em duas abas.
 6. `assistant-clarifying` e `assistant-health-clarification`: ambiguidade sem
    inferência segura nem geração.
-7. `assistant-blocked` e `assistant-emergency`: encaminhamento sem preview.
+7. `assistant-neutral-screening`, `assistant-blocked` e `assistant-emergency`:
+   triagem neutra e encaminhamento conservador sem preview.
 8. `assistant-preview`: estrutura completa, ajuste, confirmação e navegação.
 9. `assistant-provider-error`: erro persistente e retry; `assistant-abandon`:
    exclusão confirmada.

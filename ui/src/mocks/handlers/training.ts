@@ -24,9 +24,15 @@ interface TrainingState {
 }
 
 const states = new Map<string, TrainingState>();
+let trainingPlanActivated = false;
+
+export function activateTrainingPlanScenario(): void {
+  trainingPlanActivated = true;
+}
 
 export function resetTrainingScenarioStates(): void {
   states.clear();
+  trainingPlanActivated = false;
 }
 
 function scenario(request: Request): string {
@@ -113,7 +119,7 @@ function replaceExercise(
 export const trainingHandlers = [
   http.get(`${apiBaseUrl}/training`, ({ request }) => {
     const name = scenario(request);
-    if (name === 'no-active-plan')
+    if (name === 'no-active-plan' && !trainingPlanActivated)
       return HttpResponse.json({ data: { plan: null, workouts: [] } });
     const state = stateFor(name);
     return HttpResponse.json({

@@ -8,7 +8,7 @@ export const trainingStyles = tv({
     bodyAreas: 'flex flex-wrap gap-1.5',
     card: 'overflow-hidden border border-border',
     cardButton:
-      'flex w-full items-center justify-between gap-3 rounded-none px-4 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
+      'flex h-auto min-h-16 w-full items-center justify-between gap-3 whitespace-normal rounded-none px-4 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
     cardHeader: 'flex min-w-0 items-center gap-3',
     cardList: 'grid grid-cols-1 gap-4 lg:grid-cols-2',
     cardLink:
@@ -26,7 +26,7 @@ export const trainingStyles = tv({
     completionValue: 'text-2xl font-semibold text-foreground',
     empty:
       'flex min-h-72 flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-surface p-8 text-center',
-    exerciseCard: 'overflow-hidden border border-border',
+    exerciseCard: 'overflow-hidden border border-border p-0',
     exerciseContent: 'flex flex-col gap-4 border-t border-border px-4 py-4',
     exerciseHeading: 'break-words font-semibold text-foreground',
     exerciseIdentity: 'flex min-w-0 flex-1 items-start gap-2 sm:gap-3',
@@ -37,14 +37,16 @@ export const trainingStyles = tv({
     drawerBody: 'p-0',
     drawerContent: 'inset-0',
     drawerDialog: 'max-h-[85svh] overflow-hidden rounded-b-none p-0',
-    drawerHeader: 'border-b border-border pr-12',
+    drawerHandle:
+      'absolute left-1/2 top-2 z-10 -translate-x-1/2 pb-0 [&>[data-slot=drawer-handle-bar]]:bg-muted',
+    drawerHeader: 'min-w-0 border-b border-border px-5 pb-4 pt-6',
     header: 'flex flex-col gap-1',
     icon: 'size-5 shrink-0',
     indicator:
       'flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-muted',
     loadField: 'w-full min-w-0 sm:w-28',
-    loadFieldGroup: 'w-full cursor-text',
-    loadFieldInput: 'w-full cursor-text',
+    loadFieldGroup: 'w-full cursor-text grid-cols-1!',
+    loadFieldInput: 'h-full w-full cursor-text py-0 leading-9',
     mediaButton:
       'relative size-full overflow-hidden rounded-xl border border-border bg-surface-secondary p-0',
     mediaImage: 'size-full object-cover',
@@ -53,7 +55,8 @@ export const trainingStyles = tv({
     metricLabel: 'text-xs text-muted',
     modalBody: 'p-0',
     modalDialog: 'max-h-[90svh] overflow-hidden p-0',
-    modalHeader: 'border-b border-border pr-14',
+    modalHeader: 'min-w-0 border-b border-border py-4 pl-5 pr-14',
+    overlayHeading: 'min-w-0 break-words leading-snug',
     overlayActions: 'flex flex-wrap justify-end gap-3 p-4',
     overlayBody: 'flex flex-col gap-5 p-5',
     overlayCountdown:

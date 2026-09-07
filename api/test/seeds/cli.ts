@@ -405,7 +405,6 @@ async function main(): Promise<void> {
             otherReason: 'no',
             pain: 'no',
             preferences: 'none',
-            pregnancy: 'no',
             schedule: '2-45',
             supervision: 'no',
             tolerance: 'good',
@@ -455,7 +454,7 @@ async function main(): Promise<void> {
               }
             : null,
           invalidAttempts: {},
-          knowledgeVersion: 'fitness-guidelines.v2',
+          knowledgeVersion: 'fitness-guidelines.v3',
           materialization: null,
           messages: [
             {

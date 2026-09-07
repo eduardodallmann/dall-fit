@@ -24,6 +24,8 @@ function initialState(value: string): TrainingPlanAssistantSession | null {
     value === 'assistant-multiple-answers'
   )
     return createAssistantSessionFixture('collecting');
+  if (value === 'assistant-neutral-screening')
+    return createAssistantSessionFixture('neutral-screening');
   if (value === 'assistant-resumed') {
     const resumed = createAssistantSessionFixture('collecting');
     return {
@@ -138,6 +140,12 @@ export const trainingPlanAssistantHandlers = [
         value === 'assistant-health-clarification'
       )
         next = createAssistantSessionFixture('clarifying');
+      if (value === 'assistant-neutral-screening')
+        next = createAssistantSessionFixture(
+          body.text === 'yes' || body.text === 'unknown'
+            ? 'blocked'
+            : 'collecting',
+        );
       const visibleText =
         current.availableAnswers.find((answer) => answer.value === body.text)
           ?.label ?? body.text;

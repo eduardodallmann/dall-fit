@@ -27,14 +27,20 @@ Antes do início, todos os exercícios aparecem em ordem com tipo e métricas; m
 ser renderizado após o início. `Iniciar treino` cria a sessão. Durante a execução,
 somente um card fica expandido, o próximo incompleto começa aberto e conclusão
 avança/foca o próximo. Toda a superfície do cabeçalho é um botão com
-`aria-expanded` e operação por teclado. Em `390px`, nome e metadados quebram linha
-sem corte, sobreposição ou overflow horizontal, tanto aberto quanto recolhido.
+`aria-expanded`, operação por teclado e feedback visual de pressão em toda a
+largura do card, inclusive nas margens internas aparentes. O botão cresce com o
+conteúdo em vez de conservar a altura fixa do componente base. Em `390px`, nome e
+metadados quebram linha dentro dessa superfície, sem corte, sobreposição ou
+overflow horizontal, tanto aberto quanto recolhido.
 
 Exercícios `image` e `youtube-short` mostram séries. `NumberField` não possui
 botões de incremento/decremento, aceita somente inteiro entre 0 e 9999 ou vazio e
 salva após 500 ms ou blur. Vazio não bloqueia conclusão: concluir uma série envia
 a carga atual atomicamente; concluir restantes envia o vetor completo. A ação de
-conclusão cancela o debounce correspondente para impedir write tardio.
+conclusão cancela o debounce correspondente para impedir write tardio. Sem os
+steppers, o grupo do `NumberField` usa uma única coluna: o input ocupa e recebe
+clique em toda a largura visível. A altura e a linha do input acompanham os 36 px
+do grupo sem padding vertical adicional, mantendo valor e cursor centralizados.
 
 Enquanto uma gravação de carga está em voo, os campos incompletos e as ações de
 conclusão continuam utilizáveis. Gravações e conclusões compartilham a mesma fila
@@ -50,7 +56,10 @@ servidor dirigem o contador.
 `youtube-long` conclui manualmente. Exercício concluído pode ser reiniciado sem
 apagar cargas. Mídia e timers usam Drawer encostado ao rodapé em mobile e Modal em
 desktop. YouTube Short preserva 9:16; vídeo longo preserva 16:9; títulos podem
-quebrar sem serem cortados.
+quebrar sem serem cortados. O cabeçalho desses overlays reserva recuo próprio no
+topo e nas laterais, inclusive espaço para o botão de fechar. No Drawer, o handle
+tem contraste com o fundo, fica afastado da borda superior e usa posicionamento
+absoluto para não ocupar espaço nem deslocar o título.
 
 ## Alternativas, validações e erros
 

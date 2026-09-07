@@ -1,5 +1,5 @@
 {
-  "version": "fitness-guidelines.v2",
+  "version": "fitness-guidelines.v3",
   "catalogVersion": "exercise-catalog.v2",
   "promptVersion": "training-plan-assistant.v2",
   "noticeVersion": "assistant-notice.v1",
@@ -483,27 +483,8 @@
       ]
     },
     {
-      "key": "pregnancy",
-      "prompt": "Você está em gestação ou pós-parto?",
-      "sensitive": true,
-      "options": [
-        {
-          "label": "Não",
-          "value": "no"
-        },
-        {
-          "label": "Sim",
-          "value": "yes"
-        },
-        {
-          "label": "Prefiro não responder",
-          "value": "unknown"
-        }
-      ]
-    },
-    {
       "key": "otherReason",
-      "prompt": "Existe outra razão para não iniciar atividade agora?",
+      "prompt": "Existe alguma situação que exija acompanhamento profissional para você começar a se exercitar, como gestação, pós-parto ou outra condição específica?",
       "sensitive": true,
       "options": [
         {

@@ -53,6 +53,8 @@ const googleCredential = Buffer.from(
   }),
 ).toString('base64');
 const testBypassKey = 'e2e-training-test-key-with-at-least-32-random-bytes';
+const neutralProfessionalFollowUpPrompt =
+  'Existe alguma situação que exija acompanhamento profissional para você começar a se exercitar, como gestação, pós-parto ou outra condição específica?';
 
 describe('Global training plans (e2e)', () => {
   let app: INestApplication<App>;
@@ -268,6 +270,73 @@ describe('Global training plans (e2e)', () => {
 
     return result;
   }
+
+  async function advanceAssistantToNeutralScreening(
+    agent: ReturnType<typeof request.agent>,
+  ): Promise<TrainingPlanAssistantSessionResponse['data']> {
+    const created = await authenticatedMutation(
+      agent,
+      agent.post('/training-plan-assistant/session'),
+    )
+      .send({ noticeVersion: 'assistant-notice.v1' })
+      .expect(201);
+    let session = (created.body as TrainingPlanAssistantSessionResponse).data;
+
+    for (let messageNumber = 1; messageNumber <= 30; messageNumber += 1) {
+      if (session.currentPrompt === neutralProfessionalFollowUpPrompt)
+        return session;
+      const answer = session.availableAnswers[0];
+      if (answer === undefined)
+        throw new Error('Assistant stopped before neutral screening.');
+      const response = await authenticatedMutation(
+        agent,
+        agent.post('/training-plan-assistant/session/messages'),
+      )
+        .set('X-Resource-Version', String(session.version))
+        .send({
+          clientMessageId: `123e4567-e89b-42d3-a456-${String(messageNumber).padStart(12, '0')}`,
+          text: answer.value,
+        })
+        .expect(200);
+      session = (response.body as TrainingPlanAssistantSessionResponse).data;
+    }
+
+    throw new Error('Assistant did not reach neutral screening.');
+  }
+
+  it.each(['yes', 'unknown'] as const)(
+    'uses neutral screening and blocks the %s answer without name inference',
+    async (answer) => {
+      const agent = await login(false);
+      const session = await advanceAssistantToNeutralScreening(agent);
+
+      expect(session.currentPrompt).toBe(neutralProfessionalFollowUpPrompt);
+      expect(session.currentPrompt).not.toBe(
+        'Você está em gestação ou pós-parto?',
+      );
+      const response = await authenticatedMutation(
+        agent,
+        agent.post('/training-plan-assistant/session/messages'),
+      )
+        .set('X-Resource-Version', String(session.version))
+        .send({
+          clientMessageId:
+            answer === 'yes'
+              ? '123e4567-e89b-42d3-a456-900000000001'
+              : '123e4567-e89b-42d3-a456-900000000002',
+          text: answer,
+        })
+        .expect(200);
+      const blocked = (response.body as TrainingPlanAssistantSessionResponse)
+        .data;
+
+      expect(blocked).toMatchObject({
+        currentPrompt: null,
+        screeningOutcome: 'requer_avaliacao_profissional',
+        status: 'blocked',
+      });
+    },
+  );
 
   it('creates, resumes, drafts and idempotently materializes an assistant plan', async () => {
     const agent = await login(false);

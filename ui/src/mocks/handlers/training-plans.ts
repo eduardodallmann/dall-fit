@@ -26,6 +26,7 @@ import {
   publishMockRealtimeInvalidation,
   registerMockRealtimeReplication,
 } from '~/mocks/handlers/realtime';
+import { activateTrainingPlanScenario } from '~/mocks/handlers/training';
 import {
   createMockApiError,
   createMockResponseInit,
@@ -895,6 +896,7 @@ export const trainingPlanHandlers = [
     const state = getState(getScenario(request));
     const input = (await request.json()) as { catalogEntryId: string };
     state.activeCatalogEntryId = input.catalogEntryId;
+    activateTrainingPlanScenario();
     return HttpResponse.json(
       { data: { activeCatalogEntryId: input.catalogEntryId } },
       createMockResponseInit(),

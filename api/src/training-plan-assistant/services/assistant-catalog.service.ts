@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { BODY_AREAS } from '@dall-fit/types';
 
 import catalogDocument from '~/training-plan-assistant/data/exercise-catalog.v2.json';
-import knowledgeDocument from '~/training-plan-assistant/data/fitness-guidelines.v2.json';
+import knowledgeDocument from '~/training-plan-assistant/data/fitness-guidelines.v3.json';
 import type {
   AssistantCatalogExercise,
   AssistantKnowledge,
@@ -36,7 +36,7 @@ const knowledgeSchema = z.strictObject({
     )
     .min(1),
   sources: z.array(z.url()).min(1),
-  version: z.literal('fitness-guidelines.v2'),
+  version: z.literal('fitness-guidelines.v3'),
 });
 
 const catalogBase = {

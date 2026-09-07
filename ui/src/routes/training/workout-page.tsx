@@ -680,6 +680,7 @@ function ExecutionExerciseCard({
       <Button
         aria-expanded={expanded}
         className={styles.cardButton()}
+        fullWidth
         id={`training-exercise-${exercise.id}`}
         onPress={onExpand}
         variant="ghost"
@@ -873,6 +874,7 @@ function SeriesRow({
       <NumberField
         aria-label={`Carga da série ${series.number}`}
         className={styles.loadField()}
+        fullWidth
         isDisabled={completed || isPending}
         maxValue={9999}
         minValue={0}

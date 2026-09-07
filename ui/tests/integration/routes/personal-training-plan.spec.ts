@@ -42,7 +42,7 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toContainText('Saúde geral');
   });
 
-  test('FIT-75 — acompanha a conversa no fim sem tirar quem consulta mensagens antigas', async ({
+  test('FIT-76 — retoma o fim da conversa quando a pessoa interage novamente', async ({
     page,
   }) => {
     await page.goto(
@@ -80,8 +80,45 @@ test.describe('Rotas pessoais de planos de treino', () => {
     await dialog.getByRole('button', { name: 'Hipertrofia' }).click();
     await expect(conversation).toContainText('Hipertrofia');
     await expect
-      .poll(() => conversation.evaluate((element) => element.scrollTop))
-      .toBe(0);
+      .poll(() =>
+        conversation.evaluate(
+          (element) =>
+            element.scrollHeight - element.scrollTop - element.clientHeight,
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+  });
+
+  test('FIT-76 — apresenta triagem neutra sem inferir sexo ou gênero pelo nome', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/training-plan?mockAuth=person&mockTrainingPlans=assistant-neutral-screening',
+    );
+    await page.getByRole('button', { name: 'Novo plano' }).click();
+    await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Me ajude a criar um plano',
+    });
+    const conversation = dialog.getByRole('region', {
+      name: 'Histórico da conversa',
+    });
+    await expect(conversation).toContainText(
+      'Existe alguma situação que exija acompanhamento profissional para você começar a se exercitar, como gestação, pós-parto ou outra condição específica?',
+    );
+    await expect(
+      conversation.getByText('Você está em gestação ou pós-parto?'),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole('button', { name: 'Não', exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Sim' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Não sei' })).toBeVisible();
+
+    await dialog.getByRole('button', { name: 'Não sei' }).click();
+    await expect(
+      dialog.getByText('Geração indisponível nesta sessão'),
+    ).toBeVisible();
   });
 
   test('Cenário 6 — bloqueio e emergência não oferecem geração', async ({
@@ -427,6 +464,45 @@ test.describe('Rotas pessoais de planos de treino', () => {
     const readsBeforeReturn = trainingReads;
     await page.getByRole('link', { name: 'Treinar' }).click();
     await expect.poll(() => trainingReads).toBeGreaterThan(readsBeforeReturn);
+  });
+
+  test('FIT-76 — ativar um plano supera o estado vazio armazenado em Treinar', async ({
+    page,
+  }) => {
+    let trainingReads = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname.endsWith('/training')
+      )
+        trainingReads += 1;
+    });
+
+    await page.goto('/training?mockAuth=person&mockTraining=no-active-plan');
+    await expect(
+      page.getByRole('heading', { name: 'Nenhum plano em uso' }),
+    ).toBeVisible();
+    const readsAfterEmptyState = trainingReads;
+    expect(readsAfterEmptyState).toBeGreaterThan(0);
+
+    await page.getByRole('button', { name: 'Ir para Meus planos' }).click();
+    const activeRadio = page
+      .getByRole('row', { name: /Hipertrofia iniciante/ })
+      .getByRole('radio');
+    const activation = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        new URL(response.url()).pathname.endsWith('/training-plans/active'),
+    );
+    await activeRadio.click();
+    await activation;
+    await expect(activeRadio).toBeChecked();
+
+    await page.goBack();
+    await expect(
+      page.getByRole('heading', { name: 'Plano ABC 1' }),
+    ).toBeVisible();
+    expect(trainingReads).toBeGreaterThan(readsAfterEmptyState);
   });
 
   test('mantém o editor completo para um plano próprio', async ({ page }) => {

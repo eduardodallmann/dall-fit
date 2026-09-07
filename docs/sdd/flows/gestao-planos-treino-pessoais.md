@@ -46,7 +46,9 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
    imagens e materializa a árvore. Cancelamento limpa destinos.
 6. Conclusão remove a linha do job e torna o plano próprio navegável; falha mantém
    retry/cancelamento. Timeout ambíguo mantém geração e permite reentrega.
-7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca.
+7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca. Após
+   ativar, a UI remove o cache de `/training`, evitando reutilizar um estado vazio
+   lido antes da nova seleção.
 8. Excluir próprio ou desvincular limpa a seleção se necessário, sem fallback.
    Se a entrada era ativa, a UI remove o cache de `/training` para obrigar leitura
    canônica na próxima visita.
@@ -63,12 +65,17 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     uma interrupção objetiva informada na mesma frase, mesmo se o provider omitir
     esse dado.
     Na triagem respiratória, a tela distingue falta de ar fora do normal em
-    repouso daquela que ocorre com esforço leve. Bloqueio encerra a geração e
-    mantém a orientação visível até o fechamento do modal; ao fechar, a UI exclui
-    a sessão terminal para que a próxima abertura comece uma conversa nova.
+    repouso daquela que ocorre com esforço leve. Nenhuma condição é inferida pelo
+    nome: a triagem usa uma pergunta geral sobre situações que exigem
+    acompanhamento profissional, citando gestação e pós-parto somente como
+    exemplos; `yes|unknown` bloqueiam conservadoramente. Bloqueio encerra a
+    geração e mantém a orientação visível até o fechamento do modal; ao fechar, a
+    UI exclui a sessão terminal para que a próxima abertura comece uma conversa
+    nova.
     Pessoa apta revisa uma prévia antes de confirmar.
-    O histórico acompanha o turno novo somente quando a pessoa já está próxima ao
-    final; a leitura de mensagens antigas não sofre scroll forçado.
+    Atualizações passivas acompanham o turno novo somente quando a pessoa já está
+    próxima ao final; qualquer resposta ou retry local retoma o acompanhamento e
+    leva o histórico completamente ao fim.
 11. A confirmação reserva IDs, materializa a árvore completa e depois a entrada
     `owned`, inativa. Só após recibo idempotente a sessão sensível é apagada; o
     catálogo jamais lista uma árvore parcial sem entrada.

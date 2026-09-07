@@ -33,6 +33,7 @@ export type MockTrainingPlansScenario =
   | 'assistant-emergency'
   | 'assistant-health-clarification'
   | 'assistant-multiple-answers'
+  | 'assistant-neutral-screening'
   | 'assistant-preview'
   | 'assistant-provider-error'
   | 'assistant-resumed'

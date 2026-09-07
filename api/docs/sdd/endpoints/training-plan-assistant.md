@@ -48,6 +48,15 @@ normal?” e diferencia explicitamente ausência, ocorrência mesmo em repouso e
 ocorrência com esforço leve. Os valores canônicos e seus branches conservadores
 permanecem `no`, `current` e `exertion`.
 
+A base validada `fitness-guidelines.v3` não contém uma pergunta isolada sobre
+gestação. A API não recebe nem usa o nome da pessoa para inferir sexo, gênero,
+capacidade reprodutiva ou condição clínica. A pergunta `otherReason` usa a
+formulação neutra “Existe alguma situação que exija acompanhamento profissional
+para você começar a se exercitar, como gestação, pós-parto ou outra condição
+específica?”. `yes` e `unknown` produzem
+`blocked/requer_avaliacao_profissional`; somente `no` permite que a coleta
+continue.
+
 A sessão pública contém somente ID técnico, versão, estado, mensagens, pergunta,
 respostas rápidas, resultado público da triagem, preview e timestamps. Answers,
 configuração do provider, materialização e chaves permanecem internos. Erros
@@ -296,10 +305,10 @@ não é recuperável.
 ## Cobertura e limites
 
 `api/test/training-plan.e2e-spec.ts` cobre ausência, criação/retomada, coleta,
-conflito, draft, confirmação, replay, árvore completa, catálogo inativo e limpeza
-com MongoDB/Redis efêmeros. Specs do domínio validam catálogo, IDs, referências
-dos seeds, regras de atividade e fake provider. A UI cobre retomada,
-bloqueio/emergência, preview,
+triagem neutra e seus bloqueios conservadores, conflito, draft, confirmação,
+replay, árvore completa, catálogo inativo e limpeza com MongoDB/Redis efêmeros.
+Specs do domínio validam catálogo, IDs, referências dos seeds, regras de atividade
+e fake provider. A UI cobre retomada, triagem neutra, bloqueio/emergência, preview,
 confirmação e retry com Axios + MSW Browser.
 
 As regras gerais de atividade usam como referências o

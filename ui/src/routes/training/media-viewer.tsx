@@ -71,7 +71,9 @@ export function TrainingMediaViewer({
               <Modal.Dialog className={styles.modalDialog()}>
                 <Modal.CloseTrigger aria-label="Fechar mídia" />
                 <Modal.Header className={styles.modalHeader()}>
-                  <Modal.Heading>{title}</Modal.Heading>
+                  <Modal.Heading className={styles.overlayHeading()}>
+                    {title}
+                  </Modal.Heading>
                 </Modal.Header>
                 <Modal.Body className={styles.modalBody()}>
                   {content}
@@ -91,9 +93,11 @@ export function TrainingMediaViewer({
         <Drawer.Backdrop isDismissable>
           <Drawer.Content className={styles.drawerContent()} placement="bottom">
             <Drawer.Dialog className={styles.drawerDialog()}>
-              <Drawer.Handle />
+              <Drawer.Handle className={styles.drawerHandle()} />
               <Drawer.Header className={styles.drawerHeader()}>
-                <Drawer.Heading>{title}</Drawer.Heading>
+                <Drawer.Heading className={styles.overlayHeading()}>
+                  {title}
+                </Drawer.Heading>
               </Drawer.Header>
               <Drawer.Body className={styles.drawerBody()}>
                 {content}

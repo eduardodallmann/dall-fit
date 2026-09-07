@@ -43,6 +43,9 @@ mocks locais estão habilitados; uma build de produção nunca propaga
   [`training.md`](../../../../api/docs/sdd/endpoints/training.md).
 - TanStack Query usa `trainingKeys.overview`; Axios central transporta a request.
 - Sucesso utiliza `TrainingOverview`; erro não promove cache anterior a sucesso.
+- Ativar um plano em `/training-plan` remove todas as queries `trainingKeys` antes
+  de invalidar o catálogo; a próxima navegação sempre lê a seleção canônica, mesmo
+  que esta rota tenha armazenado anteriormente o estado sem plano.
 
 ## Navegação e acessibilidade
 
@@ -72,6 +75,15 @@ O pageview usa `/training`. Seleção emite `ui_training_action` com
 - Given: seleção ativa ausente.
 - When: a rota abre.
 - Then: a pessoa recebe orientação para Meus planos.
+
+### Cenário 3 — ativação após estado vazio
+
+- Link para testar: comece pelo cenário anterior e navegue por `Ir para Meus
+  planos`.
+- Given: a UI armazenou uma resposta sem plano ativo.
+- When: a pessoa marca um plano como em uso e volta para Treinar.
+- Then: o cache antigo é removido, a API é consultada novamente e o plano ativado
+  aparece.
 
 ## Estrutura e cobertura
 

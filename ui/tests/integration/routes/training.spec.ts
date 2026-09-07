@@ -150,7 +150,7 @@ test.describe('Fluxo Treinar', () => {
     }
   });
 
-  test('FIT-75 — oferece retorno somente antes do início e expande o card pelo teclado', async ({
+  test('FIT-76 — mantém todo o cabeçalho dentro da área de expansão', async ({
     page,
   }) => {
     await page.goto(
@@ -164,14 +164,35 @@ test.describe('Fluxo Treinar', () => {
       page.getByRole('link', { name: 'Voltar para treinos' }),
     ).toHaveCount(0);
     const header = page.getByRole('button', { name: /1 Supino reto/ });
+    const card = header.locator('xpath=ancestor::*[@data-slot="card"]');
+    const heading = header.getByRole('heading', { name: 'Supino reto' });
+    const headerBox = await header.boundingBox();
+    const cardBox = await card.boundingBox();
+    const headingBox = await heading.boundingBox();
+    expect(headerBox).not.toBeNull();
+    expect(cardBox).not.toBeNull();
+    expect(headingBox).not.toBeNull();
+    if (headerBox !== null && cardBox !== null && headingBox !== null) {
+      expect(headerBox.width).toBeGreaterThanOrEqual(cardBox.width - 2);
+      expect(headerBox.height).toBeGreaterThan(40);
+      expect(headingBox.y).toBeGreaterThanOrEqual(headerBox.y);
+      expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(
+        headerBox.y + headerBox.height,
+      );
+      await page.mouse.click(
+        cardBox.x + cardBox.width - 8,
+        headerBox.y + headerBox.height / 2,
+      );
+      await expect(header).toHaveAttribute('aria-expanded', 'false');
+    }
     await header.focus();
     await page.keyboard.press('Enter');
-    await expect(header).toHaveAttribute('aria-expanded', 'false');
-    await page.keyboard.press('Enter');
     await expect(header).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Space');
+    await expect(header).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('FIT-75 — preserva o layout mobile e aceita conclusão durante o salvamento da carga', async ({
+  test('FIT-76 — centraliza a carga e aceita conclusão durante o salvamento', async ({
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: 390 });
@@ -179,6 +200,24 @@ test.describe('Fluxo Treinar', () => {
       `/training/workout/${workoutId}?mockAuth=person&mockTraining=load-pending`,
     );
     const input = page.getByRole('textbox', { name: 'Carga da série 1' });
+    const fieldGroup = input.locator('..');
+    const inputBox = await input.boundingBox();
+    const groupBox = await fieldGroup.boundingBox();
+    expect(inputBox).not.toBeNull();
+    expect(groupBox).not.toBeNull();
+    if (inputBox !== null && groupBox !== null) {
+      expect(inputBox.width).toBeGreaterThanOrEqual(groupBox.width - 2);
+      expect(inputBox.height).toBeCloseTo(groupBox.height, 0);
+      await expect(input).toHaveCSS('padding-top', '0px');
+      await expect(input).toHaveCSS('padding-bottom', '0px');
+      for (const horizontalPosition of [0.1, 0.5, 0.9]) {
+        await page.mouse.click(
+          groupBox.x + groupBox.width * horizontalPosition,
+          groupBox.y + groupBox.height / 2,
+        );
+        await expect(input).toBeFocused();
+      }
+    }
     const firstSave = page.waitForRequest(
       (request) =>
         request.method() === 'PUT' && request.url().endsWith('/series/1/load'),
@@ -201,7 +240,7 @@ test.describe('Fluxo Treinar', () => {
       .toBe(true);
   });
 
-  test('FIT-75 — usa proporção vertical para Short e encosta o drawer no rodapé', async ({
+  test('FIT-76 — posiciona o handle sem deslocar o título do drawer', async ({
     page,
   }) => {
     await page.setViewportSize({ height: 900, width: 390 });
@@ -220,10 +259,63 @@ test.describe('Fluxo Treinar', () => {
           : Math.round(dialogBox.y + dialogBox.height);
       })
       .toBe(900);
+    const mobileDialogBox = await dialog.boundingBox();
+    const mobileHeadingBox = await dialog
+      .getByRole('heading', { name: 'Supino reto' })
+      .boundingBox();
+    const drawerHandle = dialog.locator('[data-slot="drawer-handle"]');
+    const drawerHandleBar = drawerHandle.locator(
+      '[data-slot="drawer-handle-bar"]',
+    );
+    const drawerHandleBarBox = await drawerHandleBar.boundingBox();
+    expect(mobileDialogBox).not.toBeNull();
+    expect(mobileHeadingBox).not.toBeNull();
+    expect(drawerHandleBarBox).not.toBeNull();
+    await expect(drawerHandle).toHaveCSS('position', 'absolute');
+    if (
+      mobileDialogBox !== null &&
+      mobileHeadingBox !== null &&
+      drawerHandleBarBox !== null
+    ) {
+      expect(mobileHeadingBox.x).toBeGreaterThanOrEqual(mobileDialogBox.x + 16);
+      expect(mobileHeadingBox.y).toBeGreaterThanOrEqual(mobileDialogBox.y + 16);
+      expect(mobileHeadingBox.x + mobileHeadingBox.width).toBeLessThanOrEqual(
+        mobileDialogBox.x + mobileDialogBox.width - 16,
+      );
+      expect(drawerHandleBarBox.y).toBeGreaterThanOrEqual(
+        mobileDialogBox.y + 8,
+      );
+      expect(drawerHandleBarBox.y + drawerHandleBarBox.height).toBeLessThan(
+        mobileHeadingBox.y,
+      );
+    }
     const player = dialog.locator('div.aspect-\\[9\\/16\\]');
     const playerBox = await player.boundingBox();
     expect(playerBox).not.toBeNull();
     if (playerBox !== null)
       expect(playerBox.width / playerBox.height).toBeCloseTo(9 / 16, 1);
+
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ height: 900, width: 1440 });
+    await page.goto(
+      `/training/workout/${workoutId}?mockAuth=person&mockTraining=session-running`,
+    );
+    await page
+      .getByRole('button', { name: 'Abrir mídia de Supino reto' })
+      .click();
+    const modal = page.getByRole('dialog', { name: 'Supino reto' });
+    const modalBox = await modal.boundingBox();
+    const modalHeadingBox = await modal
+      .getByRole('heading', { name: 'Supino reto' })
+      .boundingBox();
+    expect(modalBox).not.toBeNull();
+    expect(modalHeadingBox).not.toBeNull();
+    if (modalBox !== null && modalHeadingBox !== null) {
+      expect(modalHeadingBox.x).toBeGreaterThanOrEqual(modalBox.x + 16);
+      expect(modalHeadingBox.y).toBeGreaterThanOrEqual(modalBox.y + 12);
+      expect(modalHeadingBox.x + modalHeadingBox.width).toBeLessThanOrEqual(
+        modalBox.x + modalBox.width - 48,
+      );
+    }
   });
 });

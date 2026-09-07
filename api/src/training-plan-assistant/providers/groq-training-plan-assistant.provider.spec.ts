@@ -179,7 +179,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
           },
         ],
       },
-      knowledgeVersion: 'fitness-guidelines.v2',
+      knowledgeVersion: 'fitness-guidelines.v3',
       promptVersion: 'training-plan-assistant.v2',
     });
 
@@ -277,7 +277,7 @@ describe('GroqTrainingPlanAssistantProvider', () => {
         },
       ],
       catalogVersion: 'exercise-catalog.v2',
-      knowledgeVersion: 'fitness-guidelines.v2',
+      knowledgeVersion: 'fitness-guidelines.v3',
       promptVersion: 'training-plan-assistant.v2',
     });
 

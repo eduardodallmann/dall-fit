@@ -92,7 +92,10 @@ export function PersonalTrainingPlanListPage({
   const activateMutation = useMutation({
     mutationFn: (catalogEntryId: string) =>
       activatePersonalTrainingPlan(catalogEntryId, mockTrainingPlans),
-    onSuccess: invalidateCatalog,
+    onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: trainingKeys.all });
+      await invalidateCatalog();
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: (item: NonNullable<typeof deleteItem>) =>

@@ -4,7 +4,13 @@ const now = '2026-08-26T12:00:00.000Z';
 const expiresAt = '2026-09-02T12:00:00.000Z';
 
 type FixtureState =
-  'blocked' | 'clarifying' | 'collecting' | 'emergency' | 'preview' | 'ready';
+  | 'blocked'
+  | 'clarifying'
+  | 'collecting'
+  | 'emergency'
+  | 'neutral-screening'
+  | 'preview'
+  | 'ready';
 
 const messages: Record<FixtureState, string> = {
   blocked:
@@ -13,6 +19,8 @@ const messages: Record<FixtureState, string> = {
   collecting: 'Qual é o principal objetivo do seu plano?',
   emergency:
     'Interrompa qualquer atividade agora e procure atendimento de emergência apropriado.',
+  'neutral-screening':
+    'Existe alguma situação que exija acompanhamento profissional para você começar a se exercitar, como gestação, pós-parto ou outra condição específica?',
   preview: 'Preparei uma prévia. Revise antes de criar o plano.',
   ready: 'As respostas obrigatórias foram concluídas.',
 };
@@ -25,6 +33,7 @@ const outcomes: Record<
   clarifying: 'precisa_esclarecimento',
   collecting: null,
   emergency: 'emergencia',
+  'neutral-screening': null,
   preview: 'apto_para_fluxo_geral',
   ready: 'apto_para_fluxo_geral',
 };
@@ -33,18 +42,34 @@ export function createAssistantSessionFixture(
   state: FixtureState,
 ): TrainingPlanAssistantSession {
   const collecting = state === 'collecting';
+  const neutralScreening = state === 'neutral-screening';
+  let availableAnswers: TrainingPlanAssistantSession['availableAnswers'] = [];
+  let currentPrompt: string | null = null;
+  let status: TrainingPlanAssistantSession['status'] = 'collecting';
+  if (neutralScreening) {
+    availableAnswers = [
+      { label: 'Não', value: 'no' },
+      { label: 'Sim', value: 'yes' },
+      { label: 'Não sei', value: 'unknown' },
+    ];
+    currentPrompt = messages['neutral-screening'];
+    status = 'collecting';
+  } else if (collecting) {
+    availableAnswers = [
+      { label: 'Saúde geral', value: 'general-health' },
+      { label: 'Condicionamento', value: 'conditioning' },
+      { label: 'Hipertrofia', value: 'hypertrophy' },
+    ];
+    currentPrompt = 'Qual é o principal objetivo do seu plano?';
+  } else if (state === 'emergency') {
+    status = 'blocked';
+  } else {
+    status = state;
+  }
   const result: TrainingPlanAssistantSession = {
-    availableAnswers: collecting
-      ? [
-          { label: 'Saúde geral', value: 'general-health' },
-          { label: 'Condicionamento', value: 'conditioning' },
-          { label: 'Hipertrofia', value: 'hypertrophy' },
-        ]
-      : [],
+    availableAnswers,
     createdAt: now,
-    currentPrompt: collecting
-      ? 'Qual é o principal objetivo do seu plano?'
-      : null,
+    currentPrompt,
     draft: state === 'preview' ? createPreviewDraft() : null,
     expiresAt,
     id: '94b000000000000000000001',
@@ -58,7 +83,7 @@ export function createAssistantSessionFixture(
     ],
     noticeVersion: 'assistant-notice.v1',
     screeningOutcome: outcomes[state],
-    status: state === 'emergency' ? 'blocked' : state,
+    status,
     updatedAt: now,
     version: 3,
   };

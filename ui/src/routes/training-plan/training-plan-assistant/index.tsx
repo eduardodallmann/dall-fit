@@ -95,6 +95,15 @@ export function TrainingPlanAssistantModal({
     commitAssistantSession(queryClient, queryOptions.queryKey, session);
   };
 
+  const followLatestConversation = () => {
+    followConversation.current = true;
+    window.requestAnimationFrame(() => {
+      const conversation = conversationRef.current;
+      if (conversation !== null)
+        conversation.scrollTop = conversation.scrollHeight;
+    });
+  };
+
   const startMutation = useMutation({
     mutationFn: () => createTrainingPlanAssistantSession(mockTrainingPlans),
     onMutate: cancelSessionRead,
@@ -229,6 +238,7 @@ export function TrainingPlanAssistantModal({
       const text = value.text.trim();
       if (text.length === 0 || session === null || session === undefined)
         return;
+      followLatestConversation();
       if (session.status === 'preview') {
         await draftMutation.mutateAsync({
           adjustment: text,
@@ -277,6 +287,7 @@ export function TrainingPlanAssistantModal({
   };
 
   const retry = () => {
+    followLatestConversation();
     if (lastRetry?.kind === 'message')
       messageMutation.mutate(lastRetry.variables);
     if (lastRetry?.kind === 'draft') draftMutation.mutate(lastRetry.variables);
@@ -421,6 +432,7 @@ export function TrainingPlanAssistantModal({
                               isDisabled={pending}
                               key={answer.value}
                               onPress={() => {
+                                followLatestConversation();
                                 messageMutation.mutate({
                                   id: crypto.randomUUID(),
                                   text: answer.value,

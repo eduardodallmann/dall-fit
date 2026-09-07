@@ -973,8 +973,6 @@ export class TrainingPlanAssistantSessionService {
     if (
       answers.adult === 'no' ||
       answers.adult === 'unknown' ||
-      answers.pregnancy === 'yes' ||
-      answers.pregnancy === 'unknown' ||
       answers.pain === 'active' ||
       answers.painClarification === 'important' ||
       answers.painClarification === 'unknown' ||
@@ -990,7 +988,8 @@ export class TrainingPlanAssistantSessionService {
       answers.medicationClarification === 'no' ||
       answers.medicationClarification === 'unknown' ||
       answers.supervision === 'yes' ||
-      answers.otherReason === 'yes'
+      answers.otherReason === 'yes' ||
+      answers.otherReason === 'unknown'
     ) {
       return 'requer_avaliacao_profissional';
     }

@@ -29,7 +29,9 @@ por pessoa.
 ## Sequência e decisões
 
 1. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
-   concluído; uma sessão Redis existente prevalece e é marcada em andamento.
+   concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
+   ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
+   uma resposta anterior sem plano não sobreviva à próxima navegação.
 2. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
    Antes de iniciar, a pessoa pode retornar à seleção por um link próprio; ele não
    aparece durante a sessão.
@@ -66,8 +68,11 @@ por pessoa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
   preserva a sessão para repetição idempotente.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
-  sobrepor ou criar rolagem horizontal; Drawer fica encostado ao rodapé e Short
-  usa 9:16.
+  sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
+  alterna expansão, o input de carga recebe clique em toda a largura e o Drawer
+  fica encostado ao rodapé. Drawer e Modal preservam o título com recuos próprios,
+  o handle móvel não participa do fluxo do cabeçalho, e Short usa 9:16. Cabeçalhos
+  crescem com seu conteúdo e inputs mantêm o valor centralizado verticalmente.
 
 ## Cenários funcionais
 

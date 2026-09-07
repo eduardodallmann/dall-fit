@@ -44,7 +44,7 @@ describe('FakeTrainingPlanAssistantProvider', () => {
       answers: { experience: 'beginner', frequency: '3' },
       candidates,
       catalogVersion: 'exercise-catalog.v2',
-      knowledgeVersion: 'fitness-guidelines.v2',
+      knowledgeVersion: 'fitness-guidelines.v3',
       promptVersion: 'training-plan-assistant.v2',
     });
 
@@ -77,7 +77,7 @@ describe('FakeTrainingPlanAssistantProvider', () => {
         answers,
         candidates,
         catalogVersion: 'exercise-catalog.v2',
-        knowledgeVersion: 'fitness-guidelines.v2',
+        knowledgeVersion: 'fitness-guidelines.v3',
         promptVersion: 'training-plan-assistant.v2',
       });
       const draft = mapAssistantProposal(proposal, candidates, answers, true);

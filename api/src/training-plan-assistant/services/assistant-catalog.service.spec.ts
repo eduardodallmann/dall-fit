@@ -23,8 +23,18 @@ describe('AssistantCatalogService', () => {
     );
     expect(
       knowledge.questions.filter((question) => question.when === undefined),
-    ).toHaveLength(19);
+    ).toHaveLength(18);
     expect(knowledge.catalogVersion).toBe('exercise-catalog.v2');
+    expect(knowledge.version).toBe('fitness-guidelines.v3');
+    expect(
+      knowledge.questions.some((question) => question.key === 'pregnancy'),
+    ).toBe(false);
+    expect(
+      knowledge.questions.find((question) => question.key === 'otherReason')
+        ?.prompt,
+    ).toBe(
+      'Existe alguma situação que exija acompanhamento profissional para você começar a se exercitar, como gestação, pós-parto ou outra condição específica?',
+    );
     expect(
       catalog.every(
         (entry) =>
