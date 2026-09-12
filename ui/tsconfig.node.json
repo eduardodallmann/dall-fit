@@ -21,6 +21,7 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
+    "capacitor.config.ts",
     "playwright.config.ts",
     "playwright.sdd-screenshots.config.ts",
     "playwright-shared-config.ts",

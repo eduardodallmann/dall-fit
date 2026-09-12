@@ -135,6 +135,18 @@ Como o Playwright integrado usa MSW Browser e mantém Workbox desabilitado,
 `pnpm test:pwa-update` executa separadamente dois builds reais na mesma origem e
 duas abas Chromium, preservando um draft até o reload se tornar seguro.
 
+A fundação Capacitor possui testes unitários para seleção injetável do adapter,
+detecção Android, fallback Web diante de bridge ausente ou plataforma inesperada e
+imutabilidade do snapshot. Testes de configuração verificam identidade do app,
+`webDir`, ausência de servidor remoto, alinhamento dos pacotes Capacitor,
+`minSdkVersion` e encadeamento build-before-sync. Um teste executável do ESLint
+comprova que imports `@capacitor/*` falham fora de `core/platform/native` e são
+aceitos dentro da fronteira.
+
+Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
+locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
+API 29+ permanece manual enquanto CI e release Android não forem adotados.
+
 Esses cenários não precisam existir todos no Playwright. Funções puras, hooks e
 componentes cobrem a matriz combinatória; Playwright preserva os caminhos
 observáveis de maior risco e a integração real entre tela, cliente e MSW.

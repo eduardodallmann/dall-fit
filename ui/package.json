@@ -4,6 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "android:build:debug": "pnpm android:sync && ./android/gradlew -p android assembleDebug",
+    "android:open": "cap open android",
+    "android:run": "pnpm android:sync && cap run android",
+    "android:sync": "pnpm build && cap sync android",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "capture:sdd": "playwright test --config playwright.sdd-screenshots.config.ts",
@@ -12,7 +16,7 @@
     "lint:fix": "pnpm --dir .. exec eslint ui --fix",
     "preview": "vite preview",
     "sonar": "dotenv -e ../.env -- sh -c 'test -n \"$SONAR_TOKEN\" || { echo \"Error: SONAR_TOKEN is required. See docs/sdd/base/02-workspace-e-qualidade.md\"; exit 1; }; pnpm test:coverage:ci && sonar-scanner-npm'",
-    "test": "vitest run",
+    "test": "node tests/eslint/capacitor-boundary.mjs && vitest run",
     "test:integration": "playwright test",
     "test:integration:debug": "playwright test --debug",
     "test:integration:install": "playwright install chromium",
@@ -25,6 +29,8 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2",
     "@dall-fit/types": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -45,6 +51,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.2",
     "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "6.10.0",
     "@testing-library/react": "^16.3.2",
