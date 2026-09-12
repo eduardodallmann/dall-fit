@@ -40,16 +40,27 @@ está registrada em
 
 ## Fluxo obrigatório em duas fases
 
+### Pré-especificação — refinamento das decisões
+
+Depois de ler as fontes de verdade afetadas e antes de escrever ou refinar uma
+feature, levantar somente as decisões que ainda estiverem abertas e conduzir com o
+usuário o questionário ramificado definido em
+[`base/04-governanca-do-sdd.md`](base/04-governanca-do-sdd.md). Fatos já
+confirmados não são perguntados novamente, salvo quando uma resposta posterior
+alterar suas premissas. Quando não houver decisão pendente, esta etapa termina sem
+perguntas.
+
 ### Fase 1 — especificação da feature
 
 1. Ler os documentos `base/` deste nível e dos projetos afetados.
 2. Ler os fluxos, endpoints e rotas afetados para compreender a verdade vigente.
-3. Criar ou refinar somente a spec autocontida em `features/`, com escopo, critérios
+3. Concluir o refinamento das decisões ainda abertas.
+4. Criar ou refinar somente a spec autocontida em `features/`, com escopo, critérios
    de aceite, decisões, impactos e plano de testes suficientes para que o usuário
    valide tudo que será executado.
-4. Não alterar código, configuração, contratos executáveis, mocks, testes ou SDDs
+5. Não alterar código, configuração, contratos executáveis, mocks, testes ou SDDs
    vivos nesta fase.
-5. Apresentar a feature, encerrar o trabalho e aguardar uma ordem posterior e
+6. Apresentar a feature, encerrar o trabalho e aguardar uma ordem posterior e
    explícita do usuário para iniciar sua implementação.
 
 O pedido de criação, documentação, detalhamento, revisão ou refinamento de uma

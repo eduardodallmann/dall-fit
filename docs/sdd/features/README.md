@@ -5,6 +5,11 @@ monorepo. Uma feature é criada antes da implementação, a partir de
 `../templates/feature-spec.md`, e deve ser autocontida o suficiente para orientar a
 execução e validar a entrega sem depender de conversas externas.
 
+Antes de criar ou refinar o arquivo, concluir o questionário ramificado das
+decisões ainda abertas conforme `../base/04-governanca-do-sdd.md`. Decisões já
+confirmadas não são perguntadas novamente, salvo quando um ramo posterior alterar
+suas premissas; se não houver dúvida material, nenhuma pergunta é necessária.
+
 O pedido para criar, documentar, detalhar, revisar ou refinar uma feature altera
 somente seu arquivo. Não autoriza código, configuração, contratos executáveis,
 mocks, testes nem mudanças antecipadas nos SDDs vivos. Depois de apresentar a

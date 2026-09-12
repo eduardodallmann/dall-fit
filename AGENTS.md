@@ -72,12 +72,18 @@ solicitados que não exigem sem feature SDD **devem atualizar a documentação v
 Criar, escrever, documentar, detalhar, revisar ou refinar uma feature autoriza
 somente a fase de especificação:
 
-1. crie ou altere apenas o arquivo autocontido em `docs/sdd/features/`, usando o
+1. antes de escrever o arquivo, identifique as decisões ainda pendentes e conduza
+   com o usuário o questionário ramificado definido em
+   `docs/sdd/base/04-governanca-do-sdd.md`; não repita certezas, aceite de duas a N
+   opções ou uma única confirmação, reabra uma certeza se um ramo posterior mudar
+   sua premissa e informe `decisão X de Y` quando houver estimativa útil, ajustando
+   o total conforme os ramos; se nada estiver pendente, não faça perguntas;
+2. crie ou altere apenas o arquivo autocontido em `docs/sdd/features/`, usando o
    template da raiz;
-2. não altere código, configuração, contratos executáveis, mocks ou testes;
-3. não atualize `base/`, ADRs, flows, endpoints ou routes para descrever um
+3. não altere código, configuração, contratos executáveis, mocks ou testes;
+4. não atualize `base/`, ADRs, flows, endpoints ou routes para descrever um
    comportamento que ainda não foi implementado;
-4. encerre o turno após apresentar a feature e aguarde a validação do usuário.
+5. encerre o turno após apresentar a feature e aguarde a validação do usuário.
 
 A implementação só pode começar após uma mensagem posterior e explícita do usuário,
 como `implemente a feature <arquivo>` ou `pode iniciar a implementação da feature

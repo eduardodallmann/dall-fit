@@ -47,6 +47,40 @@ decisão prevalece. Esse caminho é apropriado para ajustes estruturantes na
 documentação base e outras mudanças cujo escopo explícito não representa uma
 demanda a preservar em `features/`.
 
+## Refinamento ramificado antes da feature
+
+Após ler as fontes de verdade afetadas e antes de escrever ou refinar o arquivo de
+uma feature, o agente deve separar:
+
+- fatos e decisões já confirmados, que entram diretamente na futura spec;
+- premissas inferidas, que precisam ser declaradas quando forem relevantes;
+- decisões realmente pendentes, que formam um questionário ramificado.
+
+O questionário trata uma decisão por vez para que cada resposta possa revelar,
+eliminar ou reformular as próximas perguntas. Não existe quantidade fixa de
+perguntas nem de alternativas: uma decisão pode ter de duas a N opções e pode ter
+uma única proposta quando o objetivo for apenas confirmar uma consequência. As
+alternativas devem ser concretas, mutuamente compreensíveis e informar impactos ou
+trade-offs relevantes; quando houver recomendação técnica, ela deve ser indicada
+com sua justificativa.
+
+Fatos e escolhas já confirmados não são perguntados novamente. Uma certeza pode
+voltar a ser uma decisão aberta quando uma resposta posterior invalidar a premissa
+que a sustentava; nesse caso, o agente explica a dependência e reabre somente o
+ponto afetado. O usuário também pode propor uma alternativa não antecipada, que
+passa a integrar o ramo corrente.
+
+Quando for possível estimar o percurso, o agente informa progresso aproximado no
+formato `decisão X de Y`. O total não é uma promessa: deve ser atualizado quando
+as respostas criarem ou eliminarem ramos. Se uma estimativa útil ainda não for
+possível, o agente não inventa um número.
+
+Pode não haver pergunta alguma quando o pedido, o SDD e decisões anteriores já
+determinarem o escopo sem ambiguidade material. Encerrado o questionário, o agente
+consolida as decisões, confirma que não restam pontos capazes de mudar escopo,
+comportamento ou critérios de aceite e somente então escreve a feature. Essa etapa
+não substitui o gate posterior entre a apresentação da feature e sua implementação.
+
 ## Separação entre especificação e implementação
 
 A criação de uma feature é uma atividade `docs-only` isolada. Durante essa fase:
