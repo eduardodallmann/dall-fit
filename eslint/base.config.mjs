@@ -17,6 +17,9 @@ export function baseConfig(rootDirectory) {
         '**/.workflow-vitest/**',
         'workflow/workflow/**',
         'ui/public/**',
+        'ui/android/app/src/main/assets/**',
+        'ui/android/**/build/**',
+        'ui/android/capacitor-cordova-android-plugins/**',
       ],
     },
     {

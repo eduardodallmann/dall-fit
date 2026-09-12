@@ -40,6 +40,30 @@ Também é possível iniciar apenas a infraestrutura da API:
 pnpm -C api dev:infra
 ```
 
+### Desenvolvimento Android
+
+O projeto Android Capacitor é versionado em `ui/android/`, mas não participa de
+`pnpm dev`, `pnpm build` nem dos gates web. Para trabalhar nele, instalar Node 24,
+pnpm, Android Studio 2025.2.1 ou mais recente e os Android SDK Tools com a platform
+API 36; o JDK adequado é instalado e administrado pelo Android Studio. O produto
+suporta dispositivos a partir da API 29.
+
+Os comandos canônicos, executados na raiz, são:
+
+```bash
+pnpm android:sync
+pnpm android:open
+pnpm android:run
+pnpm android:build:debug
+```
+
+`android:sync` sempre executa o build Vite antes de `cap sync android`.
+`android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
+Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
+debug em `ui/android/app/build/outputs/apk/debug/`. `android:open` exige Android
+Studio, mas não altera o bundle. Nenhum desses caminhos assina release ou exige
+segredo.
+
 MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
 `redis-memory-server`, sem Docker. O MongoDB usa `wiredTiger` e conserva seus dados
 entre sessões em `api/.data/mongodb/`, diretório local ignorado pelo Git; o Redis
@@ -61,6 +85,10 @@ Todos os quality gates são iniciados na raiz:
 | Comando                 | Responsabilidade                                                      |
 | ----------------------- | --------------------------------------------------------------------- |
 | `pnpm typecheck`        | Compila types e executa typecheck de API, Workflow e UI               |
+| `pnpm android:sync`     | Gera o bundle Vite e sincroniza o projeto Android Capacitor            |
+| `pnpm android:open`     | Abre o projeto nativo versionado no Android Studio                     |
+| `pnpm android:run`      | Prepara e executa o aplicativo em dispositivo ou emulador             |
+| `pnpm android:build:debug` | Prepara e compila o APK debug com o Gradle Wrapper                  |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint          |
 | `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos                        |

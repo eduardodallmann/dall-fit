@@ -30,3 +30,7 @@ substituída permanece no histórico e aponta para a sucessora.
   referências globais vivas e clonagem durável em projeto Nitro separado.
 - [`ADR-0010`](ADR-0010-sessao-efemera-e-historico-de-treino.md): sessão de treino
   no Redis e consolidação durável de execução e cargas no MongoDB.
+- [`ADR-0011`](ADR-0011-assistente-ia-triagem-e-sessao-sensivel.md): assistente de
+  IA com triagem determinística e sessão sensível.
+- [`ADR-0012`](ADR-0012-capacitor-android-e-fronteira-de-plataforma.md): Capacitor
+  Android sobre a UI compartilhada e fronteira de adapters de plataforma.

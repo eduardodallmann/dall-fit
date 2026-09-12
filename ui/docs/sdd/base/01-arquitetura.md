@@ -12,6 +12,7 @@ A fundação de aplicação usa:
 - TanStack Form para formulários;
 - Axios como client HTTP;
 - `vite-plugin-pwa` com Workbox para instalação e atualização da PWA;
+- Capacitor 8 para empacotar o mesmo bundle Vite em Android;
 - `@vercel/analytics` para pageviews e eventos customizados sem conteúdo;
 - Vitest para testes unitários e de componentes;
 - Playwright para testes integrados no navegador.
@@ -21,6 +22,32 @@ do MSW, realiza o bootstrap e aplica uma `ApplicationErrorBoundary` acima de
 `AppProviders`. Rejeição do bootstrap ou erro de renderização apresenta fallback
 global com recarga, em vez de deixar a tela vazia. `src/app.tsx` monta o
 `RouterProvider`, e a árvore tipada vive em `src/routes/routes.tsx`.
+
+## Plataforma Web e Android
+
+`capacitor.config.ts` identifica o aplicativo como `com.dallfit.app`, usa o nome
+`Dall Fit` e copia exclusivamente o bundle local de `dist`. A configuração de
+produção não define `server.url`, navegação liberada para um host remoto nem HTTP
+cleartext. O Web/PWA continua sendo o canal web vigente; Capacitor apenas adiciona
+o container Android versionado em `ui/android/`.
+
+`src/core/platform` é a fronteira do runtime. Seu contrato discriminado expõe
+somente `web | android` e um snapshot profundamente imutável das capabilities de
+fundação. O adapter Web devolve `nativeBridge: false` sem ler bridge ou plugin. O
+adapter Capacitor usa `isNativePlatform()` e `getPlatform()` e só reconhece Android
+quando ambas as informações são coerentes; iOS ou qualquer valor inesperado cai no
+fallback Web sem ser promovido por coerção.
+
+`AppProviders` é o ponto de composição e permite injetar diretamente um snapshot
+em testes. Componentes, hooks e rotas acessam apenas `PlatformContext` e
+`usePlatform`; não importam Capacitor. O ESLint proíbe `@capacitor/*` em todo
+`ui/src`, exceto em `src/core/platform/native/`. Novas capacidades adicionam seu
+port e adapter somente quando possuírem comportamento e consumidor reais.
+
+O template Capacitor 8.5.2 conserva compile/target SDK 36, Android Gradle Plugin
+8.13.0 e Gradle Wrapper 8.14.3. Apenas `minSdkVersion` é elevado para 29. Assets
+web copiados, configuração gerada, caches e outputs Gradle não são versionados;
+configuração, wrapper e código nativo necessários para reproduzir o build são.
 
 ## Estrutura alvo
 
@@ -475,6 +502,11 @@ HTML do ambiente isolado, serve ambos sucessivamente na mesma origem e usa Chrom
 com Workbox real. Ele comprova reload único da aba segura e preservação do draft em
 outra aba até a remoção do bloqueador; não registra o worker do MSW.
 
+O empacotamento Capacitor não altera manifest, service worker, instalação ou
+atualização do PWA. O build Android consome o mesmo build otimizado, mas o canal
+nativo não adiciona treino offline, autenticação nativa, storage, sync ou plugin
+nesta fundação.
+
 O documento compartilhado `index.html` declara a viewport com escala inicial e
 máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual
 por pinça em todas as rotas web e na PWA `standalone`, sem listeners JavaScript ou
@@ -584,6 +616,10 @@ consumo público por meio da interoperabilidade CommonJS do Vite.
 
 ## Referências oficiais
 
+- [Capacitor 8](https://capacitorjs.com/docs)
+- [Workflow do Capacitor](https://capacitorjs.com/docs/basics/workflow)
+- [Android no Capacitor](https://capacitorjs.com/docs/android)
+- [Atualização para Capacitor 8](https://capacitorjs.com/docs/updating/8-0)
 - [TanStack Router React](https://tanstack.com/router/latest/docs/framework/react/start/overview)
 - [TanStack Query React](https://tanstack.com/query/latest/docs/framework/react/overview)
 - [TanStack Form React](https://tanstack.com/form/latest/docs/framework/react)

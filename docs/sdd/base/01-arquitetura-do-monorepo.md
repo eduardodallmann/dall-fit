@@ -8,7 +8,8 @@ pacotes internos compartilhados.
 ```text
 dall-fit/
 ├── api/                 # backend NestJS
-├── ui/                  # frontend React + Vite
+├── ui/                  # frontend React + Vite e container Android Capacitor
+│   └── android/         # projeto nativo Android versionado
 ├── workflow/            # executor Nitro + Vercel Workflow
 ├── packages/
 │   └── types/           # contratos TypeScript compartilhados
@@ -21,7 +22,9 @@ dall-fit/
 - `api/` possui regras executadas no servidor, persistência, segurança de backend
   e contratos HTTP.
 - `ui/` possui apresentação, interação, acessibilidade, navegação e estado do
-  cliente.
+  cliente. A mesma UI gera o Web/PWA e o bundle local embarcado pelo projeto
+  Android Capacitor em `ui/android/`; o projeto nativo é código-fonte editável,
+  não um artefato regenerado a cada clone.
 - `workflow/` é uma aplicação Vercel independente. Recebe somente comandos
   internos assinados da API, executa a clonagem durável de planos e acessa
   diretamente o MongoDB e o mesmo store Blob por OIDC.
@@ -41,6 +44,9 @@ dall-fit/
 6. API e Workflow se comunicam por HTTPS assinado com HMAC. A API resolve o host
    do Related Project na Vercel e nunca chama funções internas do Workflow por
    import ou execução no mesmo processo.
+7. Capacitor não cria uma segunda aplicação frontend. APIs nativas ficam atrás do
+   contrato de plataforma da UI, e imports de `@capacitor/*` permanecem confinados
+   ao adapter nativo fiscalizado pelo ESLint.
 
 ## Convenções de importação
 
