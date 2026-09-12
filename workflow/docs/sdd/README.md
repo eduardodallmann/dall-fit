@@ -1,5 +1,9 @@
 # SDD do Workflow
 
+Aqui, **SDD** significa **Spec-Driven Development** (Desenvolvimento Orientado por
+Especificação): o processo e a documentação usados para definir e validar o
+comportamento do Workflow antes da implementação.
+
 Este diretório é a fonte de verdade da aplicação Nitro que executa processos
 duráveis. Decisões transversais permanecem no SDD da raiz; detalhes de runtime,
 segurança, ambiente, testes, endpoint interno e steps pertencem a este projeto.

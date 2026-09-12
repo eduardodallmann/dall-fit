@@ -1,5 +1,10 @@
 # Governança do SDD
 
+**SDD** significa **Spec-Driven Development** (Desenvolvimento Orientado por
+Especificação). Neste projeto, a sigla também se refere ao conjunto de documentos
+que registra as especificações, decisões, contratos e critérios de aceite usados
+para orientar a implementação.
+
 ## Hierarquia
 
 O SDD possui três contextos:

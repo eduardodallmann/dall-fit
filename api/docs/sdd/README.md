@@ -1,5 +1,9 @@
 # SDD da API
 
+Aqui, **SDD** significa **Spec-Driven Development** (Desenvolvimento Orientado por
+Especificação): o processo e a documentação usados para definir e validar o
+comportamento do backend antes da implementação.
+
 Este diretório é o contrato vivo exclusivo do backend Dall Fit.
 
 ## Estrutura

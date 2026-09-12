@@ -1,5 +1,10 @@
 # SDD do monorepo Dall Fit
 
+**SDD** significa **Spec-Driven Development** (Desenvolvimento Orientado por
+Especificação). No Dall Fit, o termo designa tanto o processo de definir e
+validar o comportamento antes da implementação quanto o conjunto de documentos
+que registra essa especificação, suas decisões e seus critérios de aceite.
+
 Este diretório reúne a verdade vigente do sistema e o histórico das demandas que
 levaram até ela. Documentos vivos descrevem o comportamento atual; feature specs e
 ADRs preservam o contexto histórico de entregas e decisões. Detalhes vigentes
