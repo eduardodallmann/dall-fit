@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { Button, Drawer, toast, useOverlayState } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
@@ -10,10 +16,13 @@ import {
   logout as logoutSession,
   type MockAuthScenario,
 } from '~/auth/auth-service';
+import { useNativeSession } from '~/auth/native-session-context';
 import { endSession } from '~/auth/session-lifecycle';
 import { trackUiEvent } from '~/core/analytics';
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { authenticatedShellStyles } from '~/core/components/authenticated-shell/styles';
+import { NativeLogoutDialog } from '~/core/components/native-logout-dialog';
+import { usePlatform } from '~/core/platform/platform';
 
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
 const styles = authenticatedShellStyles();
@@ -30,10 +39,24 @@ export function AuthenticatedShell({
   person,
 }: Readonly<AuthenticatedShellProps>) {
   const drawerOpenRef = useRef(false);
+  const nativeSession = useNativeSession();
+  const platform = usePlatform();
+  const [isCheckingPending, setIsCheckingPending] = useState(false);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const isNative = platform.platform === 'android';
   const logoutMutation = useMutation({
-    mutationFn: () => logoutSession(mockAuth),
+    mutationFn: async () => {
+      if (isNative) {
+        if (nativeSession === null)
+          throw new Error('Native session is unavailable.');
+        await nativeSession.logout();
+        return;
+      }
+      await logoutSession(mockAuth);
+    },
     onMutate: () => {
       trackUiEvent({
+        channel: isNative ? 'native' : 'web',
         control: 'logout',
         eventName: 'ui_operation_started',
         operation: 'logout',
@@ -41,17 +64,20 @@ export function AuthenticatedShell({
       });
     },
     onSuccess: async () => {
+      setIsLogoutDialogOpen(false);
       trackUiEvent({
+        channel: isNative ? 'native' : 'web',
         control: 'logout',
         eventName: 'ui_operation_completed',
         operation: 'logout',
         outcome: 'success',
         surface: 'application_menu',
       });
-      await endSession('logout');
+      if (!isNative) await endSession('logout');
     },
     onError: async () => {
       trackUiEvent({
+        channel: isNative ? 'native' : 'web',
         control: 'logout',
         eventName: 'ui_operation_completed',
         operation: 'logout',
@@ -59,9 +85,30 @@ export function AuthenticatedShell({
         surface: 'application_menu',
       });
       toast.danger('Não foi possível sair. Tente novamente.');
-      await endSession('logout');
+      if (!isNative) await endSession('logout');
     },
   });
+  const requestLogout = useCallback(async () => {
+    if (!isNative || nativeSession === null) {
+      logoutMutation.mutate();
+      return;
+    }
+    if (isCheckingPending || logoutMutation.isPending) return;
+    setIsCheckingPending(true);
+    try {
+      if (await nativeSession.hasPendingChanges()) {
+        setIsLogoutDialogOpen(true);
+      } else {
+        logoutMutation.mutate();
+      }
+    } catch {
+      toast.danger(
+        'Não foi possível verificar os dados locais. Tente novamente.',
+      );
+    } finally {
+      setIsCheckingPending(false);
+    }
+  }, [isCheckingPending, isNative, logoutMutation, nativeSession]);
   const closeReasonRef = useRef<
     'backdrop' | 'breakpoint' | 'close_trigger' | 'escape' | 'navigation'
   >('backdrop');
@@ -142,9 +189,10 @@ export function AuthenticatedShell({
     <div className={styles.shell()}>
       <aside aria-label="Menu da aplicação" className={styles.desktopMenu()}>
         <ApplicationMenu
-          isLogoutPending={logoutMutation.isPending}
-          onLogout={() => logoutMutation.mutate()}
+          isLogoutPending={isCheckingPending || logoutMutation.isPending}
+          onLogout={() => void requestLogout()}
           person={person}
+          showPwaInstall={!isNative}
         />
       </aside>
       <div className={styles.mobileTrigger()}>
@@ -178,10 +226,13 @@ export function AuthenticatedShell({
                 />
                 <Drawer.Body className={styles.drawerBody()}>
                   <ApplicationMenu
-                    isLogoutPending={logoutMutation.isPending}
+                    isLogoutPending={
+                      isCheckingPending || logoutMutation.isPending
+                    }
                     onNavigate={() => closeDrawer('navigation')}
-                    onLogout={() => logoutMutation.mutate()}
+                    onLogout={() => void requestLogout()}
                     person={person}
+                    showPwaInstall={!isNative}
                   />
                 </Drawer.Body>
               </Drawer.Dialog>
@@ -190,6 +241,14 @@ export function AuthenticatedShell({
         </Drawer>
       </div>
       <main className={styles.content()}>{children}</main>
+      <NativeLogoutDialog
+        isOpen={isLogoutDialogOpen}
+        isPending={logoutMutation.isPending}
+        onCancel={() => setIsLogoutDialogOpen(false)}
+        onConfirm={() => {
+          logoutMutation.mutate();
+        }}
+      />
     </div>
   );
 }

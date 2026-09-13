@@ -4,8 +4,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { NativeSessionContext } from '~/auth/native-session-context';
 import { queryClient } from '~/context/query-client';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
+import {
+  createPlatformSnapshot,
+  PlatformContext,
+} from '~/core/platform/platform';
 import { PwaContext } from '~/core/pwa/pwa-context';
 import { ThemeContext } from '~/core/theme/theme-context';
 import { authenticatedPersonFixture } from '~/mocks/fixtures/person';
@@ -53,13 +58,17 @@ describe('AuthenticatedShell analytics', () => {
     const user = userEvent.setup();
     render(
       <QueryClientProvider client={queryClient}>
-        <ThemeContext value={themeContextValue}>
-          <PwaContext value={pwaContextValue}>
-            <AuthenticatedShell person={authenticatedPersonFixture}>
-              <p>Conteúdo</p>
-            </AuthenticatedShell>
-          </PwaContext>
-        </ThemeContext>
+        <PlatformContext value={createPlatformSnapshot('web', false)}>
+          <NativeSessionContext value={null}>
+            <ThemeContext value={themeContextValue}>
+              <PwaContext value={pwaContextValue}>
+                <AuthenticatedShell person={authenticatedPersonFixture}>
+                  <p>Conteúdo</p>
+                </AuthenticatedShell>
+              </PwaContext>
+            </ThemeContext>
+          </NativeSessionContext>
+        </PlatformContext>
       </QueryClientProvider>,
     );
 

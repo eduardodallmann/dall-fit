@@ -47,6 +47,9 @@ dall-fit/
 7. Capacitor não cria uma segunda aplicação frontend. APIs nativas ficam atrás do
    contrato de plataforma da UI, e imports de `@capacitor/*` permanecem confinados
    ao adapter nativo fiscalizado pelo ESLint.
+8. A autenticação Android usa Credential Manager atrás dessa fronteira e conserva
+   Bearer, vínculo de pessoa e UUID da instalação somente no secure storage cifrado
+   pelo Android Keystore. O canal Web continua proprietário de cookie e CSRF.
 
 ## Convenções de importação
 

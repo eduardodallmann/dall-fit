@@ -26,9 +26,13 @@ export function uiConfig() {
           {
             patterns: [
               {
-                group: ['@capacitor/*'],
+                group: [
+                  '@aparajita/capacitor-secure-storage',
+                  '@capawesome/capacitor-google-sign-in',
+                  '@capacitor/*',
+                ],
                 message:
-                  'Import Capacitor packages only from ui/src/core/platform/native/. Consume the public platform contract elsewhere.',
+                  'Import Capacitor and native plugin packages only from ui/src/core/platform/native/. Consume ports elsewhere.',
               },
             ],
           },

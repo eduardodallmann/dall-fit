@@ -37,6 +37,7 @@ function getAuthScenario(
 const mockCsrfToken = 'mock-csrf-token';
 const staleCsrfToken = 'mock-stale-csrf-token';
 export const refreshedMockCsrfToken = 'mock-refreshed-csrf-token';
+export const mockNativeAccessToken = 'fixture.native.access-token';
 
 function isSessionRevoked(scenario: string | null): boolean {
   const key = scenario ?? 'authenticated';
@@ -128,6 +129,37 @@ export function resetAuthScenarioStates(): void {
 }
 
 export const authHandlers = [
+  http.post('*/auth/native/session', async ({ request }) => {
+    const body: unknown = await request.json().catch(() => undefined);
+    if (
+      typeof body !== 'object' ||
+      body === null ||
+      Object.keys(body).length !== 1 ||
+      !('identityToken' in body) ||
+      typeof body.identityToken !== 'string' ||
+      body.identityToken.length === 0
+    ) {
+      return HttpResponse.json(
+        createMockApiError('VALIDATION_FAILED', 'Request validation failed.'),
+        createMockResponseInit({ status: 400 }),
+      );
+    }
+    return HttpResponse.json(
+      {
+        data: {
+          accessToken: mockNativeAccessToken,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+          person: authenticatedPersonFixture,
+          tokenType: 'Bearer',
+        },
+      },
+      createMockResponseInit({ status: 201 }),
+    );
+  }),
+  http.delete(
+    '*/auth/native/session',
+    () => new HttpResponse(null, createMockResponseInit({ status: 204 })),
+  ),
   http.get('*/auth/google', ({ request }) => {
     const destination = new URL('/dash', request.url).toString();
     const result = new HttpResponse(

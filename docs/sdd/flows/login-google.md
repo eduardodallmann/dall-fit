@@ -40,6 +40,12 @@ middleware de teste do Vite, sem acessar a API real.
 |     6 | Bootstrap anti-CSRF       | `/dash`    | `GET /auth/csrf`         |
 |     7 | Menu autenticado          | `/dash`    | respostas já consultadas |
 
+No Android, as etapas 2–4 são substituídas pelo Credential Manager iniciado
+somente pelo botão, seguido de `POST /auth/native/session`. As etapas 5 e 7 usam o
+Bearer devolvido; a etapa 6 não ocorre porque o canal nativo não usa CSRF. O client
+Web/server configurado em `VITE_GOOGLE_SERVER_CLIENT_ID` é a audience do ID token;
+o cadastro OAuth Android usa `com.dallfit.app` e as assinaturas autorizadas.
+
 `POST /auth/test-login` substitui as etapas 2 e 3 somente em local/teste.
 
 ## Sequência e decisões
@@ -94,6 +100,21 @@ middleware de teste do Vite, sem acessar a API real.
     requests, reseta recursos privados, limpa CSRF/cache e navega com replace para
     `/`; descarta a intenção de navegação e a falha também mostra feedback acessível.
 
+No ramo Android, o coordenador gera e preserva um UUID v4 por instalação, armazena
+o envelope Bearer v1 no secure storage e aceita como identidade somente a `Person`
+da API. Reautenticar a mesma `person.id` preserva dados locais; outra pessoa encerra
+a geração e exige limpeza atômica antes de gravar a nova credencial. Falha nessa
+limpeza bloqueia a troca e revoga o novo Bearer em best effort. Expiração local ou
+`401` remove apenas o envelope e preserva vínculo/dados para a mesma conta.
+
+Ao sair no Android, a ausência de pendências avança diretamente. Havendo
+pendências, `Cancelar` não altera estado e `Sair e apagar dados` encerra a geração,
+remove envelope, vínculo e dados, preserva o UUID e tenta depois
+`DELETE /auth/native/session` e Google Sign-Out. Rede ou provedor indisponível não
+restaura estado local. As regras Android excluem todos esses artefatos de backup e
+transferência entre dispositivos, portanto reinstalação cria outro UUID e exige
+novo login.
+
 `401` concorrentes compartilham a mesma transição. `CSRF_VALIDATION_FAILED` renova
 o token sem repetir a mutation; `ADMIN_ACCESS_REQUIRED` revalida a pessoa, atualiza
 o Router e volta a `/dash` sem logout. Resultado tardio da geração encerrada não
@@ -131,6 +152,8 @@ devem acompanhar a reversão.
 | `isAdmin`                | operação autorizada   | API e UI          | MongoDB                               | somente `true`; ausência é `false` |
 | tema                     | pessoa ou sistema     | UI                | `Person.configs.theme` e localStorage | somente `light                     | dark`; ausência segue o sistema |
 | sessão                   | API                   | browser e API     | cookie `HttpOnly` + registro Redis    | revogável, máximo sete dias        |
+| sessão nativa            | API                   | Android e API     | secure storage + registro Redis       | Bearer, nunca storage Web          |
+| UUID da instalação       | Android               | cliente nativo    | secure storage sem backup             | aleatório, não deriva do aparelho  |
 | CSRF                     | API                   | UI e API          | Redis e memória volátil da UI         | nunca em armazenamento durável     |
 | `state`/`nonce`/verifier | API                   | Google e callback | cookies temporários                   | removidos ao terminar              |
 | `requestId`              | API ou request válida | logs e consumidor | contexto volátil e header/erro HTTP   | não persiste                       |
@@ -155,6 +178,10 @@ devem acompanhar a reversão.
   resposta 5xx, MongoDB, Redis ou código não cria sessão nem redirect; a API
   responde `500` genérico com correlação e limpa os cookies temporários. Redis
   indisponível nunca reativa validação stateless.
+- Android: cancelamento do seletor permanece silencioso; falha recuperável mostra
+  mensagem genérica. Envelope corrompido ou expirado é removido. Troca de conta só
+  publica a nova pessoa depois da limpeza, e logout local independe do resultado
+  remoto.
 
 ## Cenários funcionais
 
@@ -228,6 +255,23 @@ simulado continua retornando a `/dash`. A UI executa toda a retomada.
   da query preceda sua conclusão; depois do login, a pessoa chega a Treinar.
 - Cobertura: cenário 14 do flow Playwright. A expiração detectada apenas pela
   revalidação da tela já montada continua sem criar nova intenção.
+
+### Cenário 15 — Login e isolamento Android
+
+- Link para testar: não se aplica — exige APK, Credential Manager, Keystore e
+  cadastro OAuth Android reais.
+- Given: a instalação está sem sessão ou vinculada a uma conta anterior.
+- When: a pessoa autentica pelo botão nativo.
+- Then: mesma conta preserva dados; conta diferente limpa antes de ativar; requests
+  usam Bearer sem cookie/CSRF e nenhum segredo entra em storage Web.
+
+### Cenário 16 — Logout e reinstalação Android
+
+- Link para testar: não se aplica — exige emulador/aparelho e operações do sistema.
+- Given: existem sessão e artefatos privados locais.
+- When: o logout destrutivo é confirmado ou o aplicativo é reinstalado/restaurado.
+- Then: dados e credencial não reaparecem; logout preserva o UUID, enquanto
+  reinstalação gera outro e sempre exige login.
 
 ## Cobertura automatizada
 

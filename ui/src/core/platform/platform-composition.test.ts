@@ -17,7 +17,7 @@ describe('platform composition', () => {
     });
 
     expect(resolveApplicationPlatform(adapter)).toEqual({
-      capabilities: { nativeBridge: true },
+      capabilities: { nativeAuthentication: true, nativeBridge: true },
       platform: 'android',
     });
   });
@@ -35,7 +35,7 @@ describe('platform composition', () => {
       });
 
       expect(resolveApplicationPlatform(adapter)).toEqual({
-        capabilities: { nativeBridge: false },
+        capabilities: { nativeAuthentication: false, nativeBridge: false },
         platform: 'web',
       });
     },

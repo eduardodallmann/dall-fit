@@ -17,6 +17,7 @@ export interface ApplicationMenuProps {
   onLogout: () => void;
   onNavigate?: () => void;
   person: Person;
+  showPwaInstall?: boolean;
 }
 
 export function ApplicationMenu({
@@ -24,6 +25,7 @@ export function ApplicationMenu({
   onNavigate,
   onLogout,
   person,
+  showPwaInstall = true,
 }: Readonly<ApplicationMenuProps>) {
   const initials = getPersonInitials(person.name);
   const location = useLocation();
@@ -180,7 +182,7 @@ export function ApplicationMenu({
           </Link>
         ) : null}
       </nav>
-      <PwaInstallAction />
+      {showPwaInstall ? <PwaInstallAction /> : null}
     </div>
   );
 }

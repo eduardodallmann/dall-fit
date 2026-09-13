@@ -143,6 +143,13 @@ imutabilidade do snapshot. Testes de configuração verificam identidade do app,
 comprova que imports `@capacitor/*` falham fora de `core/platform/native` e são
 aceitos dentro da fronteira.
 
+A autenticação Android acrescenta testes de inicialização/cancelamento do Google,
+envelope versionado e UUID, isolamento entre mesma conta e conta diferente, falha
+de limpeza, expiração, logout local independente da revogação remota, Bearer sem
+cookie/CSRF, diálogo destrutivo e regras de backup para API 29/30 e 31+. Credential
+Manager, Keystore, backup/restore e reinstalação reais continuam validações manuais
+em emulador ou aparelho.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

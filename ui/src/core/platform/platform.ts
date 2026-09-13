@@ -3,6 +3,7 @@ import { createContext, use } from 'react';
 export type ApplicationPlatform = 'android' | 'web';
 
 export interface PlatformCapabilities {
+  readonly nativeAuthentication: boolean;
   readonly nativeBridge: boolean;
 }
 
@@ -33,6 +34,9 @@ export function createPlatformSnapshot(
   platform: ApplicationPlatform,
   nativeBridge: boolean,
 ): PlatformSnapshot {
-  const capabilities = Object.freeze({ nativeBridge });
+  const capabilities = Object.freeze({
+    nativeAuthentication: platform === 'android' && nativeBridge,
+    nativeBridge,
+  });
   return Object.freeze({ capabilities, platform });
 }
