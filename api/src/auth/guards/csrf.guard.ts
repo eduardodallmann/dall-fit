@@ -36,9 +36,21 @@ export class CsrfGuard implements CanActivate {
         csrfTokenPresent: typeof csrfToken === 'string',
         originPresent: typeof origin === 'string',
         path: request.originalUrl,
+        sessionChannel: session?.channel,
         sessionLoaded: session !== undefined,
       },
     });
+
+    if (session?.channel === 'native') {
+      this.logger.log('CsrfGuard -> canActivate -> nativeSession branch:', {
+        data: { csrfRequired: false },
+      });
+      const result = true;
+      this.logger.log('CsrfGuard -> canActivate -> return:', {
+        data: { allowed: result },
+      });
+      return result;
+    }
 
     const allowed =
       session !== undefined &&

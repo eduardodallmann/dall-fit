@@ -56,6 +56,10 @@ como pontos de extensão hipotéticos.
 - `CurrentPersonResponse` envolve `Person` em `ApiResponse`.
 - `CsrfTokenResponse` envolve o token anti-CSRF da sessão em `ApiResponse`; a UI
   o conserva somente em memória.
+- `CreateNativeSessionRequest` contém somente o Google ID token obtido pelo cliente
+  Android. `CreateNativeSessionResponse` devolve `tokenType: 'Bearer'`, o
+  `accessToken`, sua expiração ISO e a mesma `Person` pública usada pela Web. Claims,
+  `jti`, canal Redis e token Google permanecem internos da API.
 - o identificador Google, documentos MongoDB, cookies e payloads de sessão são
   detalhes exclusivos da API e não pertencem ao pacote.
 - `photoUrl` é anulável porque o claim de foto do provedor não é garantido.

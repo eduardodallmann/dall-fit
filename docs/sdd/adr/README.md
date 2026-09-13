@@ -34,3 +34,5 @@ substituída permanece no histórico e aponta para a sucessora.
   IA com triagem determinística e sessão sensível.
 - [`ADR-0012`](ADR-0012-capacitor-android-e-fronteira-de-plataforma.md): Capacitor
   Android sobre a UI compartilhada e fronteira de adapters de plataforma.
+- [`ADR-0013`](ADR-0013-sessoes-web-e-native-isoladas.md): audiences e canais Redis
+  isolam sessão Web por cookie da sessão Android por Bearer.

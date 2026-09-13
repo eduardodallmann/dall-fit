@@ -38,8 +38,10 @@ export class OptionalSessionGuard implements CanActivate {
     });
     if (typeof token === 'string') {
       try {
-        request.currentSession =
-          await this.authSessionService.verifySession(token);
+        request.currentSession = await this.authSessionService.verifySession(
+          token,
+          'web',
+        );
       } catch (error: unknown) {
         if (error instanceof RedisUnavailableError) {
           throw new ServiceUnavailableException({

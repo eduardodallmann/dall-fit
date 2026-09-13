@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { CodeChallengeMethod, OAuth2Client } from 'google-auth-library';
 
 import type { ExternalIdentity } from '~/auth/domain/auth.types';
+import { InvalidGoogleIdentityError } from '~/auth/errors/invalid-google-identity.error';
 import { OAuthCallbackError } from '~/auth/errors/oauth-callback.error';
 import type { GoogleOAuthCredentials } from '~/config/environment';
 
@@ -104,23 +105,66 @@ export class GoogleOAuthService {
       throw new OAuthCallbackError('Google did not return an ID token.');
     }
 
+    let identity: ExternalIdentity;
+    try {
+      identity = await this.verifyIdentityToken(idToken, nonce);
+    } catch (error: unknown) {
+      if (error instanceof InvalidGoogleIdentityError) {
+        throw new OAuthCallbackError('Google ID token is invalid.');
+      }
+      throw error;
+    }
+
+    const result = identity;
+    this.logger.log('GoogleOAuthService -> exchangeCode -> return:', {
+      data: { fields: Object.keys(result) },
+    });
+
+    return result;
+  }
+
+  async verifyNativeIdentityToken(
+    identityToken: string,
+  ): Promise<ExternalIdentity> {
+    this.logger.log(
+      'GoogleOAuthService -> verifyNativeIdentityToken -> params:',
+      { params: { identityTokenPresent: identityToken.length > 0 } },
+    );
+    const result = await this.verifyIdentityToken(identityToken);
+    this.logger.log(
+      'GoogleOAuthService -> verifyNativeIdentityToken -> return:',
+      { data: { fields: Object.keys(result) } },
+    );
+    return result;
+  }
+
+  private async verifyIdentityToken(
+    identityToken: string,
+    expectedNonce?: string,
+  ): Promise<ExternalIdentity> {
+    this.logger.log('GoogleOAuthService -> verifyIdentityToken -> params:', {
+      params: {
+        expectedNoncePresent: expectedNonce !== undefined,
+        identityTokenPresent: identityToken.length > 0,
+      },
+    });
+
     let ticket;
     try {
       ticket = await this.client.verifyIdToken({
         audience: this.clientId,
-        idToken,
+        idToken: identityToken,
       });
     } catch (error: unknown) {
       if (this.isKnownIdTokenRejection(error)) {
-        throw new OAuthCallbackError('Google ID token is invalid.');
+        throw new InvalidGoogleIdentityError();
       }
-
       throw error;
     }
     const payload = ticket.getPayload();
 
     this.logger.log(
-      'GoogleOAuthService -> exchangeCode -> idTokenValidated completed:',
+      'GoogleOAuthService -> verifyIdentityToken -> idTokenValidated completed:',
       {
         data: {
           claimNames: payload === undefined ? [] : Object.keys(payload),
@@ -133,17 +177,17 @@ export class GoogleOAuthService {
       !['accounts.google.com', 'https://accounts.google.com'].includes(
         payload.iss ?? '',
       ) ||
-      payload.nonce !== nonce ||
+      (expectedNonce !== undefined && payload.nonce !== expectedNonce) ||
       payload.email_verified !== true ||
       typeof payload.sub !== 'string' ||
       typeof payload.name !== 'string' ||
       typeof payload.email !== 'string'
     ) {
       this.logger.warn(
-        'GoogleOAuthService -> exchangeCode -> invalidClaims error:',
+        'GoogleOAuthService -> verifyIdentityToken -> invalidClaims error:',
         { data: { code: 'GOOGLE_IDENTITY_INVALID' } },
       );
-      throw new OAuthCallbackError('Google identity claims are invalid.');
+      throw new InvalidGoogleIdentityError();
     }
 
     const result = {
@@ -153,7 +197,7 @@ export class GoogleOAuthService {
       photoUrl: typeof payload.picture === 'string' ? payload.picture : null,
     };
 
-    this.logger.log('GoogleOAuthService -> exchangeCode -> return:', {
+    this.logger.log('GoogleOAuthService -> verifyIdentityToken -> return:', {
       data: { fields: Object.keys(result) },
     });
 

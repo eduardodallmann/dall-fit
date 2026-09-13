@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Header,
   HttpCode,
@@ -16,6 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 
 import type {
+  CreateNativeSessionResponse,
   CsrfTokenResponse,
   CurrentPersonResponse,
   UpdateCurrentPersonConfigsResponse,
@@ -35,6 +38,7 @@ import {
   OAUTH_STATE_COOKIE,
 } from '~/auth/auth.constants';
 import { CompleteGoogleLoginCommand } from '~/auth/commands/complete-google-login.command';
+import { CreateNativeSessionCommand } from '~/auth/commands/create-native-session.command';
 import { GetCurrentPersonCommand } from '~/auth/commands/get-current-person.command';
 import { LogoutCommand } from '~/auth/commands/logout.command';
 import { StartGoogleLoginCommand } from '~/auth/commands/start-google-login.command';
@@ -45,10 +49,12 @@ import { AuthenticatedMutation } from '~/auth/decorators/authenticated-mutation'
 import { CurrentPerson } from '~/auth/decorators/current-person';
 import { RateLimited } from '~/auth/decorators/rate-limited';
 import type { AuthenticatedRequest } from '~/auth/domain/auth.types';
+import { CreateNativeSessionDto } from '~/auth/dto/create-native-session.dto';
 import { GoogleCallbackQueryDto } from '~/auth/dto/google-callback-query.dto';
 import { TestLoginDto } from '~/auth/dto/test-login.dto';
 import { UpdateCurrentPersonConfigsDto } from '~/auth/dto/update-current-person-configs.dto';
 import { LogoutCsrfGuard } from '~/auth/guards/logout-csrf.guard';
+import { OptionalNativeSessionGuard } from '~/auth/guards/optional-native-session.guard';
 import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
@@ -64,6 +70,7 @@ export class AuthController {
     configService: ConfigService,
     private readonly startGoogleLoginCommand: StartGoogleLoginCommand,
     private readonly completeGoogleLoginCommand: CompleteGoogleLoginCommand,
+    private readonly createNativeSessionCommand: CreateNativeSessionCommand,
     private readonly logoutCommand: LogoutCommand,
     private readonly testLoginCommand: TestLoginCommand,
     private readonly getCurrentPersonCommand: GetCurrentPersonCommand,
@@ -211,6 +218,48 @@ export class AuthController {
     return result;
   }
 
+  @Post('auth/native/session')
+  @Header('Cache-Control', 'no-store')
+  @RateLimited({
+    bucket: 'native-session',
+    limitConfigKey: 'RATE_LIMIT_NATIVE_SESSION_LIMIT',
+    subject: 'ip',
+    windowConfigKey: 'RATE_LIMIT_NATIVE_SESSION_WINDOW_MS',
+  })
+  @UseGuards(RateLimitGuard)
+  async createNativeSession(
+    @Body() input: CreateNativeSessionDto,
+  ): Promise<CreateNativeSessionResponse> {
+    this.logger.log('AuthController -> createNativeSession -> params:', {
+      params: {
+        fields: Object.keys(input),
+        identityTokenPresent: input.identityToken.length > 0,
+      },
+    });
+    const commandResult = await this.createNativeSessionCommand.execute(
+      input.identityToken,
+    );
+    this.logger.log(
+      'AuthController -> createNativeSession -> createNativeSessionCommand return:',
+      {
+        data: {
+          expiresAt: commandResult.data.expiresAt,
+          personId: commandResult.data.person.id,
+          tokenCreated: commandResult.data.accessToken.length > 0,
+        },
+      },
+    );
+    const result = commandResult;
+    this.logger.log('AuthController -> createNativeSession -> return:', {
+      data: {
+        expiresAt: result.data.expiresAt,
+        personId: result.data.person.id,
+        tokenCreated: true,
+      },
+    });
+    return result;
+  }
+
   @Get('auth/csrf')
   @Header('Cache-Control', 'no-store')
   @RateLimited({
@@ -227,6 +276,17 @@ export class AuthController {
     });
     if (request.currentSession === undefined) {
       throw new Error('Authenticated request did not include its session.');
+    }
+    if (request.currentSession.channel !== 'web') {
+      this.logger.warn(
+        'AuthController -> getCsrfToken -> nativeSession error:',
+        { data: { code: 'CSRF_NOT_AVAILABLE' } },
+      );
+      throw new ForbiddenException({
+        code: 'CSRF_NOT_AVAILABLE',
+        details: {},
+        message: 'CSRF tokens are available only for web sessions.',
+      });
     }
     const result = { data: { token: request.currentSession.csrfToken } };
     this.logger.log('AuthController -> getCsrfToken -> return:', {
@@ -254,6 +314,25 @@ export class AuthController {
     await this.logoutCommand.execute(request.currentSession);
     this.clearSessionCookies(response);
     this.logger.log('AuthController -> logout -> completed:', {
+      data: { status: 204 },
+    });
+  }
+
+  @Delete('auth/native/session')
+  @HttpCode(204)
+  @RateLimited({
+    bucket: 'native-logout',
+    limitConfigKey: 'RATE_LIMIT_SESSION_LIMIT',
+    subject: 'optional-session-ip',
+    windowConfigKey: 'RATE_LIMIT_SESSION_WINDOW_MS',
+  })
+  @UseGuards(OptionalNativeSessionGuard, RateLimitGuard)
+  async logoutNative(@Req() request: AuthenticatedRequest): Promise<void> {
+    this.logger.log('AuthController -> logoutNative -> params:', {
+      params: { activeSession: request.currentSession !== undefined },
+    });
+    await this.logoutCommand.execute(request.currentSession);
+    this.logger.log('AuthController -> logoutNative -> completed:', {
       data: { status: 204 },
     });
   }

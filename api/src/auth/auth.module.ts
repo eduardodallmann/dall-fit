@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
 import { CompleteGoogleLoginCommand } from '~/auth/commands/complete-google-login.command';
+import { CreateNativeSessionCommand } from '~/auth/commands/create-native-session.command';
 import { GetCurrentPersonCommand } from '~/auth/commands/get-current-person.command';
 import { LogoutCommand } from '~/auth/commands/logout.command';
 import { StartGoogleLoginCommand } from '~/auth/commands/start-google-login.command';
@@ -17,6 +18,7 @@ import { AuthController } from '~/auth/controllers/auth.controller';
 import { AdminAuthorizationGuard } from '~/auth/guards/admin-authorization.guard';
 import { CsrfGuard } from '~/auth/guards/csrf.guard';
 import { LogoutCsrfGuard } from '~/auth/guards/logout-csrf.guard';
+import { OptionalNativeSessionGuard } from '~/auth/guards/optional-native-session.guard';
 import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
@@ -42,10 +44,12 @@ import { PersonModule } from '~/person/person.module';
     AdminAuthorizationGuard,
     CsrfGuard,
     CompleteGoogleLoginCommand,
+    CreateNativeSessionCommand,
     GetCurrentPersonCommand,
     GoogleOAuthService,
     LogoutCommand,
     LogoutCsrfGuard,
+    OptionalNativeSessionGuard,
     OptionalSessionGuard,
     OAuthCallbackCookiesMiddleware,
     RateLimitGuard,

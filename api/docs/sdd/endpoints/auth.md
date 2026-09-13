@@ -2,8 +2,9 @@
 
 ## Objetivo funcional
 
-Iniciar e concluir OAuth Google com PKCE, criar sessões revogáveis, entregar o
-segredo anti-CSRF e encerrar a sessão sem expor credenciais ou depender de estado
+Iniciar e concluir OAuth Google com PKCE para a Web, trocar Google ID token por
+Bearer no Android, criar sessões revogáveis isoladas por canal, entregar o segredo
+anti-CSRF Web e encerrar cada sessão sem expor credenciais ou depender de estado
 somente no processo da API.
 
 ## Referências técnicas
@@ -13,12 +14,15 @@ somente no processo da API.
 | Controller | [`AuthController`](../../../src/auth/controllers/auth.controller.ts)                                  | cookies, redirects, status e chamadas dos commands |
 | Command    | [`StartGoogleLoginCommand`](../../../src/auth/commands/start-google-login.command.ts)                 | cria state, nonce, verifier e challenge            |
 | Command    | [`CompleteGoogleLoginCommand`](../../../src/auth/commands/complete-google-login.command.ts)           | valida callback, sincroniza pessoa e cria sessão   |
+| Command    | [`CreateNativeSessionCommand`](../../../src/auth/commands/create-native-session.command.ts)           | valida identidade e cria sessão Bearer             |
 | Command    | [`LogoutCommand`](../../../src/auth/commands/logout.command.ts)                                       | revoga a sessão ativa                              |
 | Service    | [`GoogleOAuthService`](../../../src/auth/services/google-oauth.service.ts)                            | URL Google, troca do código e validação OIDC       |
 | Service    | [`AuthSessionService`](../../../src/auth/services/auth-session.service.ts)                            | JWT técnico, rotação e vínculo ao registro Redis   |
 | Adapter    | [`SessionStoreService`](../../../src/redis/session-store.service.ts)                                  | sessão revogável com TTL absoluto                  |
 | Proteção   | [`RateLimitGuard`](../../../src/auth/guards/rate-limit.guard.ts)                                      | quota distribuída e `Retry-After`                  |
 | Proteção   | [`CsrfGuard`](../../../src/auth/guards/csrf.guard.ts)                                                 | token e Origin exatos                              |
+| Proteção   | [`SessionAuthGuard`](../../../src/auth/guards/session-auth.guard.ts)                                   | resolve cookie ou Bearer sem ambiguidade           |
+| Proteção   | [`OptionalNativeSessionGuard`](../../../src/auth/guards/optional-native-session.guard.ts)              | logout Bearer idempotente                          |
 | Middleware | [`OAuthCallbackCookiesMiddleware`](../../../src/auth/middleware/oauth-callback-cookies.middleware.ts) | limpa cookies antes de guards e pipes              |
 
 ## Contrato HTTP resumido
@@ -58,9 +62,25 @@ preparação da URL.
 - cria a mesma sessão real usada pelo OAuth e responde `204`;
 - limite: 5 chamadas por minuto e IP; fora do contexto responde `404`.
 
+### `POST /auth/native/session`
+
+- público e exclusivo da troca de identidade do aplicativo Android;
+- aceita somente `{ "identityToken": string }`, com JSON estrito;
+- valida o ID token pelo `GoogleOAuthService` para a audience exata do client
+  Web/server configurado, além de assinatura, issuer, expiração, `sub`, nome,
+  e-mail e `email_verified`;
+- cria ou sincroniza a mesma pessoa usada pela Web e emite JWT com audience nativa
+  e registro Redis `channel: native`;
+- responde `201` com `tokenType: Bearer`, `accessToken`, `expiresAt` e `person`,
+  além de `Cache-Control: no-store`, sem criar cookie;
+- identidade inválida responde `401 GOOGLE_IDENTITY_INVALID`; erro técnico do
+  Google ou infraestrutura segue o filtro global;
+- limite: 10 chamadas por 10 minutos e IP, em bucket separado.
+
 ### `GET /auth/csrf`
 
-- exige sessão ativa e pessoa ainda existente;
+- exige sessão Web ativa e pessoa ainda existente; Bearer nativo recebe
+  `403 CSRF_NOT_AVAILABLE`;
 - responde `200 { "data": { "token": "..." } }` e
   `Cache-Control: no-store`;
 - limite: 30 chamadas por minuto e sessão+IP.
@@ -73,13 +93,27 @@ preparação da URL.
   revoga o `jti`, limpa os nomes atual e legado e responde `204`;
 - limite: 30 chamadas por minuto e sessão+IP; sem sessão usa bucket anônimo por IP.
 
+### `DELETE /auth/native/session`
+
+- considera somente `Authorization: Bearer <token>` e nunca usa cookie para revogar
+  a sessão nativa;
+- Bearer nativo ativo tem o `jti` removido do Redis e recebe `204`;
+- header ausente/malformado, JWT inválido/expirado ou sessão já revogada também
+  recebe `204`, sem body, cookie ou indicação de existência;
+- falha Redis ao verificar ou remover sessão potencialmente ativa responde
+  `503 AUTHENTICATION_UNAVAILABLE`;
+- limite: 30 chamadas por minuto e sessão+IP; sem sessão usa bucket anônimo por IP.
+
 ## Sessão e cookies
 
-O JWT usa HS256 e exige `sub`, `jti`, `iss`, `aud`, `iat`, `exp` e `kid`. O `kid`
+O JWT usa HS256 e exige `sub`, `jti`, `iss`, `aud`, `iat`, `exp` e `kid`. A Web usa
+`AUTH_SESSION_AUDIENCE` e o Android usa `AUTH_NATIVE_SESSION_AUDIENCE`; ambos
+compartilham chave, issuer e duração, mas não são intercambiáveis. O `kid`
 seleciona somente a chave ativa ou a anterior dentro da janela configurada; chave
 desconhecida, algoritmo diferente ou claim inválida recebe `401`. A validade
 absoluta máxima é sete dias e não há renovação deslizante. Redis guarda apenas
-personId, CSRF e expiração sob o `jti`; o JWT bruto nunca é persistido.
+canal, personId, CSRF e expiração sob o `jti`; o JWT bruto nunca é persistido.
+Registro legado sem canal é inválido e exige novo login.
 
 Local/teste usa `dall_fit_session`, `HttpOnly`, path `/`, `SameSite=Lax` e sem
 `Secure`. Produção/preview usa `__Host-dall_fit_session`, `HttpOnly`, `Secure`,
@@ -114,6 +148,14 @@ partir do token.
    ou registro ausente produz `401 AUTHENTICATION_REQUIRED`.
 8. Mutações executam sessão, rate limit e CSRF antes do controller. Preflight
    CORS é atendido antes dos guards e não consome quota.
+9. Na troca nativa, o controller valida o DTO e chama
+   `CreateNativeSessionCommand`. O command chama validação Google,
+   `FindOrCreatePersonService` e emissão `native` nessa ordem, monta a response e
+   nunca entrega cookie ou token CSRF.
+10. `SessionAuthGuard` rejeita cookie e Bearer simultâneos com
+    `400 AUTH_TRANSPORT_AMBIGUOUS`; um único transporte precisa coincidir com a
+    audience JWT e o canal Redis. `CsrfGuard` dispensa CSRF somente depois de uma
+    sessão `native` integralmente validada.
 
 ## Uso operacional do Redis
 
@@ -129,10 +171,12 @@ Máximo de comandos Redis por request no caminho atual:
 | -------------------------------- | ---------------------------: |
 | início Google                    |                     1 `EVAL` |
 | callback/test-login bem-sucedido |           1 `EVAL` + 1 `SET` |
+| troca nativa bem-sucedida        |           1 `EVAL` + 1 `SET` |
 | leitura autenticada              |                      1 `GET` |
 | CSRF                             |           1 `GET` + 1 `EVAL` |
 | mutação autenticada/admin        |           1 `GET` + 1 `EVAL` |
 | logout com sessão                | 1 `GET` + 1 `EVAL` + 1 `DEL` |
+| logout nativo com sessão         | 1 `GET` + 1 `EVAL` + 1 `DEL` |
 
 Os limites por usuário protegem abuso, mas não representam a quota global do
 provedor. Com teto atual de 100 ops/s, o acompanhamento deve considerar a soma de
@@ -155,6 +199,11 @@ ou contador silenciosamente.
 | Redis indisponível/saturado        | erro técnico sanitizado                   | proteção permanece ativa, sem fallback            |
 | logout válido                      | `204`                                     | sessão removida e cookies limpos                  |
 | logout sem sessão                  | `204`                                     | cookies limpos                                    |
+| identidade Google nativa válida    | `201` + Bearer                            | pessoa sincronizada e sessão nativa criada        |
+| identidade Google nativa inválida  | `401 GOOGLE_IDENTITY_INVALID`             | nenhum estado criado                              |
+| Bearer nativo ativo                | endpoint privado continua                 | Redis e pessoa relidos                            |
+| cookie e Bearer simultâneos        | `400 AUTH_TRANSPORT_AMBIGUOUS`            | nenhum domínio executado                          |
+| logout nativo ativo ou inativo     | `204`                                     | sessão ativa removida quando existir              |
 
 ## Cenários detalhados
 
@@ -257,11 +306,92 @@ curl --include --request GET \
 - Then: recebe `500 INTERNAL_SERVER_ERROR`, sem `Location` e sem novo cookie de
   sessão, mas com os três cookies temporários expirados
 
+### Cenário 7 — Google ID token nativo inválido
+
+**Seed:** não se aplica — a validação da identidade termina antes de MongoDB ou da
+criação da sessão Redis.
+
+```bash
+curl --include --request POST \
+  --url http://localhost:4000/auth/native/session \
+  --header 'content-type: application/json' \
+  --data '{"identityToken":"invalid-local-google-id-token"}'
+```
+
+- Given: o token não é um ID token assinado pelo Google para o client Web/server
+- When: solicita a troca nativa
+- Then: recebe `401 GOOGLE_IDENTITY_INVALID`, sem cookie, pessoa ou sessão
+
+O caminho válido depende de uma identidade emitida pelo Google e é coberto pelo E2E
+com double no limite do provider. Tokens reais nunca são incorporados a seed,
+fixture ou documentação.
+
+### Cenário 8 — Bearer nativo em endpoint protegido
+
+**Seed**
+
+```bash
+pnpm -C api seed -- auth:native-session
+```
+
+```bash
+curl --include --request GET \
+  --url http://localhost:4000/auth/me \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)"
+```
+
+- Given: pessoa e sessão nativa fictícias foram criadas no MongoDB e Redis locais
+- When: o Bearer acessa uma leitura protegida
+- Then: recebe `200` com a pessoa pública e nenhum cookie é necessário
+
+### Cenário 9 — Transportes simultâneos
+
+**Seed**
+
+```bash
+pnpm -C api seed -- auth:native-session
+```
+
+```bash
+curl --include --request GET \
+  --url http://localhost:4000/auth/me \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'cookie: dall_fit_session=ambiguous-local-cookie'
+```
+
+- Given: a request contém cookie e Bearer, independentemente da validade individual
+- When: acessa um endpoint protegido compartilhado
+- Then: recebe `400 AUTH_TRANSPORT_AMBIGUOUS` antes de validar uma identidade
+
+### Cenário 10 — Logout nativo idempotente
+
+**Seed**
+
+```bash
+pnpm -C api seed -- auth:native-session
+```
+
+```bash
+curl --include --request DELETE \
+  --url http://localhost:4000/auth/native/session \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+&& curl --include --request DELETE \
+  --url http://localhost:4000/auth/native/session \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)"
+```
+
+- Given: a primeira chamada recebe Bearer ativo e a segunda recebe o mesmo Bearer
+  já revogado
+- When: o logout nativo é repetido
+- Then: ambas respondem `204`, sem body ou cookie; acessos posteriores recebem
+  `401 AUTHENTICATION_REQUIRED`
+
 ## Cobertura automatizada
 
-- unitários: PKCE, classificação allowlist de falhas Google, rotação/claims JWT,
-  limpeza de cookies e guards;
-- E2E serial com MongoDB e Redis efêmeros reais: sessão, CSRF, logout, reset,
-  rate limit, CORS e preflight em `api/test/auth.e2e-spec.ts`;
+- unitários: PKCE, validação nativa Google, classificação de falhas, audiences e
+  canais JWT/Redis, rotação, limpeza de cookies, resolução de transporte e guards;
+- E2E serial com MongoDB e Redis efêmeros reais: sessões Web e nativa, CSRF por
+  canal, ambiguidade, logouts, reset, rate limit, CORS e preflight em
+  `api/test/auth.e2e-spec.ts`;
 - Playwright cobre somente a jornada da UI; o consentimento Google real permanece
   manual porque exige serviço e conta externos.

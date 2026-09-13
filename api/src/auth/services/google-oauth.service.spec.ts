@@ -1,6 +1,8 @@
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { InvalidGoogleIdentityError } from '~/auth/errors/invalid-google-identity.error';
 import { OAuthCallbackError } from '~/auth/errors/oauth-callback.error';
 import { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 
@@ -94,6 +96,41 @@ describe('GoogleOAuthService', () => {
       code: 'one-time-code',
       codeVerifier: 'code-verifier',
     });
+  });
+
+  it('validates a native identity token without requiring a nonce', async () => {
+    oauthClient.verifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        email: 'native.runner@example.test',
+        email_verified: true,
+        iss: 'accounts.google.com',
+        name: 'Native Runner',
+        sub: 'google-native-001',
+      }),
+    });
+
+    await expect(
+      service.verifyNativeIdentityToken('native-google-token'),
+    ).resolves.toMatchObject({ googleSubject: 'google-native-001' });
+    expect(oauthClient.verifyIdToken).toHaveBeenCalledWith({
+      audience: 'fake-client.apps.googleusercontent.com',
+      idToken: 'native-google-token',
+    });
+  });
+
+  it('classifies native token verification rejection without exposing SDK details', async () => {
+    const logSpy = vi.spyOn(Logger.prototype, 'log');
+    oauthClient.verifyIdToken.mockRejectedValue(
+      new Error('Wrong recipient: another-client'),
+    );
+
+    await expect(
+      service.verifyNativeIdentityToken('native-google-token'),
+    ).rejects.toBeInstanceOf(InvalidGoogleIdentityError);
+    const logged = JSON.stringify(logSpy.mock.calls);
+    expect(logged).not.toContain('native-google-token');
+    expect(logged).not.toContain('another-client');
+    logSpy.mockRestore();
   });
 
   it('rejects a response without an ID token', async () => {

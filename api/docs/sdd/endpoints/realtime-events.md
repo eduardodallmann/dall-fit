@@ -22,7 +22,9 @@ suas chaves públicas usam `catalogEntryId`, não o ID global do evento.
 
 ## Contrato HTTP resumido
 
-- `GET /realtime/events?clientInstanceId=<uuid>` com cookie de sessão;
+- `GET /realtime/events?clientInstanceId=<uuid>` com cookie Web ou
+  `Authorization: Bearer` nativo, exclusivamente; os dois juntos retornam `400
+  AUTH_TRANSPORT_AMBIGUOUS`;
 - qualquer sessão abre o stream; eventos `global-training-plan` são transmitidos para todas as sessões autenticadas, demais eventos de audiência admin exigem `isAdmin: true`;
 - 30 novas conexões/minuto por sessão e IP;
 - sucesso `200 text/event-stream`, retry 3 s, heartbeat 20 s, duração até 270 s;
@@ -46,7 +48,8 @@ não executa comandos normais; JSON inválido é ignorado. Não há command/repo
 | Feliz        | sessão, quota e UUID válidos | stream `200`  | listener temporário |
 | Origem       | mesmo UUID                   | stream aberto | evento suprimido    |
 | Reconexão    | rede/runtime/duração         | novo stream   | novo ready          |
-| Autenticação | cookie inválido              | `401`         | nenhum listener     |
+| Autenticação | transporte ausente/inválido  | `401`         | nenhum listener     |
+| Ambiguidade  | cookie e Bearer juntos        | `400`         | nenhum listener     |
 | Quota        | excesso                      | `429`         | nenhum listener     |
 | Validação    | UUID inválido                | `400`         | nenhum listener     |
 

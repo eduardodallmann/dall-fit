@@ -17,11 +17,15 @@ export interface AuthenticatedRequest {
 }
 
 export interface SessionCookieResult {
+  expiresAt: number;
   maxAgeMs: number;
   token: string;
 }
 
+export type SessionChannel = 'native' | 'web';
+
 export interface VerifiedSession {
+  channel: SessionChannel;
   csrfToken: string;
   expiresAt: number;
   jti: string;

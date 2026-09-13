@@ -17,9 +17,12 @@ embutidos. O caminho interno é sempre controller → command proprietário →
 | persistência | `MongoTrainingPlanRepository`, schemas discriminados                    |
 | contratos    | `@dall-fit/types`                                                       |
 
-Todas exigem sessão ativa e `isAdmin: true`. Mutações exigem origem/CSRF e quota:
-30/minuto nas operações administrativas existentes, 120/minuto nas mutations JSON
-do editor e 10/minuto no upload. Plano pessoal é indistinguível de ausente.
+Todas exigem sessão ativa e `isAdmin: true`, recebida exclusivamente por cookie Web
+ou `Authorization: Bearer` nativo. Enviar os dois transportes retorna `400
+AUTH_TRANSPORT_AMBIGUOUS`. Mutações Web exigem origem/CSRF; mutações nativas já
+autenticadas dispensam CSRF. A quota é 30/minuto nas operações administrativas
+existentes, 120/minuto nas mutations JSON do editor e 10/minuto no upload. Plano
+pessoal é indistinguível de ausente.
 
 ## Concorrência HTTP
 

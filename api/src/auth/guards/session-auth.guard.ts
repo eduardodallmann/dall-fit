@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -7,10 +8,12 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Request } from 'express';
 
 import { getAuthSessionCookieName } from '~/auth/auth.constants';
 import type {
   AuthenticatedRequest,
+  SessionChannel,
   VerifiedSession,
 } from '~/auth/domain/auth.types';
 import { InvalidSessionError } from '~/auth/errors/invalid-session.error';
@@ -34,17 +37,37 @@ export class SessionAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const token = request.cookies?.[this.cookieName];
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & AuthenticatedRequest>();
+    const rawCookieToken: unknown = request.cookies?.[this.cookieName];
+    const cookieToken =
+      typeof rawCookieToken === 'string' ? rawCookieToken : undefined;
+    const authorization = request.get('authorization');
 
     this.logger.log('SessionAuthGuard -> canActivate -> params:', {
       params: {
-        cookiePresent: typeof token === 'string',
+        authorizationPresent: typeof authorization === 'string',
+        cookiePresent: typeof cookieToken === 'string',
         path: request.originalUrl,
       },
     });
 
-    if (typeof token !== 'string') {
+    const bearerPresent = /^Bearer ([^\s]+)$/.test(authorization ?? '');
+    if (typeof cookieToken === 'string' && bearerPresent) {
+      this.logger.warn(
+        'SessionAuthGuard -> canActivate -> ambiguousTransport error:',
+        { data: { code: 'AUTH_TRANSPORT_AMBIGUOUS' } },
+      );
+      throw new BadRequestException({
+        code: 'AUTH_TRANSPORT_AMBIGUOUS',
+        details: {},
+        message: 'Multiple authentication transports are not allowed.',
+      });
+    }
+
+    const resolved = this.resolveTransport(cookieToken, authorization);
+    if (resolved === null) {
       this.logger.warn(
         'SessionAuthGuard -> canActivate -> missingSession error:',
         { data: { code: 'AUTHENTICATION_REQUIRED' } },
@@ -54,7 +77,10 @@ export class SessionAuthGuard implements CanActivate {
 
     let session: VerifiedSession;
     try {
-      session = await this.authSessionService.verifySession(token);
+      session = await this.authSessionService.verifySession(
+        resolved.token,
+        resolved.channel,
+      );
     } catch (error: unknown) {
       if (error instanceof RedisUnavailableError) {
         throw new ServiceUnavailableException({
@@ -101,6 +127,41 @@ export class SessionAuthGuard implements CanActivate {
       data: { authenticated: result, personId },
     });
 
+    return result;
+  }
+
+  private resolveTransport(
+    cookieToken: string | undefined,
+    authorization: string | undefined,
+  ): { channel: SessionChannel; token: string } | null {
+    this.logger.log('SessionAuthGuard -> resolveTransport -> params:', {
+      params: {
+        authorizationPresent: authorization !== undefined,
+        cookiePresent: cookieToken !== undefined,
+      },
+    });
+
+    const match = /^Bearer ([^\s]+)$/.exec(authorization ?? '');
+    if (match?.[1] !== undefined) {
+      const result = { channel: 'native' as const, token: match[1] };
+      this.logger.log('SessionAuthGuard -> resolveTransport -> return:', {
+        data: { channel: result.channel, resolved: true },
+      });
+      return result;
+    }
+
+    if (authorization === undefined && cookieToken !== undefined) {
+      const result = { channel: 'web' as const, token: cookieToken };
+      this.logger.log('SessionAuthGuard -> resolveTransport -> return:', {
+        data: { channel: result.channel, resolved: true },
+      });
+      return result;
+    }
+
+    const result = null;
+    this.logger.log('SessionAuthGuard -> resolveTransport -> return:', {
+      data: { resolved: false },
+    });
     return result;
   }
 

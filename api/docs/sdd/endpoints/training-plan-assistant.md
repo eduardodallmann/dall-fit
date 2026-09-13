@@ -34,7 +34,9 @@ plano sem preview, validação local e confirmação explícita.
 | `POST .../confirm`                        | versão e `Idempotency-Key`                     | `201` ou replay `200`                          |
 | `DELETE /training-plan-assistant/session` | nenhuma                                        | `204`                                          |
 
-Todos exigem sessão. Mutações exigem origem e CSRF; mensagens, drafts e
+Todos exigem exclusivamente cookie Web ou `Authorization: Bearer` nativo; os dois
+juntos retornam `400 AUTH_TRANSPORT_AMBIGUOUS`. Mutações Web exigem origem e CSRF,
+enquanto sessões nativas verificadas dispensam ambos; mensagens, drafts e
 confirmações também recebem limites próprios por pessoa+IP de 40/5/5 em dez
 minutos. O identificador da pessoa sempre vem da sessão. Mensagem aceita até 1.000
 caracteres e 40 turnos da pessoa. `clientMessageId` e `Idempotency-Key` são UUIDs;
