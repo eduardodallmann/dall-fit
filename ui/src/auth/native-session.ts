@@ -27,6 +27,7 @@ export interface NativeCredentialPort {
 }
 
 export interface NativeLocalDataPort {
+  bindAccount(personId: string): Promise<void>;
   clearAccountDataAtomically(): Promise<void>;
   hasPendingChanges(): Promise<boolean>;
 }
@@ -86,6 +87,7 @@ export class NativeSessionCoordinator {
       await this.credentials.clearEnvelope();
       return;
     }
+    await this.localData.bindAccount(accountPersonId);
     this.envelope = envelope;
   }
 
@@ -151,6 +153,7 @@ export class NativeSessionCoordinator {
         this.envelope = undefined;
         previousAccountCleared = true;
       }
+      await this.localData.bindAccount(createdSession.person.id);
 
       const envelope: NativeSessionEnvelope = {
         accessToken: createdSession.accessToken,
@@ -164,6 +167,9 @@ export class NativeSessionCoordinator {
       } catch (error: unknown) {
         if (previousEnvelope === undefined || previousAccountCleared) {
           await this.credentials.clearEnvelope().catch(() => undefined);
+          await this.localData
+            .clearAccountDataAtomically()
+            .catch(() => undefined);
         } else {
           await this.credentials
             .writeEnvelope(previousEnvelope)

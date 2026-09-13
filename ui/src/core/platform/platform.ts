@@ -5,6 +5,7 @@ export type ApplicationPlatform = 'android' | 'web';
 export interface PlatformCapabilities {
   readonly nativeAuthentication: boolean;
   readonly nativeBridge: boolean;
+  readonly nativeOfflineStorage: boolean;
 }
 
 export interface PlatformSnapshot {
@@ -37,6 +38,7 @@ export function createPlatformSnapshot(
   const capabilities = Object.freeze({
     nativeAuthentication: platform === 'android' && nativeBridge,
     nativeBridge,
+    nativeOfflineStorage: platform === 'android' && nativeBridge,
   });
   return Object.freeze({ capabilities, platform });
 }

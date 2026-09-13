@@ -55,6 +55,7 @@ pnpm android:sync
 pnpm android:open
 pnpm android:run
 pnpm android:build:debug
+pnpm android:test
 ```
 
 O login nativo exige `VITE_GOOGLE_SERVER_CLIENT_ID`, valor público do client OAuth
@@ -68,8 +69,9 @@ entre dispositivos pelas regras versionadas do projeto Android.
 `android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
 Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
 debug em `ui/android/app/build/outputs/apk/debug/`. `android:open` exige Android
-Studio, mas não altera o bundle. Nenhum desses caminhos assina release ou exige
-segredo.
+Studio, mas não altera o bundle. `android:test` sincroniza o bundle e executa os
+testes instrumentados em dispositivo ou emulador conectado. Nenhum desses caminhos
+assina release ou exige segredo.
 
 MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
 `redis-memory-server`, sem Docker. O MongoDB usa `wiredTiger` e conserva seus dados
@@ -96,6 +98,7 @@ Todos os quality gates são iniciados na raiz:
 | `pnpm android:open`     | Abre o projeto nativo versionado no Android Studio                     |
 | `pnpm android:run`      | Prepara e executa o aplicativo em dispositivo ou emulador             |
 | `pnpm android:build:debug` | Prepara e compila o APK debug com o Gradle Wrapper                  |
+| `pnpm android:test`     | Sincroniza e executa testes Android instrumentados conectados         |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint          |
 | `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos                        |
@@ -288,3 +291,52 @@ Source: https://sonarcloud.io/project/issues?organization=dall-fit&project=dall-
 
 - Nunca expor `SONAR_TOKEN` em prompts ou contextos compartilhados.
 - O token é de leitura e já está no `.env` local.
+
+## Agendamento de tarefas de IA em ambiente Ubuntu
+
+Algumas CLIs de IA, como o Codex, impõem janelas de limite de uso (por exemplo,
+5 horas). Quando uma tarefa de implementação ou escrita precisa aguardar o reset
+desse limite, ela pode ser agendada como um timer transitório do systemd em vez de
+manter o desenvolvedor esperando com o terminal aberto.
+
+Em máquinas Ubuntu com a CLI do Codex instalada, `systemd-run --user` cria um timer
+que dispara `codex exec` no horário definido, dentro do diretório do repositório e
+com uma instrução textual da tarefa:
+
+```bash
+systemd-run --user \
+  --unit=codex-dall-fit-feature-81-20260913 \
+  --description='Codex: implementar FIT-81 do dall-fit' \
+  --on-calendar='2026-09-13 03:05:00 America/Sao_Paulo' \
+  --timer-property=Persistent=false \
+  --collect \
+  --working-directory=/home/dallmann/Estudando/dall-fit \
+  /home/dallmann/.local/bin/codex exec \
+  --approve-for-me \
+  -C /home/dallmann/Estudando/dall-fit \
+  'Implemente integralmente a FIT-81 conforme docs/sdd/features/fit-0081-login-isolamento-conta-android.md. Siga os AGENTS.md, preserve alterações existentes, execute os testes cabíveis e não faça commit nem push.'
+```
+
+- `--unit` e `--description` identificam o agendamento nos logs e no
+  `systemctl --user list-timers`;
+- `--on-calendar` aceita data, hora e fuso horário explícitos;
+- `--timer-property=Persistent=false` evita disparo retroativo caso a máquina
+  esteja desligada no horário agendado;
+- `--collect` remove a unidade transitória automaticamente após a execução;
+- `--working-directory` e o `-C` do Codex devem apontar para o mesmo repositório.
+
+A parte essencial, reaproveitável fora de um agendamento, é:
+
+```bash
+codex exec --approve-for-me -C /caminho/do/projeto 'instrução'
+```
+
+`--approve-for-me` e `--sandbox workspace-write` são mutuamente incompatíveis na
+versão da CLI validada; não combinar as duas flags. A sintaxe foi confirmada por
+`codex exec --help` instalado na máquina; a documentação oficial da OpenAI cobre
+automações em nível de fluxo, mas não essa flag específica, então o `--help` local
+prevalece como fonte de verdade da CLI instalada.
+
+A instrução textual enviada ao Codex deve referenciar a feature ou o bugfix a
+implementar e reforçar as regras deste `AGENTS.md`, incluindo a ausência de commit
+ou push automático quando a validação humana ainda for necessária.

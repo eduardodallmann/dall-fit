@@ -79,7 +79,12 @@ function createHarness(options: {
     order.push('clear-data');
     return Promise.resolve();
   });
+  const bindAccount = vi.fn(() => {
+    order.push('bind-account');
+    return Promise.resolve();
+  });
   const localData: NativeLocalDataPort = {
+    bindAccount,
     clearAccountDataAtomically,
     hasPendingChanges: vi.fn(() => Promise.resolve(true)),
   };
@@ -109,7 +114,7 @@ function createHarness(options: {
       writeEnvelope,
     },
     google: { signIn, signOut },
-    localData: { clearAccountDataAtomically },
+    localData: { bindAccount, clearAccountDataAtomically },
     order,
   };
 }
@@ -128,6 +133,7 @@ describe('NativeSessionCoordinator', () => {
       status: 'authenticated',
     });
     expect(harness.localData.clearAccountDataAtomically).not.toHaveBeenCalled();
+    expect(harness.localData.bindAccount).toHaveBeenCalledWith(personA.id);
     expect(harness.api.createSession).toHaveBeenCalledWith(
       'temporary-google-token',
     );
@@ -144,6 +150,7 @@ describe('NativeSessionCoordinator', () => {
     expect(harness.order).toEqual([
       'clear-data',
       'clear-account',
+      'bind-account',
       'write-envelope',
       'write-person',
     ]);
@@ -202,6 +209,7 @@ describe('NativeSessionCoordinator', () => {
     harness.google.signOut.mockRejectedValueOnce(new Error('provider failed'));
     await harness.coordinator.initialize();
 
+    expect(harness.localData.bindAccount).toHaveBeenCalledWith(personA.id);
     await expect(harness.coordinator.logout()).resolves.toBeUndefined();
     expect(harness.localData.clearAccountDataAtomically).toHaveBeenCalledOnce();
     expect(harness.credentials.clearAccount).toHaveBeenCalledOnce();

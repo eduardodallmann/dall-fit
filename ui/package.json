@@ -8,6 +8,7 @@
     "android:open": "cap open android",
     "android:run": "pnpm android:sync && cap run android",
     "android:sync": "pnpm build && cap sync android",
+    "android:test": "pnpm android:sync && ./android/gradlew -p android connectedDebugAndroidTest",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "capture:sdd": "playwright test --config playwright.sdd-screenshots.config.ts",

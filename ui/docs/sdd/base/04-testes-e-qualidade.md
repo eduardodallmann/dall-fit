@@ -150,6 +150,15 @@ cookie/CSRF, diálogo destrutivo e regras de backup para API 29/30 e 31+. Creden
 Manager, Keystore, backup/restore e reinstalação reais continuam validações manuais
 em emulador ou aparelho.
 
+O motor offline acrescenta Vitest para o adapter da bridge, vínculo de conta,
+pendências e limpeza, além de testes instrumentados Java com SQLite e filesystem
+reais. A matriz nativa cobre round-trip de payload opaco, revisão regressiva e
+idempotente, transação composta de snapshot, disputa entre threads, lifecycle de
+arquivo temporário, limpeza repetida, rollback de migration e reset silencioso de
+banco incompatível. Testes de configuração protegem registro antecipado do plugin,
+ausência de permissões de armazenamento e exclusões de backup. Como eventos são
+best-effort, consumidores reparam ausência ou atraso consultando `getState`.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.
@@ -176,7 +185,13 @@ pnpm -C ui test:coverage
 pnpm -C ui test:coverage:ci
 pnpm -C ui typecheck
 pnpm test:pwa-update
+pnpm android:test
 ```
+
+`pnpm android:test` exige dispositivo ou emulador API 29+ conectado e uma JDK
+compatível com o projeto. O comando sincroniza o bundle antes de executar
+`connectedDebugAndroidTest`; ele permanece fora dos gates web e do CI enquanto a
+infraestrutura Android não for adotada.
 
 Os gates completos são executados na raiz. Não excluir código testável apenas para
 melhorar a métrica de cobertura e não criar testes sem comportamento relevante
