@@ -10,27 +10,32 @@ const uiDirectory = path.resolve(
 );
 const workspaceDirectory = path.dirname(uiDirectory);
 const eslint = new ESLint({ cwd: workspaceDirectory });
-const source =
-  "import { Capacitor } from '@capacitor/core';\nvoid Capacitor;\n";
+const restrictedSources = [
+  "import { Capacitor } from '@capacitor/core';\nvoid Capacitor;\n",
+  "import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';\nvoid GoogleSignIn;\n",
+  "import { SecureStorage } from '@aparajita/capacitor-secure-storage';\nvoid SecureStorage;\n",
+];
 
-const [outsideBoundary] = await eslint.lintText(source, {
-  filePath: path.join(uiDirectory, 'src/app.tsx'),
-});
-assert.ok(
-  outsideBoundary.messages.some(
-    ({ ruleId }) => ruleId === 'no-restricted-imports',
-  ),
-);
+for (const source of restrictedSources) {
+  const [outsideBoundary] = await eslint.lintText(source, {
+    filePath: path.join(uiDirectory, 'src/app.tsx'),
+  });
+  assert.ok(
+    outsideBoundary.messages.some(
+      ({ ruleId }) => ruleId === 'no-restricted-imports',
+    ),
+  );
 
-const [insideBoundary] = await eslint.lintText(source, {
-  filePath: path.join(
-    uiDirectory,
-    'src/core/platform/native/capacitor-platform-adapter.ts',
-  ),
-});
-assert.equal(
-  insideBoundary.messages.filter(
-    ({ ruleId }) => ruleId === 'no-restricted-imports',
-  ).length,
-  0,
-);
+  const [insideBoundary] = await eslint.lintText(source, {
+    filePath: path.join(
+      uiDirectory,
+      'src/core/platform/native/capacitor-platform-adapter.ts',
+    ),
+  });
+  assert.equal(
+    insideBoundary.messages.filter(
+      ({ ruleId }) => ruleId === 'no-restricted-imports',
+    ).length,
+    0,
+  );
+}

@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
 import {
+  createNativeSession,
   ensureCsrfToken,
   getCurrentPerson,
   getGoogleLoginUrl,
@@ -54,5 +55,16 @@ describe('authService', () => {
     await expect(
       getCurrentPerson('authenticated', controller.signal),
     ).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+  });
+
+  it('exchanges only the native Google identity token through MSW', async () => {
+    await expect(
+      createNativeSession('fixture-google-id-token'),
+    ).resolves.toMatchObject({
+      data: {
+        person: authenticatedPersonFixture,
+        tokenType: 'Bearer',
+      },
+    });
   });
 });

@@ -4,7 +4,8 @@
 
 - Problema resolvido: oferecer uma entrada pública para autenticação.
 - Ator: qualquer visitante, com ou sem sessão.
-- Resultado esperado: apresentar o Dall Fit e iniciar o login Google.
+- Resultado esperado: apresentar o Dall Fit e iniciar o login Google pelo OAuth
+  top-level na Web/PWA ou pelo Credential Manager no Android.
 - Fluxos relacionados: `../../../../docs/sdd/flows/login-google.md`.
 
 ## Entradas e pré-condições
@@ -24,6 +25,10 @@ ou por `/dash` sem renderizar a entrada pública. Um bypass one-shot permite que
 navegação terminal (logout, expiração) volte à raiz e renderize a entrada pública sem novo
 probe. Consulte `../../../../api/docs/sdd/endpoints/auth.md` e
 `../../../../docs/sdd/flows/login-google.md`.
+
+No Android, o bootstrap lê uma vez o envelope seguro. Quando ele existe e não está
+evidentemente expirado, o mesmo probe usa Bearer; sem envelope, a rota permanece
+pública. Cookie Web e CSRF não participam desse canal.
 
 ## Elementos e conteúdo
 
@@ -48,7 +53,10 @@ preferência atualizam a rota sem escrever no armazenamento.
    substitui a URL pelo destino pendente válido ou por `/dash`.
 3. Com sessão inválida, a entrada pública é renderizada.
 4. O visitante aciona `Entrar com Google`.
-5. O browser navega o documento para `GET ${VITE_API_URL}/auth/google`.
+5. Na Web/PWA, o browser navega o documento para
+   `GET ${VITE_API_URL}/auth/google`; no Android, o gesto abre o Credential Manager,
+   envia somente o ID token a `POST /auth/native/session` e confirma a pessoa
+   devolvida pela API antes de navegar com replace para `/dash`.
 
 Resultado esperado: a API inicia o fluxo OAuth.
 
@@ -98,6 +106,14 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Resultado: login e navegação continuam disponíveis; nenhum valor inferido do
   sistema é persistido.
 
+### Alternativa 6 — Login Android cancelado ou indisponível
+
+- Cancelamento fecha o seletor, não mostra erro e reabilita a ação.
+- Falha Google, de configuração ou da troca HTTP mostra somente
+  `Não foi possível entrar. Tente novamente.`, sem token ou detalhe técnico.
+- Ativações concorrentes ficam bloqueadas pelo estado pending; não existe prompt
+  automático no mount, retorno de background ou probe.
+
 ## Validações
 
 Não há formulário. A intenção de navegação é revalidada conforme
@@ -136,6 +152,11 @@ destinos inválidos ou expirados não são usados.
 - Retry, timeout e idempotência: sem retry automático; nova ativação cria novo
   state/nonce.
 
+No Android, a integração usa `POST /auth/native/session` com body estrito
+`{ identityToken }`. A response precisa ser Bearer e sua `person.id` define o
+vínculo. O ID token é descartado ao terminar a request e o Bearer é persistido
+somente no secure storage nativo.
+
 ## Navegação
 
 - Entrada: direta ou redirect.
@@ -150,6 +171,7 @@ destinos inválidos ou expirados não são usados.
 ## Acessibilidade e interação
 
 - o botão possui nome acessível `Entrar com Google` e foco visível;
+- no Android, pending impede duplo acionamento sem retirar o nome acessível;
 - acionamento por teclado executa a mesma navegação;
 - o alerta usa o componente semântico HeroUI e texto independente de cor.
 - o caminho normal da atualização não move foco nem cria anúncio; o aviso de falha
@@ -268,6 +290,22 @@ destinos inválidos ou expirados não são usados.
 - And: com intenção inválida ou expirada usa `/dash`; falha OAuth sem sessão
   preserva a intenção ainda válida para nova tentativa.
 
+### Cenário 9 — Login nativo por ação explícita
+
+- Link para testar: não se aplica — exige APK com Credential Manager e cadastro
+  OAuth Android autorizado.
+- Given: o aplicativo Android está sem envelope válido.
+- When: a pessoa aciona `Entrar com Google` e escolhe uma conta.
+- Then: somente o ID token é trocado, a identidade vem da API, o envelope fica no
+  Keystore e `/dash` usa Bearer sem CSRF.
+
+### Cenário 10 — Cancelamento nativo recuperável
+
+- Link para testar: não se aplica — exige interação com Credential Manager.
+- Given: o seletor foi aberto por gesto explícito.
+- When: a pessoa cancela.
+- Then: permanece na entrada, sem alerta, persistência parcial ou ação bloqueada.
+
 ## Estrutura técnica relevante
 
 - Arquivo da rota: `src/routes/routes.tsx` (homeRoute `beforeLoad`, `validateSearch`,
@@ -283,14 +321,15 @@ destinos inválidos ou expirados não são usados.
 - Infraestrutura core: `ThemeProvider`, `theme-storage`,
   `ApplicationErrorBoundary` e `ApplicationFallback`
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
-- Hooks e serviços: `getGoogleLoginUrl`, sem mutation ou contrato JSON
+- Hooks e serviços: `getGoogleLoginUrl`, `NativeSessionCoordinator`, Google Sign-In
+  e secure storage injetados por ports
 - Tipos compartilhados: nenhum para iniciar OAuth
 
 ## Cobertura automatizada
 
 | Regra ou cenário de negócio   | Vitest                                | Playwright   |
 | ----------------------------- | ------------------------------------- | ------------ |
-| conteúdo e destino do login   | componente home                       | rota root    |
+| conteúdo e destino do login   | componente home e coordenador nativo  | rota root    |
 | alerta de callback            | componente home                       | rota root    |
 | avanço até `/dash` mockado    | não se aplica                         | flow login   |
 | update silencioso e falha     | provider, lifecycle e componente PWA  | isolado real |

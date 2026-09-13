@@ -57,6 +57,13 @@ pnpm android:run
 pnpm android:build:debug
 ```
 
+O login nativo exige `VITE_GOOGLE_SERVER_CLIENT_ID`, valor público do client OAuth
+Web/server cuja audience também é validada pela API. O cadastro OAuth Android no
+Google Cloud usa `com.dallfit.app` e as impressões SHA das assinaturas autorizadas;
+nenhum client secret ou `google-services.json` pertence ao repositório. Sessão,
+UUID e dados privados são excluídos tanto de Auto Backup quanto de transferência
+entre dispositivos pelas regras versionadas do projeto Android.
+
 `android:sync` sempre executa o build Vite antes de `cap sync android`.
 `android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
 Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de

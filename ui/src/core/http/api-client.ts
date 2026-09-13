@@ -7,6 +7,11 @@ import {
   getCsrfToken,
   refreshCsrfToken,
 } from '~/auth/csrf-token';
+import {
+  getNativeAccessToken,
+  getSessionChannel,
+  handleNativeUnauthorized,
+} from '~/auth/session-channel';
 import { endSession, getActiveSessionSignal } from '~/auth/session-lifecycle';
 import { getApiErrorCode } from '~/core/http/http-error';
 import { getClientInstanceId } from '~/core/realtime/client-instance';
@@ -22,6 +27,13 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
+  const sessionChannel = getSessionChannel();
+  if (sessionChannel === 'native') {
+    config.withCredentials = false;
+    const accessToken = await getNativeAccessToken();
+    if (accessToken !== undefined && !config.headers.has('Authorization'))
+      config.headers.set('Authorization', `Bearer ${accessToken}`);
+  }
   const method = config.method?.toUpperCase();
   const isMutation =
     method === 'POST' ||
@@ -30,9 +42,14 @@ apiClient.interceptors.request.use(async (config) => {
     method === 'DELETE';
   const sessionSignal = getActiveSessionSignal();
   let csrfToken = getCsrfToken();
-  if (isMutation && sessionSignal !== undefined && csrfToken === undefined)
+  if (
+    sessionChannel === 'web' &&
+    isMutation &&
+    sessionSignal !== undefined &&
+    csrfToken === undefined
+  )
     csrfToken = await ensureConfiguredCsrfToken();
-  if (isMutation && csrfToken !== undefined) {
+  if (sessionChannel === 'web' && isMutation && csrfToken !== undefined) {
     config.headers.set('X-CSRF-Token', csrfToken);
   }
   if (isMutation)
@@ -55,7 +72,11 @@ apiClient.interceptors.response.use(
       const code = getApiErrorCode(error);
       if (status === 401) {
         clearCsrfToken();
-        endSession('expired').catch(() => undefined);
+        const expiration =
+          getSessionChannel() === 'native'
+            ? handleNativeUnauthorized()
+            : endSession('expired');
+        expiration.catch(() => undefined);
       } else if (status === 403 && code === 'CSRF_VALIDATION_FAILED') {
         refreshCsrfToken().catch(() => undefined);
       } else if (status === 403 && code === 'ADMIN_ACCESS_REQUIRED') {

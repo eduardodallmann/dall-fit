@@ -3,6 +3,8 @@ import type { PropsWithChildren } from 'react';
 import { Toast } from '@heroui/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 
+import type { NativeSessionCoordinator } from '~/auth/native-session';
+import { NativeSessionContext } from '~/auth/native-session-context';
 import { queryClient } from '~/context/query-client';
 import { PwaUpdateNotice } from '~/core/components/pwa-update-notice';
 import {
@@ -20,27 +22,31 @@ import {
 
 interface AppProvidersProps extends PropsWithChildren {
   initialTheme?: ThemeState;
+  nativeSession?: NativeSessionCoordinator | null;
   platform?: PlatformSnapshot;
 }
 
 export function AppProviders({
   children,
   initialTheme = getPublicThemeState(),
+  nativeSession = null,
   platform = resolveApplicationPlatform(),
 }: Readonly<AppProvidersProps>) {
   return (
     <PlatformContext value={platform}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider initialTheme={initialTheme}>
-          <ReloadSafetyProvider>
-            <PwaProvider>
-              {children}
-              <PwaUpdateNotice />
-              <Toast.Provider placement="bottom end" />
-            </PwaProvider>
-          </ReloadSafetyProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <NativeSessionContext value={nativeSession}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider initialTheme={initialTheme}>
+            <ReloadSafetyProvider>
+              <PwaProvider>
+                {children}
+                <PwaUpdateNotice />
+                <Toast.Provider placement="bottom end" />
+              </PwaProvider>
+            </ReloadSafetyProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </NativeSessionContext>
     </PlatformContext>
   );
 }

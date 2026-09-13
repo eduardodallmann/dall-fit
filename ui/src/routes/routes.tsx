@@ -13,6 +13,7 @@ import { authReturnTo, parseAuthReturnUrl } from '~/auth/auth-return-to';
 import { ensureCsrfToken, type MockAuthScenario } from '~/auth/auth-service';
 import { clearCsrfToken } from '~/auth/csrf-token';
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
+import { getSessionChannel } from '~/auth/session-channel';
 import {
   activateSession,
   armSessionReturnBypass,
@@ -164,7 +165,7 @@ const authenticatedRoute = createRoute({
         currentPersonQueryOptions(mockAuth).queryKey,
         person,
       );
-      await ensureCsrfToken(mockAuth);
+      if (getSessionChannel() === 'web') await ensureCsrfToken(mockAuth);
       assertCurrentNavigation(isCurrent);
       finishAuthenticatedNavigation(location);
       const result = { mockAuth, person };

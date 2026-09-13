@@ -151,6 +151,7 @@ type UiAnalyticsEvent =
       mode: 'create' | 'edit' | 'inline_edit';
     })
   | (CommonEvent & {
+      channel?: 'native' | 'web';
       eventName: 'ui_operation_started';
       operation:
         | 'google_login'
@@ -173,6 +174,7 @@ type UiAnalyticsEvent =
         | 'workout_update';
     })
   | (CommonEvent & {
+      channel?: 'native' | 'web';
       eventName: 'ui_operation_completed';
       operation:
         | 'google_login'
@@ -340,10 +342,15 @@ function buildProperties(event: UiAnalyticsEvent): AnalyticsProperties {
         mode: event.mode,
       });
     case 'ui_operation_started':
-      return compactProperties({ ...common, operation: event.operation });
+      return compactProperties({
+        ...common,
+        channel: event.channel,
+        operation: event.operation,
+      });
     case 'ui_operation_completed':
       return compactProperties({
         ...common,
+        channel: event.channel,
         operation: event.operation,
         outcome: event.outcome,
       });

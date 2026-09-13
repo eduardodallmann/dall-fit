@@ -4,6 +4,7 @@ import { Card, Skeleton } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Outlet,
+  useNavigate,
   useRouteContext,
   useRouter,
   useSearch,
@@ -12,6 +13,7 @@ import {
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
 import { endSession } from '~/auth/session-lifecycle';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
+import { usePlatform } from '~/core/platform/platform';
 import { useTheme } from '~/core/theme/theme-context';
 import { HomePage } from '~/routes/home';
 import { homeStyles } from '~/routes/home/styles';
@@ -25,6 +27,7 @@ export function AuthenticatedRouteComponent() {
   const router = useRouter();
   const { reconcileAuthenticated } = useTheme();
   const person = personQuery.data;
+  const platform = usePlatform();
 
   useLayoutEffect(() => {
     if (person?.id === routePerson.id) reconcileAuthenticated(person, mockAuth);
@@ -48,7 +51,7 @@ export function AuthenticatedRouteComponent() {
 
   const result = (
     <AuthenticatedShell mockAuth={mockAuth} person={person}>
-      <TrainingPlanRealtimeBridge />
+      {platform.platform === 'web' ? <TrainingPlanRealtimeBridge /> : null}
       <Outlet />
     </AuthenticatedShell>
   );
@@ -60,6 +63,7 @@ const homePageStyles = homeStyles();
 
 export function HomeRouteComponent() {
   const search = useSearch({ from: '/' });
+  const navigate = useNavigate();
   const { reconcilePublic } = useTheme();
 
   useLayoutEffect(() => {
@@ -67,7 +71,10 @@ export function HomeRouteComponent() {
   }, [reconcilePublic]);
 
   const result = (
-    <HomePage hasAuthError={search.authError === 'oauth_failed'} />
+    <HomePage
+      hasAuthError={search.authError === 'oauth_failed'}
+      onNativeAuthenticated={() => navigate({ replace: true, to: '/dash' })}
+    />
   );
 
   return result;

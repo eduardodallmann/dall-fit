@@ -24,9 +24,9 @@ atende as rotas pessoais e administrativas sem conexão duplicada.
   os cenários `admin`, `unauthenticated`, `error`, `theme-light`, `theme-dark`,
   `theme-unset`, `theme-save-error`, `theme-save-error-unset`, `csrf-error`,
   `csrf-refresh`, `session-expired`, `admin-revoked` e `logout-error`.
-- Contexto e estado persistido: cookie de sessão gerenciado pelo browser, cache
-  TanStack Query, preferência opcional `dall-fit:theme` e estado local temporário
-  do `Drawer` móvel.
+- Contexto e estado persistido: cookie de sessão gerenciado pelo browser na Web;
+  envelope Bearer cifrado, vínculo de pessoa e UUID no Android; cache TanStack
+  Query, preferência opcional de tema e estado local temporário do `Drawer`.
 - Permissões: sessão válida e pessoa existente. A rota é comum e não pertence ao
   layout administrativo.
 
@@ -174,6 +174,16 @@ enquanto o dashboard permanece intencionalmente vazio.
 - Resultado: nenhum dado privado permanece no documento, mesmo sem confirmação do
   endpoint.
 
+### Alternativa 10 — Logout Android com pendências
+
+- Sem pendências locais, `Sair` encerra diretamente a geração, apaga envelope,
+  vínculo e dados da conta, preserva o UUID e tenta revogação/Google Sign-Out em
+  best effort.
+- Com pendências, um `AlertDialog` não dispensável oferece exatamente `Cancelar`
+  e `Sair e apagar dados`, com foco inicial em `Cancelar`.
+- Cancelar preserva sessão e dados sem chamada remota. Confirmar mantém o diálogo
+  bloqueado durante a limpeza; falha remota nunca restaura dados locais.
+
 ## Validações
 
 Não se aplica — a rota e o menu não possuem formulário nem entrada editável.
@@ -245,6 +255,12 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
 - Erro: mantém rota, identidade e caches; reabilita o botão e mostra
   `Não foi possível sair. Tente novamente.`.
 - Retry: somente por nova ativação explícita.
+
+No Android, a consulta de pendências antecede a mutation. A confirmação captura o
+Bearer somente em memória, encerra a geração, limpa localmente envelope, vínculo,
+tema e artefatos da conta, preserva o UUID e só depois tenta
+`DELETE /auth/native/session` e Google Sign-Out. Nenhuma dessas etapas usa CSRF ou
+cookie; falhas remotas geram no máximo feedback genérico.
 
 ## Responsividade e interações do menu
 
@@ -503,6 +519,15 @@ móvel não o reabre.
 - Given: a pessoa está no shell autenticado
 - When: ativa `Sair` e o endpoint falha
 - Then: mostra toast acessível, encerra o estado local e substitui a URL por `/`
+
+### Cenário 19 — Logout Android com pendências
+
+- Link para testar: não se aplica — a port concreta ainda não possui pendências;
+  o estado é coberto com port injetada em teste de componente.
+- Given: a instalação Android informa pendências.
+- When: a pessoa aciona `Sair`.
+- Then: `Cancelar` preserva tudo; `Sair e apagar dados` limpa a conta, preserva o
+  UUID e termina na raiz pública mesmo se API ou Credential Manager falhar.
 
 ## Estrutura técnica relevante
 
