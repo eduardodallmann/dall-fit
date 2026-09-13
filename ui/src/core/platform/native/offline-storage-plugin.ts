@@ -1,0 +1,112 @@
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+
+export type OfflineStorageRecovery = 'migration-reset' | 'none';
+
+export interface OfflineStorageState {
+  accountBound: boolean;
+  initialized: true;
+  pendingSnapshotCount: number;
+  preparedPlanAvailable: boolean;
+  readyFileCount: number;
+  recovery: OfflineStorageRecovery;
+  resetGeneration: number;
+  revision: number;
+  sessionAvailable: boolean;
+  temporaryFileCount: number;
+}
+
+export interface OfflineStoredAggregate {
+  id: string;
+  payload: Readonly<Record<string, unknown>>;
+  payloadVersion: number;
+  planId: string;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface OfflineFileMetadata {
+  contentType: string;
+  fileId: string;
+  planId?: string;
+  revision: number;
+  sizeBytes: number;
+  status: 'ready' | 'temporary';
+  updatedAt: string;
+}
+
+export interface OfflineStoragePlugin {
+  addListener(
+    eventName: 'stateChanged',
+    listener: (state: OfflineStorageState) => void,
+  ): Promise<PluginListenerHandle>;
+  bindAccount(options: { personId: string }): Promise<void>;
+  clearAccountData(): Promise<void>;
+  completeFile(options: {
+    expectedRevision: number;
+    fileId: string;
+    updatedAt: string;
+  }): Promise<{ file: OfflineFileMetadata }>;
+  getActiveSession(): Promise<{ aggregate?: OfflineStoredAggregate }>;
+  getFile(options: { fileId: string }): Promise<{ file?: OfflineFileMetadata }>;
+  getPreparedPlan(): Promise<{ aggregate?: OfflineStoredAggregate }>;
+  getSnapshot(options: {
+    executionId: string;
+  }): Promise<{ aggregate?: OfflineStoredAggregate }>;
+  getState(): Promise<OfflineStorageState>;
+  hasPendingChanges(): Promise<{ value: boolean }>;
+  initialize(): Promise<OfflineStorageState>;
+  listSnapshots(): Promise<{ aggregates: OfflineStoredAggregate[] }>;
+  putActiveSession(options: {
+    payload: Readonly<Record<string, unknown>>;
+    payloadVersion: number;
+    planId: string;
+    revision: number;
+    sessionId: string;
+    updatedAt: string;
+  }): Promise<void>;
+  putPreparedPlan(options: {
+    expectedPlanId?: string;
+    expectedRevision?: number;
+    expiresAt: string;
+    payload: Readonly<Record<string, unknown>>;
+    payloadVersion: number;
+    planId: string;
+    revision: number;
+    validatedAt: string;
+  }): Promise<void>;
+  putSnapshot(options: {
+    executionId: string;
+    payload: Readonly<Record<string, unknown>>;
+    payloadVersion: number;
+    planId: string;
+    revision: number;
+    updatedAt: string;
+  }): Promise<void>;
+  registerTemporaryFile(options: {
+    contentType: string;
+    expectedRevision?: number;
+    fileId: string;
+    planId?: string;
+    revision: number;
+    updatedAt: string;
+  }): Promise<{ file: OfflineFileMetadata }>;
+  removeActiveSession(options: {
+    expectedRevision: number;
+    sessionId: string;
+  }): Promise<{ removed: boolean }>;
+  removeFile(options: {
+    expectedRevision: number;
+    fileId: string;
+  }): Promise<{ removed: boolean }>;
+  removePreparedPlan(options: {
+    expectedRevision: number;
+    planId: string;
+  }): Promise<{ removed: boolean }>;
+  removeSnapshot(options: {
+    executionId: string;
+    expectedRevision: number;
+  }): Promise<{ removed: boolean }>;
+}
+
+export const offlineStoragePlugin =
+  registerPlugin<OfflineStoragePlugin>('OfflineStorage');

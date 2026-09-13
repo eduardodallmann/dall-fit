@@ -50,6 +50,10 @@ dall-fit/
 8. A autenticação Android usa Credential Manager atrás dessa fronteira e conserva
    Bearer, vínculo de pessoa e UUID da instalação somente no secure storage cifrado
    pelo Android Keystore. O canal Web continua proprietário de cookie e CSRF.
+9. A persistência offline Android pertence a um único serviço Java de escopo da
+   aplicação, apoiado por SQLite e pelo filesystem interno privado. A bridge
+   Capacitor expõe comandos tipados e futuros consumidores nativos usam a mesma
+   instância e o mesmo lock; Web/PWA não mantém uma implementação paralela.
 
 ## Convenções de importação
 

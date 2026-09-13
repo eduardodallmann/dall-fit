@@ -46,6 +46,34 @@ Somente adapters em `src/core/platform/native/` importam Capacitor ou os plugins
 plugins. O Google adapter inicializa uma vez com `VITE_GOOGLE_SERVER_CLIENT_ID`,
 solicita apenas autenticação e entrega ao coordenador somente o ID token transitório.
 
+`nativeOfflineStorage: true` identifica o motor offline exclusivo do Android. O
+plugin local `OfflineStorage`, registrado explicitamente no `MainActivity`, é uma
+ponte fina para o singleton `OfflineStorageService`; o serviço não depende de
+Activity, WebView ou React e pode ser reutilizado por futuros Workers. Somente
+arquivos de `src/core/platform/native/` importam o contrato Capacitor. Web/PWA não
+registra o plugin, não cria IndexedDB equivalente e conserva comportamento online.
+
+O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v1
+mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
+sessão ativa, snapshots por execução, estado `pending` separado e metadados de
+arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON opacos com
+`payloadVersion` e revisão; apenas IDs, timestamps e estado operacional necessários
+ficam normalizados. A bridge não expõe SQL, path absoluto ou bytes.
+
+Arquivos nascem como `.part` e só viram `.data` por rename no mesmo filesystem;
+temporários e órfãos são removidos na próxima inicialização. A limpeza de conta
+isola o diretório, remove as linhas em transação e conclui a exclusão física antes
+de resolver. Falha mantém o motor fechado para outra identidade e permite retry.
+Eventos `stateChanged` são best-effort; `getState` sempre fornece revisão e
+contadores canônicos, inclusive a geração/categoria técnica de recuperação.
+
+Criação e migrations pertencem ao `SQLiteOpenHelper`. Falha de abertura é tentada
+novamente com outro handle; falha persistente, migration ausente ou downgrade
+recria banco, sidecars e arquivos e registra somente diagnóstico sanitizado. O
+reset é deliberadamente invisível: não aciona toast, modal, navegação ou Analytics.
+Falha no próprio reset rejeita comandos sem fallback Web.
+
 O coordenador nativo mantém um envelope v1 mínimo (`accessToken`, `expiresAt` e
 `personId`) e o UUID v4 aleatório da instalação no secure storage cifrado pelo
 Android Keystore. Envelope ausente, inválido, ilegível ou evidentemente expirado
@@ -54,6 +82,10 @@ dados da conta. A `Person` devolvida por `POST /auth/native/session` é a única
 canônica de identidade. Mesma pessoa substitui somente a credencial; pessoa
 diferente encerra a geração e limpa a conta anterior antes de confirmar a nova.
 Falha de limpeza impede ativação e revoga a nova sessão em best effort.
+Depois de validar uma sessão recuperada e antes de confirmar um login, o
+coordenador vincula a identidade canônica ao motor. `NativeLocalDataPort` consulta
+pendências reais — sessão ativa ou snapshot `pending` — e sua limpeza coordena o
+motor antes de remover o tema Web local.
 
 `AppProviders` é o ponto de composição e permite injetar diretamente um snapshot
 em testes. Componentes, hooks e rotas acessam apenas `PlatformContext` e

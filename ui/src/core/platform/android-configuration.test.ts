@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import rootPackageSource from '../../../../package.json?raw';
 import androidManifest from '../../../android/app/src/main/AndroidManifest.xml?raw';
+import mainActivity from '../../../android/app/src/main/java/com/dallfit/app/MainActivity.java?raw';
+import offlineStoragePlugin from '../../../android/app/src/main/java/com/dallfit/app/OfflineStoragePlugin.java?raw';
 import backupRules from '../../../android/app/src/main/res/xml/backup_rules.xml?raw';
 import dataExtractionRules from '../../../android/app/src/main/res/xml/data_extraction_rules.xml?raw';
 import androidVariables from '../../../android/variables.gradle?raw';
@@ -72,11 +74,33 @@ describe('Android workspace configuration', () => {
     expect(uiPackage.scripts['android:build:debug']).toMatch(
       /^pnpm android:sync &&/,
     );
+    expect(uiPackage.scripts['android:test']).toBe(
+      'pnpm android:sync && ./android/gradlew -p android connectedDebugAndroidTest',
+    );
     expect(rootPackage.scripts).toMatchObject({
       'android:build:debug': 'pnpm -C ui android:build:debug',
       'android:open': 'pnpm -C ui android:open',
       'android:run': 'pnpm -C ui android:run',
       'android:sync': 'pnpm -C ui android:sync',
+      'android:test': 'pnpm -C ui android:test',
     });
+  });
+
+  it('registers the local offline plugin before the Capacitor bridge is created', () => {
+    const registration = mainActivity.indexOf(
+      'registerPlugin(OfflineStoragePlugin.class)',
+    );
+    const bridgeCreation = mainActivity.indexOf(
+      'super.onCreate(savedInstanceState)',
+    );
+
+    expect(registration).toBeGreaterThan(-1);
+    expect(registration).toBeLessThan(bridgeCreation);
+    expect(offlineStoragePlugin).toContain(
+      '@CapacitorPlugin(name = "OfflineStorage")',
+    );
+    expect(androidManifest).not.toContain('READ_EXTERNAL_STORAGE');
+    expect(androidManifest).not.toContain('WRITE_EXTERNAL_STORAGE');
+    expect(androidManifest).not.toContain('MANAGE_EXTERNAL_STORAGE');
   });
 });

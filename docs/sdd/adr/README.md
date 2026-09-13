@@ -36,3 +36,6 @@ substituída permanece no histórico e aponta para a sucessora.
   Android sobre a UI compartilhada e fronteira de adapters de plataforma.
 - [`ADR-0013`](ADR-0013-sessoes-web-e-native-isoladas.md): audiences e canais Redis
   isolam sessão Web por cookie da sessão Android por Bearer.
+- [`ADR-0014`](ADR-0014-motor-nativo-de-persistencia-offline.md): SQLite e
+  filesystem privado sob um único motor Android compartilhado pela bridge e por
+  consumidores nativos.

@@ -55,6 +55,7 @@ pnpm android:sync
 pnpm android:open
 pnpm android:run
 pnpm android:build:debug
+pnpm android:test
 ```
 
 O login nativo exige `VITE_GOOGLE_SERVER_CLIENT_ID`, valor público do client OAuth
@@ -68,8 +69,9 @@ entre dispositivos pelas regras versionadas do projeto Android.
 `android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
 Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
 debug em `ui/android/app/build/outputs/apk/debug/`. `android:open` exige Android
-Studio, mas não altera o bundle. Nenhum desses caminhos assina release ou exige
-segredo.
+Studio, mas não altera o bundle. `android:test` sincroniza o bundle e executa os
+testes instrumentados em dispositivo ou emulador conectado. Nenhum desses caminhos
+assina release ou exige segredo.
 
 MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
 `redis-memory-server`, sem Docker. O MongoDB usa `wiredTiger` e conserva seus dados
@@ -96,6 +98,7 @@ Todos os quality gates são iniciados na raiz:
 | `pnpm android:open`     | Abre o projeto nativo versionado no Android Studio                     |
 | `pnpm android:run`      | Prepara e executa o aplicativo em dispositivo ou emulador             |
 | `pnpm android:build:debug` | Prepara e compila o APK debug com o Gradle Wrapper                  |
+| `pnpm android:test`     | Sincroniza e executa testes Android instrumentados conectados         |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint          |
 | `pnpm sonar`            | Executa análise SonarCloud nos quatro projetos                        |
