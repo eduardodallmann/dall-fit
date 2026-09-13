@@ -14,6 +14,31 @@ describe('ExerciseImageService', () => {
     return result;
   }
 
+  it('derives a stable opaque offline id only from the display asset', () => {
+    const service = new ExerciseImageService({} as BlobStorageService);
+    const image = {
+      display: {
+        key: 'exercise-images/private/display.webp',
+        width: 320,
+        height: 640,
+      },
+      thumbnail: {
+        key: 'exercise-images/private/thumbnail.webp',
+        width: 160,
+        height: 160,
+      },
+    };
+    const first = service.createOfflineMediaId(image);
+    const second = service.createOfflineMediaId({
+      ...image,
+      thumbnail: { ...image.thumbnail, key: 'another-thumbnail' },
+    });
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[a-f0-9]{64}$/u);
+    expect(first).not.toContain('exercise-images');
+  });
+
   it('creates two WebP variants without enlarging and persists no original', async () => {
     const upload = vi
       .fn()

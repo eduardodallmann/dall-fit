@@ -133,8 +133,27 @@ public final class OfflineStorageService {
 
     public StoredAggregate getPreparedPlan() {
         return readAggregate(
-            "SELECT plan_id, plan_id, payload_version, revision, payload_json, updated_at FROM prepared_plan WHERE id = 1"
+            "SELECT plan_id, plan_id, payload_version, revision, payload_json, updated_at, validated_at, expires_at " +
+            "FROM prepared_plan WHERE id = 1"
         );
+    }
+
+    public OfflineFileMetadata registerTemporaryFileForPreparedPlan(
+        String fileId,
+        String planId,
+        String contentType,
+        long revision,
+        String updatedAt,
+        long expectedPlanRevision
+    ) {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            if (!preparedPlanMatchesLocked(planId, expectedPlanRevision)) throw revisionConflict();
+            return registerTemporaryFile(fileId, planId, contentType, revision, updatedAt, null);
+        } finally {
+            mutationLock.unlock();
+        }
     }
 
     public void putPreparedPlan(
@@ -548,6 +567,23 @@ public final class OfflineStorageService {
         }
     }
 
+    public OfflineFileMetadata completeFileForPreparedPlan(
+        String fileId,
+        long expectedRevision,
+        String updatedAt,
+        String planId,
+        long expectedPlanRevision
+    ) {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            if (!preparedPlanMatchesLocked(planId, expectedPlanRevision)) throw revisionConflict();
+            return completeFile(fileId, expectedRevision, updatedAt);
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
     public OfflineFileMetadata getFile(String fileId) {
         requireText(fileId, "fileId");
         mutationLock.lock();
@@ -844,8 +880,23 @@ public final class OfflineStorageService {
             cursor.getInt(2),
             cursor.getLong(3),
             cursor.getString(4),
-            cursor.getString(5)
+            cursor.getString(5),
+            cursor.getColumnCount() > 6 && !cursor.isNull(6) ? cursor.getString(6) : null,
+            cursor.getColumnCount() > 7 && !cursor.isNull(7) ? cursor.getString(7) : null
         );
+    }
+
+    private boolean preparedPlanMatchesLocked(String planId, long revision) {
+        try (
+            Cursor cursor = helper
+                .getReadableDatabase()
+                .rawQuery(
+                    "SELECT 1 FROM prepared_plan WHERE id = 1 AND plan_id = ? AND revision = ?",
+                    new String[] { planId, Long.toString(revision) }
+                )
+        ) {
+            return cursor.moveToFirst();
+        }
     }
 
     private OfflineFileMetadata getFileLocked(String fileId) {

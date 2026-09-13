@@ -1,6 +1,7 @@
 package com.dallfit.app;
 
 import com.dallfit.app.offline.OfflineFileMetadata;
+import com.dallfit.app.offline.OfflineMediaDownloader;
 import com.dallfit.app.offline.OfflineStorageException;
 import com.dallfit.app.offline.OfflineStorageProvider;
 import com.dallfit.app.offline.OfflineStorageService;
@@ -22,12 +23,14 @@ public final class OfflineStoragePlugin extends Plugin {
     }
 
     private OfflineStorageService service;
+    private OfflineMediaDownloader mediaDownloader;
     private final OfflineStorageService.StateListener stateListener = state ->
         execute(() -> notifyListeners("stateChanged", stateToJson(state)));
 
     @Override
     public void load() {
         service = OfflineStorageProvider.get(getContext());
+        mediaDownloader = new OfflineMediaDownloader(service);
         service.addStateListener(stateListener);
     }
 
@@ -69,6 +72,25 @@ public final class OfflineStoragePlugin extends Plugin {
             service.clearAccountDataAtomically();
             return new JSObject();
         });
+    }
+
+    @PluginMethod
+    public void downloadFile(PluginCall call) {
+        execute(() ->
+            resolve(call, () -> {
+                OfflineFileMetadata file = mediaDownloader.download(
+                    requiredString(call, "url"),
+                    requiredString(call, "fileId"),
+                    requiredString(call, "planId"),
+                    requiredString(call, "contentType"),
+                    requiredLong(call, "revision"),
+                    requiredLong(call, "expectedPlanRevision")
+                );
+                JSObject result = new JSObject();
+                result.put("file", fileToJson(file));
+                return result;
+            })
+        );
     }
 
     @PluginMethod
@@ -328,6 +350,8 @@ public final class OfflineStoragePlugin extends Plugin {
         result.put("revision", aggregate.getRevision());
         result.put("payload", new JSObject(aggregate.getPayloadJson()));
         result.put("updatedAt", aggregate.getUpdatedAt());
+        if (aggregate.getValidatedAt() != null) result.put("validatedAt", aggregate.getValidatedAt());
+        if (aggregate.getExpiresAt() != null) result.put("expiresAt", aggregate.getExpiresAt());
         return result;
     }
 

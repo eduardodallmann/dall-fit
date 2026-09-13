@@ -37,11 +37,23 @@ e retry explícito. A navegação do card conserva o seletor MSW somente quando 
 mocks locais estão habilitados; uma build de produção nunca propaga
 `mockTraining` para a URL.
 
+No Android com storage nativo, a entrada dispara a preparação do plano ativo. Sem
+snapshot essencial válido, o conteúdo da rota mostra um gate acessível nos estados
+`preparing-data`, `expired` ou `failed`; falha oferece retry e link real para Meus
+planos, sem bloquear o shell. Depois do commit essencial, mídia pendente ou
+incompleta não bloqueia a lista. Os estados completos são `no-plan`,
+`preparing-data`, `data-ready-media-in-progress`, `ready`,
+`ready-media-incomplete`, `expired` e `failed`. Um snapshot válido não é invalidado
+nem tem a validade estendida por falha de atualização. A rota ainda renderiza pela
+API online; consumo do snapshot pertence à evolução de execução offline.
+
 ## Integração
 
 - `GET /training`, documentado em
   [`training.md`](../../../../api/docs/sdd/endpoints/training.md).
 - TanStack Query usa `trainingKeys.overview`; Axios central transporta a request.
+- O coordenador Android consulta os mesmos endpoints, com concorrência máxima de
+  quatro, e persiste somente o payload de domínio e `fileId` da mídia display.
 - Sucesso utiliza `TrainingOverview`; erro não promove cache anterior a sucesso.
 - Ativar um plano em `/training-plan` remove todas as queries `trainingKeys` antes
   de invalidar o catálogo; a próxima navegação sempre lê a seleção canônica, mesmo

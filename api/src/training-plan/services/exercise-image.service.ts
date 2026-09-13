@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
@@ -166,6 +166,19 @@ export class ExerciseImageService {
       );
       throw createImageUrlSigningFailedException();
     }
+  }
+
+  createOfflineMediaId(image: StoredExerciseImage): string {
+    this.logger.log('ExerciseImageService -> createOfflineMediaId -> params:', {
+      params: { variants: 2 },
+    });
+    const result = createHash('sha256')
+      .update(`display:${image.display.key}`)
+      .digest('hex');
+    this.logger.log('ExerciseImageService -> createOfflineMediaId -> return:', {
+      data: { mediaIdentified: true },
+    });
+    return result;
   }
 
   async toPublicExercise(exercise: StoredExercise): Promise<Exercise> {

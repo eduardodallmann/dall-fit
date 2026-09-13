@@ -246,7 +246,10 @@ IDs criados são determinísticos; multipart exige um `File` no campo `file` e n
 conforme `ExerciseImage`.
 
 O seletor `mockTraining` cobre visão geral, prévia, sessão, timer e conclusão do
-fluxo Treinar. Os cenários `sdd-session-running`, `sdd-pause-running` e
+fluxo Treinar. A visão geral inclui validade offline determinística e a projeção do
+plano ativo; previews de imagem podem fornecer signed URLs fictícias e
+`offlineMediaId` sem acionar a bridge no navegador. Os cenários
+`sdd-session-running`, `sdd-pause-running` e
 `sdd-workout-complete` reutilizam respectivamente os estados funcionais homônimos
 sem o prefixo, mas fixam o relógio da fixture em `2026-08-01T12:00:00.000Z`. Eles
 existem exclusivamente para produzir referências visuais determinísticas; testes

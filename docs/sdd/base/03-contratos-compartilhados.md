@@ -145,11 +145,16 @@ request; o Workflow os lê no MongoDB.
 
 ## Execução de treino
 
-- `TrainingOverview` combina o resumo do plano ativo com cards de workout e um
-  indicador opcional `current | in-progress`.
+- `TrainingOverview` combina a apresentação vigente com cards de workout, um
+  indicador opcional `current | in-progress`, `offlineValidity` emitido pelo
+  servidor e `offlinePreparation` com o plano ativo e seus IDs de workout. A
+  projeção separada impede que uma sessão em andamento faça o Android preparar um
+  plano que deixou de ser a seleção canônica; sem ativo, ambas são `null`.
 - `TrainingWorkoutPreview` publica os cinco tipos de exercício e acrescenta
   `lastLoadsKg` aos exercícios de séries. Cada posição é inteiro de 0 a 9999 ou
-  `null`; ausência de carga é um valor válido, não um erro.
+  `null`; ausência de carga é um valor válido, não um erro. Imagem também publica
+  `offlineMediaId`, hash opaco e estável do asset `display`, sem capacidade de
+  acesso ao Blob.
 - `TrainingSession` é o snapshot público versionado. Expõe timestamps ISO,
   exercício/séries concluídos e no máximo um `TrainingTimer`; detalhes de chave,
   TTL e mídia privada persistida permanecem exclusivos da API.

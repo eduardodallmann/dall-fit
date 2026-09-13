@@ -54,12 +54,17 @@ abandono e finalização têm 30 por minuto. A configuração está em
 
 ### Listagem e prévia
 
-`overview` consulta primeiro a sessão Redis. Se existir, usa o snapshot para não
+`overview` consulta a sessão Redis e a seleção ativa. Se existir sessão, usa seu snapshot para não
 misturar edições posteriores e marca seu workout como `in-progress`. Sem sessão,
 resolve a seleção ativa, busca a última execução do plano e marca o workout
 seguinte ciclicamente como `current`. Ausência de seleção retorna plano nulo e lista
-vazia. A prévia exige workout pertencente ao plano ativo, lê os perfis da pessoa e
-hidrata signed URLs somente na resposta; nenhuma URL temporária é persistida.
+vazia. Independentemente da apresentação, `offlinePreparation` identifica o plano
+ativo canônico e seus workouts; `offlineValidity` usa o relógio da API e expira
+exatamente sete dias depois. Ambos são nulos sem seleção ativa. A prévia exige
+workout pertencente ao plano ativo, lê os perfis da pessoa e hidrata signed URLs
+somente na resposta; nenhuma URL temporária é persistida. Imagens da prévia incluem
+`offlineMediaId`, SHA-256 estável derivado internamente da chave do asset display,
+sem revelar essa chave nem autorizar acesso.
 Atividades por duração preservam instrução curta e vídeo demonstrativo opcional
 tanto na prévia quanto no snapshot da execução.
 
@@ -185,6 +190,8 @@ O DTO retorna `400 VALIDATION_ERROR`; Redis e MongoDB não são acessados.
 | Regra                           | Unitário             | E2E                                   | Mock/fixture       |
 | ------------------------------- | -------------------- | ------------------------------------- | ------------------ |
 | plano ativo, início e sessão v0 | services existentes  | `training-plan.e2e-spec.ts`           | `training.ts`      |
+| validade e projeção offline     | `training.service.spec.ts` | mesmo E2E valida sete dias         | `training.ts`      |
+| identificador opaco display    | `exercise-image.service.spec.ts` | prévia do mesmo E2E          | preview fixture    |
 | carga opcional e inteira        | DTO/service          | mesmo E2E combina `null` e `17`       | fixture de sessão  |
 | descanso e CAS conflitante      | store/service        | resolve timer e força versão obsoleta | handler versionado |
 | finalização, execução e perfil  | repositories/service | MongoDB + Redis efêmeros              | completion fixture |

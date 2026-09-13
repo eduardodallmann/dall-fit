@@ -283,16 +283,33 @@ export interface TrainingPlanExecutionSummary {
   workoutCount: number;
 }
 
+export interface TrainingOfflineValidity {
+  expiresAt: Timestamp;
+  validatedAt: Timestamp;
+}
+
+export interface TrainingOfflinePreparation {
+  plan: TrainingPlanExecutionSummary;
+  workoutIds: readonly EntityId[];
+}
+
 export interface TrainingOverview {
+  offlinePreparation: TrainingOfflinePreparation | null;
+  offlineValidity: TrainingOfflineValidity | null;
   plan: TrainingPlanExecutionSummary | null;
   workouts: readonly TrainingWorkoutCard[];
+}
+
+export interface TrainingPreviewImage extends ExerciseImage {
+  offlineMediaId: string;
 }
 
 export type TrainingExercisePreview =
   | (YoutubeShortExercise & {
       lastLoadsKg: readonly (number | null)[];
     })
-  | (ImageExercise & {
+  | (Omit<ImageExercise, 'image'> & {
+      image: TrainingPreviewImage | null;
       lastLoadsKg: readonly (number | null)[];
     })
   | YoutubeLongExercise

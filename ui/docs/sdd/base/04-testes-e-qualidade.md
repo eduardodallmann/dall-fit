@@ -159,6 +159,14 @@ banco incompatível. Testes de configuração protegem registro antecipado do pl
 ausência de permissões de armazenamento e exclusões de backup. Como eventos são
 best-effort, consumidores reparam ausência ou atraso consultando `getState`.
 
+A preparação de treino acrescenta Vitest do coordenador para coalescência,
+composição best-effort, commit essencial anterior à mídia, ausência de signed URL
+no payload, validade e falhas não bloqueantes. Testes instrumentados protegem a
+validade devolvida pela bridge e impedem que uma revisão atrasada conclua arquivo
+de um plano já substituído. Status HTTP/tipo/tamanho/corpo, redirects HTTPS,
+sincronização e promoção atômica pertencem ao downloader Java; o smoke final exige
+APK e dispositivo/emulador.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

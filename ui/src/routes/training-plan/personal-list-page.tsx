@@ -21,6 +21,7 @@ import type {
 } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
+import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
@@ -64,6 +65,7 @@ export function PersonalTrainingPlanListPage({
 }: Readonly<PersonalListPageProps>) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const offlinePreparation = useOfflinePreparation();
   const query = useQuery(
     personalTrainingPlanListQueryOptions(page, mockTrainingPlans),
   );
@@ -94,6 +96,7 @@ export function PersonalTrainingPlanListPage({
       activatePersonalTrainingPlan(catalogEntryId, mockTrainingPlans),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: trainingKeys.all });
+      await offlinePreparation?.replaceActivePlan();
       await invalidateCatalog();
     },
   });
@@ -107,6 +110,7 @@ export function PersonalTrainingPlanListPage({
     onSuccess: async (_, item) => {
       if (item.active)
         queryClient.removeQueries({ queryKey: trainingKeys.all });
+      if (item.active) await offlinePreparation?.clearActivePlan();
       await invalidateCatalog();
     },
   });

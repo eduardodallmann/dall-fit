@@ -1,11 +1,14 @@
+import { useEffect, useState, useSyncExternalStore } from 'react';
+
 import { Alert, Button, Card, Chip, Skeleton } from '@heroui/react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Dumbbell, ImageOff, Play, Video } from 'lucide-react';
 
-import type { TrainingWorkoutCard } from '@dall-fit/types';
+import type { TrainingOverview, TrainingWorkoutCard } from '@dall-fit/types';
 
 import { trackTrainingAction } from '~/core/analytics';
+import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
 import { trainingStyles } from '~/routes/training/styles';
 import { trainingOverviewQueryOptions } from '~/routes/training/training-queries';
@@ -19,8 +22,90 @@ const styles = trainingStyles();
 export function TrainingOverviewPage({
   mockTraining,
 }: Readonly<{ mockTraining: MockTrainingScenario }>) {
-  const navigate = useNavigate();
   const query = useQuery(trainingOverviewQueryOptions(mockTraining));
+  const offlinePreparation = useOfflinePreparation();
+
+  useEffect(() => {
+    void offlinePreparation?.enter();
+  }, [offlinePreparation]);
+
+  if (offlinePreparation !== null)
+    return (
+      <NativeTrainingOverview
+        mockTraining={mockTraining}
+        offlinePreparation={offlinePreparation}
+        query={query}
+      />
+    );
+
+  return <OnlineTrainingOverview mockTraining={mockTraining} query={query} />;
+}
+
+function NativeTrainingOverview({
+  mockTraining,
+  offlinePreparation,
+  query,
+}: Readonly<{
+  mockTraining: MockTrainingScenario;
+  offlinePreparation: NonNullable<ReturnType<typeof useOfflinePreparation>>;
+  query: UseQueryResult<TrainingOverview, Error>;
+}>) {
+  const snapshot = useSyncExternalStore(
+    offlinePreparation.subscribe,
+    offlinePreparation.getSnapshot,
+  );
+  const [retrying, setRetrying] = useState(false);
+  const blocked =
+    snapshot.status === 'preparing-data' ||
+    snapshot.status === 'expired' ||
+    snapshot.status === 'failed';
+  let heading = 'Não foi possível preparar seus treinos';
+  if (snapshot.status === 'preparing-data') heading = 'Preparando seus treinos';
+  if (snapshot.status === 'expired') heading = 'Seus treinos offline expiraram';
+  if (blocked)
+    return (
+      <main className={styles.page()}>
+        <Alert status={snapshot.status === 'failed' ? 'danger' : 'default'}>
+          <Alert.Title>{heading}</Alert.Title>
+          <Alert.Description>
+            {snapshot.status === 'preparing-data'
+              ? 'Aguarde enquanto os dados essenciais são salvos neste aparelho.'
+              : 'Conecte-se à internet para preparar os dados essenciais deste aparelho.'}
+          </Alert.Description>
+        </Alert>
+        <div aria-live="polite" className={styles.pageActions()} role="status">
+          {snapshot.status === 'preparing-data'
+            ? 'Preparação em andamento.'
+            : null}
+        </div>
+        {snapshot.status !== 'preparing-data' ? (
+          <Button
+            isDisabled={retrying}
+            isPending={retrying}
+            onPress={() => {
+              setRetrying(true);
+              void offlinePreparation.retry().finally(() => setRetrying(false));
+            }}
+          >
+            Tentar novamente
+          </Button>
+        ) : null}
+        <Link className={styles.backLink()} to="/training-plan">
+          Ir para Meus planos
+        </Link>
+      </main>
+    );
+  return <OnlineTrainingOverview mockTraining={mockTraining} query={query} />;
+}
+
+function OnlineTrainingOverview({
+  mockTraining,
+  query,
+}: Readonly<{
+  mockTraining: MockTrainingScenario;
+  query: UseQueryResult<TrainingOverview, Error>;
+}>) {
+  const navigate = useNavigate();
 
   if (query.isPending) {
     return (
