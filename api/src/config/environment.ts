@@ -480,11 +480,7 @@ function validateAuthSecurityCombinations(
   config: ParsedEnvironment,
   runtimeEnvironment: RuntimeEnvironment,
 ): void {
-  if (config.AUTH_NATIVE_SESSION_AUDIENCE === config.AUTH_SESSION_AUDIENCE) {
-    throw new Error(
-      'Invalid environment variables: AUTH_NATIVE_SESSION_AUDIENCE must differ from AUTH_SESSION_AUDIENCE',
-    );
-  }
+  validateSessionAudiences(config);
 
   if (
     config.AUTH_TEST_BYPASS_ENABLED &&
@@ -555,6 +551,14 @@ function validateAuthSecurityCombinations(
   ) {
     throw new Error(
       'Invalid environment variables: AUTH_SESSION_PREVIOUS_VALID_UNTIL cannot exceed the maximum session lifetime',
+    );
+  }
+}
+
+function validateSessionAudiences(config: ParsedEnvironment): void {
+  if (config.AUTH_NATIVE_SESSION_AUDIENCE === config.AUTH_SESSION_AUDIENCE) {
+    throw new Error(
+      'Invalid environment variables: AUTH_NATIVE_SESSION_AUDIENCE must differ from AUTH_SESSION_AUDIENCE',
     );
   }
 }
