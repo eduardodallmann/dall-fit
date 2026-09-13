@@ -199,6 +199,12 @@ cookie com `Max-Age=0` para permitir novo login após logout. O estado de autent
 reiniciado depois de cada teste Vitest e permanece isolado entre contextos
 Playwright.
 
+Os handlers também cobrem `POST /auth/native/session` com body estrito contendo
+somente `identityToken`, response Bearer inteiramente fictícia e
+`DELETE /auth/native/session` idempotente. Eles exercitam service, coordenador e
+headers em Vitest; o Playwright no browser continua validando apenas o ramo Web e
+nunca simula Credential Manager ou Keystore reais.
+
 Planos globais usam fixtures tipadas e handlers para as quinze operações em arquivos
 `training-plans.ts`. A query exclusiva `mockTrainingPlans` vira o header
 `x-dall-fit-mock-training-plans` somente com mocks ativos; nenhum dos dois pertence

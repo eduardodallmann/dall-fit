@@ -38,6 +38,23 @@ adapter Capacitor usa `isNativePlatform()` e `getPlatform()` e só reconhece And
 quando ambas as informações são coerentes; iOS ou qualquer valor inesperado cai no
 fallback Web sem ser promovido por coerção.
 
+No snapshot Android, `nativeAuthentication: true` ativa uma composição carregada
+dinamicamente que injeta ports de Google Sign-In, credencial segura e dados locais.
+Somente adapters em `src/core/platform/native/` importam Capacitor ou os plugins
+`@capawesome/capacitor-google-sign-in` e
+`@aparajita/capacitor-secure-storage`; o bundle Web não inicializa nem chama esses
+plugins. O Google adapter inicializa uma vez com `VITE_GOOGLE_SERVER_CLIENT_ID`,
+solicita apenas autenticação e entrega ao coordenador somente o ID token transitório.
+
+O coordenador nativo mantém um envelope v1 mínimo (`accessToken`, `expiresAt` e
+`personId`) e o UUID v4 aleatório da instalação no secure storage cifrado pelo
+Android Keystore. Envelope ausente, inválido, ilegível ou evidentemente expirado
+falha fechado; expiração remove somente o envelope, preservando UUID, vínculo e
+dados da conta. A `Person` devolvida por `POST /auth/native/session` é a única fonte
+canônica de identidade. Mesma pessoa substitui somente a credencial; pessoa
+diferente encerra a geração e limpa a conta anterior antes de confirmar a nova.
+Falha de limpeza impede ativação e revoga a nova sessão em best effort.
+
 `AppProviders` é o ponto de composição e permite injetar diretamente um snapshot
 em testes. Componentes, hooks e rotas acessam apenas `PlatformContext` e
 `usePlatform`; não importam Capacitor. O ESLint proíbe `@capacitor/*` em todo
@@ -178,6 +195,13 @@ branch administrativa sem logout. Outro `403` permanece com o fluxo proprietári
 Se a renovação CSRF falhar, a sessão continua ativa e mutations aguardam uma nova
 obtenção single-flight na próxima ação explícita; a operação rejeitada não é
 recriada pelo interceptor.
+
+No Android, a instância Axios continua única, mas define `withCredentials=false`,
+obtém o Bearer em memória pelo coordenador e injeta `Authorization` sem adicionar
+`X-CSRF-Token`. Um `401` remove o envelope e encerra a geração; cookie eventualmente
+presente no WebView nunca é fallback. O bootstrap protegido consulta somente
+`GET /auth/me` com Bearer, não chama `GET /auth/csrf`, e a conexão SSE baseada em
+cookie permanece desativada até existir transporte nativo próprio para realtime.
 
 `src/auth/session-lifecycle.ts` mantém uma geração monotônica, um
 `AbortController` e um registro mínimo de recursos privados. O primeiro `401`, o
@@ -590,6 +614,8 @@ O Vite usa obrigatoriamente a porta `3000` e falha se ela estiver ocupada.
 
 - `VITE_API_URL=http://localhost:4000`, base da API usada pelo Axios;
 - `VITE_ENABLE_API_MOCKS=false`, opt-in dos mocks MSW.
+- `VITE_GOOGLE_SERVER_CLIENT_ID`, client OAuth Web/server público usado somente
+  pela autenticação Android e obrigatório nesse runtime.
 
 O `.env` local não é versionado. Toda variável exposta à UI usa prefixo `VITE_`,
 é tipada em `src/vite-env.d.ts` e deve ser tratada como informação pública

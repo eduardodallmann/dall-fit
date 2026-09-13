@@ -1,4 +1,6 @@
 import type {
+  CreateNativeSessionRequest,
+  CreateNativeSessionResponse,
   CsrfTokenResponse,
   CurrentPersonResponse,
   Person,
@@ -79,6 +81,25 @@ export async function logout(
 ): Promise<void> {
   await apiClient.post('/auth/logout', undefined, {
     headers: getMockHeaders(mockScenario),
+  });
+}
+
+export async function createNativeSession(
+  identityToken: string,
+): Promise<CreateNativeSessionResponse> {
+  const body: CreateNativeSessionRequest = { identityToken };
+  const response = await apiClient.post<CreateNativeSessionResponse>(
+    '/auth/native/session',
+    body,
+  );
+  const result = response.data;
+
+  return result;
+}
+
+export async function revokeNativeSession(accessToken: string): Promise<void> {
+  await apiClient.delete('/auth/native/session', {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
 
