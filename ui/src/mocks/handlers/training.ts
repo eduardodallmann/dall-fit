@@ -127,7 +127,14 @@ export const trainingHandlers = [
   http.get(`${apiBaseUrl}/training`, ({ request }) => {
     const name = scenario(request);
     if (name === 'no-active-plan' && !trainingPlanActivated)
-      return HttpResponse.json({ data: { plan: null, workouts: [] } });
+      return HttpResponse.json({
+        data: {
+          offlinePreparation: null,
+          offlineValidity: null,
+          plan: null,
+          workouts: [],
+        },
+      });
     const state = stateFor(name);
     return HttpResponse.json({
       data: createTrainingOverviewFixture(state.session !== null),

@@ -28,25 +28,30 @@ por pessoa.
 
 ## Sequência e decisões
 
-1. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
+1. No Android, entrar na listagem valida o snapshot local pela janela de sete dias
+   emitida pela API. Ausência ou expiração bloqueia somente o conteúdo de Treinar
+   durante a composição de overview e previews; o snapshot essencial é confirmado
+   antes dos downloads display e mídia incompleta nunca bloqueia. Web/PWA
+   permanecem exclusivamente online.
+2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
    uma resposta anterior sem plano não sobreviva à próxima navegação.
-2. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
+3. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
    Antes de iniciar, a pessoa pode retornar à seleção por um link próprio; ele não
    aparece durante a sessão.
-3. Iniciar cria um snapshot exclusivo com TTL absoluto de 24 horas. Se outro
+4. Iniciar cria um snapshot exclusivo com TTL absoluto de 24 horas. Se outro
    workout já estiver ativo, a pessoa retoma ou confirma o descarte antes de criar
    o novo.
-4. Cada mutation envia a versão canônica. Carga é inteira entre 0 e 9999 ou vazia;
+5. Cada mutation envia a versão canônica. Carga é inteira entre 0 e 9999 ou vazia;
    concluir série aceita ambos atomicamente. Descansos e exercícios temporizados
    usam timestamps do servidor. Salvar carga e concluir compartilham uma fila FIFO
    por sessão, lendo a versão somente ao chegar à cabeça. Um PUT de carga pendente
    não bloqueia campos incompletos nem ações de conclusão; a ação usa o draft mais
    novo e respostas antigas não o sobrescrevem.
-5. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
+6. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
    incompleto requer confirmação explícita para finalizar.
-6. A finalização grava execução e perfis no MongoDB, remove o snapshot Redis e
+7. A finalização grava execução e perfis no MongoDB, remove o snapshot Redis e
    navega para o resumo semanal compartilhável.
 
 ## Dados compartilhados

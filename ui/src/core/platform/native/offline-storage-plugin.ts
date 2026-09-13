@@ -16,12 +16,14 @@ export interface OfflineStorageState {
 }
 
 export interface OfflineStoredAggregate {
+  expiresAt?: string;
   id: string;
   payload: Readonly<Record<string, unknown>>;
   payloadVersion: number;
   planId: string;
   revision: number;
   updatedAt: string;
+  validatedAt?: string;
 }
 
 export interface OfflineFileMetadata {
@@ -41,6 +43,14 @@ export interface OfflineStoragePlugin {
   ): Promise<PluginListenerHandle>;
   bindAccount(options: { personId: string }): Promise<void>;
   clearAccountData(): Promise<void>;
+  downloadFile(options: {
+    contentType: 'image/webp';
+    expectedPlanRevision: number;
+    fileId: string;
+    planId: string;
+    revision: number;
+    url: string;
+  }): Promise<{ file: OfflineFileMetadata }>;
   completeFile(options: {
     expectedRevision: number;
     fileId: string;

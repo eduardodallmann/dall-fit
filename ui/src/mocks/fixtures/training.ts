@@ -32,6 +32,11 @@ export const trainingPlanExecutionFixture: TrainingPlanExecutionSummary = {
   workoutCount: 3,
 };
 
+const offlineValidity = {
+  expiresAt: '2030-01-08T00:00:00.000Z',
+  validatedAt: '2030-01-01T00:00:00.000Z',
+} as const;
+
 export function createTrainingPreviewFixture(): TrainingWorkoutPreview {
   return {
     exercises: [
@@ -86,6 +91,11 @@ export function createTrainingOverviewFixture(
   inProgress = false,
 ): TrainingOverview {
   return {
+    offlinePreparation: {
+      plan: trainingPlanExecutionFixture,
+      workoutIds: [...mockTrainingIds.workouts],
+    },
+    offlineValidity,
     plan: trainingPlanExecutionFixture,
     workouts: [
       {

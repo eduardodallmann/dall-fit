@@ -117,6 +117,11 @@ de invalidar o catálogo; assim, uma visita anterior sem plano não pode reapare
 do cache ao navegar novamente para Treinar.
 Excluir a entrada ativa remove imediatamente as queries de `/training`; a próxima
 visita refaz a leitura e não exibe por um instante o plano excluído.
+No Android, o sucesso da troca também limpa plano/mídias preparados antes de
+compor imediatamente a nova seleção, mesmo fora de Treinar. Falha de preparação
+não desfaz a seleção nem restaura o snapshot anterior. Excluir ou desvincular a
+entrada ativa limpa o preparado; editar conteúdo aguarda a próxima entrada em
+Treinar. Sessão ativa e snapshots de execução permanecem independentes.
 
 Job aparece como linha não navegável “Clonando”, com estado/progresso. Em
 `failed|start-failed` oferece retry; enquanto não terminal oferece cancelar. A

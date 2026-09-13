@@ -21,6 +21,7 @@ import {
 import type {
   GlobalTrainingPlanCollectionResponse,
   GlobalTrainingPlanLibraryResponse,
+  TrainingOverviewResponse,
   TrainingPlanAssistantSessionResponse,
   TrainingPlanDetailsResponse,
 } from '@dall-fit/types';
@@ -1687,10 +1688,21 @@ describe('Global training plans (e2e)', () => {
     const overview = await person.get('/training').expect(200);
     expect(overview.body).toMatchObject({
       data: {
+        offlinePreparation: {
+          plan: { id: plan.id },
+          workoutIds: [workoutId.toString()],
+        },
         plan: { id: plan.id, source: 'global-reference' },
         workouts: [{ id: workoutId.toString(), indicator: 'current' }],
       },
     });
+    const overviewData = (overview.body as TrainingOverviewResponse).data;
+    const offlineValidity = overviewData.offlineValidity;
+    expect(offlineValidity).not.toBeNull();
+    if (offlineValidity === null) throw new Error('Expected offline validity.');
+    const validatedAt = Date.parse(offlineValidity.validatedAt);
+    const expiresAt = Date.parse(offlineValidity.expiresAt);
+    expect(expiresAt - validatedAt).toBe(7 * 24 * 60 * 60 * 1000);
     const preview = await person
       .get(`/training/workouts/${workoutId.toString()}`)
       .expect(200);

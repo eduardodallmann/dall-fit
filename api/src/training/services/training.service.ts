@@ -53,6 +53,7 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
 import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const OFFLINE_PLAN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class TrainingService {
@@ -71,7 +72,36 @@ export class TrainingService {
     this.logger.log('TrainingService -> overview -> params:', {
       params: { personId },
     });
-    const session = await this.sessions.get(personId);
+    const [session, active] = await Promise.all([
+      this.sessions.get(personId),
+      this.personalPlans.getActiveExecutionPlan(personId),
+    ]);
+    this.logger.log('TrainingService -> overview -> dependencies return:', {
+      data: {
+        activePlanFound: active !== null,
+        sessionFound: session !== null,
+      },
+    });
+    const validatedAt = this.clock.now();
+    this.logger.log('TrainingService -> overview -> clock return:', {
+      data: { resolved: true },
+    });
+    const offlineValidity =
+      active === null
+        ? null
+        : {
+            expiresAt: new Date(
+              validatedAt.getTime() + OFFLINE_PLAN_TTL_MS,
+            ).toISOString(),
+            validatedAt: validatedAt.toISOString(),
+          };
+    const offlinePreparation =
+      active === null
+        ? null
+        : {
+            plan: this.planSummary(active),
+            workoutIds: active.plan.workouts.map((workout) => workout.id),
+          };
     if (session !== null) {
       const workouts = await Promise.all(
         session.planWorkouts.map(async (workout) => ({
@@ -80,15 +110,24 @@ export class TrainingService {
             workout.id === session.workout.id ? ('in-progress' as const) : null,
         })),
       );
-      const result = { plan: session.plan, workouts };
+      const result = {
+        offlinePreparation,
+        offlineValidity,
+        plan: session.plan,
+        workouts,
+      };
       this.logger.log('TrainingService -> overview -> return:', {
         data: { personId, source: 'session', workoutCount: workouts.length },
       });
       return result;
     }
-    const active = await this.personalPlans.getActiveExecutionPlan(personId);
     if (active === null) {
-      const result = { plan: null, workouts: [] };
+      const result = {
+        offlinePreparation: null,
+        offlineValidity: null,
+        plan: null,
+        workouts: [],
+      };
       this.logger.log('TrainingService -> overview -> return:', {
         data: { personId, source: 'empty', workoutCount: 0 },
       });
@@ -98,6 +137,10 @@ export class TrainingService {
       personId,
       active.plan.id,
     );
+    this.logger.log(
+      'TrainingService -> overview -> workoutExecutionRepository return:',
+      { data: { executionFound: last !== null } },
+    );
     const currentId = this.resolveCurrentWorkoutId(active, last?.workoutId);
     const workouts = await Promise.all(
       active.plan.workouts.map(async (workout) => ({
@@ -106,6 +149,8 @@ export class TrainingService {
       })),
     );
     const result = {
+      offlinePreparation,
+      offlineValidity,
       plan: this.planSummary(active),
       workouts,
     };
@@ -139,8 +184,30 @@ export class TrainingService {
       workout.exercises,
     );
     const exercises = publicExercises.map(
-      (exercise): TrainingExercisePreview => {
-        if (exercise.type === 'image' || exercise.type === 'youtube-short') {
+      (exercise, index): TrainingExercisePreview => {
+        if (exercise.type === 'image') {
+          const storedExercise = workout.exercises[index];
+          const image =
+            exercise.image !== null &&
+            storedExercise?.type === 'image' &&
+            storedExercise.image !== null
+              ? {
+                  ...exercise.image,
+                  offlineMediaId: this.images.createOfflineMediaId(
+                    storedExercise.image,
+                  ),
+                }
+              : null;
+          return {
+            ...exercise,
+            image,
+            lastLoadsKg: Array.from(
+              { length: exercise.sets },
+              (_, index) => loadsByExercise.get(exercise.id)?.[index] ?? null,
+            ),
+          };
+        }
+        if (exercise.type === 'youtube-short') {
           return {
             ...exercise,
             lastLoadsKg: Array.from(

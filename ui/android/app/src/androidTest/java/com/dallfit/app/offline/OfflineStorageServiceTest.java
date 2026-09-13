@@ -90,6 +90,8 @@ public final class OfflineStorageServiceTest {
             0L
         );
         assertEquals("plan-b", service.getPreparedPlan().getPlanId());
+        assertEquals("2026-09-13T12:00:00Z", service.getPreparedPlan().getValidatedAt());
+        assertEquals("2026-09-20T12:00:00Z", service.getPreparedPlan().getExpiresAt());
         service.putActiveSession(
             "session-a",
             "plan-a",
@@ -270,6 +272,53 @@ public final class OfflineStorageServiceTest {
         assertNull(service.getFile("image-a"));
         assertFalse(new File(context.getFilesDir(), directoryName + "/account").exists());
         assertFalse(service.getState().isAccountBound());
+    }
+
+    @Test
+    public void rejectsAFileCommitAfterThePreparedPlanRevisionChanges() throws Exception {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.putPreparedPlan(
+            "plan-a",
+            1,
+            1,
+            "{\"workouts\":[]}",
+            "2026-09-13T12:00:00Z",
+            "2026-09-20T12:00:00Z"
+        );
+        service.registerTemporaryFileForPreparedPlan(
+            "image-a",
+            "plan-a",
+            "image/webp",
+            1,
+            "2026-09-13T12:00:00Z",
+            1
+        );
+        try (FileOutputStream output = new FileOutputStream(service.getTemporaryFileForNativeWrite("image-a"))) {
+            output.write("fixture".getBytes(StandardCharsets.UTF_8));
+        }
+        service.putPreparedPlan(
+            "plan-a",
+            1,
+            2,
+            "{\"workouts\":[]}",
+            "2026-09-13T12:01:00Z",
+            "2026-09-20T12:01:00Z"
+        );
+
+        OfflineStorageException error = assertThrows(
+            OfflineStorageException.class,
+            () -> service.completeFileForPreparedPlan(
+                "image-a",
+                1,
+                "2026-09-13T12:02:00Z",
+                "plan-a",
+                1
+            )
+        );
+
+        assertEquals("OFFLINE_STORAGE_REVISION_CONFLICT", error.getCode());
+        assertEquals("temporary", service.getFile("image-a").getStatus());
     }
 
     @Test

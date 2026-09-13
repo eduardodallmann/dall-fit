@@ -7,6 +7,8 @@ public final class StoredAggregate {
     private final String planId;
     private final long revision;
     private final String updatedAt;
+    private final String validatedAt;
+    private final String expiresAt;
 
     public StoredAggregate(
         String id,
@@ -16,12 +18,27 @@ public final class StoredAggregate {
         String payloadJson,
         String updatedAt
     ) {
+        this(id, planId, payloadVersion, revision, payloadJson, updatedAt, null, null);
+    }
+
+    public StoredAggregate(
+        String id,
+        String planId,
+        int payloadVersion,
+        long revision,
+        String payloadJson,
+        String updatedAt,
+        String validatedAt,
+        String expiresAt
+    ) {
         this.id = id;
         this.planId = planId;
         this.payloadVersion = payloadVersion;
         this.revision = revision;
         this.payloadJson = payloadJson;
         this.updatedAt = updatedAt;
+        this.validatedAt = validatedAt;
+        this.expiresAt = expiresAt;
     }
 
     public String getId() {
@@ -46,5 +63,13 @@ public final class StoredAggregate {
 
     public String getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getValidatedAt() {
+        return validatedAt;
+    }
+
+    public String getExpiresAt() {
+        return expiresAt;
     }
 }

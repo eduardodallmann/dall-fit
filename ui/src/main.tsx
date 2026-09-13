@@ -12,6 +12,7 @@ import {
   ApplicationErrorBoundary,
   ApplicationFallback,
 } from '~/core/components/application-fallback';
+import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { resolveApplicationPlatform } from '~/core/platform/platform-composition';
 import { bootstrapTheme } from '~/core/theme/theme-storage';
 
@@ -27,14 +28,16 @@ export async function bootstrap() {
     const initialTheme = bootstrapTheme();
     const platform = resolveApplicationPlatform();
     let nativeSession: NativeSessionCoordinator | null = null;
+    let offlinePreparation: OfflinePreparationCoordinator | null = null;
     if (platform.capabilities.nativeAuthentication) {
-      const { createNativeSessionCoordinator } =
+      const { createNativeComposition } =
         await import('~/core/platform/native/native-session-composition');
-      const coordinator = await createNativeSessionCoordinator();
-      nativeSession = coordinator;
+      const composition = await createNativeComposition();
+      nativeSession = composition.session;
+      offlinePreparation = composition.offlinePreparation;
       configureSessionChannel('native', {
-        getAccessToken: () => coordinator.getAccessToken(),
-        handleUnauthorized: () => coordinator.expireSession(),
+        getAccessToken: () => composition.session.getAccessToken(),
+        handleUnauthorized: () => composition.session.expireSession(),
       });
     } else {
       configureSessionChannel('web');
@@ -54,6 +57,7 @@ export async function bootstrap() {
           <AppProviders
             initialTheme={initialTheme}
             nativeSession={nativeSession}
+            offlinePreparation={offlinePreparation}
             platform={platform}
           >
             <App />

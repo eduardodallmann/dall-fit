@@ -54,6 +54,10 @@ dall-fit/
    aplicação, apoiado por SQLite e pelo filesystem interno privado. A bridge
    Capacitor expõe comandos tipados e futuros consumidores nativos usam a mesma
    instância e o mesmo lock; Web/PWA não mantém uma implementação paralela.
+10. A preparação de treino Android compõe os endpoints públicos pelo Axios da UI,
+    persiste primeiro um snapshot opaco no motor nativo e entrega signed URLs
+    somente em memória ao downloader Java. O downloader grava apenas WebP
+    `display` no filesystem privado; nenhum Bearer, URL ou pathname entra no banco.
 
 ## Convenções de importação
 

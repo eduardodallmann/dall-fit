@@ -48,10 +48,13 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
    retry/cancelamento. Timeout ambíguo mantém geração e permite reentrega.
 7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca. Após
    ativar, a UI remove o cache de `/training`, evitando reutilizar um estado vazio
-   lido antes da nova seleção.
+   lido antes da nova seleção. No Android, o sucesso limpa imediatamente o plano e
+   as mídias preparados e inicia a composição do novo ativo; falha dessa preparação
+   não reverte a seleção nem restaura a réplica anterior.
 8. Excluir próprio ou desvincular limpa a seleção se necessário, sem fallback.
    Se a entrada era ativa, a UI remove o cache de `/training` para obrigar leitura
-   canônica na próxima visita.
+   canônica na próxima visita e limpa o preparado Android, preservando sessão e
+   snapshots de execução independentes.
 9. Excluir global remove vínculos/seleções, mas jobs continuam pelo snapshot.
 10. Pedir ajuda abre uma sessão separada e retomável. A API coleta uma pergunta
     por vez, calcula triagem local e só chama o provider para operações restritas.

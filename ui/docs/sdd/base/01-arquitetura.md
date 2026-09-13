@@ -68,6 +68,15 @@ de resolver. Falha mantém o motor fechado para outra identidade e permite retry
 Eventos `stateChanged` são best-effort; `getState` sempre fornece revisão e
 contadores canônicos, inclusive a geração/categoria técnica de recuperação.
 
+`OfflinePreparationCoordinator` existe somente na composição Android. Ao entrar
+em Treinar, ele lê validade e metadados canônicos, compõe `GET /training` e até
+quatro previews simultâneos pelo Axios autenticado, grava o payload v1 sem URLs e
+libera a rota antes das mídias. Até quatro downloads Java recebem a signed URL
+`display` apenas durante a chamada, exigem HTTPS/WebP/2xx, no máximo três redirects
+HTTPS, corpo completo não vazio de até 10 MiB e concluem pelo rename do motor.
+Geração e revisão impedem callbacks atrasados de publicar dados depois de troca ou
+remoção. Web/PWA não instancia esse coordenador.
+
 Criação e migrations pertencem ao `SQLiteOpenHelper`. Falha de abertura é tentada
 novamente com outro handle; falha persistente, migration ausente ou downgrade
 recria banco, sidecars e arquivos e registra somente diagnóstico sanitizado. O
@@ -559,9 +568,9 @@ com Workbox real. Ele comprova reload único da aba segura e preservação do dr
 outra aba até a remoção do bloqueador; não registra o worker do MSW.
 
 O empacotamento Capacitor não altera manifest, service worker, instalação ou
-atualização do PWA. O build Android consome o mesmo build otimizado, mas o canal
-nativo não adiciona treino offline, autenticação nativa, storage, sync ou plugin
-nesta fundação.
+atualização do PWA. O build Android consome o mesmo build otimizado e acrescenta
+autenticação, storage privado e preparação de treino atrás da fronteira nativa;
+Web/PWA não carregam essas capacidades.
 
 O documento compartilhado `index.html` declara a viewport com escala inicial e
 máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual
