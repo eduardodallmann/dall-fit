@@ -37,6 +37,7 @@ export class TestLoginCommand {
 
     const session = await this.authSessionService.createSession(
       personResult.person.id,
+      'web',
     );
     this.logger.log(
       'TestLoginCommand -> execute -> authSessionService return:',

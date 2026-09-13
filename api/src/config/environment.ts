@@ -70,6 +70,12 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(600_000),
+  RATE_LIMIT_NATIVE_SESSION_LIMIT: z.coerce.number().int().min(1).default(10),
+  RATE_LIMIT_NATIVE_SESSION_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(600_000),
   RATE_LIMIT_TEST_LOGIN_LIMIT: z.coerce.number().int().min(1).default(5),
   RATE_LIMIT_TEST_LOGIN_WINDOW_MS: z.coerce
     .number()
@@ -211,6 +217,7 @@ const environmentSchema = z.looseObject({
   ),
   AUTH_SESSION_ISSUER: z.string().min(1).default('dall-fit-api'),
   AUTH_SESSION_AUDIENCE: z.string().min(1).default('dall-fit-ui'),
+  AUTH_NATIVE_SESSION_AUDIENCE: z.string().min(1).default('dall-fit-android'),
   AUTH_SESSION_TTL_SECONDS: z.coerce
     .number()
     .int()
@@ -473,6 +480,12 @@ function validateAuthSecurityCombinations(
   config: ParsedEnvironment,
   runtimeEnvironment: RuntimeEnvironment,
 ): void {
+  if (config.AUTH_NATIVE_SESSION_AUDIENCE === config.AUTH_SESSION_AUDIENCE) {
+    throw new Error(
+      'Invalid environment variables: AUTH_NATIVE_SESSION_AUDIENCE must differ from AUTH_SESSION_AUDIENCE',
+    );
+  }
+
   if (
     config.AUTH_TEST_BYPASS_ENABLED &&
     config.AUTH_TEST_BYPASS_KEY === undefined

@@ -8,6 +8,8 @@ export type {
   CreateExerciseResponse,
   CreateGlobalTrainingPlanReferenceRequest,
   CreateGlobalTrainingPlanReferenceResponse,
+  CreateNativeSessionRequest,
+  CreateNativeSessionResponse,
   CreatePersonalTrainingPlanResponse,
   CreateTrainingPlanAssistantSessionRequest,
   CreateTrainingPlanCloneJobRequest,

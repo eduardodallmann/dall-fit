@@ -24,6 +24,7 @@ export function configureApplication(app: INestApplication): void {
   app.use(cookieParser());
   app.enableCors({
     allowedHeaders: [
+      'Authorization',
       'Content-Type',
       'Idempotency-Key',
       'X-Resource-Version',

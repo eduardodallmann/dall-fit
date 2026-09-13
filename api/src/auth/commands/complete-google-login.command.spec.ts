@@ -70,6 +70,7 @@ describe('CompleteGoogleLoginCommand', () => {
       expect(findOrCreatePersonService.execute).toHaveBeenCalledWith(identity);
       expect(authSessionService.createSession).toHaveBeenCalledWith(
         'person-001',
+        'web',
       );
     },
   );

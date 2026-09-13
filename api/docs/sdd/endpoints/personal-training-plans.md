@@ -69,6 +69,11 @@ assistente preservam minutos, instrução curta e vídeo demonstrativo opcional.
 fluxo HTTP proprietário está em
 [`training-plan-assistant.md`](training-plan-assistant.md).
 
+Todos os endpoints exigem exatamente um transporte de sessão: cookie Web ou
+`Authorization: Bearer` nativo. Os dois juntos retornam `400
+AUTH_TRANSPORT_AMBIGUOUS`. Mutações Web exigem origem e CSRF; uma sessão nativa já
+verificada dispensa ambos.
+
 ## Cenários reproduzíveis
 
 ### Cenário 1 — catálogo misto e seleção ativa

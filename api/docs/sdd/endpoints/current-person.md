@@ -24,8 +24,8 @@ o próprio tema sem expor um CRUD geral de pessoas.
 ## Contrato HTTP resumido
 
 - Método e path: `GET /auth/me`
-- Autenticação: cookie de sessão vigente, JWT validado, registro Redis ativo e
-  pessoa ainda existente
+- Autenticação: exatamente um transporte entre cookie Web e Bearer nativo, com JWT,
+  audience, canal Redis e pessoa ainda existente validados
 - Autorização: pessoa da sessão ainda existente; o endpoint não exige
   administrador
 - Entrada: não se aplica
@@ -46,9 +46,11 @@ devolve `configs: {}` sem gravar ou inferir um default; quando existe, devolve
 
 ### `PATCH /auth/me/configs`
 
-- Autenticação: cookie `dall_fit_session` obrigatório; nenhum ID é aceito
-- Proteção de mutação: `Origin` exatamente igual a `UI_URL`, header
-  `X-CSRF-Token` da sessão e limite de 60/minuto por pessoa+IP
+- Autenticação: exatamente um transporte entre cookie Web e Bearer nativo; nenhum
+  ID de pessoa é aceito
+- Proteção de mutação: limite de 60/minuto por pessoa+IP; cookie Web exige `Origin`
+  exatamente igual a `UI_URL` e `X-CSRF-Token`, enquanto Bearer nativo verificado
+  dispensa CSRF
 - Entrada: exatamente `{ "theme": "light" | "dark" }`
 - Saída: `{ data: Person }` atualizada
 - Status: `200`, `400 VALIDATION_ERROR`, `401 AUTHENTICATION_REQUIRED`,
@@ -61,9 +63,10 @@ devolve `configs: {}` sem gravar ou inferir um default; quando existe, devolve
 
 ### 1. Proteção — `SessionAuthGuard.canActivate`
 
-O guard lê o cookie vigente, chama `AuthSessionService` para validar claims,
-assinatura/chave e o registro ativo no Redis e recebe a sessão técnica. Depois
-chama `FindPersonByIdService`, que acessa
+O guard resolve cookie Web ou Bearer nativo e rejeita os dois simultaneamente.
+`AuthSessionService` valida claims, assinatura/chave, audience e canal do registro
+ativo no Redis e devolve a sessão técnica. Depois o guard chama
+`FindPersonByIdService`, que acessa
 `MongoPersonRepository.findById`.
 
 O repository mapeia os campos persistidos para `PersonEntity`. Ele inclui
@@ -90,8 +93,9 @@ adicional para determinar autorização.
 ### 1. Proteção e validação
 
 `SessionAuthGuard` valida a sessão e carrega a pessoa como no GET.
-`RateLimitGuard` consome atomicamente a quota Redis e `CsrfGuard` compara token em
-tempo constante e origem exata. Só então o
+`RateLimitGuard` consome atomicamente a quota Redis. Para sessão Web, `CsrfGuard`
+compara token em tempo constante e origem exata; para sessão nativa já verificada,
+ele permite a continuação sem material CSRF. Só então o
 `ValidationPipe` aplica `UpdateCurrentPersonConfigsDto`: body vazio, valor fora de
 `light | dark` ou propriedade adicional termina com `400 VALIDATION_ERROR` antes
 do command.
@@ -122,10 +126,11 @@ service preserva a falha de pessoa removida como `401`, e o command monta a
 | atualização válida      | tema `light` ou `dark`               | `200` com `Person` atualizada        | MongoDB                |
 | atualização idempotente | tema igual ao persistido             | `200` com mesmo tema                 | `updatedAt` atualizado |
 | body inválido           | vazio, valor inválido ou campo extra | `400 VALIDATION_ERROR`               | nenhum                 |
-| cookie ausente          | sem sessão                           | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
+| transporte ausente      | sem sessão                           | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
+| cookie e Bearer juntos  | transporte ambíguo                   | `400 AUTH_TRANSPORT_AMBIGUOUS`       | nenhum                 |
 | token inválido/expirado | falha JWT                            | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
 | registro Redis ausente  | sessão revogada/resetada             | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |
-| CSRF ou Origin inválido | mutação sem proteção exata           | `403 CSRF_VALIDATION_FAILED`         | nenhum                 |
+| CSRF ou Origin inválido | mutação Web sem proteção exata       | `403 CSRF_VALIDATION_FAILED`         | nenhum                 |
 | quota excedida          | mais de 60 mutações/min/pessoa+IP    | `429` e `Retry-After`                | contador Redis         |
 | Redis indisponível      | proteção não pode ser confirmada     | erro técnico sanitizado              | nenhum                 |
 | pessoa removida         | repository devolve vazio             | `401 AUTHENTICATION_REQUIRED`        | nenhum                 |

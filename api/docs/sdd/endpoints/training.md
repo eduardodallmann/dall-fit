@@ -37,7 +37,9 @@ HTTP compartilhados em `@dall-fit/types`.
 | `POST /training/session/complete`               | `{ confirmIncomplete, timezone }` | `201 WorkoutExecutionSummaryResponse` |
 | `GET /training/completions/:workoutExecutionId` | MongoID                           | `200 WorkoutExecutionSummaryResponse` |
 
-Todos exigem sessão. Mutações exigem Origin e CSRF; as mutações de sessão exigem
+Todos exigem exclusivamente cookie Web ou `Authorization: Bearer` nativo; os dois
+juntos retornam `400 AUTH_TRANSPORT_AMBIGUOUS`. Mutações Web exigem Origin e CSRF;
+sessões nativas verificadas dispensam ambos. As mutações de sessão exigem
 `X-Resource-Version` inteiro, exceto iniciar e abandonar. Leitura e resposta de
 mutation da sessão usam `Cache-Control: private, no-store` e devolvem a versão
 canônica no mesmo header. Carga aceita `null` ou inteiro de 0 a 9999; a série pode

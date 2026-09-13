@@ -79,6 +79,7 @@ export class CompleteGoogleLoginCommand {
 
       const session = await this.authSessionService.createSession(
         personResult.person.id,
+        'web',
       );
       this.logger.log(
         'CompleteGoogleLoginCommand -> execute -> authSessionService return:',

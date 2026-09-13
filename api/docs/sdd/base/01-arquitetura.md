@@ -292,7 +292,9 @@ preview, fila offline desabilitada, tentativas e timeouts limitados e encerramen
 no lifecycle do Nest. Na Vercel, a mesma conexão é anexada ao lifecycle oficial de
 Fluid Compute; não existe conexão, pool ou fallback por request.
 
-`SessionStoreService` cria, lê e remove sessões revogáveis. `RateLimitService` usa
+`SessionStoreService` cria, lê e remove sessões revogáveis discriminadas por canal
+`web | native`. Registros anteriores sem canal são inválidos e expiram pelo TTL;
+eles nunca são promovidos implicitamente. `RateLimitService` usa
 um script Lua atômico que executa incremento, TTL e leitura da janela em um único
 comando Redis. Somente `RedisKeyService` compõe as chaves injetando o namespace;
 nenhum adapter executa `KEYS`, `FLUSH*` ou limpeza por prefixo em runtime publicado.
@@ -371,8 +373,9 @@ isolados em instâncias temporárias próprias sem acessar o diretório persiste
   - `REDIS_NAMESPACE`, base do namespace; preview acrescenta hash do deployment;
   - `REDIS_CONNECT_TIMEOUT_MS` e `REDIS_COMMAND_TIMEOUT_MS`, limites de espera;
   - pares `RATE_LIMIT_*_LIMIT` e `RATE_LIMIT_*_WINDOW_MS` para início/callback
-    Google, bypass local, sessão, mutações autenticadas e administrativas; aceitam
-    somente inteiros positivos e as janelas têm mínimo de um segundo;
+    Google, troca nativa, bypass local, sessão, mutações autenticadas e
+    administrativas; aceitam somente inteiros positivos e as janelas têm mínimo de
+    um segundo;
   - `TRAINING_PLAN_ASSISTANT_*`, com flag, provider/modelo, chave Groq, timeout,
     budget máximo de completion, confirmações de ZDR/privacidade e quotas próprias
     de mensagem, draft e confirmação;
@@ -380,8 +383,9 @@ isolados em instâncias temporárias próprias sem acessar o diretório persiste
   - `GOOGLE_OAUTH_CREDENTIALS_BASE64`, JSON de cliente OAuth Web codificado em
     base64;
   - `AUTH_SESSION_SECRET`, chave HMAC com pelo menos 32 caracteres;
-  - `AUTH_SESSION_ACTIVE_KEY_ID`, `AUTH_SESSION_ISSUER` e
-    `AUTH_SESSION_AUDIENCE`, identidade criptográfica da chave e do token;
+  - `AUTH_SESSION_ACTIVE_KEY_ID`, `AUTH_SESSION_ISSUER`,
+    `AUTH_SESSION_AUDIENCE` e `AUTH_NATIVE_SESSION_AUDIENCE`, identidade
+    criptográfica da chave e audiences isoladas dos tokens Web e Android;
   - trio opcional `AUTH_SESSION_PREVIOUS_SECRET`,
     `AUTH_SESSION_PREVIOUS_KEY_ID` e `AUTH_SESSION_PREVIOUS_VALID_UNTIL`, aceito
     somente durante no máximo uma validade absoluta de sessão;
@@ -416,10 +420,13 @@ cria `state`, `nonce` e verifier aleatórios em cookies temporários, e
 valida assinatura, issuer, audience, nonce, `sub`, e-mail verificado, nome e
 e-mail. `POST /auth/google` não existe.
 
-`SessionAuthGuard` é a fronteira reutilizável de endpoints privados. Ele lê
-`dall_fit_session` em local/teste ou `__Host-dall_fit_session` em ambiente seguro,
-valida `alg`, `kid`, assinatura, `sub`, `jti`, `iss`, `aud`, `iat` e `exp`, exige o
-registro ativo correspondente no Redis e então consulta `Person` no MongoDB.
+`SessionAuthGuard` é a fronteira reutilizável de endpoints privados. Ele aceita
+exatamente um transporte: o cookie `dall_fit_session` em local/teste ou
+`__Host-dall_fit_session` em ambiente seguro para o canal Web, ou
+`Authorization: Bearer` para o canal Android nativo. Presença simultânea é
+rejeitada. O guard valida `alg`, `kid`, assinatura, `sub`, `jti`, `iss`, `aud`,
+`iat` e `exp`, exige audience e canal Redis correspondentes e então consulta
+`Person` no MongoDB.
 `Authenticated` aplica o guard e `CurrentPerson` entrega a entidade já validada ao
 controller. O token contém somente claims técnicos; o JWT bruto nunca é persistido
 no Redis. Cada sessão dura no máximo sete dias, sem renovação deslizante, e o TTL
@@ -432,7 +439,10 @@ service novamente. Pessoa autenticada sem a chave recebe
 `403 ADMIN_ACCESS_REQUIRED`. As sete operações de planos globais aplicam essa
 proteção no controller proprietário.
 
-Cookies de sessão usam `HttpOnly`, path `/` e expiração configurada. Em local/teste
+JWTs Web usam `AUTH_SESSION_AUDIENCE`; JWTs nativos usam a audience distinta
+`AUTH_NATIVE_SESSION_AUDIENCE`. Ambos usam a mesma chave, issuer, duração absoluta,
+rotação e registro revogável, mas não são intercambiáveis. Cookies de sessão usam
+`HttpOnly`, path `/` e expiração configurada. Em local/teste
 usam nome sem prefixo, `SameSite=Lax` e sem `Secure`; em produção/preview usam
 prefixo `__Host-`, `Secure`, host-only e `SameSite=None`. Os cookies temporários de
 `state`, `nonce` e verifier duram no máximo dez minutos, usam sempre
@@ -441,19 +451,24 @@ do parser de cookies e antes de guards, pipes e command. Assim a limpeza acontec
 também em validação, rate limit e falha técnica; o cookie de sessão preexistente
 não é tocado por essa limpeza.
 
-`GET /auth/csrf` devolve o segredo da sessão com `Cache-Control: no-store`.
-Mutações autenticadas exigem simultaneamente cookie, `X-CSRF-Token` comparado em
-tempo constante e `Origin` exatamente igual a `UI_URL`. `POST /auth/logout` é
+`POST /auth/native/session` valida o Google ID token para a audience server/Web,
+sincroniza a pessoa e devolve sessão Bearer nativa com `Cache-Control: no-store`.
+`DELETE /auth/native/session` revoga essa sessão e é idempotente para credencial
+ausente ou inativa. `GET /auth/csrf` aceita somente sessão Web e devolve seu segredo
+com `Cache-Control: no-store`. Mutações autenticadas por cookie exigem
+simultaneamente `X-CSRF-Token` comparado em tempo constante e `Origin` exatamente
+igual a `UI_URL`; uma sessão nativa já verificada dispensa CSRF. `POST /auth/logout` é
 idempotente quando não há sessão válida; quando há, aplica a proteção, remove o
 registro Redis e limpa nomes atual e legado do cookie.
 
 Rate limits distribuídos usam sessão/pessoa e IP conforme o endpoint. Início
-Google aceita 10/10min/IP; callback 30/10min/IP; bypass 5/min/IP; CSRF e logout
+Google aceita 10/10min/IP; troca nativa 10/10min/IP; callback 30/10min/IP; bypass
+5/min/IP; CSRF e logouts
 30/min/sessão+IP; mutações autenticadas comuns 60/min/pessoa+IP; administrativas
 30/min/admin+IP. Preflight não consome quota. Excesso responde `429` estruturado e
 `Retry-After`. Depois da correlação da request, a API usa Helmet e parser de
 cookies; CORS credenciado mantém origem e métodos exatos, aceita somente os headers
-contratados, inclusive `Idempotency-Key`, e expõe apenas `X-Request-Id` e
+contratados, inclusive `Authorization` e `Idempotency-Key`, e expõe apenas `X-Request-Id` e
 `X-Resource-Version`; `trust proxy` permanece explícito.
 
 No callback OAuth, somente negação de consentimento, callback ausente ou

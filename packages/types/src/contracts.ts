@@ -64,6 +64,17 @@ export type CsrfTokenResponse = ApiResponse<{
   token: string;
 }>;
 
+export interface CreateNativeSessionRequest {
+  identityToken: string;
+}
+
+export type CreateNativeSessionResponse = ApiResponse<{
+  accessToken: string;
+  expiresAt: string;
+  person: Person;
+  tokenType: 'Bearer';
+}>;
+
 export interface CreateTrainingPlanRequest {
   name: string;
   description: string;

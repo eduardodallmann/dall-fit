@@ -1,5 +1,9 @@
 import 'dotenv/config';
 
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+
+import Redis from 'ioredis';
 import { connect, disconnect, model, Types, type Model } from 'mongoose';
 
 import {
@@ -47,7 +51,11 @@ const authScenarios = [
   'auth:person-new',
   'auth:person-theme-dark',
   'auth:person-theme-light',
+  'auth:native-session',
 ] as const;
+
+const nativePersonId = '64b000000000000000000080';
+const nativeTokenFile = '/tmp/dall-fit-native-session-token.txt';
 
 const assistantScenarios = [
   'assistant:confirm',
@@ -83,6 +91,30 @@ async function seedAuthenticationScenario(
   personModel: Model<PersonDocument>,
   scenario: string | undefined,
 ): Promise<boolean> {
+  if (scenario === 'auth:native-session') {
+    await personModel
+      .deleteMany({
+        _id: { $ne: new Types.ObjectId(nativePersonId) },
+        googleSubject: 'google-native-001',
+      })
+      .exec();
+    await personModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(nativePersonId) },
+        {
+          $set: {
+            email: 'native.runner@example.test',
+            googleSubject: 'google-native-001',
+            name: 'Native Runner',
+            photoUrl: null,
+          },
+          $unset: { configs: 1, isAdmin: 1 },
+        },
+        { new: true, setDefaultsOnInsert: true, upsert: true },
+      )
+      .exec();
+    return true;
+  }
   if (scenario === 'auth:person-new') {
     await personModel.deleteMany({ googleSubject: 'google-new-001' }).exec();
     return true;
@@ -170,6 +202,64 @@ async function seedAuthenticationScenario(
   }
 
   return false;
+}
+
+async function seedNativeSession(): Promise<void> {
+  const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
+  const parsedRedisUrl = new URL(redisUrl);
+  if (!['127.0.0.1', 'localhost'].includes(parsedRedisUrl.hostname)) {
+    throw new Error('Native session seed requires an explicitly local Redis.');
+  }
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (secret === undefined || secret.length < 32) {
+    throw new Error(
+      'AUTH_SESSION_SECRET with at least 32 characters is required.',
+    );
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt =
+    issuedAt + Number(process.env.AUTH_SESSION_TTL_SECONDS ?? 604_800);
+  const jti = randomUUID();
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString('base64url');
+  const unsignedToken = `${encode({
+    alg: 'HS256',
+    kid: process.env.AUTH_SESSION_ACTIVE_KEY_ID ?? 'active-v1',
+    typ: 'JWT',
+  })}.${encode({
+    aud: process.env.AUTH_NATIVE_SESSION_AUDIENCE ?? 'dall-fit-android',
+    exp: expiresAt,
+    iat: issuedAt,
+    iss: process.env.AUTH_SESSION_ISSUER ?? 'dall-fit-api',
+    jti,
+    sub: nativePersonId,
+  })}`;
+  const signature = createHmac('sha256', secret)
+    .update(unsignedToken)
+    .digest('base64url');
+  const token = `${unsignedToken}.${signature}`;
+  const namespace = `${process.env.REDIS_NAMESPACE ?? 'dall-fit'}:local`;
+  const redis = new Redis(redisUrl, {
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+  });
+  try {
+    await redis.set(
+      `${namespace}:session:${jti}`,
+      JSON.stringify({
+        channel: 'native',
+        csrfToken: randomBytes(32).toString('base64url'),
+        expiresAt,
+        personId: nativePersonId,
+      }),
+      'PXAT',
+      expiresAt * 1000,
+    );
+    await writeFile(nativeTokenFile, token, { mode: 0o600 });
+  } finally {
+    await redis.quit();
+  }
 }
 
 // The CLI keeps scenario selection and ownership-safe cleanup visible in one operational transaction.
@@ -479,6 +569,9 @@ async function main(): Promise<void> {
       }
     }
 
+    if (scenario === 'auth:native-session') {
+      await seedNativeSession();
+    }
     process.stdout.write(`Seed ${scenario} prepared.\n`);
   } finally {
     await disconnect();

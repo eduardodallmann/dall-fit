@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import type { SessionChannel } from '~/auth/domain/auth.types';
 import { RedisClientService } from '~/redis/redis-client.service';
 import { RedisKeyService } from '~/redis/redis-key.service';
 
 export interface StoredSession {
+  channel: SessionChannel;
   csrfToken: string;
   expiresAt: number;
   personId: string;
@@ -20,7 +22,11 @@ export class SessionStoreService {
 
   async create(jti: string, session: StoredSession): Promise<void> {
     this.logger.log('SessionStoreService -> create -> params:', {
-      params: { expiresAt: session.expiresAt, personId: session.personId },
+      params: {
+        channel: session.channel,
+        expiresAt: session.expiresAt,
+        personId: session.personId,
+      },
     });
     const key = this.redisKeyService.create('session', jti);
     const value = JSON.stringify(session);
@@ -68,22 +74,32 @@ export class SessionStoreService {
   }
 }
 
-function parseStoredSession(value: string): StoredSession {
-  const parsed: unknown = JSON.parse(value);
+function parseStoredSession(value: string): StoredSession | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
     !('csrfToken' in parsed) ||
     typeof parsed.csrfToken !== 'string' ||
+    !('channel' in parsed) ||
+    !['native', 'web'].includes(
+      typeof parsed.channel === 'string' ? parsed.channel : '',
+    ) ||
     !('expiresAt' in parsed) ||
     typeof parsed.expiresAt !== 'number' ||
     !('personId' in parsed) ||
     typeof parsed.personId !== 'string'
   ) {
-    throw new Error('Stored session is invalid.');
+    return null;
   }
 
   return {
+    channel: parsed.channel as SessionChannel,
     csrfToken: parsed.csrfToken,
     expiresAt: parsed.expiresAt,
     personId: parsed.personId,

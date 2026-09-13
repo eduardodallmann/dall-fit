@@ -15,6 +15,11 @@ bridge e trata timeout sem executar clonagem na request.
 | `POST /training-plan-clone-jobs/:cloneJobId/retry` | `{}`                     | `202`, nova geração |
 | `DELETE /training-plan-clone-jobs/:cloneJobId`     | nenhuma                  | `202`, cancelling   |
 
+Os três endpoints exigem exclusivamente cookie Web ou `Authorization: Bearer`
+nativo; os dois juntos retornam `400 AUTH_TRANSPORT_AMBIGUOUS`. Por serem
+mutações, requests Web exigem origem e CSRF, enquanto uma sessão nativa verificada
+dispensa ambos.
+
 ## Fluxo e estados
 
 Start lê o global com imagens internas e captura o ETag de cada variante; uploads

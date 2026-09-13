@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
 import type {
+  SessionChannel,
   SessionCookieResult,
   VerifiedSession,
 } from '~/auth/domain/auth.types';
@@ -30,7 +31,7 @@ export class AuthSessionService {
   private readonly logger = new Logger(AuthSessionService.name);
   private readonly activeKeyId: string;
   private readonly activeSecret: string;
-  private readonly audience: string;
+  private readonly audiences: Readonly<Record<SessionChannel, string>>;
   private readonly issuer: string;
   private readonly previousKeyId?: string;
   private readonly previousSecret?: string;
@@ -49,7 +50,10 @@ export class AuthSessionService {
       'AUTH_SESSION_ACTIVE_KEY_ID',
     );
     this.activeSecret = configService.getOrThrow<string>('AUTH_SESSION_SECRET');
-    this.audience = configService.getOrThrow<string>('AUTH_SESSION_AUDIENCE');
+    this.audiences = {
+      native: configService.getOrThrow<string>('AUTH_NATIVE_SESSION_AUDIENCE'),
+      web: configService.getOrThrow<string>('AUTH_SESSION_AUDIENCE'),
+    };
     this.issuer = configService.getOrThrow<string>('AUTH_SESSION_ISSUER');
     this.previousKeyId = configService.get<string>(
       'AUTH_SESSION_PREVIOUS_KEY_ID',
@@ -62,9 +66,12 @@ export class AuthSessionService {
     );
   }
 
-  async createSession(personId: string): Promise<SessionCookieResult> {
+  async createSession(
+    personId: string,
+    channel: SessionChannel,
+  ): Promise<SessionCookieResult> {
     this.logger.log('AuthSessionService -> createSession -> params:', {
-      params: { personId },
+      params: { channel, personId },
     });
     const jti = randomUUID();
     const csrfToken = randomBytes(32).toString('base64url');
@@ -74,7 +81,7 @@ export class AuthSessionService {
       { exp: expiresAt, iat: issuedAt },
       {
         algorithm: 'HS256',
-        audience: this.audience,
+        audience: this.audiences[channel],
         issuer: this.issuer,
         jwtid: jti,
         keyid: this.activeKeyId,
@@ -88,6 +95,7 @@ export class AuthSessionService {
     );
 
     await this.sessionStoreService.create(jti, {
+      channel,
       csrfToken,
       expiresAt,
       personId,
@@ -98,6 +106,7 @@ export class AuthSessionService {
     );
 
     const result = {
+      expiresAt,
       maxAgeMs: this.ttlSeconds * 1000,
       token,
     };
@@ -108,9 +117,12 @@ export class AuthSessionService {
     return result;
   }
 
-  async verifySession(token: string): Promise<VerifiedSession> {
+  async verifySession(
+    token: string,
+    expectedChannel: SessionChannel,
+  ): Promise<VerifiedSession> {
     this.logger.log('AuthSessionService -> verifySession -> params:', {
-      params: { tokenPresent: token.length > 0 },
+      params: { expectedChannel, tokenPresent: token.length > 0 },
     });
 
     let payload: SessionPayload;
@@ -119,7 +131,7 @@ export class AuthSessionService {
       const secret = this.resolveSecret(header);
       payload = await this.jwtService.verifyAsync<SessionPayload>(token, {
         algorithms: ['HS256'],
-        audience: this.audience,
+        audience: this.audiences[expectedChannel],
         issuer: this.issuer,
         secret,
       });
@@ -154,6 +166,7 @@ export class AuthSessionService {
     );
     if (
       storedSession === null ||
+      storedSession.channel !== expectedChannel ||
       storedSession.personId !== payload.sub ||
       storedSession.expiresAt !== payload.exp ||
       storedSession.expiresAt <= Math.floor(Date.now() / 1000)
@@ -162,6 +175,7 @@ export class AuthSessionService {
     }
 
     const result = {
+      channel: storedSession.channel,
       csrfToken: storedSession.csrfToken,
       expiresAt: storedSession.expiresAt,
       jti: payload.jti,

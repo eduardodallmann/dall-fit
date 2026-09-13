@@ -32,9 +32,12 @@ describe('validateEnvironment', () => {
       RUNTIME_ENVIRONMENT: 'local',
       RATE_LIMIT_GOOGLE_START_LIMIT: 10,
       RATE_LIMIT_GOOGLE_START_WINDOW_MS: 600_000,
+      RATE_LIMIT_NATIVE_SESSION_LIMIT: 10,
+      RATE_LIMIT_NATIVE_SESSION_WINDOW_MS: 600_000,
       RATE_LIMIT_SESSION_LIMIT: 30,
       RATE_LIMIT_SESSION_WINDOW_MS: 60_000,
       AUTH_COOKIE_SECURE: false,
+      AUTH_NATIVE_SESSION_AUDIENCE: 'dall-fit-android',
       AUTH_TEST_BYPASS_ENABLED: false,
       AUTH_TEST_BYPASS_E2E_ENABLED: false,
       GOOGLE_OAUTH_CREDENTIALS: {
@@ -120,6 +123,18 @@ describe('validateEnvironment', () => {
         AUTH_TEST_BYPASS_ENABLED: 'true',
       }),
     ).toThrow('AUTH_TEST_BYPASS_KEY: required');
+  });
+
+  it('requires distinct audiences for Web and native sessions', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        AUTH_NATIVE_SESSION_AUDIENCE: 'shared-audience',
+        AUTH_SESSION_AUDIENCE: 'shared-audience',
+      }),
+    ).toThrow(
+      'AUTH_NATIVE_SESSION_AUDIENCE must differ from AUTH_SESSION_AUDIENCE',
+    );
   });
 
   it('rejects insecure cookies and the bypass in production', () => {

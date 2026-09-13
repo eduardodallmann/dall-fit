@@ -23,6 +23,7 @@ import {
   OAUTH_NONCE_COOKIE,
   OAUTH_STATE_COOKIE,
 } from '~/auth/auth.constants';
+import { InvalidGoogleIdentityError } from '~/auth/errors/invalid-google-identity.error';
 import { GoogleOAuthService } from '~/auth/services/google-oauth.service';
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
@@ -57,6 +58,7 @@ describe('Authentication (e2e)', () => {
     process.env.REDIS_NAMESPACE = 'dall-fit-auth-e2e';
     process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64 = googleCredential;
     process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
+    process.env.AUTH_NATIVE_SESSION_AUDIENCE = 'dall-fit-android-e2e';
     process.env.AUTH_COOKIE_SECURE = 'false';
     process.env.AUTH_TEST_BYPASS_ENABLED = 'true';
     process.env.AUTH_TEST_BYPASS_E2E_ENABLED = 'true';
@@ -93,6 +95,32 @@ describe('Authentication (e2e)', () => {
     const body = response.body as { data: { token: string } };
 
     return body.data.token;
+  }
+
+  async function createNativeSession(
+    googleSubject: string,
+  ): Promise<{ accessToken: string }> {
+    const googleOAuthService = app.get(GoogleOAuthService);
+    const verifySpy = vi
+      .spyOn(googleOAuthService, 'verifyNativeIdentityToken')
+      .mockResolvedValueOnce({
+        email: `${googleSubject}@example.test`,
+        googleSubject,
+        name: 'Native Runner',
+        photoUrl: null,
+      });
+    const response = await request(app.getHttpServer())
+      .post('/auth/native/session')
+      .send({ identityToken: 'safe-e2e-google-token' });
+    verifySpy.mockRestore();
+    expect(response.status).toBe(201);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['set-cookie']).toBeUndefined();
+    const body = response.body as {
+      data: { accessToken: string; tokenType: string };
+    };
+    expect(body.data.tokenType).toBe('Bearer');
+    return { accessToken: body.data.accessToken };
   }
 
   it('returns the removed root as a public normalized 404', async () => {
@@ -161,6 +189,117 @@ describe('Authentication (e2e)', () => {
     });
     expect(storedPerson).not.toHaveProperty('isAdmin');
     expect(storedPerson).not.toHaveProperty('configs');
+  });
+
+  it('creates and uses a revocable native Bearer session without CSRF', async () => {
+    const { accessToken } = await createNativeSession('google-native-001');
+
+    const meResponse = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    const mutationResponse = await request(app.getHttpServer())
+      .patch('/auth/me/configs')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ theme: 'dark' });
+    const csrfResponse = await request(app.getHttpServer())
+      .get('/auth/csrf')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(meResponse.status).toBe(200);
+    expect(meResponse.body).toMatchObject({
+      data: { name: 'Native Runner' },
+    });
+    expect(mutationResponse.status).toBe(200);
+    expect(mutationResponse.body).toMatchObject({
+      data: { configs: { theme: 'dark' } },
+    });
+    expect(csrfResponse.status).toBe(403);
+    expect(csrfResponse.body).toMatchObject({ code: 'CSRF_NOT_AVAILABLE' });
+
+    const jwtPayload = JSON.parse(
+      Buffer.from(accessToken.split('.')[1] ?? '', 'base64url').toString(),
+    ) as { jti: string };
+    const stored = await redisClient.get(
+      `dall-fit-auth-e2e:test:session:${jwtPayload.jti}`,
+    );
+    expect(JSON.parse(stored ?? '{}')).toMatchObject({ channel: 'native' });
+  });
+
+  it('rejects invalid native identity tokens without creating state', async () => {
+    const googleOAuthService = app.get(GoogleOAuthService);
+    const verifySpy = vi
+      .spyOn(googleOAuthService, 'verifyNativeIdentityToken')
+      .mockRejectedValueOnce(new InvalidGoogleIdentityError());
+
+    const response = await request(app.getHttpServer())
+      .post('/auth/native/session')
+      .send({ identityToken: 'invalid-e2e-google-token' });
+    verifySpy.mockRestore();
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({ code: 'GOOGLE_IDENTITY_INVALID' });
+    await expect(personModel.countDocuments()).resolves.toBe(0);
+  });
+
+  it('rejects simultaneous cookie and Bearer transports', async () => {
+    const agent = request.agent(app.getHttpServer());
+    await agent
+      .post('/auth/test-login')
+      .set('x-auth-test-key', testBypassKey)
+      .send({
+        email: 'ambiguous@example.test',
+        googleSubject: 'google-ambiguous-web-001',
+        name: 'Ambiguous Runner',
+        photoUrl: null,
+      })
+      .expect(204);
+    const { accessToken } = await createNativeSession(
+      'google-ambiguous-native-001',
+    );
+
+    const response = await agent
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: 'AUTH_TRANSPORT_AMBIGUOUS',
+    });
+  });
+
+  it('revokes native sessions idempotently without affecting web logout', async () => {
+    const { accessToken } = await createNativeSession(
+      'google-logout-native-001',
+    );
+
+    await request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete('/auth/native/session')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete('/auth/native/session')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete('/auth/native/session')
+      .set('Authorization', 'Bearer malformed')
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete('/auth/native/session')
+      .expect(204);
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
   });
 
   it('maps a legacy person without configs to an empty public object', async () => {
@@ -717,6 +856,9 @@ describe('Authentication (e2e)', () => {
     );
     expect(mutationPreflight.headers['access-control-allow-headers']).toContain(
       'Idempotency-Key',
+    );
+    expect(mutationPreflight.headers['access-control-allow-headers']).toContain(
+      'Authorization',
     );
     expect(
       mutationPreflight.headers['access-control-allow-headers'],
