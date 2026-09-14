@@ -41,21 +41,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = context.getRequest<unknown>();
     const response = context.getResponse<unknown>();
     const requestId = this.storage.getStore()?.requestId ?? randomUUID();
+    const path = this.resolvePath(request);
     const status = this.resolveStatus(exception);
-    const body = this.resolveBody(exception, status, requestId);
+    const body = this.resolveBody(exception, status, requestId, path);
 
     httpAdapter.setHeader(response, 'x-request-id', requestId);
 
     if (
       !(exception instanceof HttpException) &&
-      !(exception instanceof RedisUnavailableError)
+      !(exception instanceof RedisUnavailableError) &&
+      !this.isPayloadTooLarge(exception)
     ) {
       this.logger.error('GlobalExceptionFilter -> catch -> unexpectedError:', {
         data: {
           errorName:
             exception instanceof Error ? exception.name : 'UnknownError',
           method: this.readRequestValue(request, 'method'),
-          path: this.resolvePath(request),
+          path,
         },
         stack: exception instanceof Error ? exception.stack : undefined,
       });
@@ -65,10 +67,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 
   private resolveStatus(exception: unknown): HttpStatus {
-    const result =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    let result = HttpStatus.INTERNAL_SERVER_ERROR;
+    if (exception instanceof HttpException) {
+      result = exception.getStatus();
+    } else if (this.isPayloadTooLarge(exception)) {
+      result = HttpStatus.PAYLOAD_TOO_LARGE;
+    }
 
     return result;
   }
@@ -77,6 +81,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     exception: unknown,
     status: HttpStatus,
     requestId: string,
+    path: string,
   ): ApiError {
     if (exception instanceof HttpException) {
       const structuredError = this.readStructuredError(exception.getResponse());
@@ -86,9 +91,37 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
+    if (
+      status === HttpStatus.PAYLOAD_TOO_LARGE &&
+      path === '/training/offline-snapshot'
+    ) {
+      const result = {
+        code: 'OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE',
+        details: {},
+        message: 'The offline training snapshot is too large.',
+        requestId,
+      };
+      return result;
+    }
+
     const fallback = this.resolveFallback(status);
     const result = { ...fallback, details: {}, requestId };
 
+    return result;
+  }
+
+  private isPayloadTooLarge(exception: unknown): boolean {
+    if (
+      typeof exception !== 'object' ||
+      exception === null ||
+      Array.isArray(exception)
+    ) {
+      return false;
+    }
+    const candidate = exception as Record<string, unknown>;
+    const result =
+      candidate.status === HttpStatus.PAYLOAD_TOO_LARGE ||
+      candidate.statusCode === HttpStatus.PAYLOAD_TOO_LARGE;
     return result;
   }
 

@@ -4,6 +4,7 @@ import {
   type INestApplication,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import type { Express } from 'express';
 import helmet from 'helmet';
@@ -12,6 +13,8 @@ import { RequestContextLogger } from '~/observability/request-context.logger';
 import { RequestContextMiddleware } from '~/observability/request-context.middleware';
 
 export function configureApplication(app: INestApplication): void {
+  const expressApplication = app as NestExpressApplication;
+  expressApplication.useBodyParser('json', { limit: 1024 * 1024 });
   const configService = app.get(ConfigService);
   const corsOrigin = configService.getOrThrow<string>('CORS_ORIGIN');
   const trustProxyHops = configService.getOrThrow<number>('TRUST_PROXY_HOPS');

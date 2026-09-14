@@ -51,6 +51,11 @@ DTOs e rejeita campos adicionais. Toda falha de query, param ou body validado po
 esse pipe responde `400` com `code: VALIDATION_ERROR`, `details: {}` e mensagem
 genérica. A API não expõe a lista interna de constraints ou valores rejeitados.
 
+O parser JSON aceita no máximo 1 MiB, necessário para o snapshot offline de
+treino. Excesso nesse endpoint é traduzido para `413
+OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE`; os demais endpoints continuam sujeitos aos
+DTOs e limites menores de seus próprios contratos.
+
 ## Compatibilidade
 
 Adicionar campo opcional costuma ser compatível. Remover, renomear, tornar

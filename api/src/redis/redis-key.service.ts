@@ -14,6 +14,8 @@ export class RedisKeyService {
     subject:
       | 'assistant-provider-circuit'
       | 'offline-training-lease'
+      | 'offline-training-snapshot'
+      | 'offline-training-snapshot-lock'
       | 'rate'
       | 'realtime'
       | 'session'

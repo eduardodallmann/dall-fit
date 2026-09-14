@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 
 import Redis from 'ioredis';
@@ -57,6 +57,7 @@ const authScenarios = [
 const nativePersonId = '64b000000000000000000080';
 const nativeTokenFile = '/tmp/dall-fit-native-session-token.txt';
 const webCookieFile = '/tmp/dall-fit-web-session-cookie.txt';
+const offlineSnapshotFile = '/tmp/dall-fit-offline-training-snapshot.json';
 const offlineLeasePersonId = '64b000000000000000000003';
 
 const offlineLeaseScenarios = [
@@ -67,6 +68,14 @@ const offlineLeaseScenarios = [
   'offline-training-lease:takeover',
   'offline-training-lease:takeover-required',
   'offline-training-lease:unchanged',
+] as const;
+
+const offlineSnapshotScenarios = [
+  'offline-training-snapshot:current',
+  'offline-training-snapshot:expired',
+  'offline-training-snapshot:invalid',
+  'offline-training-snapshot:ready',
+  'offline-training-snapshot:revoked',
 ] as const;
 
 const assistantScenarios = [
@@ -93,6 +102,7 @@ function assertSeedCanRun(
     ...assistantScenarios,
     ...authScenarios,
     ...offlineLeaseScenarios,
+    ...offlineSnapshotScenarios,
     ...trainingPlanScenarios,
   ];
   if (!knownScenarios.includes(scenario ?? '')) {
@@ -291,7 +301,11 @@ async function seedSession(
 async function seedOfflineLeaseRedis(
   scenario: string | undefined,
 ): Promise<void> {
-  if (!scenario?.startsWith('offline-training-lease:')) return;
+  if (
+    !scenario?.startsWith('offline-training-lease:') &&
+    !scenario?.startsWith('offline-training-snapshot:')
+  )
+    return;
   const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
   const redis = new Redis(redisUrl, {
     enableOfflineQueue: false,
@@ -307,14 +321,19 @@ async function seedOfflineLeaseRedis(
       scenario === 'offline-training-lease:unchanged' ||
       scenario === 'offline-training-lease:takeover' ||
       scenario === 'offline-training-lease:takeover-required' ||
-      scenario === 'offline-training-lease:plan-rebound'
+      scenario === 'offline-training-lease:plan-rebound' ||
+      (scenario.startsWith('offline-training-snapshot:') &&
+        scenario !== 'offline-training-snapshot:expired')
     ) {
       const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
       await redis.set(
         key,
         JSON.stringify({
           expiresAt: new Date(expiresAt).toISOString(),
-          installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          installationId:
+            scenario === 'offline-training-snapshot:revoked'
+              ? 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+              : 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           personId: offlineLeasePersonId,
           planId: '64b000000000000000000002',
@@ -322,6 +341,113 @@ async function seedOfflineLeaseRedis(
         'PXAT',
         expiresAt,
       );
+    }
+  } finally {
+    await redis.quit();
+  }
+}
+
+function sortCanonicalValue(value: unknown): unknown {
+  if (Array.isArray(value))
+    return value.map((item) => sortCanonicalValue(item));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, sortCanonicalValue(item)]),
+    );
+  }
+  return value;
+}
+
+function offlineSnapshotRequestFixture(revision: number) {
+  return {
+    clientUpdatedAt: '2026-09-14T12:05:00.000Z',
+    executionId: '11111111-1111-4111-8111-111111111111',
+    installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    payloadVersion: 1,
+    revision,
+    snapshot: {
+      activeTimer: null,
+      plan: {
+        catalogEntryId: '74b000000000000000000001',
+        name: 'Plano histórico capturado',
+        planId: '64b000000000000000000002',
+        source: 'owned',
+        workouts: [
+          {
+            bodyAreas: ['chest'],
+            id: '64b000000000000000000101',
+            name: 'Treino capturado',
+          },
+        ],
+      },
+      startedAt: '2026-09-14T12:00:00.000Z',
+      workout: {
+        exercises: [
+          {
+            bodyArea: 'chest',
+            completedAt: null,
+            id: '64b000000000000000000201',
+            name: 'Exercício capturado',
+            repetitions: 10,
+            restSeconds: 60,
+            series: [
+              {
+                completedAt: null,
+                loadKg: null,
+                number: 1,
+                repetitions: 10,
+              },
+            ],
+            sets: 1,
+            type: 'youtube-short',
+            youtubeId: 'ZA8gs8XP2bs',
+          },
+        ],
+        id: '64b000000000000000000101',
+        name: 'Treino capturado',
+      },
+    },
+  };
+}
+
+async function seedOfflineSnapshotRedis(
+  scenario: string | undefined,
+): Promise<void> {
+  if (!scenario?.startsWith('offline-training-snapshot:')) return;
+  const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
+  const redis = new Redis(redisUrl, {
+    enableOfflineQueue: false,
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+  });
+  const namespace = `${process.env.REDIS_NAMESPACE ?? 'dall-fit'}:local`;
+  const key = `${namespace}:offline-training-snapshot:${offlineLeasePersonId}`;
+  try {
+    await redis.connect();
+    await redis.del(key);
+    if (scenario === 'offline-training-snapshot:current') {
+      const request = offlineSnapshotRequestFixture(2);
+      const acceptedAtMs = Date.parse('2026-09-14T12:06:00.000Z');
+      const expiresAtMs = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      const contentHash = createHash('sha256')
+        .update(JSON.stringify(sortCanonicalValue(request)))
+        .digest('hex');
+      await redis.hset(key, {
+        acceptedAtMs: String(acceptedAtMs),
+        clientUpdatedAt: request.clientUpdatedAt,
+        clientUpdatedAtMs: String(Date.parse(request.clientUpdatedAt)),
+        contentHash,
+        executionId: request.executionId,
+        expiresAtMs: String(expiresAtMs),
+        orderedAtMs: String(Date.parse(request.clientUpdatedAt)),
+        payloadVersion: '1',
+        revision: '2',
+        snapshot: JSON.stringify(request.snapshot),
+      });
+      await redis.pexpireat(key, expiresAtMs);
     }
   } finally {
     await redis.quit();
@@ -450,7 +576,8 @@ async function main(): Promise<void> {
       ]);
       if (
         scenario?.startsWith('personal-training-plans:') ||
-        scenario?.startsWith('offline-training-lease:')
+        scenario?.startsWith('offline-training-lease:') ||
+        scenario?.startsWith('offline-training-snapshot:')
       ) {
         const personId = new Types.ObjectId('64b000000000000000000003');
         const ownedEntryId = new Types.ObjectId('74b000000000000000000001');
@@ -497,7 +624,8 @@ async function main(): Promise<void> {
             personId,
           });
         if (
-          scenario?.startsWith('offline-training-lease:') &&
+          (scenario?.startsWith('offline-training-lease:') ||
+            scenario?.startsWith('offline-training-snapshot:')) &&
           scenario !== 'offline-training-lease:no-active-plan'
         )
           await activeModel.create({
@@ -652,10 +780,23 @@ async function main(): Promise<void> {
     if (scenario === 'auth:native-session') {
       await seedSession();
     }
-    if (scenario?.startsWith('offline-training-lease:')) {
+    if (
+      scenario?.startsWith('offline-training-lease:') ||
+      scenario?.startsWith('offline-training-snapshot:')
+    ) {
       await seedSession(offlineLeasePersonId);
       await seedSession(offlineLeasePersonId, 'web', webCookieFile);
       await seedOfflineLeaseRedis(scenario);
+      await seedOfflineSnapshotRedis(scenario);
+      if (scenario.startsWith('offline-training-snapshot:')) {
+        const revision =
+          scenario === 'offline-training-snapshot:current' ? 2 : 0;
+        await writeFile(
+          offlineSnapshotFile,
+          JSON.stringify(offlineSnapshotRequestFixture(revision)),
+          { mode: 0o600 },
+        );
+      }
     }
     process.stdout.write(`Seed ${scenario} prepared.\n`);
   } finally {

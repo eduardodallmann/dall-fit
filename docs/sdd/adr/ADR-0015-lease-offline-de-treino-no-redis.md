@@ -49,6 +49,12 @@ operação interna nomeada para sincronização já aceita pode revalidar a tupl
 mover `expiresAt` e `PXAT` por mais sete dias. Todas as decisões compostas são
 atômicas no Redis; não há `WATCH`, lock local, fallback ou autorização no MongoDB.
 
+A ingestão de snapshot implementa essa condição na mesma transição Lua que publica
+uma revisão nova. O script confronta o fence e atribui o mesmo `PXAT` de sete dias
+ao lease e ao snapshot; replay idêntico, revisão obsoleta, colisão, outra execução
+ou erro não renovam nenhum deles. Um lock Redis curto por instalação serializa a
+região crítica entre runtimes e é removido somente pelo token proprietário.
+
 ## Consequências
 
 ### Positivas
