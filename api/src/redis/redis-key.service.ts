@@ -13,6 +13,7 @@ export class RedisKeyService {
   create(
     subject:
       | 'assistant-provider-circuit'
+      | 'offline-training-lease'
       | 'rate'
       | 'realtime'
       | 'session'

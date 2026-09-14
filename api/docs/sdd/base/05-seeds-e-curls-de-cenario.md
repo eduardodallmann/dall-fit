@@ -75,6 +75,14 @@ Identificadores vigentes incluem:
 - `auth:native-session`, que também cria uma sessão Bearer local no Redis e grava o
   token fictício com permissão restrita em
   `/tmp/dall-fit-native-session-token.txt`;
+- `offline-training-lease:create`, `offline-training-lease:unchanged`,
+  `offline-training-lease:plan-rebound`,
+  `offline-training-lease:takeover-required`, `offline-training-lease:takeover`,
+  `offline-training-lease:no-active-plan` e
+  `offline-training-lease:invalid-body`, que criam pessoa, sessão Bearer e o estado
+  mínimo de plano/lease do caminho correspondente; esses seeds também gravam o
+  cookie Web fictício em `/tmp/dall-fit-web-session-cookie.txt` para validar a
+  restrição de canal;
 - `training-plans:list`, `training-plans:create`, `training-plans:detail`,
   `training-plans:update`, `training-plans:delete`,
   `training-plans:create-workout`, `training-plans:delete-workout` e

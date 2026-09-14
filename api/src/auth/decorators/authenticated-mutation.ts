@@ -2,6 +2,7 @@ import { applyDecorators, UseGuards } from '@nestjs/common';
 
 import { RateLimited } from '~/auth/decorators/rate-limited';
 import { CsrfGuard } from '~/auth/guards/csrf.guard';
+import { NativeSessionGuard } from '~/auth/guards/native-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { SessionAuthGuard } from '~/auth/guards/session-auth.guard';
 
@@ -81,6 +82,19 @@ export function TrainingLifecycleMutation(): MethodDecorator {
       windowConfigKey: 'RATE_LIMIT_TRAINING_LIFECYCLE_WINDOW_MS',
     }),
     UseGuards(SessionAuthGuard, RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}
+
+export function NativeTrainingLifecycleMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'training-lifecycle',
+      limitConfigKey: 'RATE_LIMIT_TRAINING_LIFECYCLE_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_TRAINING_LIFECYCLE_WINDOW_MS',
+    }),
+    UseGuards(SessionAuthGuard, NativeSessionGuard, RateLimitGuard, CsrfGuard),
   );
   return result;
 }
