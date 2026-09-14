@@ -18,6 +18,7 @@ import { AuthController } from '~/auth/controllers/auth.controller';
 import { AdminAuthorizationGuard } from '~/auth/guards/admin-authorization.guard';
 import { CsrfGuard } from '~/auth/guards/csrf.guard';
 import { LogoutCsrfGuard } from '~/auth/guards/logout-csrf.guard';
+import { NativeSessionGuard } from '~/auth/guards/native-session.guard';
 import { OptionalNativeSessionGuard } from '~/auth/guards/optional-native-session.guard';
 import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
@@ -52,6 +53,7 @@ import { PersonModule } from '~/person/person.module';
     OptionalNativeSessionGuard,
     OptionalSessionGuard,
     OAuthCallbackCookiesMiddleware,
+    NativeSessionGuard,
     RateLimitGuard,
     SessionAuthGuard,
     StartGoogleLoginCommand,
@@ -62,6 +64,7 @@ import { PersonModule } from '~/person/person.module';
   exports: [
     AdminAuthorizationGuard,
     AuthSessionService,
+    NativeSessionGuard,
     PersonModule,
     SessionAuthGuard,
   ],

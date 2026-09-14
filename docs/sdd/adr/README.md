@@ -39,3 +39,5 @@ substituída permanece no histórico e aponta para a sucessora.
 - [`ADR-0014`](ADR-0014-motor-nativo-de-persistencia-offline.md): SQLite e
   filesystem privado sob um único motor Android compartilhado pela bridge e por
   consumidores nativos.
+- [`ADR-0015`](ADR-0015-lease-offline-de-treino-no-redis.md): lease Redis único
+  por pessoa, fence por concessão e renovação condicionada à sincronização aceita.

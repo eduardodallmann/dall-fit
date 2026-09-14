@@ -25,6 +25,8 @@ por pessoa.
 |     3 | executar ou retomar | `/training/workout/:workoutId`             | `GET /training/session` e mutações de série, timer e exercício |
 |     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
+|     — | autorizar edição offline | consumidor Android futuro | `PUT /training/offline-lease`, `POST /training/offline-lease/takeover` |
+|     — | autorizar offline   | consumidor Android futuro                 | `PUT /training/offline-lease`, `POST .../takeover`             |
 
 ## Sequência e decisões
 
@@ -33,6 +35,14 @@ por pessoa.
    durante a composição de overview e previews; o snapshot essencial é confirmado
    antes dos downloads display e mídia incompleta nunca bloqueia. Web/PWA
    permanecem exclusivamente online.
+   A API já oferece, separadamente, registro e takeover do lease Redis do plano
+   ativo para uma única instalação editora, com fence por concessão e validade de
+   sete dias renovável somente por sincronização aceita. O cliente ainda não chama
+   esses endpoints nesta etapa da jornada.
+   O backend já disponibiliza um lease Redis exclusivo por pessoa para autorizar a
+   futura produção e sincronização de snapshots: registro deriva o plano ativo,
+   takeover é explícito e somente uma sincronização aceita poderá renovar seus
+   sete dias. A UI e o motor Android ainda não chamam esses endpoints neste fluxo.
 2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
@@ -63,6 +73,8 @@ por pessoa.
 | cargas por série         | UI/API      | execução e próxima prévia              | Redis; perfil MongoDB ao finalizar | inteiro ou `null`                                |
 | timers                   | API         | overlay da UI                          | timestamps no Redis                | nenhum interval é persistido                     |
 | resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
+| lease de edição offline  | API         | consumidor Android futuro              | Redis, uma chave por pessoa        | plano/instalação no valor; `leaseId` cerca a concessão |
+| lease de edição offline  | API         | consumidor Android futuro              | Redis, sete dias condicionais      | uma instalação e um fence por pessoa             |
 
 ## Estados e exceções
 
@@ -72,6 +84,9 @@ por pessoa.
 - Conflito: draft local é descartado, GET canônico prevalece e a UI avisa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
   preserva a sessão para repetição idempotente.
+- Autorização offline: ausência expira, divergência de fence revoga e takeover
+  substitui o editor sem ler ou apagar dados do aparelho anterior. Ainda não há
+  ingestão nem cliente sincronizador nesta jornada.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
   sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
   alterna expansão, o input de carga recebe clique em toda a largura e o Drawer

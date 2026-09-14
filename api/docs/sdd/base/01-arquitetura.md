@@ -273,6 +273,10 @@ coordenadas com consumidores antes de remover campos ou alterar semântica.
 - a execução de treino mantém um snapshot por pessoa no Redis com TTL absoluto e
   CAS; somente resumo final e perfil de cargas são consolidados no MongoDB,
   conforme a ADR-0010.
+- a autorização de edição offline mantém uma chave de lease por pessoa no Redis.
+  Plano e instalação ficam no valor, e um `leaseId` cerca cada concessão. Scripts
+  Lua linearizam registro, takeover, validação e renovação; somente sincronização
+  já aceita renova os sete dias, conforme a ADR-0015.
 - Mongoose e ioredis são os clients oficiais de produção.
 - services dependem de ports de repository ou cache, não de clients ou models
   concretos.
@@ -300,6 +304,12 @@ comando Redis. Somente `RedisKeyService` compõe as chaves injetando o namespace
 nenhum adapter executa `KEYS`, `FLUSH*` ou limpeza por prefixo em runtime publicado.
 Falha, timeout, saturação, reset do dataset ou rejeição por `noeviction` nunca
 desabilitam autenticação, CSRF ou rate limit: o caminho protegido falha fechado.
+
+`OfflineTrainingLeaseService`, no módulo de treino, usa o mesmo singleton e uma
+chave `offline-training-lease` por pessoa. Ele não recebe DTO HTTP nem persiste no
+MongoDB. Os endpoints são exclusivos de sessão Bearer nativa; commands resolvem o
+plano ativo antes de chamar o service. Falha do Redis vira indisponibilidade
+específica, sem autorização otimista ou lease local por instância.
 
 `OperationalModule` expõe liveness em `GET /health` sem dependências e readiness
 em `GET /ready`. A readiness usa Terminus para pingar a conexão Mongoose vigente e

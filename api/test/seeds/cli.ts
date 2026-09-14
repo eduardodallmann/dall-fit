@@ -56,6 +56,18 @@ const authScenarios = [
 
 const nativePersonId = '64b000000000000000000080';
 const nativeTokenFile = '/tmp/dall-fit-native-session-token.txt';
+const webCookieFile = '/tmp/dall-fit-web-session-cookie.txt';
+const offlineLeasePersonId = '64b000000000000000000003';
+
+const offlineLeaseScenarios = [
+  'offline-training-lease:create',
+  'offline-training-lease:invalid-body',
+  'offline-training-lease:no-active-plan',
+  'offline-training-lease:plan-rebound',
+  'offline-training-lease:takeover',
+  'offline-training-lease:takeover-required',
+  'offline-training-lease:unchanged',
+] as const;
 
 const assistantScenarios = [
   'assistant:confirm',
@@ -80,6 +92,7 @@ function assertSeedCanRun(
   const knownScenarios: readonly string[] = [
     ...assistantScenarios,
     ...authScenarios,
+    ...offlineLeaseScenarios,
     ...trainingPlanScenarios,
   ];
   if (!knownScenarios.includes(scenario ?? '')) {
@@ -204,7 +217,11 @@ async function seedAuthenticationScenario(
   return false;
 }
 
-async function seedNativeSession(): Promise<void> {
+async function seedSession(
+  sessionPersonId: string = nativePersonId,
+  channel: 'native' | 'web' = 'native',
+  outputFile: string = nativeTokenFile,
+): Promise<void> {
   const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
   const parsedRedisUrl = new URL(redisUrl);
   if (!['127.0.0.1', 'localhost'].includes(parsedRedisUrl.hostname)) {
@@ -228,12 +245,15 @@ async function seedNativeSession(): Promise<void> {
     kid: process.env.AUTH_SESSION_ACTIVE_KEY_ID ?? 'active-v1',
     typ: 'JWT',
   })}.${encode({
-    aud: process.env.AUTH_NATIVE_SESSION_AUDIENCE ?? 'dall-fit-android',
+    aud:
+      channel === 'native'
+        ? (process.env.AUTH_NATIVE_SESSION_AUDIENCE ?? 'dall-fit-android')
+        : (process.env.AUTH_SESSION_AUDIENCE ?? 'dall-fit-ui'),
     exp: expiresAt,
     iat: issuedAt,
     iss: process.env.AUTH_SESSION_ISSUER ?? 'dall-fit-api',
     jti,
-    sub: nativePersonId,
+    sub: sessionPersonId,
   })}`;
   const signature = createHmac('sha256', secret)
     .update(unsignedToken)
@@ -242,21 +262,67 @@ async function seedNativeSession(): Promise<void> {
   const namespace = `${process.env.REDIS_NAMESPACE ?? 'dall-fit'}:local`;
   const redis = new Redis(redisUrl, {
     enableOfflineQueue: false,
+    lazyConnect: true,
     maxRetriesPerRequest: 1,
   });
   try {
+    await redis.connect();
     await redis.set(
       `${namespace}:session:${jti}`,
       JSON.stringify({
-        channel: 'native',
+        channel,
         csrfToken: randomBytes(32).toString('base64url'),
         expiresAt,
-        personId: nativePersonId,
+        personId: sessionPersonId,
       }),
       'PXAT',
       expiresAt * 1000,
     );
-    await writeFile(nativeTokenFile, token, { mode: 0o600 });
+    await writeFile(
+      outputFile,
+      channel === 'web' ? `dall_fit_session=${token}` : token,
+      { mode: 0o600 },
+    );
+  } finally {
+    await redis.quit();
+  }
+}
+
+async function seedOfflineLeaseRedis(
+  scenario: string | undefined,
+): Promise<void> {
+  if (!scenario?.startsWith('offline-training-lease:')) return;
+  const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
+  const redis = new Redis(redisUrl, {
+    enableOfflineQueue: false,
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+  });
+  const namespace = `${process.env.REDIS_NAMESPACE ?? 'dall-fit'}:local`;
+  const key = `${namespace}:offline-training-lease:${offlineLeasePersonId}`;
+  try {
+    await redis.connect();
+    await redis.del(key);
+    if (
+      scenario === 'offline-training-lease:unchanged' ||
+      scenario === 'offline-training-lease:takeover' ||
+      scenario === 'offline-training-lease:takeover-required' ||
+      scenario === 'offline-training-lease:plan-rebound'
+    ) {
+      const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      await redis.set(
+        key,
+        JSON.stringify({
+          expiresAt: new Date(expiresAt).toISOString(),
+          installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          personId: offlineLeasePersonId,
+          planId: '64b000000000000000000002',
+        }),
+        'PXAT',
+        expiresAt,
+      );
+    }
   } finally {
     await redis.quit();
   }
@@ -382,7 +448,10 @@ async function main(): Promise<void> {
           workouts: [],
         },
       ]);
-      if (scenario?.startsWith('personal-training-plans:')) {
+      if (
+        scenario?.startsWith('personal-training-plans:') ||
+        scenario?.startsWith('offline-training-lease:')
+      ) {
         const personId = new Types.ObjectId('64b000000000000000000003');
         const ownedEntryId = new Types.ObjectId('74b000000000000000000001');
         const referenceEntryId = new Types.ObjectId('74b000000000000000000002');
@@ -425,6 +494,17 @@ async function main(): Promise<void> {
         if (scenario === 'personal-training-plans:reference')
           await activeModel.create({
             catalogEntryId: referenceEntryId,
+            personId,
+          });
+        if (
+          scenario?.startsWith('offline-training-lease:') &&
+          scenario !== 'offline-training-lease:no-active-plan'
+        )
+          await activeModel.create({
+            catalogEntryId:
+              scenario === 'offline-training-lease:plan-rebound'
+                ? referenceEntryId
+                : ownedEntryId,
             personId,
           });
         if (scenario === 'personal-training-plans:clone-job')
@@ -570,7 +650,12 @@ async function main(): Promise<void> {
     }
 
     if (scenario === 'auth:native-session') {
-      await seedNativeSession();
+      await seedSession();
+    }
+    if (scenario?.startsWith('offline-training-lease:')) {
+      await seedSession(offlineLeasePersonId);
+      await seedSession(offlineLeasePersonId, 'web', webCookieFile);
+      await seedOfflineLeaseRedis(scenario);
     }
     process.stdout.write(`Seed ${scenario} prepared.\n`);
   } finally {
