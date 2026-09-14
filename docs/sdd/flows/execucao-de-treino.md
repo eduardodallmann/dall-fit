@@ -27,6 +27,7 @@ por pessoa.
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
 |     — | autorizar edição offline | consumidor Android futuro | `PUT /training/offline-lease`, `POST /training/offline-lease/takeover` |
 |     — | autorizar offline   | consumidor Android futuro                 | `PUT /training/offline-lease`, `POST .../takeover`             |
+|     — | ingerir snapshot offline | consumidor Android futuro            | `PUT /training/offline-snapshot`                               |
 
 ## Sequência e decisões
 
@@ -39,10 +40,11 @@ por pessoa.
    ativo para uma única instalação editora, com fence por concessão e validade de
    sete dias renovável somente por sincronização aceita. O cliente ainda não chama
    esses endpoints nesta etapa da jornada.
-   O backend já disponibiliza um lease Redis exclusivo por pessoa para autorizar a
-   futura produção e sincronização de snapshots: registro deriva o plano ativo,
-   takeover é explícito e somente uma sincronização aceita poderá renovar seus
-   sete dias. A UI e o motor Android ainda não chamam esses endpoints neste fluxo.
+   O backend disponibiliza um lease Redis exclusivo por pessoa e a ingestão
+   idempotente de snapshots v1. Uma revisão nova aceita renova atomicamente lease e
+   snapshot por sete dias; replay não renova, e árvore histórica válida do mesmo
+   plano não altera o MongoDB. A UI, o motor Android e o sincronizador ainda não
+   chamam esses endpoints neste fluxo.
 2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
@@ -75,6 +77,7 @@ por pessoa.
 | resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
 | lease de edição offline  | API         | consumidor Android futuro              | Redis, uma chave por pessoa        | plano/instalação no valor; `leaseId` cerca a concessão |
 | lease de edição offline  | API         | consumidor Android futuro              | Redis, sete dias condicionais      | uma instalação e um fence por pessoa             |
+| snapshot offline corrente | Android/API | sincronizador Android futuro            | Redis, uma chave por pessoa        | revisão monotônica; replay não renova             |
 
 ## Estados e exceções
 
@@ -85,8 +88,8 @@ por pessoa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
   preserva a sessão para repetição idempotente.
 - Autorização offline: ausência expira, divergência de fence revoga e takeover
-  substitui o editor sem ler ou apagar dados do aparelho anterior. Ainda não há
-  ingestão nem cliente sincronizador nesta jornada.
+  substitui o editor sem ler ou apagar dados do aparelho anterior. A API já
+  ingere snapshots idempotentes; ainda não há cliente sincronizador nesta jornada.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
   sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
   alterna expansão, o input de carga recebe clique em toda a largura e o Drawer

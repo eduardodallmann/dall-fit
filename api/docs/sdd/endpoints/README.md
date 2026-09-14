@@ -33,3 +33,5 @@ somente quando constituir requisito funcional excepcional.
   conclusão durável.
 - [`Lease offline de treino`](offline-training-lease.md): registro e takeover
   atômicos da única instalação editora de uma pessoa.
+- [`PUT /training/offline-snapshot`](offline-training-snapshot.md): ingestão
+  idempotente e cercada da execução Android corrente.

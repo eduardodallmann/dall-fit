@@ -5,7 +5,8 @@
 `PUT /training/offline-lease` registra idempotentemente a instalação Android como
 editora offline do plano ativo. `POST /training/offline-lease/takeover` substitui
 explicitamente outra instalação. Existe uma única concessão por pessoa; estes
-endpoints não ingerem snapshots nem alteram a sessão online de treino.
+endpoints não ingerem snapshots nem alteram a sessão online de treino. A ingestão
+proprietária usa separadamente `PUT /training/offline-snapshot`.
 
 ## Referências técnicas
 
@@ -89,12 +90,12 @@ conexão adicional.
 `OfflineTrainingLeaseRevokedError` se qualquer campo diverge ou a tupla atual se
 tudo coincide. Essa leitura não toca no TTL.
 
-`renewAfterAcceptedSync` deve ser chamada somente depois que o consumidor futuro
-classificar a sincronização como aceita. O script repete a comparação integral e,
-somente na coincidência, grava a mesma concessão com novo `expiresAt` e `PXAT` de
-sete dias. Ausência e divergência conservam as mesmas classificações. Erro ou
-resposta Redis inválida vira `OfflineTrainingLeaseUnavailableError`; não existe
-fallback MongoDB ou autorização otimista.
+`renewAfterAcceptedSync` permanece uma fronteira interna condicionada, mas a
+ingestão pública não separa a gravação do snapshot dessa renovação. O
+`OfflineTrainingSnapshotService` confronta a mesma tupla e renova o lease dentro
+da única transição Lua que publica uma revisão nova. Duplicata e qualquer erro não
+tocam no lease. Ausência e divergência conservam as classificações expiração e
+revogação; não existe fallback MongoDB ou autorização otimista.
 
 ## Mapa de caminhos
 
@@ -304,7 +305,6 @@ OFFLINE_LEASE_UNAVAILABLE`.
 
 ## Fora do comportamento atual
 
-- ingestão ou endpoint público de snapshot;
 - cliente Android, UI de takeover ou sincronização em background;
 - histórico/tombstone de lease no MongoDB;
 - recuperação dos dados da instalação revogada;

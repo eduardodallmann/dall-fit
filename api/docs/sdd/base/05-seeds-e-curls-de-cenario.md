@@ -83,6 +83,11 @@ Identificadores vigentes incluem:
   mínimo de plano/lease do caminho correspondente; esses seeds também gravam o
   cookie Web fictício em `/tmp/dall-fit-web-session-cookie.txt` para validar a
   restrição de canal;
+- `offline-training-snapshot:ready`, `offline-training-snapshot:current`,
+  `offline-training-snapshot:expired`, `offline-training-snapshot:revoked` e
+  `offline-training-snapshot:invalid`, que preparam pessoa, sessões, plano, lease
+  e, quando aplicável, revisão corrente. O body v1 determinístico é gravado com
+  permissão restrita em `/tmp/dall-fit-offline-training-snapshot.json`;
 - `training-plans:list`, `training-plans:create`, `training-plans:detail`,
   `training-plans:update`, `training-plans:delete`,
   `training-plans:create-workout`, `training-plans:delete-workout` e

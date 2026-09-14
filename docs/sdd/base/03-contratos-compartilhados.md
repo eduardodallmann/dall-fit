@@ -164,6 +164,14 @@ request; o Workflow os lê no MongoDB.
   os sete dias da semana calculados no timezone informado na finalização.
 - respostas seguem `ApiResponse`; mutations de sessão devolvem a versão também no
   header `X-Resource-Version`.
+- `PutOfflineTrainingSnapshotV1Request` publica o envelope estrito do snapshot
+  Android em andamento: identidade da instalação, fence, execução, revisão,
+  timestamp cliente e `OfflineTrainingSnapshotV1`. A árvore bruta captura plano,
+  workouts, workout executado, exercícios/séries e timer sem totais derivados,
+  pessoa, validade, mídia ou capacidades temporárias.
+- `OfflineTrainingSnapshotResult` confirma `accepted | duplicate`, execução e
+  revisão e devolve `acceptedAt`, `orderedAt` e `expiresAt` server-side. A UI
+  ainda não consome o contrato; ele atende ao sincronizador Android posterior.
 
 ## Assistente de planos de treino
 

@@ -311,6 +311,14 @@ MongoDB. Os endpoints são exclusivos de sessão Bearer nativa; commands resolve
 plano ativo antes de chamar o service. Falha do Redis vira indisponibilidade
 específica, sem autorização otimista ou lease local por instância.
 
+O mesmo módulo recebe snapshots Android v1 em uma chave
+`offline-training-snapshot` por pessoa. Validação Zod e hash canônico acontecem
+antes da região crítica. Um lock Redis curto por instalação usa token e release
+condicionado; sob ele, um único script Lua confronta lease, execução, revisão e
+hash, grava o agregado completo e renova lease e snapshot para o mesmo `PXAT` de
+sete dias. Replay idêntico não escreve nem renova. O endpoint não lê a árvore
+corrente do plano e não grava MongoDB.
+
 `OperationalModule` expõe liveness em `GET /health` sem dependências e readiness
 em `GET /ready`. A readiness usa Terminus para pingar a conexão Mongoose vigente e
 o mesmo singleton ioredis, ambos com espera finita; não cria client ou pool

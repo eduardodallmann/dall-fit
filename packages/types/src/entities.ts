@@ -368,6 +368,65 @@ export interface TrainingSession {
   workout: Pick<TrainingPlanWorkoutDetails, 'id' | 'name'>;
 }
 
+export interface OfflineTrainingSnapshotPlanWorkoutV1 {
+  bodyAreas: readonly BodyArea[];
+  id: EntityId;
+  name: string;
+}
+
+export interface OfflineTrainingSnapshotPlanV1 {
+  catalogEntryId: EntityId;
+  name: string;
+  planId: EntityId;
+  source: TrainingPlanSource;
+  workouts: readonly OfflineTrainingSnapshotPlanWorkoutV1[];
+}
+
+export interface OfflineTrainingSnapshotSeriesV1 {
+  completedAt: Timestamp | null;
+  loadKg: number | null;
+  number: number;
+  repetitions: number;
+}
+
+interface OfflineTrainingSnapshotExerciseStateV1 {
+  completedAt: Timestamp | null;
+}
+
+export type OfflineTrainingSnapshotExerciseV1 =
+  | (YoutubeShortExercise &
+      OfflineTrainingSnapshotExerciseStateV1 & {
+        series: readonly OfflineTrainingSnapshotSeriesV1[];
+      })
+  | (Omit<ImageExercise, 'image'> &
+      OfflineTrainingSnapshotExerciseStateV1 & {
+        series: readonly OfflineTrainingSnapshotSeriesV1[];
+      })
+  | (YoutubeLongExercise & OfflineTrainingSnapshotExerciseStateV1)
+  | (PauseExercise & OfflineTrainingSnapshotExerciseStateV1)
+  | (DurationExercise & OfflineTrainingSnapshotExerciseStateV1);
+
+export interface OfflineTrainingSnapshotWorkoutV1 {
+  exercises: readonly OfflineTrainingSnapshotExerciseV1[];
+  id: EntityId;
+  name: string;
+}
+
+export interface OfflineTrainingSnapshotTimerV1 {
+  durationSeconds: number;
+  exerciseId: EntityId;
+  kind: TrainingTimerKind;
+  seriesNumber?: number;
+  startedAt: Timestamp;
+}
+
+export interface OfflineTrainingSnapshotV1 {
+  activeTimer: OfflineTrainingSnapshotTimerV1 | null;
+  plan: OfflineTrainingSnapshotPlanV1;
+  startedAt: Timestamp;
+  workout: OfflineTrainingSnapshotWorkoutV1;
+}
+
 export interface TrainingWeekDay {
   completed: boolean;
   date: string;

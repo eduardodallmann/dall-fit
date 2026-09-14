@@ -6,6 +6,7 @@ import type {
   GlobalTrainingPlanLibraryItem,
   GlobalTrainingPlanSummary,
   GlobalTrainingPlanWorkoutDetails,
+  OfflineTrainingSnapshotV1,
   Person,
   PersonalTrainingPlanDetails,
   PersonalTrainingPlanListItem,
@@ -187,6 +188,30 @@ export type TrainingWorkoutPreviewResponse =
 export type TrainingSessionResponse = ApiResponse<TrainingSession>;
 export type WorkoutExecutionSummaryResponse =
   ApiResponse<WorkoutExecutionSummary>;
+
+export interface PutOfflineTrainingSnapshotV1Request {
+  clientUpdatedAt: string;
+  executionId: string;
+  installationId: string;
+  leaseId: string;
+  payloadVersion: 1;
+  revision: number;
+  snapshot: OfflineTrainingSnapshotV1;
+}
+
+export type OfflineTrainingSnapshotState = 'accepted' | 'duplicate';
+
+export interface OfflineTrainingSnapshotResult {
+  acceptedAt: string;
+  executionId: string;
+  expiresAt: string;
+  orderedAt: string;
+  revision: number;
+  state: OfflineTrainingSnapshotState;
+}
+
+export type PutOfflineTrainingSnapshotResponse =
+  ApiResponse<OfflineTrainingSnapshotResult>;
 
 export interface TrainingLoadRequest {
   loadKg: number | null;

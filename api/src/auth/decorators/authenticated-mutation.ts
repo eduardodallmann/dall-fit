@@ -98,3 +98,16 @@ export function NativeTrainingLifecycleMutation(): MethodDecorator {
   );
   return result;
 }
+
+export function NativeTrainingMutation(): MethodDecorator {
+  const result = applyDecorators(
+    RateLimited({
+      bucket: 'training-mutation',
+      limitConfigKey: 'RATE_LIMIT_TRAINING_MUTATION_LIMIT',
+      subject: 'person-ip',
+      windowConfigKey: 'RATE_LIMIT_TRAINING_MUTATION_WINDOW_MS',
+    }),
+    UseGuards(SessionAuthGuard, NativeSessionGuard, RateLimitGuard, CsrfGuard),
+  );
+  return result;
+}

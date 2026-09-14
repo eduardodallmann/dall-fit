@@ -60,6 +60,17 @@ interface LeaseResponseBody {
   };
 }
 
+interface SnapshotResponseBody {
+  data: {
+    acceptedAt: string;
+    executionId: string;
+    expiresAt: string;
+    orderedAt: string;
+    revision: number;
+    state: 'accepted' | 'duplicate';
+  };
+}
+
 describe('Offline training lease (e2e)', () => {
   let app: INestApplication<App>;
   let mongoServer: MongoMemoryServer;
@@ -196,6 +207,76 @@ describe('Offline training lease (e2e)', () => {
 
   function leaseKey(): string {
     return `dall-fit-offline-lease-e2e:test:offline-training-lease:${personId.toString()}`;
+  }
+
+  function snapshotKey(): string {
+    return `dall-fit-offline-lease-e2e:test:offline-training-snapshot:${personId.toString()}`;
+  }
+
+  function snapshotLockKey(installationId: string): string {
+    return `dall-fit-offline-lease-e2e:test:offline-training-snapshot-lock:${installationId}`;
+  }
+
+  function snapshotRequest(leaseId: string, revision = 0) {
+    return {
+      clientUpdatedAt: '2026-09-14T12:05:00.000Z',
+      executionId: '11111111-1111-4111-8111-111111111111',
+      installationId: installationA,
+      leaseId,
+      payloadVersion: 1,
+      revision,
+      snapshot: {
+        activeTimer: null,
+        plan: {
+          catalogEntryId: firstEntryId.toString(),
+          name: 'Captured plan before edit',
+          planId: firstPlanId.toString(),
+          source: 'owned',
+          workouts: [
+            {
+              bodyAreas: ['chest'],
+              id: '64b000000000000000000843',
+              name: 'Captured workout',
+            },
+          ],
+        },
+        startedAt: '2026-09-14T12:00:00.000Z',
+        workout: {
+          exercises: [
+            {
+              bodyArea: 'chest',
+              completedAt: null,
+              id: '64b000000000000000000844',
+              name: 'Captured exercise',
+              repetitions: 10,
+              restSeconds: 60,
+              series: [
+                {
+                  completedAt: null,
+                  loadKg: null as number | null,
+                  number: 1,
+                  repetitions: 10,
+                },
+              ],
+              sets: 1,
+              type: 'youtube-short',
+              youtubeId: 'ZA8gs8XP2bs',
+            },
+          ],
+          id: '64b000000000000000000843',
+          name: 'Captured workout',
+        },
+      },
+    };
+  }
+
+  async function registeredLease(token: string): Promise<LeaseResponseBody> {
+    const response = await request(app.getHttpServer())
+      .put('/training/offline-lease')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ installationId: installationA })
+      .expect(200);
+    return response.body as LeaseResponseBody;
   }
 
   it('creates once and preserves the fence, expiry and PTTL on repeated registration', async () => {
@@ -411,6 +492,292 @@ describe('Offline training lease (e2e)', () => {
       .send({ installationId: installationA })
       .expect(403);
     expect(web.body).toMatchObject({ code: 'NATIVE_SESSION_REQUIRED' });
+  });
+
+  it('accepts a historical snapshot atomically and an identical replay preserves values and TTLs', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    await redisClient.pexpire(leaseKey(), 10_000);
+    await planModel.updateOne(
+      { _id: firstPlanId },
+      { $set: { name: 'Current edited plan', workouts: [] } },
+    );
+    const body = snapshotRequest(lease.data.leaseId);
+    const accepted = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    const acceptedBody = accepted.body as SnapshotResponseBody;
+    const snapshotBefore = await redisClient.hgetall(snapshotKey());
+    const snapshotTtlBefore = await redisClient.pttl(snapshotKey());
+    const leaseTtlBefore = await redisClient.pttl(leaseKey());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const replay = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    const replayBody = replay.body as SnapshotResponseBody;
+
+    expect(accepted.headers['cache-control']).toBe('private, no-store');
+    expect(acceptedBody.data.state).toBe('accepted');
+    expect(replayBody.data).toEqual({
+      ...acceptedBody.data,
+      state: 'duplicate',
+    });
+    expect(await redisClient.hgetall(snapshotKey())).toEqual(snapshotBefore);
+    expect(await redisClient.pttl(snapshotKey())).toBeLessThan(
+      snapshotTtlBefore,
+    );
+    expect(await redisClient.pttl(leaseKey())).toBeLessThan(leaseTtlBefore);
+    expect(snapshotTtlBefore).toBeGreaterThan(604_790_000);
+    expect(Math.abs(snapshotTtlBefore - leaseTtlBefore)).toBeLessThan(10);
+    expect(await planModel.findById(firstPlanId).lean().exec()).toMatchObject({
+      name: 'Current edited plan',
+      workouts: [],
+    });
+  });
+
+  it('advances only larger revisions and orders equal or regressive client clocks monotonically', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const initial = snapshotRequest(lease.data.leaseId);
+    const first = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(initial)
+      .expect(200);
+    const equalClock = {
+      ...snapshotRequest(lease.data.leaseId, 1),
+      snapshot: {
+        ...initial.snapshot,
+        workout: { ...initial.snapshot.workout, name: 'Captured workout' },
+      },
+    };
+    const second = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(equalClock)
+      .expect(200);
+    const regressive = {
+      ...snapshotRequest(lease.data.leaseId, 2),
+      clientUpdatedAt: '2026-09-14T12:04:00.000Z',
+    };
+    const third = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(regressive)
+      .expect(200);
+    const firstBody = first.body as SnapshotResponseBody;
+    const secondBody = second.body as SnapshotResponseBody;
+    const thirdBody = third.body as SnapshotResponseBody;
+    expect(Date.parse(secondBody.data.orderedAt)).toBeGreaterThan(
+      Date.parse(firstBody.data.orderedAt),
+    );
+    expect(Date.parse(thirdBody.data.orderedAt)).toBeGreaterThan(
+      Date.parse(secondBody.data.orderedAt),
+    );
+    expect(await redisClient.hget(snapshotKey(), 'clientUpdatedAt')).toBe(
+      regressive.clientUpdatedAt,
+    );
+
+    const stale = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(snapshotRequest(lease.data.leaseId, 1))
+      .expect(409);
+    expect(stale.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SNAPSHOT_STALE',
+    });
+    expect(await redisClient.hget(snapshotKey(), 'revision')).toBe('2');
+  });
+
+  it('distinguishes idempotency and current-execution conflicts without changing the snapshot', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const body = snapshotRequest(lease.data.leaseId);
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    const before = await redisClient.hgetall(snapshotKey());
+    const collision = structuredClone(body);
+    collision.snapshot.workout.exercises[0].series[0].loadKg = 10;
+    const collisionResponse = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(collision)
+      .expect(409);
+    expect(collisionResponse.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SNAPSHOT_IDEMPOTENCY_CONFLICT',
+    });
+    const otherExecution = {
+      ...body,
+      executionId: '44444444-4444-4444-8444-444444444444',
+    };
+    const executionResponse = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(otherExecution)
+      .expect(409);
+    expect(executionResponse.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_EXECUTION_CONFLICT',
+    });
+    expect(JSON.stringify(executionResponse.body)).not.toContain(
+      body.executionId,
+    );
+    expect(await redisClient.hgetall(snapshotKey())).toEqual(before);
+  });
+
+  it('rejects invalid trees, revoked leases, occupied locks and non-native transports before writes', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const invalid = snapshotRequest(lease.data.leaseId);
+    invalid.snapshot.workout.id = '64b000000000000000000999';
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(invalid)
+      .expect(400);
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+
+    const revoked = snapshotRequest('44444444-4444-4444-8444-444444444444');
+    const revokedResponse = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(revoked)
+      .expect(409);
+    expect(revokedResponse.body).toMatchObject({
+      code: 'OFFLINE_LEASE_REVOKED',
+    });
+
+    await redisClient.set(
+      snapshotLockKey(installationA),
+      'other-token',
+      'PX',
+      15_000,
+    );
+    const contended = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(409);
+    expect(contended.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SYNC_IN_PROGRESS',
+    });
+    await redisClient.del(snapshotLockKey(installationA));
+
+    const cookie = await webCookie();
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Cookie', cookie)
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(403);
+    const ambiguous = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Cookie', cookie)
+      .set('Authorization', `Bearer ${token}`)
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(400);
+    expect(ambiguous.body).toMatchObject({ code: 'AUTH_TRANSPORT_AMBIGUOUS' });
+  });
+
+  it('returns the specific expiration and size errors without a snapshot write', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    await redisClient.del(leaseKey());
+    const expired = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(410);
+    expect(expired.body).toMatchObject({ code: 'OFFLINE_LEASE_EXPIRED' });
+    const oversized = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ extra: 'x'.repeat(1024 * 1024) })
+      .expect(413);
+    expect(oversized.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE',
+    });
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+    expect(await redisClient.exists(snapshotLockKey(installationA))).toBe(0);
+  });
+
+  it('allows only one concurrent request into the installation critical region', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const redisService = app.get(RedisClientService);
+    const internalClient = Reflect.get(redisService, 'client') as Redis;
+    const originalEval = internalClient.eval.bind(internalClient);
+    vi.spyOn(internalClient, 'eval').mockImplementation(
+      (...arguments_: Parameters<Redis['eval']>) => {
+        const script = String(arguments_[0]);
+        if (script.includes("redis.call('HSET', KEYS[2]")) {
+          return new Promise((resolve, reject) => {
+            setTimeout(() => {
+              originalEval(...arguments_).then(resolve, reject);
+            }, 40);
+          });
+        }
+        return originalEval(...arguments_);
+      },
+    );
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .put('/training/offline-snapshot')
+        .set('Authorization', `Bearer ${token}`)
+        .send(snapshotRequest(lease.data.leaseId)),
+      request(app.getHttpServer())
+        .put('/training/offline-snapshot')
+        .set('Authorization', `Bearer ${token}`)
+        .send(snapshotRequest(lease.data.leaseId, 1)),
+    ]);
+    expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+    expect(responses.find(({ status }) => status === 409)?.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SYNC_IN_PROGRESS',
+    });
+    expect(await redisClient.exists(snapshotLockKey(installationA))).toBe(0);
+  });
+
+  it('maps an isolated snapshot Redis failure without writing or renewing the lease', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    await redisClient.pexpire(leaseKey(), 10_000);
+    const leaseBefore = await redisClient.get(leaseKey());
+    const ttlBefore = await redisClient.pttl(leaseKey());
+    const redisService = app.get(RedisClientService);
+    const internalClient = Reflect.get(redisService, 'client') as Redis;
+    const originalEval = internalClient.eval.bind(internalClient);
+    vi.spyOn(internalClient, 'eval').mockImplementation(
+      (...arguments_: Parameters<Redis['eval']>) => {
+        if (String(arguments_[0]).includes("redis.call('HSET', KEYS[2]")) {
+          return Promise.reject(new Error('isolated snapshot failure'));
+        }
+        return originalEval(...arguments_);
+      },
+    );
+    const response = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(503);
+    expect(response.body).toMatchObject({
+      code: 'OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE',
+    });
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+    expect(await redisClient.get(leaseKey())).toBe(leaseBefore);
+    expect(await redisClient.pttl(leaseKey())).toBeLessThan(ttlBefore);
+    expect(await redisClient.exists(snapshotLockKey(installationA))).toBe(0);
   });
 
   it('returns lease-specific 503 when the Redis lease transition fails', async () => {
