@@ -48,6 +48,13 @@ perfil, pois ausência de carga não é uma sugestão útil. A criação da exec
 idempotente por pessoa e `sessionId`; somente depois da consolidação a sessão Redis
 é removida.
 
+A finalização offline segue a mesma consolidação e usa `executionId` como chave de
+idempotência da execução. Conclusão e cancelamento criam ainda um recibo terminal
+imutável em `offline_training_terminal_receipts`, único por pessoa e execução.
+Cancelamento não cria histórico; conclusão produz as mesmas métricas, perfis e
+resumo do caminho online. O snapshot offline é removido somente após o recibo e,
+quando aplicável, o histórico estarem duráveis.
+
 ## Consequências
 
 ### Positivas
@@ -62,7 +69,8 @@ idempotente por pessoa e `sessionId`; somente depois da consolidação a sessão
 - a finalização coordena dois bancos sem transação distribuída;
 - indisponibilidade do Redis impede continuar o treino em andamento;
 - a recuperação de uma finalização interrompida depende da idempotência por
-  `sessionId` e do estado `finalizing` no MongoDB;
+  `sessionId` ou `executionId`, do estado `finalizing` e do recibo terminal no
+  MongoDB;
 - a edição concorrente adota descarte explícito do draft em vez de merge.
 
 ## Plano de adoção
@@ -75,6 +83,7 @@ idempotente por pessoa e `sessionId`; somente depois da consolidação a sessão
 ## Links relacionados
 
 - [FIT-0070](../features/fit-0070-fluxo-treinar.md)
+- [FIT-0086](../features/fit-0086-finalizar-cancelar-resolver-conflitos-execucoes-offline.md)
 - [Fluxo de execução de treino](../flows/execucao-de-treino.md)
 - [ADR-0006](ADR-0006-versao-de-recurso-em-header-de-dominio.md)
 - [Endpoints de treino](../../../api/docs/sdd/endpoints/training.md)

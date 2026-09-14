@@ -420,12 +420,34 @@ export interface OfflineTrainingSnapshotTimerV1 {
   startedAt: Timestamp;
 }
 
-export interface OfflineTrainingSnapshotV1 {
-  activeTimer: OfflineTrainingSnapshotTimerV1 | null;
+interface OfflineTrainingSnapshotBaseV1 {
   plan: OfflineTrainingSnapshotPlanV1;
   startedAt: Timestamp;
   workout: OfflineTrainingSnapshotWorkoutV1;
 }
+
+export interface OfflineTrainingInProgressSnapshotV1 extends OfflineTrainingSnapshotBaseV1 {
+  activeTimer: OfflineTrainingSnapshotTimerV1 | null;
+  state: 'in-progress';
+}
+
+export interface OfflineTrainingCompletedSnapshotV1 extends OfflineTrainingSnapshotBaseV1 {
+  activeTimer: null;
+  completedAt: Timestamp;
+  state: 'completed';
+  timezone: string;
+}
+
+export interface OfflineTrainingCancelledSnapshotV1 extends OfflineTrainingSnapshotBaseV1 {
+  activeTimer: null;
+  cancelledAt: Timestamp;
+  state: 'cancelled';
+}
+
+export type OfflineTrainingSnapshotV1 =
+  | OfflineTrainingInProgressSnapshotV1
+  | OfflineTrainingCompletedSnapshotV1
+  | OfflineTrainingCancelledSnapshotV1;
 
 export interface TrainingWeekDay {
   completed: boolean;

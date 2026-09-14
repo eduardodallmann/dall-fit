@@ -195,20 +195,56 @@ export interface PutOfflineTrainingSnapshotV1Request {
   installationId: string;
   leaseId: string;
   payloadVersion: 1;
+  resolution?: {
+    choice: 'local' | 'server';
+    conflictToken: string;
+  };
   revision: number;
   snapshot: OfflineTrainingSnapshotV1;
 }
 
-export type OfflineTrainingSnapshotState = 'accepted' | 'duplicate';
+export type OfflineTrainingSnapshotState =
+  | 'accepted'
+  | 'cancelled'
+  | 'completed'
+  | 'duplicate'
+  | 'duplicate-cancelled'
+  | 'duplicate-completed'
+  | 'resolved-local'
+  | 'resolved-server';
 
 export interface OfflineTrainingSnapshotResult {
   acceptedAt: string;
+  completion?: WorkoutExecutionSummary;
+  executionId: string;
+  expiresAt?: string;
+  orderedAt: string;
+  revision: number;
+  snapshotState: OfflineTrainingSnapshotV1['state'];
+  state: OfflineTrainingSnapshotState;
+}
+
+export interface OfflineTrainingServerVersionV1 {
+  acceptedAt: string;
+  clientUpdatedAt: string;
   executionId: string;
   expiresAt: string;
   orderedAt: string;
   revision: number;
-  state: OfflineTrainingSnapshotState;
+  snapshot: OfflineTrainingSnapshotV1;
 }
+
+export type OfflineTrainingSnapshotConflictDetails =
+  | {
+      allowedResolution: 'local-or-server';
+      conflictToken: string;
+      serverVersion: OfflineTrainingServerVersionV1;
+    }
+  | {
+      allowedResolution: 'discard-local-only';
+      completion?: WorkoutExecutionSummary;
+      terminalState: 'cancelled' | 'completed';
+    };
 
 export type PutOfflineTrainingSnapshotResponse =
   ApiResponse<OfflineTrainingSnapshotResult>;

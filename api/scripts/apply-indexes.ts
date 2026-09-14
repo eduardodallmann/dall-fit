@@ -4,7 +4,7 @@ import process from 'node:process';
 
 import { connect, disconnect } from 'mongoose';
 
-const confirmation = 'apply-dall-fit-indexes-v2';
+const confirmation = 'apply-dall-fit-indexes-v3';
 const trainingPlanIndexName = 'ownerPersonId_1_createdAt_-1__id_-1';
 const legacyTrainingPlanIndexName = 'ownerPersonId_1_createdAt_-1';
 const peopleIndexName = 'googleSubject_1';
@@ -30,6 +30,9 @@ async function main(): Promise<void> {
     const people = database.collection('people');
     const workoutExecutions = database.collection('workout_executions');
     const loadProfiles = database.collection('person_exercise_load_profiles');
+    const offlineTerminalReceipts = database.collection(
+      'offline_training_terminal_receipts',
+    );
 
     await people.createIndex(
       { googleSubject: 1 },
@@ -58,6 +61,10 @@ async function main(): Promise<void> {
         unique: true,
       },
     );
+    await offlineTerminalReceipts.createIndex(
+      { personId: 1, executionId: 1 },
+      { name: 'personId_1_executionId_1', unique: true },
+    );
     await loadProfiles.createIndex(
       { trainingPlanId: 1, workoutId: 1 },
       { name: 'trainingPlanId_1_workoutId_1' },
@@ -71,7 +78,7 @@ async function main(): Promise<void> {
     if (indexes.some((index) => index.name === legacyTrainingPlanIndexName)) {
       await trainingPlans.dropIndex(legacyTrainingPlanIndexName);
     }
-    process.stdout.write('Index set v2 applied successfully.\n');
+    process.stdout.write('Index set v3 applied successfully.\n');
   } finally {
     await disconnect();
   }

@@ -63,11 +63,20 @@ uma feature, o agente deve separar:
 
 O questionário trata uma decisão por vez para que cada resposta possa revelar,
 eliminar ou reformular as próximas perguntas. Não existe quantidade fixa de
-perguntas nem de alternativas: uma decisão pode ter de duas a N opções e pode ter
-uma única proposta quando o objetivo for apenas confirmar uma consequência. As
+perguntas, mas toda pergunta precisa corresponder a uma dúvida real: devem existir
+ao menos duas respostas plausíveis, compatíveis com as fontes de verdade e capazes
+de mudar materialmente escopo, comportamento, contrato ou critério de aceite. As
 alternativas devem ser concretas, mutuamente compreensíveis e informar impactos ou
-trade-offs relevantes; quando houver recomendação técnica, ela deve ser indicada
-com sua justificativa.
+trade-offs relevantes; quando houver recomendação, ela deve ser indicada com sua
+justificativa.
+
+Não pedir confirmação de uma única proposta, consequência necessária ou solução
+já determinada pelo pedido, ticket, SDD, código vigente ou documentação oficial.
+Também não transferir ao usuário escolhas técnicas locais que possam ser resolvidas
+com segurança pelos padrões existentes. Nesses casos, o agente registra diretamente
+o fato ou a premissa fundamentada na feature. Se houver uma inferência relevante,
+ela é declarada com sua evidência e risco, mas só vira pergunta quando outra opção
+materialmente diferente continuar plausível.
 
 Fatos e escolhas já confirmados não são perguntados novamente. Uma certeza pode
 voltar a ser uma decisão aberta quando uma resposta posterior invalidar a premissa
@@ -80,11 +89,13 @@ formato `decisão X de Y`. O total não é uma promessa: deve ser atualizado qua
 as respostas criarem ou eliminarem ramos. Se uma estimativa útil ainda não for
 possível, o agente não inventa um número.
 
-Pode não haver pergunta alguma quando o pedido, o SDD e decisões anteriores já
-determinarem o escopo sem ambiguidade material. Encerrado o questionário, o agente
-consolida as decisões, confirma que não restam pontos capazes de mudar escopo,
-comportamento ou critérios de aceite e somente então escreve a feature. Essa etapa
-não substitui o gate posterior entre a apresentação da feature e sua implementação.
+Não há pergunta quando o pedido, o SDD, o código e decisões anteriores já
+determinarem o escopo sem ambiguidade material. A ausência de perguntas é o
+resultado esperado quando o refinamento já estiver suficiente; o agente não cria
+um ritual de confirmação. Encerrado o questionário, o agente consolida as decisões,
+verifica internamente que não restam pontos capazes de mudar escopo, comportamento
+ou critérios de aceite e somente então escreve a feature. Essa etapa não substitui
+o gate posterior entre a apresentação da feature e sua implementação.
 
 ## Separação entre especificação e implementação
 

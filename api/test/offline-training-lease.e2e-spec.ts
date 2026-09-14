@@ -31,6 +31,8 @@ import {
   OfflineTrainingLeaseExpiredError,
   OfflineTrainingLeaseRevokedError,
 } from '~/training/errors/offline-training-lease.errors';
+import { OfflineTrainingTerminalReceiptDocument } from '~/training/repositories/offline-training-terminal-receipt.schema';
+import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 import { OfflineTrainingLeaseService } from '~/training/services/offline-training-lease.service';
 
 const googleCredential = Buffer.from(
@@ -63,11 +65,21 @@ interface LeaseResponseBody {
 interface SnapshotResponseBody {
   data: {
     acceptedAt: string;
+    completion?: { id: string };
     executionId: string;
-    expiresAt: string;
+    expiresAt?: string;
     orderedAt: string;
     revision: number;
-    state: 'accepted' | 'duplicate';
+    snapshotState: 'cancelled' | 'completed' | 'in-progress';
+    state:
+      | 'accepted'
+      | 'cancelled'
+      | 'completed'
+      | 'duplicate'
+      | 'duplicate-cancelled'
+      | 'duplicate-completed'
+      | 'resolved-local'
+      | 'resolved-server';
   };
 }
 
@@ -80,6 +92,8 @@ describe('Offline training lease (e2e)', () => {
   let planModel: Model<TrainingPlanDocument>;
   let catalogModel: Model<PersonalTrainingPlanCatalogDocument>;
   let activeModel: Model<PersonalTrainingPlanActiveDocument>;
+  let receiptModel: Model<OfflineTrainingTerminalReceiptDocument>;
+  let executionModel: Model<WorkoutExecutionDocument>;
   let authSessions: AuthSessionService;
   let leases: OfflineTrainingLeaseService;
 
@@ -117,12 +131,18 @@ describe('Offline training lease (e2e)', () => {
     );
     authSessions = app.get(AuthSessionService);
     leases = app.get(OfflineTrainingLeaseService);
+    receiptModel = app.get(
+      getModelToken(OfflineTrainingTerminalReceiptDocument.name),
+    );
+    executionModel = app.get(getModelToken(WorkoutExecutionDocument.name));
     redisClient = new Redis(process.env.REDIS_URL);
     await Promise.all([
       personModel.syncIndexes(),
       planModel.syncIndexes(),
       catalogModel.syncIndexes(),
       activeModel.syncIndexes(),
+      receiptModel.syncIndexes(),
+      executionModel.syncIndexes(),
     ]);
   });
 
@@ -133,6 +153,8 @@ describe('Offline training lease (e2e)', () => {
       planModel.deleteMany({}).exec(),
       catalogModel.deleteMany({}).exec(),
       activeModel.deleteMany({}).exec(),
+      receiptModel.deleteMany({}).exec(),
+      executionModel.deleteMany({}).exec(),
       redisClient.flushdb(),
     ]);
     await personModel.create({
@@ -227,6 +249,7 @@ describe('Offline training lease (e2e)', () => {
       revision,
       snapshot: {
         activeTimer: null,
+        state: 'in-progress',
         plan: {
           catalogEntryId: firstEntryId.toString(),
           name: 'Captured plan before edit',
@@ -590,7 +613,8 @@ describe('Offline training lease (e2e)', () => {
       .send(snapshotRequest(lease.data.leaseId, 1))
       .expect(409);
     expect(stale.body).toMatchObject({
-      code: 'OFFLINE_TRAINING_SNAPSHOT_STALE',
+      code: 'OFFLINE_TRAINING_SNAPSHOT_VERSION_CONFLICT',
+      details: { allowedResolution: 'local-or-server' },
     });
     expect(await redisClient.hget(snapshotKey(), 'revision')).toBe('2');
   });
@@ -614,7 +638,8 @@ describe('Offline training lease (e2e)', () => {
       .send(collision)
       .expect(409);
     expect(collisionResponse.body).toMatchObject({
-      code: 'OFFLINE_TRAINING_SNAPSHOT_IDEMPOTENCY_CONFLICT',
+      code: 'OFFLINE_TRAINING_SNAPSHOT_VERSION_CONFLICT',
+      details: { allowedResolution: 'local-or-server' },
     });
     const otherExecution = {
       ...body,
@@ -626,12 +651,157 @@ describe('Offline training lease (e2e)', () => {
       .send(otherExecution)
       .expect(409);
     expect(executionResponse.body).toMatchObject({
-      code: 'OFFLINE_TRAINING_EXECUTION_CONFLICT',
+      code: 'OFFLINE_TRAINING_SNAPSHOT_VERSION_CONFLICT',
+      details: { allowedResolution: 'local-or-server' },
     });
-    expect(JSON.stringify(executionResponse.body)).not.toContain(
-      body.executionId,
-    );
     expect(await redisClient.hgetall(snapshotKey())).toEqual(before);
+  });
+
+  it('resolves a comparable conflict by complete local or server version', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const body = snapshotRequest(lease.data.leaseId);
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    const local = structuredClone(body);
+    local.snapshot.workout.exercises[0].series[0].loadKg = 10;
+    const conflict = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(local)
+      .expect(409);
+    const conflictToken = (
+      conflict.body as {
+        details: { conflictToken: string };
+      }
+    ).details.conflictToken;
+    const keepServer = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        ...local,
+        resolution: { choice: 'server', conflictToken },
+      })
+      .expect(200);
+    expect(keepServer.body).toMatchObject({
+      data: { snapshotState: 'in-progress', state: 'resolved-server' },
+    });
+    const replace = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        ...local,
+        resolution: { choice: 'local', conflictToken },
+      })
+      .expect(200);
+    expect(replace.body).toMatchObject({
+      data: { snapshotState: 'in-progress', state: 'resolved-local' },
+    });
+    expect(await redisClient.hget(snapshotKey(), 'snapshot')).toContain(
+      '"loadKg":10',
+    );
+  });
+
+  it('completes once, returns the canonical summary and recognizes replay', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const body = snapshotRequest(lease.data.leaseId, 1);
+    body.snapshot.state = 'completed';
+    const completedSnapshot = body.snapshot as unknown as {
+      completedAt: string;
+      state: string;
+      timezone: string;
+      workout: {
+        exercises: Array<{
+          completedAt: string | null;
+          series: Array<{
+            completedAt: string | null;
+            loadKg: number | null;
+          }>;
+        }>;
+      };
+    };
+    completedSnapshot.completedAt = '2026-09-14T12:06:00.000Z';
+    completedSnapshot.timezone = 'America/Sao_Paulo';
+    completedSnapshot.workout.exercises[0].completedAt =
+      '2026-09-14T12:05:00.000Z';
+    completedSnapshot.workout.exercises[0].series[0].completedAt =
+      '2026-09-14T12:04:00.000Z';
+    completedSnapshot.workout.exercises[0].series[0].loadKg = 20;
+    const first = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    const firstBody = first.body as SnapshotResponseBody;
+    expect(first.body).toMatchObject({
+      data: {
+        completion: {
+          completedExerciseCount: 1,
+          durationSeconds: 360,
+          totalLoadKg: 20,
+        },
+        snapshotState: 'completed',
+        state: 'completed',
+      },
+    });
+    expect(await executionModel.countDocuments()).toBe(1);
+    expect(await receiptModel.countDocuments()).toBe(1);
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+
+    const replay = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(body)
+      .expect(200);
+    expect(replay.body).toMatchObject({
+      data: {
+        completion: { id: firstBody.data.completion?.id },
+        state: 'duplicate-completed',
+      },
+    });
+    expect(await executionModel.countDocuments()).toBe(1);
+    expect(await receiptModel.countDocuments()).toBe(1);
+  });
+
+  it('cancels without history and allows the next execution', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const cancelled = snapshotRequest(lease.data.leaseId);
+    cancelled.snapshot.state = 'cancelled';
+    const cancelledSnapshot =
+      cancelled.snapshot as typeof cancelled.snapshot & {
+        cancelledAt: string;
+      };
+    cancelledSnapshot.cancelledAt = '2026-09-14T12:06:00.000Z';
+    const response = await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(cancelled)
+      .expect(200);
+    expect(response.body).toMatchObject({
+      data: { snapshotState: 'cancelled', state: 'cancelled' },
+    });
+    expect(await executionModel.countDocuments()).toBe(0);
+    expect(await receiptModel.countDocuments()).toBe(1);
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+
+    const next = snapshotRequest(lease.data.leaseId);
+    next.executionId = '55555555-5555-4555-8555-555555555555';
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .send(next)
+      .expect(200);
+    expect(await redisClient.hget(snapshotKey(), 'executionId')).toBe(
+      next.executionId,
+    );
   });
 
   it('rejects invalid trees, revoked leases, occupied locks and non-native transports before writes', async () => {

@@ -102,6 +102,68 @@ const timer = z
   })
   .strict();
 
+const snapshotPlan = z
+  .object({
+    catalogEntryId: mongoId,
+    name: resourceName,
+    planId: mongoId,
+    source: z.enum(['global-reference', 'owned']),
+    workouts: z
+      .array(
+        z
+          .object({
+            bodyAreas: z.array(bodyArea).max(BODY_AREAS.length),
+            id: mongoId,
+            name: resourceName,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(25),
+  })
+  .strict();
+
+const snapshotWorkout = z
+  .object({
+    exercises: z.array(exercise).max(50),
+    id: mongoId,
+    name: resourceName,
+  })
+  .strict();
+
+const snapshotCommon = {
+  plan: snapshotPlan,
+  startedAt: timestamp,
+  workout: snapshotWorkout,
+};
+
+const snapshot = z.discriminatedUnion('state', [
+  z
+    .object({
+      ...snapshotCommon,
+      activeTimer: timer.nullable(),
+      state: z.literal('in-progress'),
+    })
+    .strict(),
+  z
+    .object({
+      ...snapshotCommon,
+      activeTimer: z.null(),
+      completedAt: timestamp,
+      state: z.literal('completed'),
+      timezone: z.string().min(1).max(100),
+    })
+    .strict(),
+  z
+    .object({
+      ...snapshotCommon,
+      activeTimer: z.null(),
+      cancelledAt: timestamp,
+      state: z.literal('cancelled'),
+    })
+    .strict(),
+]);
+
 const offlineTrainingSnapshotBaseSchema = z
   .object({
     clientUpdatedAt: timestamp,
@@ -109,40 +171,15 @@ const offlineTrainingSnapshotBaseSchema = z
     installationId: z.uuidv4(),
     leaseId: z.uuidv4(),
     payloadVersion: z.literal(1),
-    revision: z.number().int().min(0).max(2_147_483_647),
-    snapshot: z
+    resolution: z
       .object({
-        activeTimer: timer.nullable(),
-        plan: z
-          .object({
-            catalogEntryId: mongoId,
-            name: resourceName,
-            planId: mongoId,
-            source: z.enum(['global-reference', 'owned']),
-            workouts: z
-              .array(
-                z
-                  .object({
-                    bodyAreas: z.array(bodyArea).max(BODY_AREAS.length),
-                    id: mongoId,
-                    name: resourceName,
-                  })
-                  .strict(),
-              )
-              .min(1)
-              .max(25),
-          })
-          .strict(),
-        startedAt: timestamp,
-        workout: z
-          .object({
-            exercises: z.array(exercise).max(50),
-            id: mongoId,
-            name: resourceName,
-          })
-          .strict(),
+        choice: z.enum(['local', 'server']),
+        conflictToken: z.string().regex(/^[a-f\d]{64}$/),
       })
-      .strict(),
+      .strict()
+      .optional(),
+    revision: z.number().int().min(0).max(2_147_483_647),
+    snapshot,
   })
   .strict();
 
@@ -272,9 +309,48 @@ function validateTimerRelation(
   }
 }
 
+function validateTerminal(
+  request: ParsedOfflineTrainingSnapshotRequest,
+  context: z.RefinementCtx,
+): void {
+  if (request.snapshot.state === 'in-progress') return;
+  const terminalAt =
+    request.snapshot.state === 'completed'
+      ? request.snapshot.completedAt
+      : request.snapshot.cancelledAt;
+  const terminalMs = Date.parse(terminalAt);
+  const actionTimestamps = request.snapshot.workout.exercises.flatMap(
+    (item) => [
+      item.completedAt,
+      ...('series' in item
+        ? item.series.map((itemSeries) => itemSeries.completedAt)
+        : []),
+    ],
+  );
+  const happensBeforeAction = actionTimestamps.some(
+    (value) => value !== null && Date.parse(value) > terminalMs,
+  );
+  if (
+    terminalMs < Date.parse(request.snapshot.startedAt) ||
+    happensBeforeAction
+  ) {
+    context.addIssue({ code: 'custom', path: ['snapshot', 'state'] });
+  }
+  if (request.snapshot.state === 'completed') {
+    try {
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: request.snapshot.timezone,
+      }).format(new Date(terminalMs));
+    } catch {
+      context.addIssue({ code: 'custom', path: ['snapshot', 'timezone'] });
+    }
+  }
+}
+
 export const offlineTrainingSnapshotRequestSchema =
   offlineTrainingSnapshotBaseSchema.superRefine((request, context) => {
     validatePlanRelations(request, context);
     validateExerciseRelations(request, context);
     validateTimerRelation(request, context);
+    validateTerminal(request, context);
   }) satisfies z.ZodType<PutOfflineTrainingSnapshotV1Request>;

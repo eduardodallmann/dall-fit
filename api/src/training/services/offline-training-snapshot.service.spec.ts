@@ -11,10 +11,9 @@ import {
   OfflineTrainingLeaseRevokedError,
 } from '~/training/errors/offline-training-lease.errors';
 import {
-  OfflineTrainingExecutionConflictError,
-  OfflineTrainingSnapshotIdempotencyConflictError,
-  OfflineTrainingSnapshotStaleError,
+  OfflineTrainingSnapshotResolutionExpiredError,
   OfflineTrainingSnapshotUnavailableError,
+  OfflineTrainingSnapshotVersionConflictError,
 } from '~/training/errors/offline-training-snapshot.errors';
 import { OfflineTrainingSnapshotService } from '~/training/services/offline-training-snapshot.service';
 import type { TrainingClockService } from '~/training/services/training-clock.service';
@@ -30,6 +29,7 @@ describe('OfflineTrainingSnapshotService', () => {
     revision: 0,
     snapshot: {
       activeTimer: null,
+      state: 'in-progress',
       plan: { planId: '64b000000000000000000001' },
       startedAt: '2026-09-14T12:00:00.000Z',
       workout: {},
@@ -65,6 +65,11 @@ describe('OfflineTrainingSnapshotService', () => {
         String(now.getTime()),
         String(Date.parse(request.clientUpdatedAt)),
         String(now.getTime() + 604_800_000),
+        request.executionId,
+        '0',
+        request.clientUpdatedAt,
+        'hidden-hash',
+        JSON.stringify(request.snapshot),
       ]);
       const result = await service.ingest({
         contentHash: 'hidden-hash',
@@ -72,9 +77,10 @@ describe('OfflineTrainingSnapshotService', () => {
         request,
         serializedSnapshot: '{}',
       });
-      expect(result).toMatchObject({
+      expect(result.result).toMatchObject({
         executionId: request.executionId,
         revision: 0,
+        snapshotState: 'in-progress',
         state,
       });
       expect(evalMock).toHaveBeenCalledWith(
@@ -95,6 +101,8 @@ describe('OfflineTrainingSnapshotService', () => {
         String(now.getTime() + 604_800_000),
         '2026-09-21T12:10:00.000Z',
         '{}',
+        '',
+        '',
       );
     },
   );
@@ -102,13 +110,11 @@ describe('OfflineTrainingSnapshotService', () => {
   it.each([
     ['lease-expired', OfflineTrainingLeaseExpiredError],
     ['lease-revoked', OfflineTrainingLeaseRevokedError],
-    ['stale', OfflineTrainingSnapshotStaleError],
-    ['idempotency-conflict', OfflineTrainingSnapshotIdempotencyConflictError],
-    ['execution-conflict', OfflineTrainingExecutionConflictError],
+    ['resolution-expired', OfflineTrainingSnapshotResolutionExpiredError],
   ] as const)(
     'maps %s without declaring acceptance',
     async (state, ErrorType) => {
-      evalMock.mockResolvedValueOnce([state, '', '', '']);
+      evalMock.mockResolvedValueOnce([state, '', '', '', '', '', '', '', '']);
       await expect(
         service.ingest({
           contentHash: 'hidden-hash',
@@ -119,6 +125,35 @@ describe('OfflineTrainingSnapshotService', () => {
       ).rejects.toBeInstanceOf(ErrorType);
     },
   );
+
+  it('returns the safe server version for a comparable conflict', async () => {
+    evalMock.mockResolvedValueOnce([
+      'conflict',
+      String(now.getTime()),
+      String(Date.parse(request.clientUpdatedAt)),
+      String(now.getTime() + 604_800_000),
+      request.executionId,
+      '0',
+      request.clientUpdatedAt,
+      'hidden-hash',
+      JSON.stringify(request.snapshot),
+    ]);
+    const error = await service
+      .ingest({
+        contentHash: 'other-hash',
+        personId: 'hidden-person',
+        request,
+        serializedSnapshot: '{}',
+      })
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OfflineTrainingSnapshotVersionConflictError);
+    expect(error).toMatchObject({
+      details: {
+        allowedResolution: 'local-or-server',
+        conflictToken: 'hidden-hash',
+      },
+    });
+  });
 
   it.each([new RedisUnavailableError(), new Error('invalid-response')])(
     'fails closed on technical or malformed Redis responses',

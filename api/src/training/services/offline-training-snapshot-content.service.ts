@@ -32,7 +32,8 @@ export class OfflineTrainingSnapshotContentService {
       'OfflineTrainingSnapshotContentService -> prepare -> params:',
       { params: { payloadVersion: request.payloadVersion } },
     );
-    const canonical = JSON.stringify(sortCanonicalValue(request));
+    const { resolution: _resolution, ...content } = request;
+    const canonical = JSON.stringify(sortCanonicalValue(content));
     const serializedSnapshot = JSON.stringify(request.snapshot);
     const contentHash = createHash('sha256').update(canonical).digest('hex');
     const result = { contentHash, serializedSnapshot };

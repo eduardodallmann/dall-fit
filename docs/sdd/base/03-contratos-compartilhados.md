@@ -165,13 +165,21 @@ request; o Workflow os lê no MongoDB.
 - respostas seguem `ApiResponse`; mutations de sessão devolvem a versão também no
   header `X-Resource-Version`.
 - `PutOfflineTrainingSnapshotV1Request` publica o envelope estrito do snapshot
-  Android em andamento: identidade da instalação, fence, execução, revisão,
-  timestamp cliente e `OfflineTrainingSnapshotV1`. A árvore bruta captura plano,
-  workouts, workout executado, exercícios/séries e timer sem totais derivados,
-  pessoa, validade, mídia ou capacidades temporárias.
-- `OfflineTrainingSnapshotResult` confirma `accepted | duplicate`, execução e
-  revisão e devolve `acceptedAt`, `orderedAt` e `expiresAt` server-side. A UI
-  ainda não consome o contrato; ele atende ao sincronizador Android posterior.
+  Android: identidade da instalação, fence, execução, revisão, timestamp cliente
+  e `OfflineTrainingSnapshotV1`, discriminado em `in-progress`, `completed` ou
+  `cancelled`. A árvore bruta captura plano, workouts, workout executado,
+  exercícios/séries e timer sem totais derivados, pessoa, validade, mídia ou
+  capacidades temporárias. A resolução opcional leva a escolha explícita
+  `local | server` e o token do conflito observado.
+- `OfflineTrainingSnapshotResult` diferencia aceite, duplicata, conclusão,
+  cancelamento e resolução local/servidor; identifica o estado do snapshot e
+  devolve os metadados server-side aplicáveis. Conclusão inclui o mesmo
+  `WorkoutExecutionSummary` da jornada online.
+- Conflitos comparáveis usam `OfflineTrainingSnapshotConflictDetails` com a versão
+  completa segura do servidor e escolha `local-or-server`. Execuções já terminais
+  são imutáveis e retornam somente `discard-local-only`, estado terminal e o
+  resumo canônico quando houver. O token é opaco e só vale enquanto a versão
+  observada continuar corrente.
 
 ## Assistente de planos de treino
 

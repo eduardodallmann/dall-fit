@@ -11,7 +11,13 @@ import { OfflineTrainingLeaseController } from '~/training/controllers/offline-t
 import { OfflineTrainingSnapshotController } from '~/training/controllers/offline-training-snapshot.controller';
 import { TrainingController } from '~/training/controllers/training.controller';
 import { OfflineTrainingSnapshotValidationPipe } from '~/training/dto/offline-training-snapshot.dto';
+import { MongoOfflineTrainingTerminalReceiptRepository } from '~/training/repositories/mongo-offline-training-terminal-receipt.repository';
 import { MongoWorkoutExecutionRepository } from '~/training/repositories/mongo-workout-execution.repository';
+import { OfflineTrainingTerminalReceiptRepository } from '~/training/repositories/offline-training-terminal-receipt.repository';
+import {
+  OfflineTrainingTerminalReceiptDocument,
+  OfflineTrainingTerminalReceiptSchema,
+} from '~/training/repositories/offline-training-terminal-receipt.schema';
 import { WorkoutExecutionRepository } from '~/training/repositories/workout-execution.repository';
 import {
   WorkoutExecutionDocument,
@@ -21,6 +27,7 @@ import { OfflineTrainingLeaseService } from '~/training/services/offline-trainin
 import { OfflineTrainingSnapshotContentService } from '~/training/services/offline-training-snapshot-content.service';
 import { OfflineTrainingSnapshotLockService } from '~/training/services/offline-training-snapshot-lock.service';
 import { OfflineTrainingSnapshotService } from '~/training/services/offline-training-snapshot.service';
+import { OfflineTrainingTerminalService } from '~/training/services/offline-training-terminal.service';
 import { TrainingClockService } from '~/training/services/training-clock.service';
 import { TrainingService } from '~/training/services/training.service';
 import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
@@ -30,6 +37,10 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
     AuthModule,
     TrainingPlanModule,
     MongooseModule.forFeature([
+      {
+        name: OfflineTrainingTerminalReceiptDocument.name,
+        schema: OfflineTrainingTerminalReceiptSchema,
+      },
       { name: WorkoutExecutionDocument.name, schema: WorkoutExecutionSchema },
     ]),
   ],
@@ -40,10 +51,12 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
   ],
   providers: [
     MongoWorkoutExecutionRepository,
+    MongoOfflineTrainingTerminalReceiptRepository,
     OfflineTrainingLeaseService,
     OfflineTrainingSnapshotContentService,
     OfflineTrainingSnapshotLockService,
     OfflineTrainingSnapshotService,
+    OfflineTrainingTerminalService,
     OfflineTrainingSnapshotValidationPipe,
     PutOfflineTrainingSnapshotCommand,
     RegisterOfflineTrainingLeaseCommand,
@@ -52,6 +65,10 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
     TrainingCommand,
     TrainingService,
     WorkoutSessionStore,
+    {
+      provide: OfflineTrainingTerminalReceiptRepository,
+      useExisting: MongoOfflineTrainingTerminalReceiptRepository,
+    },
     {
       provide: WorkoutExecutionRepository,
       useExisting: MongoWorkoutExecutionRepository,

@@ -53,7 +53,9 @@ usuário o questionário ramificado definido em
 [`base/04-governanca-do-sdd.md`](base/04-governanca-do-sdd.md). Fatos já
 confirmados não são perguntados novamente, salvo quando uma resposta posterior
 alterar suas premissas. Quando não houver decisão pendente, esta etapa termina sem
-perguntas.
+perguntas. Uma dúvida só é real quando ao menos duas respostas plausíveis continuam
+capazes de mudar materialmente a feature; não pedir confirmação de proposta única,
+consequência necessária ou decisão técnica já derivável das fontes de verdade.
 
 ### Fase 1 — especificação da feature
 

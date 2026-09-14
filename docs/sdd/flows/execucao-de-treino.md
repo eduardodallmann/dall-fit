@@ -26,8 +26,7 @@ por pessoa.
 |     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
 |     — | autorizar edição offline | consumidor Android futuro | `PUT /training/offline-lease`, `POST /training/offline-lease/takeover` |
-|     — | autorizar offline   | consumidor Android futuro                 | `PUT /training/offline-lease`, `POST .../takeover`             |
-|     — | ingerir snapshot offline | consumidor Android futuro            | `PUT /training/offline-snapshot`                               |
+|     — | sincronizar, concluir ou cancelar offline | consumidor Android futuro | `PUT /training/offline-snapshot` |
 
 ## Sequência e decisões
 
@@ -42,8 +41,10 @@ por pessoa.
    esses endpoints nesta etapa da jornada.
    O backend disponibiliza um lease Redis exclusivo por pessoa e a ingestão
    idempotente de snapshots v1. Uma revisão nova aceita renova atomicamente lease e
-   snapshot por sete dias; replay não renova, e árvore histórica válida do mesmo
-   plano não altera o MongoDB. A UI, o motor Android e o sincronizador ainda não
+   snapshot por sete dias; replay não renova. Conflitos devolvem a versão segura do
+   servidor e exigem escolha local ou servidor vinculada ao token observado.
+   Conclusão consolida o mesmo histórico e resumo do caminho online; cancelamento
+   só grava o recibo terminal. A UI, o motor Android e o sincronizador ainda não
    chamam esses endpoints neste fluxo.
 2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
@@ -65,6 +66,10 @@ por pessoa.
    incompleto requer confirmação explícita para finalizar.
 7. A finalização grava execução e perfis no MongoDB, remove o snapshot Redis e
    navega para o resumo semanal compartilhável.
+8. No caminho offline, `completed` consolida a árvore capturada e devolve o mesmo
+   resumo semanal; `cancelled` descarta a execução sem histórico. Ambos gravam um
+   recibo imutável antes da limpeza condicionada do snapshot. Replay terminal
+   continua idempotente mesmo após lease ou Redis expirarem.
 
 ## Dados compartilhados
 
@@ -75,9 +80,9 @@ por pessoa.
 | cargas por série         | UI/API      | execução e próxima prévia              | Redis; perfil MongoDB ao finalizar | inteiro ou `null`                                |
 | timers                   | API         | overlay da UI                          | timestamps no Redis                | nenhum interval é persistido                     |
 | resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
-| lease de edição offline  | API         | consumidor Android futuro              | Redis, uma chave por pessoa        | plano/instalação no valor; `leaseId` cerca a concessão |
-| lease de edição offline  | API         | consumidor Android futuro              | Redis, sete dias condicionais      | uma instalação e um fence por pessoa             |
-| snapshot offline corrente | Android/API | sincronizador Android futuro            | Redis, uma chave por pessoa        | revisão monotônica; replay não renova             |
+| lease de edição offline  | API         | consumidor Android futuro              | Redis, sete dias condicionais      | plano/instalação no valor; `leaseId` cerca a concessão |
+| snapshot offline corrente | Android/API | sincronizador Android futuro            | Redis, uma chave por pessoa        | revisão monotônica; conflito exige escolha explícita |
+| terminal offline         | API         | retries e histórico                    | recibo MongoDB único por execução  | conclusão ou cancelamento imutável                |
 
 ## Estados e exceções
 
@@ -89,7 +94,9 @@ por pessoa.
   preserva a sessão para repetição idempotente.
 - Autorização offline: ausência expira, divergência de fence revoga e takeover
   substitui o editor sem ler ou apagar dados do aparelho anterior. A API já
-  ingere snapshots idempotentes; ainda não há cliente sincronizador nesta jornada.
+  ingere snapshots idempotentes, resolve conflitos sem merge silencioso e impede
+  mutação depois de conclusão ou cancelamento; ainda não há cliente sincronizador
+  nesta jornada.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
   sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
   alterna expansão, o input de carga recebe clique em toda a largura e o Drawer
