@@ -74,10 +74,12 @@ somente a fase de especificação:
 
 1. antes de escrever o arquivo, identifique as decisões ainda pendentes e conduza
    com o usuário o questionário ramificado definido em
-   `docs/sdd/base/04-governanca-do-sdd.md`; não repita certezas, aceite de duas a N
-   opções ou uma única confirmação, reabra uma certeza se um ramo posterior mudar
-   sua premissa e informe `decisão X de Y` quando houver estimativa útil, ajustando
-   o total conforme os ramos; se nada estiver pendente, não faça perguntas;
+   `docs/sdd/base/04-governanca-do-sdd.md`; não repita certezas nem peça confirmação
+   de proposta única, consequência necessária ou escolha técnica derivável; só
+   pergunte quando ao menos duas respostas plausíveis puderem mudar materialmente a
+   feature, reabra uma certeza se um ramo posterior mudar sua premissa e informe
+   `decisão X de Y` quando houver estimativa útil, ajustando o total conforme os
+   ramos; se nada estiver realmente pendente, não faça perguntas;
 2. crie ou altere apenas o arquivo autocontido em `docs/sdd/features/`, usando o
    template da raiz;
 3. não altere código, configuração, contratos executáveis, mocks ou testes;
