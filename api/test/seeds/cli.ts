@@ -26,6 +26,18 @@ import {
   TrainingPlanDocument,
   TrainingPlanSchema,
 } from '~/training-plan/repositories/training-plan.schema';
+import {
+  OfflineTrainingTerminalReceiptDocument,
+  OfflineTrainingTerminalReceiptSchema,
+} from '~/training/repositories/offline-training-terminal-receipt.schema';
+import {
+  TrainingLoadProfileDocument,
+  TrainingLoadProfileSchema,
+} from '~/training/repositories/training-load-profile.schema';
+import {
+  WorkoutExecutionDocument,
+  WorkoutExecutionSchema,
+} from '~/training/repositories/workout-execution.schema';
 
 const trainingPlanScenarios = [
   'training-plans:create',
@@ -370,6 +382,7 @@ function offlineSnapshotRequestFixture(revision: number) {
     revision,
     snapshot: {
       activeTimer: null,
+      state: 'in-progress',
       plan: {
         catalogEntryId: '74b000000000000000000001',
         name: 'Plano histórico capturado',
@@ -487,6 +500,18 @@ async function main(): Promise<void> {
     const assistantSessionModel = model(
       TrainingPlanAssistantSessionDocument.name,
       TrainingPlanAssistantSessionSchema,
+    );
+    const offlineTerminalReceiptModel = model(
+      OfflineTrainingTerminalReceiptDocument.name,
+      OfflineTrainingTerminalReceiptSchema,
+    );
+    const trainingLoadProfileModel = model(
+      TrainingLoadProfileDocument.name,
+      TrainingLoadProfileSchema,
+    );
+    const workoutExecutionModel = model(
+      WorkoutExecutionDocument.name,
+      WorkoutExecutionSchema,
     );
 
     if (!(await seedAuthenticationScenario(personModel, scenario))) {
@@ -635,6 +660,13 @@ async function main(): Promise<void> {
                 : ownedEntryId,
             personId,
           });
+        if (scenario?.startsWith('offline-training-snapshot:')) {
+          await Promise.all([
+            offlineTerminalReceiptModel.deleteMany({ personId }).exec(),
+            trainingLoadProfileModel.deleteMany({ personId }).exec(),
+            workoutExecutionModel.deleteMany({ personId }).exec(),
+          ]);
+        }
         if (scenario === 'personal-training-plans:clone-job')
           await cloneJobModel.create({
             _id: new Types.ObjectId('84b000000000000000000001'),

@@ -13,4 +13,15 @@ export interface OfflineTrainingSnapshotIngestInput {
   serializedSnapshot: string;
 }
 
-export type OfflineTrainingSnapshotIngestResult = OfflineTrainingSnapshotResult;
+export interface OfflineTrainingSnapshotIngestResult {
+  contentHash: string;
+  effectiveRequest: PutOfflineTrainingSnapshotV1Request;
+  result: OfflineTrainingSnapshotResult;
+}
+
+export interface OfflineTrainingTerminalCleanupInput {
+  contentHash: string;
+  executionId: string;
+  personId: string;
+  revision: number;
+}

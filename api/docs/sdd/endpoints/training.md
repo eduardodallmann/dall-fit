@@ -104,6 +104,13 @@ Redis é removida e o resumo semanal é calculado no timezone recebido. Repetiç
 após persistência encontra a mesma execução e evita duplicar o histórico. A leitura
 de conclusão sempre filtra também por pessoa.
 
+O terminal `completed` de `PUT /training/offline-snapshot` reutiliza essa mesma
+consolidação a partir da árvore capturada no snapshot e usa `executionId` como
+identidade idempotente. Métricas, perfis elegíveis e resumo semanal seguem as
+mesmas regras; `cancelled` não cria execução nem perfis. O endpoint offline grava
+um recibo terminal antes de limpar seu snapshot Redis, conforme sua documentação
+proprietária.
+
 ## Mapa de caminhos e erros
 
 | Caminho                               | Gatilho                                          | Resultado                                                        | Efeitos            |

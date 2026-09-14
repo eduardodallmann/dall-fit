@@ -51,9 +51,16 @@ atômicas no Redis; não há `WATCH`, lock local, fallback ou autorização no M
 
 A ingestão de snapshot implementa essa condição na mesma transição Lua que publica
 uma revisão nova. O script confronta o fence e atribui o mesmo `PXAT` de sete dias
-ao lease e ao snapshot; replay idêntico, revisão obsoleta, colisão, outra execução
-ou erro não renovam nenhum deles. Um lock Redis curto por instalação serializa a
-região crítica entre runtimes e é removido somente pelo token proprietário.
+ao lease e ao snapshot; replay idêntico, conflito, escolha da versão do servidor ou
+erro não renovam nenhum deles. Conflitos comparáveis devolvem a versão segura
+corrente e um token opaco; a escolha local só substitui essa versão se o token
+ainda coincidir. Um lock Redis curto por instalação serializa a região crítica
+entre runtimes e é removido somente pelo token proprietário.
+
+Aceitar um estado terminal ainda exige o lease vigente na primeira tentativa, mas
+o recibo durável permite repetir exatamente a mesma conclusão ou cancelamento sem
+Redis ou lease. Depois da persistência MongoDB, a limpeza do snapshot compara
+execução, revisão e hash e não pode remover uma versão substituta.
 
 ## Consequências
 
@@ -84,6 +91,7 @@ região crítica entre runtimes e é removido somente pelo token proprietário.
 ## Links relacionados
 
 - [FIT-0084](../features/fit-0084-lease-redis-plano-instalacao-pessoa.md)
+- [FIT-0086](../features/fit-0086-finalizar-cancelar-resolver-conflitos-execucoes-offline.md)
 - [ADR-0010](ADR-0010-sessao-efemera-e-historico-de-treino.md)
 - [ADR-0013](ADR-0013-sessoes-web-e-native-isoladas.md)
 - [Fluxo de execução de treino](../flows/execucao-de-treino.md)

@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type {
   BodyArea,
+  OfflineTrainingCompletedSnapshotV1,
   TrainingExerciseExecution,
   TrainingExercisePreview,
   TrainingOverview,
@@ -619,27 +620,65 @@ export class TrainingService {
       completedExercises.length === session.exercises.length;
     if (!fullCompletion && !confirmIncomplete)
       throw createWorkoutIncompleteException();
-    const now = this.clock.now();
-    const input = this.executionInput(
+    const execution = await this.persistExecution(
+      personId,
       session,
-      completedExercises,
-      fullCompletion,
-      now,
+      this.clock.now(),
       timezone,
     );
-    const started = await this.executions.begin(input);
-    if (started.status !== 'completed') {
-      await this.persistLoadProfiles(personId, session);
-    }
-    const execution =
-      started.status === 'completed'
-        ? started
-        : await this.executions.complete(personId, session.id);
     await this.sessions.saveCompletionReceipt(personId, execution.id);
     await this.sessions.delete(personId, session.id);
     const result = await this.toCompletion(personId, execution);
     this.logger.log('TrainingService -> completeSession -> return:', {
       data: { executionId: result.id, personId },
+    });
+    return result;
+  }
+
+  async completeOfflineSnapshot(
+    personId: string,
+    executionId: string,
+    revision: number,
+    snapshot: OfflineTrainingCompletedSnapshotV1,
+  ): Promise<WorkoutExecutionSummary> {
+    this.logger.log('TrainingService -> completeOfflineSnapshot -> params:', {
+      params: { revisionCategory: revision === 0 ? 'initial' : 'advanced' },
+    });
+    this.assertTimezone(snapshot.timezone);
+    const session: WorkoutSessionSnapshot = {
+      activeTimer: null,
+      exercises: snapshot.workout.exercises.map((exercise) =>
+        exercise.type === 'image' ? { ...exercise, image: null } : exercise,
+      ),
+      expiresAt: snapshot.completedAt,
+      id: executionId,
+      personId,
+      plan: {
+        catalogEntryId: snapshot.plan.catalogEntryId,
+        id: snapshot.plan.planId,
+        name: snapshot.plan.name,
+        source: snapshot.plan.source,
+        workoutCount: snapshot.plan.workouts.length,
+      },
+      planWorkouts: snapshot.plan.workouts.map((workout) => ({
+        bodyAreas: workout.bodyAreas,
+        firstMediaExercise: null,
+        id: workout.id,
+        name: workout.name,
+      })),
+      startedAt: snapshot.startedAt,
+      version: revision,
+      workout: { id: snapshot.workout.id, name: snapshot.workout.name },
+    };
+    const execution = await this.persistExecution(
+      personId,
+      session,
+      new Date(snapshot.completedAt),
+      snapshot.timezone,
+    );
+    const result = await this.toCompletion(personId, execution);
+    this.logger.log('TrainingService -> completeOfflineSnapshot -> return:', {
+      data: { completed: true },
     });
     return result;
   }
@@ -1017,6 +1056,49 @@ export class TrainingService {
       workoutId: session.workout.id,
       workoutName: session.workout.name,
     };
+    return result;
+  }
+
+  private async persistExecution(
+    personId: string,
+    session: WorkoutSessionSnapshot,
+    completedAt: Date,
+    timezone: string,
+  ): Promise<StoredWorkoutExecution> {
+    this.logger.log('TrainingService -> persistExecution -> params:', {
+      params: { personId },
+    });
+    const completedExercises = session.exercises.filter(
+      (exercise) => exercise.completedAt !== null,
+    );
+    const fullCompletion =
+      completedExercises.length === session.exercises.length;
+    const input = this.executionInput(
+      session,
+      completedExercises,
+      fullCompletion,
+      completedAt,
+      timezone,
+    );
+    const started = await this.executions.begin(input);
+    this.logger.log(
+      'TrainingService -> persistExecution -> executions begin return:',
+      { data: { status: started.status } },
+    );
+    if (started.status !== 'completed') {
+      await this.persistLoadProfiles(personId, session);
+      this.logger.log(
+        'TrainingService -> persistExecution -> load profiles completed:',
+        { data: { completed: true } },
+      );
+    }
+    const result =
+      started.status === 'completed'
+        ? started
+        : await this.executions.complete(personId, session.id);
+    this.logger.log('TrainingService -> persistExecution -> return:', {
+      data: { status: result.status },
+    });
     return result;
   }
 

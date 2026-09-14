@@ -71,7 +71,7 @@ Essa reconciliação preserva tanto referências materializadas quanto origens d
 snapshot e destinos já confirmados de jobs de clone não terminais.
 `autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
 `pnpm -C api indexes:apply -- --execute` com
-`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v1`. O comando cria primeiro
+`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v3`. O comando cria primeiro
 os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
 usa `syncIndexes()`.
 
@@ -277,6 +277,11 @@ coordenadas com consumidores antes de remover campos ou alterar semântica.
   Plano e instalação ficam no valor, e um `leaseId` cerca cada concessão. Scripts
   Lua linearizam registro, takeover, validação e renovação; somente sincronização
   já aceita renova os sete dias, conforme a ADR-0015.
+- snapshots offline em andamento permanecem no Redis. Ao concluir ou cancelar, um
+  recibo terminal imutável e único por pessoa + execução é consolidado no MongoDB;
+  conclusão também usa `workout_executions` e os perfis de carga canônicos. O
+  snapshot Redis só é removido por comparação de execução, revisão e hash depois
+  da persistência durável.
 - Mongoose e ioredis são os clients oficiais de produção.
 - services dependem de ports de repository ou cache, não de clients ou models
   concretos.
@@ -315,9 +320,17 @@ O mesmo módulo recebe snapshots Android v1 em uma chave
 `offline-training-snapshot` por pessoa. Validação Zod e hash canônico acontecem
 antes da região crítica. Um lock Redis curto por instalação usa token e release
 condicionado; sob ele, um único script Lua confronta lease, execução, revisão e
-hash, grava o agregado completo e renova lease e snapshot para o mesmo `PXAT` de
-sete dias. Replay idêntico não escreve nem renova. O endpoint não lê a árvore
-corrente do plano e não grava MongoDB.
+hash, resolve conflitos por token da versão observada e grava o agregado completo
+com lease e snapshot no mesmo `PXAT` de sete dias. Replay idêntico e escolha da
+versão do servidor não escrevem nem renovam.
+
+Snapshots `completed` reutilizam `TrainingService` para métricas, perfis e resumo
+semanal; snapshots `cancelled` não criam histórico. Ambos geram recibo em
+`offline_training_terminal_receipts`, com índice único de pessoa + execução, antes
+da limpeza condicionada do Redis. O recibo torna retries idempotentes mesmo depois
+da limpeza ou expiração do lease e impede que uma execução terminal seja
+ressuscitada. A árvore capturada determina o resultado; apenas a elegibilidade dos
+perfis de carga consulta o plano atual, como na finalização online.
 
 `OperationalModule` expõe liveness em `GET /health` sem dependências e readiness
 em `GET /ready`. A readiness usa Terminus para pingar a conexão Mongoose vigente e

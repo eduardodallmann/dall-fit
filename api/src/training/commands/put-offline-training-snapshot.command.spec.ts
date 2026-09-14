@@ -5,12 +5,13 @@ import type { PutOfflineTrainingSnapshotV1Request } from '@dall-fit/types';
 
 import { PutOfflineTrainingSnapshotCommand } from '~/training/commands/put-offline-training-snapshot.command';
 import {
-  OfflineTrainingSnapshotStaleError,
+  OfflineTrainingSnapshotResolutionExpiredError,
   OfflineTrainingSnapshotSyncInProgressError,
 } from '~/training/errors/offline-training-snapshot.errors';
 import type { OfflineTrainingSnapshotContentService } from '~/training/services/offline-training-snapshot-content.service';
 import type { OfflineTrainingSnapshotLockService } from '~/training/services/offline-training-snapshot-lock.service';
 import type { OfflineTrainingSnapshotService } from '~/training/services/offline-training-snapshot.service';
+import type { OfflineTrainingTerminalService } from '~/training/services/offline-training-terminal.service';
 
 describe('PutOfflineTrainingSnapshotCommand', () => {
   const request = {
@@ -18,6 +19,7 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
     installationId: '22222222-2222-4222-8222-222222222222',
     payloadVersion: 1,
     revision: 0,
+    snapshot: { state: 'in-progress' },
   } as PutOfflineTrainingSnapshotV1Request;
   const content = {
     prepare: vi.fn(() => ({
@@ -28,6 +30,7 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
   const lock = { key: 'hidden-key', token: 'hidden-token' };
   const locks = { acquire: vi.fn(), release: vi.fn() };
   const snapshots = { ingest: vi.fn() };
+  const terminals = { process: vi.fn(), replay: vi.fn() };
   let command: PutOfflineTrainingSnapshotCommand;
 
   beforeEach(() => {
@@ -35,17 +38,24 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
     locks.acquire.mockResolvedValue(lock);
     locks.release.mockResolvedValue(undefined);
     snapshots.ingest.mockResolvedValue({
-      acceptedAt: '2026-09-14T12:00:00.000Z',
-      executionId: request.executionId,
-      expiresAt: '2026-09-21T12:00:00.000Z',
-      orderedAt: '2026-09-14T11:59:00.000Z',
-      revision: 0,
-      state: 'accepted',
+      contentHash: 'hash',
+      effectiveRequest: request,
+      result: {
+        acceptedAt: '2026-09-14T12:00:00.000Z',
+        executionId: request.executionId,
+        expiresAt: '2026-09-21T12:00:00.000Z',
+        orderedAt: '2026-09-14T11:59:00.000Z',
+        revision: 0,
+        snapshotState: 'in-progress',
+        state: 'accepted',
+      },
     });
+    terminals.replay.mockResolvedValue(null);
     command = new PutOfflineTrainingSnapshotCommand(
       content as unknown as OfflineTrainingSnapshotContentService,
       locks as unknown as OfflineTrainingSnapshotLockService,
       snapshots as unknown as OfflineTrainingSnapshotService,
+      terminals as unknown as OfflineTrainingTerminalService,
     );
   });
 
@@ -65,14 +75,14 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
 
   it('releases the lock and maps a domain conflict', async () => {
     snapshots.ingest.mockRejectedValueOnce(
-      new OfflineTrainingSnapshotStaleError(),
+      new OfflineTrainingSnapshotResolutionExpiredError(),
     );
     const error = await command
       .execute('hidden-person', request)
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getResponse()).toMatchObject({
-      code: 'OFFLINE_TRAINING_SNAPSHOT_STALE',
+      code: 'OFFLINE_TRAINING_CONFLICT_TOKEN_STALE',
     });
     expect(locks.release).toHaveBeenCalledWith(lock);
   });

@@ -2,105 +2,111 @@
 
 ## Objetivo funcional
 
-Receber a revisão completa mais recente de uma execução Android em andamento,
-autorizá-la pelo lease vigente e manter uma única execução corrente por pessoa no
-Redis. O endpoint é exclusivo de sessão Bearer nativa, não consulta a árvore atual
-do plano e não escreve no MongoDB.
+Sincronizar a versão completa de uma execução Android, em andamento, concluída ou
+cancelada, sob o lease vigente. O endpoint mantém uma única versão corrente por
+pessoa, permite resolver conflitos explicitamente e torna estados terminais
+duráveis e imutáveis.
 
 ## Referências técnicas
 
 | Papel | Símbolo e arquivo | Responsabilidade |
 | --- | --- | --- |
-| Controller | [`OfflineTrainingSnapshotController`](../../../src/training/controllers/offline-training-snapshot.controller.ts) | recebe o body validado e devolve a response do command |
-| Entrada | [`OfflineTrainingSnapshotValidationPipe`](../../../src/training/dto/offline-training-snapshot.dto.ts) e [`offlineTrainingSnapshotRequestSchema`](../../../src/training/domain/offline-training-snapshot.schema.ts) | limitam o JSON a 1 MiB e validam envelope, árvore estrita, discriminadores e relações |
-| Command | [`PutOfflineTrainingSnapshotCommand`](../../../src/training/commands/put-offline-training-snapshot.command.ts) | prepara conteúdo, adquire o lock, executa a ingestão e libera o lock |
-| Conteúdo | [`OfflineTrainingSnapshotContentService`](../../../src/training/services/offline-training-snapshot-content.service.ts) | serializa o agregado e calcula uma vez o SHA-256 da representação canônica |
-| Lock | [`OfflineTrainingSnapshotLockService`](../../../src/training/services/offline-training-snapshot-lock.service.ts) | usa Redis global por instalação, token opaco, TTL de 15 segundos e release condicionado |
-| Transição | [`OfflineTrainingSnapshotService`](../../../src/training/services/offline-training-snapshot.service.ts) | confronta lease, execução, revisão e hash e grava snapshot + renovação em um script Lua |
-| Redis | [`RedisClientService`](../../../src/redis/redis-client.service.ts) e [`RedisKeyService`](../../../src/redis/redis-key.service.ts) | reutilizam o singleton e compõem somente as chaves namespaced autorizadas |
-| Contrato | [`PutOfflineTrainingSnapshotV1Request`](../../../../packages/types/src/contracts.ts) e [`OfflineTrainingSnapshotV1`](../../../../packages/types/src/entities.ts) | publicam request, árvore bruta e resultado para o futuro sincronizador Android |
+| Controller | [`OfflineTrainingSnapshotController`](../../../src/training/controllers/offline-training-snapshot.controller.ts) | recebe a entrada validada e devolve a resposta do command |
+| Validação | [`OfflineTrainingSnapshotValidationPipe`](../../../src/training/dto/offline-training-snapshot.dto.ts) e [`offlineTrainingSnapshotRequestSchema`](../../../src/training/domain/offline-training-snapshot.schema.ts) | limitam o JSON a 1 MiB e validam envelope, estado e relações |
+| Command | [`PutOfflineTrainingSnapshotCommand`](../../../src/training/commands/put-offline-training-snapshot.command.ts) | calcula o conteúdo, adquire o lock, consulta recibo, ingere, consolida terminal e limpa |
+| Conteúdo | [`OfflineTrainingSnapshotContentService`](../../../src/training/services/offline-training-snapshot-content.service.ts) | produz serialização canônica e SHA-256 sem incluir a escolha de resolução |
+| Lock | [`OfflineTrainingSnapshotLockService`](../../../src/training/services/offline-training-snapshot-lock.service.ts) | serializa por instalação com token e release condicionado |
+| Redis | [`OfflineTrainingSnapshotService`](../../../src/training/services/offline-training-snapshot.service.ts) | aplica lease, CAS, resolução, TTL e limpeza condicionada em Lua |
+| Terminal | [`OfflineTrainingTerminalService`](../../../src/training/services/offline-training-terminal.service.ts) | faz replay durável, conclusão canônica, cancelamento e imutabilidade |
+| Histórico | [`TrainingService`](../../../src/training/services/training.service.ts) | consolida execução, perfis e resumo com as mesmas regras do fluxo online |
+| Recibo | [`MongoOfflineTrainingTerminalReceiptRepository`](../../../src/training/repositories/mongo-offline-training-terminal-receipt.repository.ts) | persiste terminal único por pessoa + execução |
+| Contrato | [`PutOfflineTrainingSnapshotV1Request`](../../../../packages/types/src/contracts.ts) e [`OfflineTrainingSnapshotV1`](../../../../packages/types/src/entities.ts) | definem envelope, estados, respostas e conflitos compartilhados |
 
 ## Contrato HTTP resumido
 
-- Autenticação: somente `Authorization: Bearer` de sessão `native`. Cookie Web
-  recebe `403 NATIVE_SESSION_REQUIRED`; cookie e Bearer juntos recebem `400
+- Autenticação: somente sessão Bearer `native`; cookie Web recebe `403
+  NATIVE_SESSION_REQUIRED`, e cookie com Bearer recebe `400
   AUTH_TRANSPORT_AMBIGUOUS`. Sessão nativa dispensa CSRF.
 - Rate limit: política `training-mutation`, por pessoa/sessão e IP.
-- Entrada: envelope estrito v1 com UUID v4 de instalação, lease e execução,
-  revisão de `0` a `2147483647`, timestamp com timezone e snapshot completo.
+- Entrada: envelope estrito `payloadVersion: 1`, UUID v4 de instalação e execução,
+  fence do lease, revisão inteira, timestamp com timezone e snapshot completo.
+- Estado: `snapshot.state` discrimina `in-progress`, `completed` e `cancelled`.
+  Estados terminais exigem timer nulo e seus respectivos timestamps; conclusão
+  exige timezone para o resumo semanal.
+- Resolução opcional: `{ choice: 'local' | 'server', conflictToken }`. O token de
+  64 caracteres hexadecimais identifica a versão exata observada.
 - Árvore: plano capturado com até 25 workouts, workout executado com até 50
-  exercícios e até 100 séries consecutivas por exercício. IDs Mongo, nomes,
-  áreas, cargas, parâmetros e timer precisam ser internamente coerentes.
-- Tamanho: o parser HTTP e o pipe limitam o JSON completo a 1 MiB. Excesso retorna
-  `413 OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE` antes do lock.
+  exercícios e até 100 séries consecutivas por exercício. IDs, nomes, áreas,
+  parâmetros, cargas e timer precisam ser coerentes.
+- Tamanho: parser e pipe limitam o JSON completo a 1 MiB; excesso retorna `413
+  OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE` antes do lock.
 - Sucesso: `200`, `Cache-Control: private, no-store` e
-  `ApiResponse<OfflineTrainingSnapshotResult>` com estado `accepted | duplicate`.
-- Dados efêmeros: o hash e o agregado ficam em um hash Redis
-  `offline-training-snapshot:<personId>` por sete dias. Não existem documento,
-  histórico por revisão, mídia, URL assinada ou escrita do plano.
+  `ApiResponse<OfflineTrainingSnapshotResult>`.
 
 ## Fluxo completo
 
-### Entrada e validação
+O controller chama o command com a pessoa autenticada. O content service ordena
+recursivamente nomes de propriedades, preserva a ordem semântica de arrays e
+calcula o hash do envelope sem `resolution`. O command adquire um lock Redis curto
+por instalação; contenção retorna `OFFLINE_TRAINING_SYNC_IN_PROGRESS`, e o
+`finally` libera somente se o token ainda for proprietário.
 
-Os guards autenticam a pessoa e restringem o canal antes do rate limit e do
-controller. O parser aceita no máximo 1 MiB; o pipe Zod rejeita campos adicionais,
-versão desconhecida, UUID/timestamp/limite inválido, série não consecutiva,
-workout fora do plano capturado e timer incompatível. A pessoa nunca vem no body.
+Sob o lock, o command primeiro procura o recibo MongoDB por pessoa + execução. Um
+recibo idêntico responde `duplicate-completed` ou `duplicate-cancelled` mesmo sem
+lease; divergência responde execução imutável. Sem recibo, um script Lua valida a
+tupla de lease e compara a versão Redis:
 
-Depois da validação, o controller passa pessoa e request ao command. O content
-service ordena recursivamente somente nomes de propriedades para o hash; a ordem
-dos arrays continua semântica. Snapshot e timestamp bruto não são reescritos.
+1. ausência ou divergência do lease falha sem escrita;
+2. ausência de versão corrente ou revisão maior aceita a versão recebida;
+3. mesma execução, revisão e hash responde `duplicate`;
+4. revisão menor, mesmo número com conteúdo diferente ou outra execução devolve a
+   versão segura completa, seu token e `local-or-server`;
+5. escolha `server` mantém a versão corrente e responde `resolved-server`;
+6. escolha `local` substitui a versão e responde `resolved-local`, somente se o
+   token ainda coincidir; versão alterada invalida a resolução;
+7. escrita aceita renova lease e snapshot para o mesmo `PXAT` de sete dias;
+   duplicata, conflito e escolha do servidor não renovam.
 
-### Lock global da instalação
+`acceptedAt` usa o relógio da API. `orderedAt` acompanha `clientUpdatedAt` quando
+ele avança a ordem; empate ou regressão recebe um instante server-side estritamente
+maior que o anterior. O timestamp cliente original permanece no agregado.
 
-O command chama o lock service antes de ler lease ou snapshot. O service executa
-`SET NX PX` com token criptograficamente aleatório e espera zero. Contenção vira
-`OFFLINE_TRAINING_SYNC_IN_PROGRESS`. O `finally` sempre tenta liberar por Lua, que
-só remove a chave se o token ainda coincidir; queda do runtime é limitada pelo TTL.
+Se a versão efetiva é `completed`, o terminal service reutiliza a consolidação do
+treino online: cria/retoma `workout_executions`, atualiza somente perfis ainda
+elegíveis na árvore atual, conclui a execução e calcula o resumo semanal. Se é
+`cancelled`, não cria histórico nem perfil. Nos dois casos grava um recibo único e
+imutável em `offline_training_terminal_receipts`. Somente depois remove o snapshot
+Redis por execução + revisão + hash; o lease permanece até expirar. Uma conclusão
+responde também `completion` com o resumo canônico.
 
-### Transição atômica
-
-Sob o lock, o snapshot service entrega ao Redis duas chaves explícitas: lease da
-pessoa e snapshot corrente. O script constante:
-
-1. exige lease presente e coincidência de pessoa, plano, instalação e `leaseId`;
-2. se não existe snapshot, aceita a primeira revisão;
-3. para a mesma execução, devolve `duplicate` apenas quando revisão e hash são
-   iguais, rejeita hash diferente e revisão menor, e aceita somente revisão maior;
-4. rejeita outro `executionId` sem revelar a execução armazenada;
-5. em aceite, grava o agregado completo e renova snapshot e o mesmo lease para o
-   mesmo `PXAT` de sete dias dentro da transição;
-6. em duplicata ou erro, não executa escrita nem desloca TTL.
-
-`acceptedAt` vem do relógio server-side. `orderedAt` acompanha
-`clientUpdatedAt` quando ele avança a ordem canônica; empate, regressão ou um
-relógio que ficou atrás de desempates anteriores recebe um instante estritamente
-maior que o `orderedAt` anterior. O timestamp bruto continua persistido.
-
-Falha de Redis em lock ou transição vira `503
-OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE`. Como lease e snapshot são tratados no
-mesmo script, o endpoint não declara aceite com apenas um dos dois atualizado.
+Falha de Redis vira `503 OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE`. Falha MongoDB não
+declara terminal concluído; a repetição retoma a execução `finalizing` de forma
+idempotente.
 
 ## Mapa de caminhos
 
 | Caminho | Resultado | Efeito |
 | --- | --- | --- |
-| primeira revisão ou revisão maior | `200 accepted` | substitui snapshot completo e renova os dois TTLs |
-| replay idêntico | `200 duplicate` | nenhum write; metadados e TTLs originais |
-| revisão menor | `409 OFFLINE_TRAINING_SNAPSHOT_STALE` | nenhum |
-| mesma revisão, outro conteúdo | `409 OFFLINE_TRAINING_SNAPSHOT_IDEMPOTENCY_CONFLICT` | nenhum |
-| outra execução corrente | `409 OFFLINE_TRAINING_EXECUTION_CONFLICT` | nenhum |
-| lock ocupado | `409 OFFLINE_TRAINING_SYNC_IN_PROGRESS` | nenhum |
-| lease ausente/divergente | `410 OFFLINE_LEASE_EXPIRED` / `409 OFFLINE_LEASE_REVOKED` | nenhum |
-| shape/tamanho inválido | `400 VALIDATION_ERROR` / `413 OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE` | interrompe antes do lock |
+| primeira versão ou revisão maior em andamento | `200 accepted` | substitui snapshot e renova lease/TTL |
+| replay idêntico em andamento | `200 duplicate` | nenhuma escrita ou renovação |
+| conflito comparável | `409 OFFLINE_TRAINING_SNAPSHOT_VERSION_CONFLICT` | devolve versão segura, token e duas escolhas |
+| escolha local com token atual | `200 resolved-local` | substitui a versão; terminal é consolidado quando aplicável |
+| escolha do servidor com token atual | `200 resolved-server` | mantém versão e TTL correntes |
+| token sem versão ou versão alterada | `409 OFFLINE_TRAINING_CONFLICT_TOKEN_STALE` ou novo conflito atual | nenhuma escrita |
+| conclusão inédita | `200 completed` | histórico, perfis elegíveis, recibo e limpeza do snapshot |
+| cancelamento inédito | `200 cancelled` | recibo e limpeza; nenhum histórico ou perfil |
+| replay terminal idêntico | `200 duplicate-completed` ou `duplicate-cancelled` | lê recibo, independente do lease e do snapshot Redis |
+| mutação após terminal | `409 OFFLINE_TRAINING_EXECUTION_IMMUTABLE` | informa `discard-local-only` e estado terminal |
+| lock ocupado | `409 OFFLINE_TRAINING_SYNC_IN_PROGRESS` | nenhum efeito |
+| lease ausente/divergente | `410 OFFLINE_LEASE_EXPIRED` / `409 OFFLINE_LEASE_REVOKED` | nenhum efeito inicial |
+| shape/tamanho inválido | `400 VALIDATION_ERROR` / `413 OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE` | para antes do lock |
 | Redis indisponível | `503 OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE` | nenhum aceite declarado |
 
 ## Cenários reproduzíveis
 
 Os seeds gravam token, cookie e body fictícios com permissão `0600` em `/tmp`.
 
-### Cenário 1 — primeira revisão e árvore histórica aceitas
+### Cenário 1 — primeira revisão
 
 **Seed**
 
@@ -117,12 +123,9 @@ curl --include --request PUT http://localhost:4000/training/offline-snapshot \
   --data-binary @/tmp/dall-fit-offline-training-snapshot.json
 ```
 
-- Given: lease válido para o plano pessoal atual, cujo documento MongoDB não
-  contém a árvore histórica enviada.
-- Then: `200 accepted`; snapshot e lease recebem a mesma janela de sete dias e o
-  plano MongoDB permanece intacto.
+O resultado é `accepted`; a árvore histórica enviada não altera o plano MongoDB.
 
-### Cenário 2 — replay, atualização, stale e colisões
+### Cenário 2 — conflito e resolução
 
 **Seed**
 
@@ -133,25 +136,46 @@ pnpm -C api seed -- offline-training-snapshot:current
 **cURL**
 
 ```bash
-# duplicate da revisão 2
-curl --include --request PUT http://localhost:4000/training/offline-snapshot \
-  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
-  --header 'content-type: application/json' \
-  --data-binary @/tmp/dall-fit-offline-training-snapshot.json
-
-# revisão 3 aceita
-jq '.revision = 3' /tmp/dall-fit-offline-training-snapshot.json | curl --include \
+jq '.revision = 1' /tmp/dall-fit-offline-training-snapshot.json | curl --include \
   --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
   --header 'content-type: application/json' --data-binary @-
 ```
 
-Repetir o seed e enviar `.revision = 1` reproduz `STALE`; manter revisão 2 e
-alterar `.snapshot.workout.exercises[0].series[0].loadKg = 10` reproduz
-`IDEMPOTENCY_CONFLICT`; alterar `.executionId` para outro UUID v4 reproduz
-`EXECUTION_CONFLICT`. Nenhum erro altera o hash, agregado ou TTL vigente.
+O resultado é `OFFLINE_TRAINING_SNAPSHOT_VERSION_CONFLICT`. Copie
+`details.conflictToken` da resposta para `resolution.conflictToken`, escolha
+`server` para conservar a versão retornada ou `local` para publicar o body local.
+Repetir o seed antes da resolução altera a versão corrente e exercita token stale
+ou um novo conflito, sem sobrescrita cega.
 
-### Cenário 3 — lease expirado ou revogado
+### Cenário 3 — conclusão e cancelamento
+
+**Seed**
+
+```bash
+pnpm -C api seed -- offline-training-snapshot:ready
+```
+
+**cURL de conclusão**
+
+```bash
+jq '.snapshot.state = "completed" |
+    .snapshot.activeTimer = null |
+    .snapshot.completedAt = "2026-09-14T12:06:00.000Z" |
+    .snapshot.timezone = "America/Sao_Paulo"' \
+  /tmp/dall-fit-offline-training-snapshot.json | curl --include \
+  --request PUT http://localhost:4000/training/offline-snapshot \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'content-type: application/json' --data-binary @-
+```
+
+O resultado `completed` contém `completion`; repetir exatamente o body responde
+`duplicate-completed`. Para cancelamento, repita o seed e troque a transformação
+por `.snapshot.state = "cancelled" | .snapshot.activeTimer = null |
+.snapshot.cancelledAt = "2026-09-14T12:06:00.000Z"`; o resultado é `cancelled`,
+sem `workout_executions`.
+
+### Cenário 4 — lease expirado ou revogado
 
 **Seed**
 
@@ -168,11 +192,10 @@ curl --include --request PUT http://localhost:4000/training/offline-snapshot \
   --data-binary @/tmp/dall-fit-offline-training-snapshot.json
 ```
 
-O seed `offline-training-snapshot:revoked` com o mesmo cURL prepara outra
-instalação como proprietária. Os resultados são, respectivamente, `410
-OFFLINE_LEASE_EXPIRED` e `409 OFFLINE_LEASE_REVOKED`, sem snapshot.
+O seed `offline-training-snapshot:revoked` com o mesmo cURL produz o outro ramo.
+Os resultados são `OFFLINE_LEASE_EXPIRED` e `OFFLINE_LEASE_REVOKED`.
 
-### Cenário 4 — validação, tamanho e canais
+### Cenário 5 — validação e canais
 
 **Seed**
 
@@ -189,16 +212,14 @@ jq '.payloadVersion = 2' /tmp/dall-fit-offline-training-snapshot.json | curl --i
   --header 'content-type: application/json' --data-binary @-
 ```
 
-Versão/shape/relação inválida retorna `400 VALIDATION_ERROR`. Um JSON acima de 1
-MiB retorna o código específico `413`. Trocar o header Bearer pelo cookie de
-`/tmp/dall-fit-web-session-cookie.txt` retorna `NATIVE_SESSION_REQUIRED`; enviar
-ambos retorna `AUTH_TRANSPORT_AMBIGUOUS`.
+Shape ou relação inválida retorna `VALIDATION_ERROR`. Trocar Bearer pelo cookie de
+`/tmp/dall-fit-web-session-cookie.txt` retorna `NATIVE_SESSION_REQUIRED`; enviar os
+dois transportes retorna `AUTH_TRANSPORT_AMBIGUOUS`.
 
-### Cenário 5 — concorrência e indisponibilidade
+### Cenário 6 — concorrência e indisponibilidade
 
-**Seed:** não se aplica — contenção real exige uma barreira entre requests e a
-indisponibilidade exige interromper apenas o Redis efêmero; um cURL público não
-deve selecionar artificialmente esses branches.
+**Seed:** não se aplica — esses caminhos exigem barreira real entre requests ou a
+interrupção isolada do Redis.
 
 **cURL**
 
@@ -206,25 +227,22 @@ deve selecionar artificialmente esses branches.
 curl --include http://localhost:4000/ready
 ```
 
-O cURL confirma apenas a infraestrutura. O E2E ocupa o lock com outro token e
-valida `OFFLINE_TRAINING_SYNC_IN_PROGRESS`; falhas isoladas do client validam
-`OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE`, release condicionado e ausência de estado
-parcial.
+O cURL apenas observa a infraestrutura. O E2E ocupa o lock e interrompe adapters
+controladamente para validar contenção, falha fechada e ausência de estado parcial.
 
-## Regras cobertas por testes
+## Cobertura automatizada
 
-- Unitários do pipe cobrem envelope estrito, timezone, limites, relações, séries e
-  timer; o content service cobre hash canônico.
-- Unitários de command e services cobrem ordem da orquestração, release em erro,
-  lock NX/token, matriz da transição e tradução de falhas.
+- Unitários do pipe cobrem os três estados, timestamps, timezone, limites,
+  relações, séries, timer e resolução.
+- Unitários de command e services cobrem lock, hash, CAS, token, replay,
+  imutabilidade, consolidação e tradução HTTP.
 - [`offline-training-lease.e2e-spec.ts`](../../../test/offline-training-lease.e2e-spec.ts)
-  usa Nest, MongoDB e Redis efêmeros reais para canais, árvore histórica, criação,
-  replay, TTL, atualização, relógio regressivo, stale, colisões, lease e lock.
+  usa Nest, MongoDB e Redis efêmeros para criação, conflitos e ambas as escolhas,
+  conclusão canônica, cancelamento, recibos, limpeza e retries.
 
 ## Fora do comportamento atual
 
-- cliente/sincronizador Android, lote, patch ou merge;
-- conclusão, cancelamento, histórico MongoDB ou limpeza terminal;
-- múltiplas execuções correntes e substituição silenciosa;
-- mídia, signed URL, métricas derivadas ou alteração do plano canônico.
-
+- cliente, motor e fila do sincronizador Android;
+- lote, patch ou merge automático;
+- múltiplas execuções correntes ou substituição sem escolha explícita;
+- upload de mídia, signed URL ou alteração do plano canônico.

@@ -19,6 +19,7 @@ function validRequest(): Record<string, unknown> {
         seriesNumber: 1,
         startedAt: '2026-09-14T12:04:00.000Z',
       },
+      state: 'in-progress',
       plan: {
         catalogEntryId: '74b000000000000000000001',
         name: 'Captured plan',
@@ -79,6 +80,33 @@ describe('OfflineTrainingSnapshotValidationPipe', () => {
       payloadVersion: 1,
       revision: 0,
     });
+  });
+
+  it.each(['completed', 'cancelled'] as const)(
+    'accepts a coherent %s terminal snapshot',
+    (state) => {
+      const request = validRequest();
+      const snapshot = request.snapshot as Record<string, unknown>;
+      snapshot.activeTimer = null;
+      snapshot.state = state;
+      if (state === 'completed') {
+        snapshot.completedAt = '2026-09-14T12:06:00.000Z';
+        snapshot.timezone = 'America/Sao_Paulo';
+      } else {
+        snapshot.cancelledAt = '2026-09-14T12:06:00.000Z';
+      }
+      expect(pipe.transform(request).snapshot.state).toBe(state);
+    },
+  );
+
+  it('rejects a terminal before a completed action', () => {
+    const request = validRequest();
+    const snapshot = request.snapshot as Record<string, unknown>;
+    snapshot.activeTimer = null;
+    snapshot.state = 'completed';
+    snapshot.completedAt = '2026-09-14T12:02:00.000Z';
+    snapshot.timezone = 'America/Sao_Paulo';
+    expect(caught(() => pipe.transform(request)).getStatus()).toBe(400);
   });
 
   it.each([

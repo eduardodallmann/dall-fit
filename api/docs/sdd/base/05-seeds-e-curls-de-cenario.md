@@ -87,7 +87,9 @@ Identificadores vigentes incluem:
   `offline-training-snapshot:expired`, `offline-training-snapshot:revoked` e
   `offline-training-snapshot:invalid`, que preparam pessoa, sessões, plano, lease
   e, quando aplicável, revisão corrente. O body v1 determinístico é gravado com
-  permissão restrita em `/tmp/dall-fit-offline-training-snapshot.json`;
+  permissão restrita em `/tmp/dall-fit-offline-training-snapshot.json`; os cenários
+  de conflito, resolução, conclusão e cancelamento usam esse body com as
+  transformações `jq` documentadas no endpoint;
 - `training-plans:list`, `training-plans:create`, `training-plans:detail`,
   `training-plans:update`, `training-plans:delete`,
   `training-plans:create-workout`, `training-plans:delete-workout` e
