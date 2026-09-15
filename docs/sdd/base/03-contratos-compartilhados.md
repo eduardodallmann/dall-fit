@@ -171,6 +171,11 @@ request; o Workflow os lê no MongoDB.
   exercícios/séries e timer sem totais derivados, pessoa, validade, mídia ou
   capacidades temporárias. A resolução opcional leva a escolha explícita
   `local | server` e o token do conflito observado.
+- `RegisterOfflineTrainingLeaseRequest` contém somente o UUID v4 da instalação.
+  `OfflineTrainingLeaseResponse` publica plano, fence, vencimento e o estado
+  `created | unchanged | plan-rebound | taken-over`; pessoa e instalação não
+  retornam. O contrato é compartilhado porque a preparação Android registra o
+  lease antes de tornar o plano apto a novas sessões offline.
 - `OfflineTrainingSnapshotResult` diferencia aceite, duplicata, conclusão,
   cancelamento e resolução local/servidor; identifica o estado do snapshot e
   devolve os metadados server-side aplicáveis. Conclusão inclui o mesmo

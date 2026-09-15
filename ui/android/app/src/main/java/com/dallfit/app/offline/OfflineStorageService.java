@@ -308,6 +308,93 @@ public final class OfflineStorageService {
         });
     }
 
+    public void commitTrainingSession(
+        String sessionId,
+        String executionId,
+        String planId,
+        long revision,
+        String sessionPayloadJson,
+        String snapshotPayloadJson,
+        String updatedAt
+    ) {
+        Log.i(LOG_TAG, "OfflineStorageService -> commitTrainingSession -> params: revision=" + revision);
+        validateAggregate(sessionId, planId, 1, revision, sessionPayloadJson, updatedAt);
+        validateAggregate(executionId, planId, 1, revision, snapshotPayloadJson, updatedAt);
+        boolean changed = mutate(database -> {
+            requireAccount(database);
+            if (!mayWriteRevision(
+                database,
+                "active_session",
+                "id = 1",
+                new String[0],
+                revision,
+                sessionPayloadJson,
+                planId,
+                1,
+                updatedAt,
+                "session_id",
+                sessionId,
+                null,
+                null
+            )) throw revisionConflict();
+            ContentValues sessionValues = aggregateValues(planId, 1, revision, sessionPayloadJson, updatedAt);
+            sessionValues.put("id", 1);
+            sessionValues.put("account_id", 1);
+            sessionValues.put("session_id", sessionId);
+            database.insertWithOnConflict("active_session", null, sessionValues, SQLiteDatabase.CONFLICT_REPLACE);
+            writeSnapshotLocked(database, executionId, planId, revision, snapshotPayloadJson, updatedAt);
+            incrementStateRevision(database);
+            return true;
+        });
+        if (changed) notifySnapshotPending();
+        Log.i(LOG_TAG, "OfflineStorageService -> commitTrainingSession -> return: committed=" + changed);
+    }
+
+    public void commitTrainingTerminal(
+        String sessionId,
+        long expectedSessionRevision,
+        String executionId,
+        String planId,
+        long revision,
+        String snapshotPayloadJson,
+        String updatedAt
+    ) {
+        Log.i(LOG_TAG, "OfflineStorageService -> commitTrainingTerminal -> params: revision=" + revision);
+        requireText(sessionId, "sessionId");
+        requireRevision(expectedSessionRevision);
+        validateAggregate(executionId, planId, 1, revision, snapshotPayloadJson, updatedAt);
+        boolean changed = mutate(database -> {
+            requireAccount(database);
+            if (count(database, "active_session", "id = 1", null) == 0) {
+                try (Cursor cursor = database.rawQuery(
+                    "SELECT plan_id, payload_version, revision, payload_json, updated_at FROM snapshots WHERE execution_id = ?",
+                    new String[] { executionId }
+                )) {
+                    if (
+                        cursor.moveToFirst() &&
+                        planId.equals(cursor.getString(0)) &&
+                        cursor.getInt(1) == 1 &&
+                        cursor.getLong(2) == revision &&
+                        snapshotPayloadJson.equals(cursor.getString(3)) &&
+                        updatedAt.equals(cursor.getString(4))
+                    ) return false;
+                }
+                throw revisionConflict();
+            }
+            int deleted = database.delete(
+                "active_session",
+                "id = 1 AND session_id = ? AND revision = ?",
+                new String[] { sessionId, Long.toString(expectedSessionRevision) }
+            );
+            if (deleted != 1) throw revisionConflict();
+            writeSnapshotLocked(database, executionId, planId, revision, snapshotPayloadJson, updatedAt);
+            incrementStateRevision(database);
+            return true;
+        });
+        if (changed) notifySnapshotPending();
+        Log.i(LOG_TAG, "OfflineStorageService -> commitTrainingTerminal -> return: committed=" + changed);
+    }
+
     public StoredAggregate getSnapshot(String executionId) {
         requireText(executionId, "executionId");
         return readAggregate(
@@ -350,53 +437,69 @@ public final class OfflineStorageService {
         validateAggregate(executionId, planId, payloadVersion, revision, payloadJson, updatedAt);
         boolean changed = mutate(database -> {
             requireAccount(database);
-            if (
-                !mayWriteRevision(
-                    database,
-                    "snapshots",
-                    "execution_id = ?",
-                    new String[] { executionId },
-                    revision,
-                    payloadJson,
-                    planId,
-                    payloadVersion,
-                    updatedAt,
-                    null,
-                    null,
-                    null,
-                    null
-                )
-            ) return false;
-            ContentValues snapshotValues = aggregateValues(planId, payloadVersion, revision, payloadJson, updatedAt);
-            snapshotValues.put("execution_id", executionId);
-            snapshotValues.put("account_id", 1);
-            int updated = database.update(
-                "snapshots",
-                snapshotValues,
-                "execution_id = ?",
-                new String[] { executionId }
-            );
-            if (updated == 0) database.insertOrThrow("snapshots", null, snapshotValues);
-            snapshotWriteHook.afterSnapshotWritten(revision);
-
-            long syncRevision = nextSyncRevision(database, executionId);
-            long queueSequence = queueSequence(database, executionId);
-            ContentValues syncValues = new ContentValues();
-            syncValues.put("execution_id", executionId);
-            syncValues.put("snapshot_revision", revision);
-            syncValues.put("queue_sequence", queueSequence);
-            syncValues.put("status", "pending");
-            syncValues.put("attempt_count", 0);
-            syncValues.putNull("next_attempt_at");
-            syncValues.putNull("reason");
-            syncValues.putNull("action_details_json");
-            syncValues.put("revision", syncRevision);
-            syncValues.put("updated_at", updatedAt);
-            database.insertWithOnConflict("sync_state", null, syncValues, SQLiteDatabase.CONFLICT_REPLACE);
+            if (!writeSnapshotLocked(database, executionId, planId, revision, payloadJson, updatedAt, payloadVersion)) return false;
             incrementStateRevision(database);
             return true;
         });
         if (changed) notifySnapshotPending();
+    }
+
+    private boolean writeSnapshotLocked(
+        SQLiteDatabase database,
+        String executionId,
+        String planId,
+        long revision,
+        String payloadJson,
+        String updatedAt
+    ) {
+        return writeSnapshotLocked(database, executionId, planId, revision, payloadJson, updatedAt, 1);
+    }
+
+    private boolean writeSnapshotLocked(
+        SQLiteDatabase database,
+        String executionId,
+        String planId,
+        long revision,
+        String payloadJson,
+        String updatedAt,
+        int payloadVersion
+    ) {
+        if (!mayWriteRevision(
+            database,
+            "snapshots",
+            "execution_id = ?",
+            new String[] { executionId },
+            revision,
+            payloadJson,
+            planId,
+            payloadVersion,
+            updatedAt,
+            null,
+            null,
+            null,
+            null
+        )) return false;
+        ContentValues snapshotValues = aggregateValues(planId, payloadVersion, revision, payloadJson, updatedAt);
+        snapshotValues.put("execution_id", executionId);
+        snapshotValues.put("account_id", 1);
+        int updated = database.update("snapshots", snapshotValues, "execution_id = ?", new String[] { executionId });
+        if (updated == 0) database.insertOrThrow("snapshots", null, snapshotValues);
+        snapshotWriteHook.afterSnapshotWritten(revision);
+        long syncRevision = nextSyncRevision(database, executionId);
+        long queueSequence = queueSequence(database, executionId);
+        ContentValues syncValues = new ContentValues();
+        syncValues.put("execution_id", executionId);
+        syncValues.put("snapshot_revision", revision);
+        syncValues.put("queue_sequence", queueSequence);
+        syncValues.put("status", "pending");
+        syncValues.put("attempt_count", 0);
+        syncValues.putNull("next_attempt_at");
+        syncValues.putNull("reason");
+        syncValues.putNull("action_details_json");
+        syncValues.put("revision", syncRevision);
+        syncValues.put("updated_at", updatedAt);
+        database.insertWithOnConflict("sync_state", null, syncValues, SQLiteDatabase.CONFLICT_REPLACE);
+        return true;
     }
 
     public boolean removeSnapshot(String executionId, long expectedRevision) {
@@ -868,6 +971,23 @@ public final class OfflineStorageService {
         try {
             ensureOperationalLocked();
             return getFileLocked(fileId);
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public File getReadyFileForRead(String fileId) {
+        Log.i(LOG_TAG, "OfflineStorageService -> getReadyFileForRead -> params: requested=true");
+        requireText(fileId, "fileId");
+        validateFileId(fileId);
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            OfflineFileMetadata metadata = getFileLocked(fileId);
+            File file = readyFile(fileId);
+            File result = metadata != null && "ready".equals(metadata.getStatus()) && file.isFile() ? file : null;
+            Log.i(LOG_TAG, "OfflineStorageService -> getReadyFileForRead -> return: ready=" + (result != null));
+            return result;
         } finally {
             mutationLock.unlock();
         }

@@ -15,6 +15,7 @@ import {
 import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { resolveApplicationPlatform } from '~/core/platform/platform-composition';
 import { bootstrapTheme } from '~/core/theme/theme-storage';
+import type { TrainingRepository } from '~/routes/training/training-repository';
 
 export async function bootstrap() {
   const rootElement = document.getElementById('root');
@@ -29,12 +30,14 @@ export async function bootstrap() {
     const platform = resolveApplicationPlatform();
     let nativeSession: NativeSessionCoordinator | null = null;
     let offlinePreparation: OfflinePreparationCoordinator | null = null;
+    let trainingRepository: TrainingRepository | null = null;
     if (platform.capabilities.nativeAuthentication) {
       const { createNativeComposition } =
         await import('~/core/platform/native/native-session-composition');
       const composition = await createNativeComposition();
       nativeSession = composition.session;
       offlinePreparation = composition.offlinePreparation;
+      trainingRepository = composition.trainingRepository;
       configureSessionChannel('native', {
         getAccessToken: () => composition.session.getAccessToken(),
         handleUnauthorized: () => composition.session.expireSession(),
@@ -59,6 +62,7 @@ export async function bootstrap() {
             nativeSession={nativeSession}
             offlinePreparation={offlinePreparation}
             platform={platform}
+            trainingRepository={trainingRepository}
           >
             <App />
           </AppProviders>

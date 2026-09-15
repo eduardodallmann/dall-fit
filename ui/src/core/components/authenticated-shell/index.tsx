@@ -22,6 +22,7 @@ import { trackUiEvent } from '~/core/analytics';
 import { ApplicationMenu } from '~/core/components/application-menu';
 import { authenticatedShellStyles } from '~/core/components/authenticated-shell/styles';
 import { NativeLogoutDialog } from '~/core/components/native-logout-dialog';
+import { NativeOfflineGuard } from '~/core/components/native-offline-guard';
 import { usePlatform } from '~/core/platform/platform';
 
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
@@ -240,7 +241,9 @@ export function AuthenticatedShell({
           </Drawer.Backdrop>
         </Drawer>
       </div>
-      <main className={styles.content()}>{children}</main>
+      <main className={styles.content()}>
+        <NativeOfflineGuard>{children}</NativeOfflineGuard>
+      </main>
       <NativeLogoutDialog
         isOpen={isLogoutDialogOpen}
         isPending={logoutMutation.isPending}

@@ -5,6 +5,7 @@ import { Check, Share2 } from 'lucide-react';
 
 import { trackTrainingAction } from '~/core/analytics';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
+import { createHttpTrainingRepository } from '~/routes/training/http-training-repository';
 import { trainingStyles } from '~/routes/training/styles';
 import { trainingCompletionQueryOptions } from '~/routes/training/training-queries';
 import {
@@ -23,8 +24,13 @@ export function TrainingCompletionPage({
   workoutExecutionId: string;
 }>) {
   const navigate = useNavigate();
+  const repository = createHttpTrainingRepository(mockTraining);
   const query = useQuery(
-    trainingCompletionQueryOptions(workoutExecutionId, mockTraining),
+    trainingCompletionQueryOptions(
+      workoutExecutionId,
+      repository,
+      mockTraining,
+    ),
   );
 
   if (query.isPending) {

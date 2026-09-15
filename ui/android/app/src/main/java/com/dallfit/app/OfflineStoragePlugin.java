@@ -17,6 +17,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.util.List;
+import android.os.SystemClock;
+import androidx.core.content.FileProvider;
 import org.json.JSONException;
 
 @CapacitorPlugin(name = "OfflineStorage")
@@ -193,6 +195,47 @@ public final class OfflineStoragePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void commitTrainingSession(PluginCall call) {
+        execute(() -> resolve(call, () -> {
+            service.commitTrainingSession(
+                requiredString(call, "sessionId"),
+                requiredString(call, "executionId"),
+                requiredString(call, "planId"),
+                requiredLong(call, "revision"),
+                requiredObject(call, "sessionPayload").toString(),
+                requiredObject(call, "snapshotPayload").toString(),
+                requiredString(call, "updatedAt")
+            );
+            return new JSObject();
+        }));
+    }
+
+    @PluginMethod
+    public void commitTrainingTerminal(PluginCall call) {
+        execute(() -> resolve(call, () -> {
+            service.commitTrainingTerminal(
+                requiredString(call, "sessionId"),
+                requiredLong(call, "expectedSessionRevision"),
+                requiredString(call, "executionId"),
+                requiredString(call, "planId"),
+                requiredLong(call, "revision"),
+                requiredObject(call, "snapshotPayload").toString(),
+                requiredString(call, "updatedAt")
+            );
+            return new JSObject();
+        }));
+    }
+
+    @PluginMethod
+    public void getMonotonicTime(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            result.put("elapsedRealtime", SystemClock.elapsedRealtime());
+            return result;
+        });
+    }
+
+    @PluginMethod
     public void removeActiveSession(PluginCall call) {
         resolveRemoved(
             call,
@@ -283,6 +326,25 @@ public final class OfflineStoragePlugin extends Plugin {
             OfflineFileMetadata file = service.getFile(requiredString(call, "fileId"));
             JSObject result = new JSObject();
             if (file != null) result.put("file", fileToJson(file));
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void getReadyFileUrl(PluginCall call) {
+        resolve(call, () -> {
+            java.io.File file = service.getReadyFileForRead(requiredString(call, "fileId"));
+            JSObject result = new JSObject();
+            if (file != null) {
+                result.put(
+                    "url",
+                    FileProvider.getUriForFile(
+                        getContext(),
+                        getContext().getPackageName() + ".fileprovider",
+                        file
+                    ).toString()
+                );
+            }
             return result;
         });
     }

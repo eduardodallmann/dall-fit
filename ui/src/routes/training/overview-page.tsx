@@ -1,6 +1,13 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
-import { Alert, Button, Card, Chip, Skeleton } from '@heroui/react';
+import {
+  Alert,
+  AlertDialog,
+  Button,
+  Card,
+  Chip,
+  Skeleton,
+} from '@heroui/react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Dumbbell, ImageOff, Play, Video } from 'lucide-react';
@@ -10,8 +17,10 @@ import type { TrainingOverview, TrainingWorkoutCard } from '@dall-fit/types';
 import { trackTrainingAction } from '~/core/analytics';
 import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
+import { createHttpTrainingRepository } from '~/routes/training/http-training-repository';
 import { trainingStyles } from '~/routes/training/styles';
 import { trainingOverviewQueryOptions } from '~/routes/training/training-queries';
+import { useNativeTrainingRepository } from '~/routes/training/training-repository';
 import {
   trainingMockSearch,
   type MockTrainingScenario,
@@ -22,12 +31,21 @@ const styles = trainingStyles();
 export function TrainingOverviewPage({
   mockTraining,
 }: Readonly<{ mockTraining: MockTrainingScenario }>) {
-  const query = useQuery(trainingOverviewQueryOptions(mockTraining));
+  const nativeRepository = useNativeTrainingRepository();
+  const httpRepository = useMemo(
+    () => createHttpTrainingRepository(mockTraining),
+    [mockTraining],
+  );
+  const repository = nativeRepository ?? httpRepository;
+  const query = useQuery(
+    trainingOverviewQueryOptions(repository, mockTraining),
+  );
+  const refetch = query.refetch;
   const offlinePreparation = useOfflinePreparation();
 
   useEffect(() => {
-    void offlinePreparation?.enter();
-  }, [offlinePreparation]);
+    void offlinePreparation?.enter().finally(() => void refetch());
+  }, [offlinePreparation, refetch]);
 
   if (offlinePreparation !== null)
     return (
@@ -35,6 +53,7 @@ export function TrainingOverviewPage({
         mockTraining={mockTraining}
         offlinePreparation={offlinePreparation}
         query={query}
+        repository={repository}
       />
     );
 
@@ -45,16 +64,23 @@ function NativeTrainingOverview({
   mockTraining,
   offlinePreparation,
   query,
+  repository,
 }: Readonly<{
   mockTraining: MockTrainingScenario;
   offlinePreparation: NonNullable<ReturnType<typeof useOfflinePreparation>>;
   query: UseQueryResult<TrainingOverview, Error>;
+  repository: NonNullable<ReturnType<typeof useNativeTrainingRepository>>;
 }>) {
+  const navigate = useNavigate();
   const snapshot = useSyncExternalStore(
     offlinePreparation.subscribe,
     offlinePreparation.getSnapshot,
   );
   const [retrying, setRetrying] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+  const activeWorkout = query.data?.workouts.find(
+    (workout) => workout.indicator === 'in-progress',
+  );
   const blocked =
     snapshot.status === 'preparing-data' ||
     snapshot.status === 'expired' ||
@@ -95,7 +121,55 @@ function NativeTrainingOverview({
         </Link>
       </main>
     );
-  return <OnlineTrainingOverview mockTraining={mockTraining} query={query} />;
+  return (
+    <>
+      <OnlineTrainingOverview mockTraining={mockTraining} query={query} />
+      <AlertDialog isOpen={activeWorkout !== undefined}>
+        <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>Treino em andamento</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                Continue o treino salvo neste aparelho ou descarte o progresso
+                para liberar uma nova execução.
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button
+                  isDisabled={discarding}
+                  onPress={() => {
+                    if (activeWorkout === undefined) return;
+                    void navigate({
+                      params: { workoutId: activeWorkout.id },
+                      search: trainingMockSearch(mockTraining),
+                      to: '/training/workout/$workoutId',
+                    });
+                  }}
+                  variant="primary"
+                >
+                  Continuar treino
+                </Button>
+                <Button
+                  isPending={discarding}
+                  onPress={() => {
+                    setDiscarding(true);
+                    void repository
+                      .abandonSession()
+                      .then(() => query.refetch())
+                      .finally(() => setDiscarding(false));
+                  }}
+                  variant="danger"
+                >
+                  Descartar treino
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+    </>
+  );
 }
 
 function OnlineTrainingOverview({

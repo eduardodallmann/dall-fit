@@ -2,6 +2,8 @@ import type {
   CompleteRemainingTrainingSeriesRequest,
   CompleteTrainingSeriesRequest,
   CompleteTrainingSessionRequest,
+  OfflineTrainingLeaseResponse,
+  RegisterOfflineTrainingLeaseRequest,
   ResolveTrainingTimerRequest,
   StartTrainingTimerRequest,
   TrainingLoadRequest,
@@ -243,6 +245,17 @@ export async function getWorkoutExecutionSummary(
   const response = await apiClient.get<WorkoutExecutionSummaryResponse>(
     `/training/completions/${executionId}`,
     config(scenario, signal),
+  );
+  return response.data.data;
+}
+
+export async function registerOfflineTrainingLease(
+  installationId: string,
+): Promise<OfflineTrainingLeaseResponse['data']> {
+  const input: RegisterOfflineTrainingLeaseRequest = { installationId };
+  const response = await apiClient.put<OfflineTrainingLeaseResponse>(
+    '/training/offline-lease',
+    input,
   );
   return response.data.data;
 }

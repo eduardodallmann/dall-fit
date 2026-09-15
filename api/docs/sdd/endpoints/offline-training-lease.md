@@ -18,7 +18,7 @@ proprietária usa separadamente `PUT /training/offline-snapshot`.
 | Plano ativo | [`PersonalTrainingPlanService`](../../../src/training-plan/services/personal-training-plan.service.ts) | deriva da pessoa autenticada a árvore canônica atualmente selecionada |
 | Lease | [`OfflineTrainingLeaseService`](../../../src/training/services/offline-training-lease.service.ts) | executa registro, takeover, validação e renovação atômicos |
 | Redis | [`RedisClientService`](../../../src/redis/redis-client.service.ts) e [`RedisKeyService`](../../../src/redis/redis-key.service.ts) | reutilizam o singleton e compõem a única chave namespaced por pessoa |
-| Tipos | [`offline-training-lease.types.ts`](../../../src/training/domain/offline-training-lease.types.ts) | define tupla interna, estados e response exclusivos da API |
+| Tipos | [`offline-training-lease.types.ts`](../../../src/training/domain/offline-training-lease.types.ts) e [`@dall-fit/types`](../../../../packages/types/src/contracts.ts) | mantêm a tupla interna e compartilham request, estados e response pública com a UI Android |
 
 Não existe repository ou MongoDB do lease. MongoDB participa apenas da autenticação
 da pessoa e da resolução vigente do plano ativo.

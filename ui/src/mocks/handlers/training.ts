@@ -124,6 +124,32 @@ function replaceExercise(
 }
 
 export const trainingHandlers = [
+  http.put(`${apiBaseUrl}/training/offline-lease`, async ({ request }) => {
+    const body = (await request.json()) as { installationId?: unknown };
+    if (
+      typeof body.installationId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        body.installationId,
+      )
+    )
+      return error(
+        'VALIDATION_ERROR',
+        'Installation identifier is invalid.',
+        400,
+      );
+    return HttpResponse.json(
+      {
+        data: {
+          expiresAt: '2030-01-08T00:00:00.000Z',
+          leaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          planId: '64b000000000000000000001',
+          state: 'created',
+        },
+      },
+      createMockResponseInit(),
+    );
+  }),
+
   http.get(`${apiBaseUrl}/training`, ({ request }) => {
     const name = scenario(request);
     if (name === 'no-active-plan' && !trainingPlanActivated)

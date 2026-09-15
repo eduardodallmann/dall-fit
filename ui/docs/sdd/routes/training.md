@@ -16,8 +16,10 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 ## Entradas e pré-condições
 
 O item `Treinar` do menu navega para a rota. `mockAuth` e `mockTraining` existem
-somente nos cenários locais. O backend deriva a pessoa, a seleção ativa e uma
-eventual sessão Redis; query ou body não escolhem owner.
+somente nos cenários locais. No Web, o backend deriva a pessoa, a seleção ativa e
+uma eventual sessão Redis; query ou body não escolhem owner. No Android, o
+repository nativo deriva esses dados do plano e da sessão vinculados à conta no
+SQLite.
 
 ## Elementos, estados e ações
 
@@ -44,14 +46,22 @@ planos, sem bloquear o shell. Depois do commit essencial, mídia pendente ou
 incompleta não bloqueia a lista. Os estados completos são `no-plan`,
 `preparing-data`, `data-ready-media-in-progress`, `ready`,
 `ready-media-incomplete`, `expired` e `failed`. Um snapshot válido não é invalidado
-nem tem a validade estendida por falha de atualização. A rota ainda renderiza pela
-API online; consumo do snapshot pertence à evolução de execução offline.
+nem tem a validade estendida por falha de atualização. A rota renderiza a projeção
+local válida mesmo sem rede enquanto uma atualização online ocorre em paralelo.
+Mídia ausente, temporária ou remota offline usa fallback acessível sem bloquear.
+
+Uma sessão local ativa marca o workout como `Em andamento` e abre um
+`AlertDialog` não descartável. `Continuar treino` navega ao workout capturado;
+`Descartar treino` espera o commit atômico de `cancelled`, remoção da sessão e
+preservação do terminal na fila. Somente então outra execução fica livre.
 
 ## Integração
 
-- `GET /training`, documentado em
+- No Web, `GET /training`, documentado em
   [`training.md`](../../../../api/docs/sdd/endpoints/training.md).
-- TanStack Query usa `trainingKeys.overview`; Axios central transporta a request.
+- TanStack Query distingue `web | native` na key. O adapter Web usa o Axios
+  central; Android usa `NativeTrainingRepository` e não alterna para HTTP por
+  ação.
 - O coordenador Android consulta os mesmos endpoints, com concorrência máxima de
   quatro, e persiste somente o payload de domínio e `fileId` da mídia display.
 - Sucesso utiliza `TrainingOverview`; erro não promove cache anterior a sucesso.
@@ -96,6 +106,24 @@ O pageview usa `/training`. Seleção emite `ui_training_action` com
 - When: a pessoa marca um plano como em uso e volta para Treinar.
 - Then: o cache antigo é removido, a API é consultada novamente e o plano ativado
   aparece.
+
+### Cenário 4 — listagem offline e retomada obrigatória no Android
+
+- Link para testar: não se aplica; exige bridge/SQLite Android ou repository nativo
+  injetado.
+- Given: existe plano preparado válido e uma sessão local ativa.
+- When: a pessoa abre Treinar sem rede.
+- Then: a lista local aparece e exige `Continuar treino` ou `Descartar treino`, sem
+  request da jornada nem dismiss acidental.
+
+### Cenário 5 — conexão necessária fora da jornada suportada
+
+- Link para testar: não se aplica; depende da capability e conectividade Android
+  injetadas.
+- Given: o Android está offline em uma rota autenticada não suportada.
+- When: existe plano local válido ou ele está ausente/incompatível.
+- Then: o primeiro caso substitui a rota por `/training`; o segundo mantém uma
+  superfície acessível de conexão necessária, sem loop ou destino persistido.
 
 ## Estrutura e cobertura
 

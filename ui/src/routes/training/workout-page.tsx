@@ -22,12 +22,14 @@ import type {
 
 import { trackTrainingAction } from '~/core/analytics';
 import { getApiErrorCode } from '~/core/http/http-error';
+import { NativeTrainingRepositoryError } from '~/core/platform/native/native-training-repository';
 import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
 import {
   bodyAreaLabels,
   exerciseTypeIcons,
   exerciseTypeLabels,
 } from '~/routes/training-plan/exercise-presentation';
+import { createHttpTrainingRepository } from '~/routes/training/http-training-repository';
 import { TrainingMediaViewer } from '~/routes/training/media-viewer';
 import { trainingStyles } from '~/routes/training/styles';
 import { TrainingTimerOverlay } from '~/routes/training/timer-overlay';
@@ -37,21 +39,21 @@ import {
   trainingSessionQueryOptions,
 } from '~/routes/training/training-queries';
 import {
-  abandonTrainingSession,
-  completeRemainingTrainingSeries,
-  completeTrainingExercise,
-  completeTrainingSeries,
-  completeTrainingSession,
-  resolveTrainingTimer,
-  restartTrainingExercise,
-  saveTrainingLoad,
-  startTrainingSession,
-  startTrainingTimer,
+  useNativeTrainingRepository,
+  type TrainingRepository,
+} from '~/routes/training/training-repository';
+import {
   trainingMockSearch,
   type MockTrainingScenario,
 } from '~/routes/training/training-service';
 
 const styles = trainingStyles();
+
+function trainingErrorCode(error: unknown): string | undefined {
+  return error instanceof NativeTrainingRepositoryError
+    ? error.code
+    : getApiErrorCode(error);
+}
 
 type SessionAction =
   | {
@@ -87,22 +89,28 @@ export function TrainingWorkoutPage({
 }: Readonly<TrainingWorkoutPageProps>) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const previewQuery = useQuery(
-    trainingPreviewQueryOptions(workoutId, mockTraining),
+  const nativeRepository = useNativeTrainingRepository();
+  const httpRepository = useMemo(
+    () => createHttpTrainingRepository(mockTraining),
+    [mockTraining],
   );
-  const sessionOptions = trainingSessionQueryOptions(mockTraining);
+  const repository = nativeRepository ?? httpRepository;
+  const previewQuery = useQuery(
+    trainingPreviewQueryOptions(workoutId, repository, mockTraining),
+  );
+  const sessionOptions = trainingSessionQueryOptions(repository, mockTraining);
   const sessionQuery = useQuery(sessionOptions);
   const [discardOpen, setDiscardOpen] = useState(false);
   const expiredHandled = useRef(false);
   const session = sessionQuery.data;
   const sessionNotFound =
     sessionQuery.isError &&
-    getApiErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_NOT_FOUND';
+    trainingErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_NOT_FOUND';
   const sessionExpired =
     sessionQuery.isError &&
-    getApiErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_EXPIRED';
+    trainingErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_EXPIRED';
   const startMutation = useMutation({
-    mutationFn: () => startTrainingSession(workoutId, mockTraining),
+    mutationFn: () => repository.startSession(workoutId),
     onSuccess: (data) => {
       queryClient.setQueryData(sessionOptions.queryKey, data);
       trackTrainingAction('training_workout', 'start_workout', 'success');
@@ -114,8 +122,8 @@ export function TrainingWorkoutPage({
   });
   const discardMutation = useMutation({
     mutationFn: async () => {
-      await abandonTrainingSession(mockTraining);
-      return startTrainingSession(workoutId, mockTraining);
+      await repository.abandonSession();
+      return repository.startSession(workoutId);
     },
     onSuccess: (data) => {
       queryClient.setQueryData(sessionOptions.queryKey, data);
@@ -165,6 +173,7 @@ export function TrainingWorkoutPage({
     return (
       <ActiveWorkout
         mockTraining={mockTraining}
+        repository={repository}
         session={session}
         sessionQueryKey={sessionOptions.queryKey}
       />
@@ -309,10 +318,12 @@ function PreviewExercises({
 
 function ActiveWorkout({
   mockTraining,
+  repository,
   session,
   sessionQueryKey,
 }: Readonly<{
   mockTraining: MockTrainingScenario;
+  repository: TrainingRepository;
   session: TrainingSession;
   sessionQueryKey: readonly unknown[];
 }>) {
@@ -334,49 +345,33 @@ function ActiveWorkout({
     const version = current?.version ?? session.version;
     switch (action.type) {
       case 'load':
-        return saveTrainingLoad(
+        return repository.saveLoad(
           action.exerciseId,
           action.seriesNumber,
           action.loadKg,
           version,
-          mockTraining,
         );
       case 'complete-series':
-        return completeTrainingSeries(
+        return repository.completeSeries(
           action.exerciseId,
           action.seriesNumber,
           action.loadKg,
           version,
-          mockTraining,
         );
       case 'complete-remaining':
-        return completeRemainingTrainingSeries(
+        return repository.completeRemainingSeries(
           action.exerciseId,
           action.loadsKg,
           version,
-          mockTraining,
         );
       case 'start-timer':
-        return startTrainingTimer(
-          action.exerciseId,
-          action.kind,
-          version,
-          mockTraining,
-        );
+        return repository.startTimer(action.exerciseId, action.kind, version);
       case 'resolve-timer':
-        return resolveTrainingTimer(action.outcome, version, mockTraining);
+        return repository.resolveTimer(action.outcome, version);
       case 'complete-exercise':
-        return completeTrainingExercise(
-          action.exerciseId,
-          version,
-          mockTraining,
-        );
+        return repository.completeExercise(action.exerciseId, version);
       case 'restart-exercise':
-        return restartTrainingExercise(
-          action.exerciseId,
-          version,
-          mockTraining,
-        );
+        return repository.restartExercise(action.exerciseId, version);
     }
   };
   const handleSessionSuccess = (
@@ -411,9 +406,9 @@ function ActiveWorkout({
       trainingActionName(action),
       'error',
     );
-    if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
+    if (trainingErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
       const canonical = await queryClient.fetchQuery({
-        ...trainingSessionQueryOptions(mockTraining),
+        ...trainingSessionQueryOptions(repository, mockTraining),
         staleTime: 0,
       });
       setDrafts(sessionDrafts(canonical));
@@ -440,18 +435,26 @@ function ActiveWorkout({
   });
   const completeMutation = useMutation({
     mutationFn: (confirmIncomplete: boolean) =>
-      completeTrainingSession(
+      repository.completeSession(
         confirmIncomplete,
         Intl.DateTimeFormat().resolvedOptions().timeZone,
         queryClient.getQueryData<TrainingSession>(sessionQueryKey)?.version ??
           session.version,
-        mockTraining,
       ),
     mutationKey: ['training-session-write', session.id],
     scope: { id: session.id },
     onSuccess: (completion) => {
       queryClient.removeQueries({ queryKey: sessionQueryKey });
       void queryClient.invalidateQueries({ queryKey: trainingKeys.all });
+      if (completion === null) {
+        void navigate({
+          replace: true,
+          search: trainingMockSearch(mockTraining),
+          to: '/training',
+        });
+        trackTrainingAction('training_workout', 'complete_workout', 'success');
+        return;
+      }
       void navigate({
         params: { workoutExecutionId: completion.id },
         replace: true,
@@ -462,9 +465,9 @@ function ActiveWorkout({
     },
     onError: async (error) => {
       trackTrainingAction('training_workout', 'complete_workout', 'error');
-      if (getApiErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
+      if (trainingErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
         const canonical = await queryClient.fetchQuery({
-          ...trainingSessionQueryOptions(mockTraining),
+          ...trainingSessionQueryOptions(repository, mockTraining),
           staleTime: 0,
         });
         setDrafts(sessionDrafts(canonical));

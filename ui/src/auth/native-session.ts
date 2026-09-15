@@ -112,6 +112,11 @@ export class NativeSessionCoordinator {
     return undefined;
   }
 
+  async getInstallationId(): Promise<string> {
+    await this.initialize();
+    return this.credentials.getInstallationId();
+  }
+
   login(): Promise<NativeLoginResult> {
     if (this.loginPromise !== undefined) return this.loginPromise;
     this.loginPromise = this.performLogin().finally(() => {

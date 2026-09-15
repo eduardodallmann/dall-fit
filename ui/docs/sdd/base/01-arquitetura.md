@@ -105,12 +105,38 @@ contadores canônicos, inclusive a geração/categoria técnica de recuperação
 
 `OfflinePreparationCoordinator` existe somente na composição Android. Ao entrar
 em Treinar, ele lê validade e metadados canônicos, compõe `GET /training` e até
-quatro previews simultâneos pelo Axios autenticado, grava o payload v1 sem URLs e
+quatro previews simultâneos pelo Axios autenticado, registra o lease e grava o
+payload v2 sem URLs e
 libera a rota antes das mídias. Até quatro downloads Java recebem a signed URL
 `display` apenas durante a chamada, exigem HTTPS/WebP/2xx, no máximo três redirects
 HTTPS, corpo completo não vazio de até 10 MiB e concluem pelo rename do motor.
 Geração e revisão impedem callbacks atrasados de publicar dados depois de troca ou
 remoção. Web/PWA não instancia esse coordenador.
+
+O payload preparado v2 acrescenta a projeção de overview, previews sanitizados e
+o lease registrado por `PUT /training/offline-lease`; UUID e fence permanecem no
+SQLite privado e não entram em logs. Payload v1 legado não autoriza nova sessão e
+exige preparação online. `TrainingRepository` é a fronteira única da jornada:
+Web/PWA injeta o adapter HTTP, enquanto Android injeta sempre
+`NativeTrainingRepository`, inclusive online. A autoridade Android lê o plano e a
+sessão do motor, aplica ações localmente e confirma cada feedback somente depois do
+commit composto de sessão + envelope de snapshot.
+Arquivos `ready` são projetados sob demanda pelo `FileProvider` como URI de
+conteúdo restrita ao aplicativo; somente `fileId` persiste no plano e na sessão,
+e indisponibilidade do arquivo produz o fallback visual sem invalidar o treino.
+
+Os comandos nativos de treino gravam sessão e snapshot da mesma revisão em uma
+única transação, ou gravam o terminal e removem a sessão pelo CAS da revisão. Uma
+execução pendente é coalescida sem perder sua sequência, e terminais de execuções
+anteriores permanecem na fila. Timers guardam timestamp civil, duração e âncora de
+`SystemClock.elapsedRealtime()`; a apresentação usa monotônico no mesmo boot e
+fallback civil limitado depois de reboot. O contador não grava por tick nem resolve
+o domínio automaticamente ao chegar a zero.
+
+O shell Android observa conectividade como hint. Fora de `/training` e
+`/training/workout/:workoutId`, perda de rede substitui a navegação por Treinar se
+houver plano local válido; sem ele, mantém uma superfície acessível de conexão
+necessária. Web/PWA não participa desse guard.
 
 Criação e migrations pertencem ao `SQLiteOpenHelper`. Falha de abertura é tentada
 novamente com outro handle; falha persistente, migration ausente ou downgrade

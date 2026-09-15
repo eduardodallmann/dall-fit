@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useSyncExternalStore } from 'react';
 
 import {
   Button,
@@ -13,10 +13,20 @@ import { ImageOff, Play } from 'lucide-react';
 import type { TrainingExerciseExecution } from '@dall-fit/types';
 
 import { trackTrainingAction } from '~/core/analytics';
+import { usePlatform } from '~/core/platform/platform';
 import { trainingStyles } from '~/routes/training/styles';
 
 const ReactPlayer = lazy(() => import('react-player'));
 const styles = trainingStyles();
+
+function subscribeConnectivity(listener: () => void): () => void {
+  window.addEventListener('online', listener);
+  window.addEventListener('offline', listener);
+  return () => {
+    window.removeEventListener('online', listener);
+    window.removeEventListener('offline', listener);
+  };
+}
 
 export function TrainingMediaViewer({
   exercise,
@@ -24,19 +34,29 @@ export function TrainingMediaViewer({
   const isDesktop = useMediaQuery('(min-width: 768px)', {
     defaultValue: true,
   });
+  const platform = usePlatform();
+  const online = useSyncExternalStore(
+    subscribeConnectivity,
+    () => navigator.onLine,
+    () => true,
+  );
   const state = useOverlayState();
   const hasImage = exercise.type === 'image' && exercise.image !== null;
-  const hasVideo =
+  const hasRemoteVideo =
     'youtubeId' in exercise &&
     exercise.youtubeId !== undefined &&
     exercise.youtubeId.length > 0;
+  const hasVideo =
+    hasRemoteVideo && (!platform.capabilities.nativeOfflineStorage || online);
 
   if (!hasImage && !hasVideo) {
     return (
       <div className={styles.exerciseMedia()}>
         <div className={styles.placeholder()}>
           <ImageOff aria-hidden="true" className={styles.icon()} />
-          <span>Sem mídia</span>
+          <span>
+            {hasRemoteVideo ? 'Mídia indisponível offline' : 'Sem mídia'}
+          </span>
         </div>
       </div>
     );

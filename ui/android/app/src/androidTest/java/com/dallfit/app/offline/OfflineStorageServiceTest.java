@@ -232,6 +232,73 @@ public final class OfflineStorageServiceTest {
     }
 
     @Test
+    public void commitsTrainingSessionAndTerminalAsAtomicTransitions() {
+        service.initialize();
+        service.bindAccount("person-a");
+
+        service.commitTrainingSession(
+            "session-a",
+            "execution-a",
+            "plan-a",
+            0,
+            "{\"session\":{\"version\":0}}",
+            "{\"payloadVersion\":1,\"revision\":0,\"snapshot\":{\"state\":\"in-progress\"}}",
+            "2026-09-13T12:00:00Z"
+        );
+
+        assertNotNull(service.getActiveSession());
+        assertNotNull(service.getSnapshot("execution-a"));
+        assertEquals(1, service.getState().getPendingSnapshotCount());
+
+        service.commitTrainingTerminal(
+            "session-a",
+            0,
+            "execution-a",
+            "plan-a",
+            1,
+            "{\"payloadVersion\":1,\"revision\":1,\"snapshot\":{\"state\":\"completed\"}}",
+            "2026-09-13T12:10:00Z"
+        );
+
+        assertNull(service.getActiveSession());
+        assertEquals(1, service.getSnapshot("execution-a").getRevision());
+        assertTrue(service.getSnapshot("execution-a").getPayloadJson().contains("completed"));
+        assertEquals(1, service.getState().getPendingSnapshotCount());
+    }
+
+    @Test
+    public void rollsBackTerminalWhenExpectedSessionRevisionDoesNotMatch() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.commitTrainingSession(
+            "session-a",
+            "execution-a",
+            "plan-a",
+            2,
+            "{\"session\":{\"version\":2}}",
+            "{\"payloadVersion\":1,\"revision\":2,\"snapshot\":{\"state\":\"in-progress\"}}",
+            "2026-09-13T12:00:00Z"
+        );
+
+        OfflineStorageException error = assertThrows(
+            OfflineStorageException.class,
+            () -> service.commitTrainingTerminal(
+                "session-a",
+                1,
+                "execution-a",
+                "plan-a",
+                3,
+                "{\"snapshot\":{\"state\":\"cancelled\"}}",
+                "2026-09-13T12:01:00Z"
+            )
+        );
+
+        assertEquals("OFFLINE_STORAGE_REVISION_CONFLICT", error.getCode());
+        assertNotNull(service.getActiveSession());
+        assertEquals(2, service.getSnapshot("execution-a").getRevision());
+    }
+
+    @Test
     public void publishesCompletedFilesAndClearsRowsAndBytesIdempotently() throws Exception {
         service.initialize();
         service.bindAccount("person-a");

@@ -1,7 +1,11 @@
+import type {
+  OfflineTrainingLeaseResponse,
+  OfflineTrainingLeaseState,
+} from '@dall-fit/types';
+
 export const OFFLINE_TRAINING_LEASE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type OfflineTrainingLeaseState =
-  'created' | 'plan-rebound' | 'taken-over' | 'unchanged';
+export type { OfflineTrainingLeaseResponse, OfflineTrainingLeaseState };
 
 export interface OfflineTrainingLease {
   expiresAt: string;
@@ -11,16 +15,7 @@ export interface OfflineTrainingLease {
   personId: string;
 }
 
-export interface OfflineTrainingLeasePublic {
-  expiresAt: string;
-  leaseId: string;
-  planId: string;
-  state: OfflineTrainingLeaseState;
-}
-
-export interface OfflineTrainingLeaseResponse {
-  data: OfflineTrainingLeasePublic;
-}
+export type OfflineTrainingLeasePublic = OfflineTrainingLeaseResponse['data'];
 
 export interface OfflineTrainingLeaseIdentity {
   installationId: string;

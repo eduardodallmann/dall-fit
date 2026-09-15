@@ -1,4 +1,5 @@
 import type {
+  OfflineTrainingLeaseResponse,
   TrainingExercisePreview,
   TrainingOverview,
   TrainingWorkoutPreview,
@@ -34,7 +35,10 @@ type PreparedExercise =
   Exclude<TrainingExercisePreview, { type: 'image' }> | PreparedImageExercise;
 
 interface PreparedPlanPayload extends Readonly<Record<string, unknown>> {
+  lease: OfflineTrainingLeaseResponse['data'] & { installationId: string };
+  overview: TrainingOverview;
   plan: NonNullable<TrainingOverview['offlinePreparation']>['plan'];
+  previews: readonly TrainingWorkoutPreview[];
   workouts: readonly {
     exercises: readonly PreparedExercise[];
     workout: TrainingWorkoutPreview['workout'];
@@ -47,13 +51,17 @@ interface MediaJob {
 }
 
 interface OfflinePreparationDependencies {
+  getInstallationId: () => Promise<string>;
   getOverview: () => Promise<TrainingOverview>;
   getPreview: (workoutId: string) => Promise<TrainingWorkoutPreview>;
   now?: () => number;
   plugin: OfflineStoragePlugin;
+  registerLease: (
+    installationId: string,
+  ) => Promise<OfflineTrainingLeaseResponse['data']>;
 }
 
-const payloadVersion = 1;
+const payloadVersion = 2;
 const maxConcurrency = 4;
 
 export class OfflinePreparationCoordinator {
@@ -149,9 +157,15 @@ export class OfflinePreparationCoordinator {
         maxConcurrency,
         (workoutId) => this.dependencies.getPreview(workoutId),
       );
+      const installationId = await this.dependencies.getInstallationId();
+      const lease = await this.dependencies.registerLease(installationId);
+      if (lease.planId !== overview.offlinePreparation.plan.id)
+        throw new Error('Offline lease does not match the prepared plan.');
       const { media, payload } = this.buildPayload(
+        overview,
         overview.offlinePreparation.plan,
         previews,
+        { ...lease, installationId },
       );
       this.assertGeneration(generation);
       const revision = Math.max(Date.now(), (current?.revision ?? -1) + 1);
@@ -191,8 +205,10 @@ export class OfflinePreparationCoordinator {
   }
 
   private buildPayload(
+    overview: TrainingOverview,
     plan: NonNullable<TrainingOverview['offlinePreparation']>['plan'],
     previews: readonly TrainingWorkoutPreview[],
+    lease: OfflineTrainingLeaseResponse['data'] & { installationId: string },
   ): { media: MediaJob[]; payload: PreparedPlanPayload } {
     const media: MediaJob[] = [];
     const workouts = previews.map((preview) => ({
@@ -205,7 +221,28 @@ export class OfflinePreparationCoordinator {
       }),
       workout: preview.workout,
     }));
-    return { media, payload: { plan, workouts } };
+    const safeOverview: TrainingOverview = {
+      ...overview,
+      workouts: overview.workouts.map((workout) => ({
+        ...workout,
+        media: workout.media?.type === 'image' ? null : workout.media,
+      })),
+    };
+    const safePreviews = workouts.map((item) => ({
+      exercises: item.exercises,
+      plan,
+      workout: item.workout,
+    })) as unknown as readonly TrainingWorkoutPreview[];
+    return {
+      media,
+      payload: {
+        lease,
+        overview: safeOverview,
+        plan,
+        previews: safePreviews,
+        workouts,
+      },
+    };
   }
 
   private async downloadIfNeeded(

@@ -189,6 +189,20 @@ export type TrainingSessionResponse = ApiResponse<TrainingSession>;
 export type WorkoutExecutionSummaryResponse =
   ApiResponse<WorkoutExecutionSummary>;
 
+export interface RegisterOfflineTrainingLeaseRequest {
+  installationId: string;
+}
+
+export type OfflineTrainingLeaseState =
+  'created' | 'plan-rebound' | 'taken-over' | 'unchanged';
+
+export type OfflineTrainingLeaseResponse = ApiResponse<{
+  expiresAt: string;
+  leaseId: string;
+  planId: string;
+  state: OfflineTrainingLeaseState;
+}>;
+
 export interface PutOfflineTrainingSnapshotV1Request {
   clientUpdatedAt: string;
   executionId: string;

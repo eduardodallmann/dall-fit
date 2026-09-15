@@ -2,19 +2,23 @@ import { createNativeSession, revokeNativeSession } from '~/auth/auth-service';
 import { NativeSessionCoordinator } from '~/auth/native-session';
 import { GoogleSignInAdapter } from '~/core/platform/native/google-sign-in-adapter';
 import { NativeLocalDataAdapter } from '~/core/platform/native/local-data-adapter';
+import { NativeTrainingRepository } from '~/core/platform/native/native-training-repository';
 import { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { offlineStoragePlugin } from '~/core/platform/native/offline-storage-plugin';
 import { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
 import { SecureCredentialAdapter } from '~/core/platform/native/secure-credential-adapter';
+import type { TrainingRepository } from '~/routes/training/training-repository';
 import {
   getTrainingOverview,
   getTrainingWorkoutPreview,
+  registerOfflineTrainingLease,
 } from '~/routes/training/training-service';
 
 export interface NativeComposition {
   offlinePreparation: OfflinePreparationCoordinator;
   offlineSync: OfflineSyncCoordinator;
   session: NativeSessionCoordinator;
+  trainingRepository: TrainingRepository;
 }
 
 export async function createNativeComposition(): Promise<NativeComposition> {
@@ -31,12 +35,19 @@ export async function createNativeComposition(): Promise<NativeComposition> {
   );
   await coordinator.initialize();
   const offlinePreparation = new OfflinePreparationCoordinator({
+    getInstallationId: () => coordinator.getInstallationId(),
     getOverview: () => getTrainingOverview('active-plan'),
     getPreview: (workoutId) =>
       getTrainingWorkoutPreview(workoutId, 'active-plan'),
     plugin: offlineStoragePlugin,
+    registerLease: registerOfflineTrainingLease,
   });
   const offlineSync = new OfflineSyncCoordinator(coordinator);
   await offlineSync.initialize();
-  return { offlinePreparation, offlineSync, session: coordinator };
+  return {
+    offlinePreparation,
+    offlineSync,
+    session: coordinator,
+    trainingRepository: new NativeTrainingRepository(offlineStoragePlugin),
+  };
 }

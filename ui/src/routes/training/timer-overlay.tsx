@@ -53,12 +53,6 @@ export function TrainingTimerOverlay({
     return () => window.clearInterval(interval);
   }, [serverNow]);
 
-  useEffect(() => {
-    if (remainingMs > 0 || resolvedRef.current) return;
-    resolvedRef.current = true;
-    onResolve('finish');
-  }, [onResolve, remainingMs]);
-
   const resolve = (outcome: 'cancel' | 'finish' | 'skip') => {
     if (resolvedRef.current || isPending) return;
     resolvedRef.current = true;

@@ -48,6 +48,21 @@ const preview: TrainingWorkoutPreview = {
   plan,
   workout: { id: 'workout-a', name: 'Treino A' },
 };
+const lease = {
+  expiresAt: validity.expiresAt,
+  leaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  planId: plan.id,
+  state: 'created' as const,
+};
+
+function preparationDependencies() {
+  return {
+    getInstallationId: vi
+      .fn()
+      .mockResolvedValue('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+    registerLease: vi.fn().mockResolvedValue(lease),
+  };
+}
 
 function createPlugin() {
   let prepared: OfflineStoredAggregate | undefined;
@@ -135,6 +150,7 @@ describe('OfflinePreparationCoordinator', () => {
         }),
     );
     const coordinator = new OfflinePreparationCoordinator({
+      ...preparationDependencies(),
       getOverview: vi.fn().mockResolvedValue(overview),
       getPreview: vi.fn().mockResolvedValue(preview),
       now: () => Date.parse(validity.validatedAt),
@@ -172,6 +188,7 @@ describe('OfflinePreparationCoordinator', () => {
       offlinePreparation: { plan, workoutIds: [] },
     });
     const coordinator = new OfflinePreparationCoordinator({
+      ...preparationDependencies(),
       getOverview,
       getPreview: vi.fn(),
       plugin,
@@ -185,13 +202,23 @@ describe('OfflinePreparationCoordinator', () => {
     const { plugin } = createPlugin();
     await plugin.putPreparedPlan({
       expiresAt: validity.expiresAt,
-      payload: { plan, workouts: [] },
-      payloadVersion: 1,
+      payload: {
+        lease: {
+          ...lease,
+          installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        },
+        overview,
+        plan,
+        previews: [],
+        workouts: [],
+      },
+      payloadVersion: 2,
       planId: plan.id,
       revision: 1,
       validatedAt: validity.validatedAt,
     });
     const coordinator = new OfflinePreparationCoordinator({
+      ...preparationDependencies(),
       getOverview: vi.fn().mockRejectedValue(new Error('network')),
       getPreview: vi.fn(),
       now: () => Date.parse(validity.validatedAt),

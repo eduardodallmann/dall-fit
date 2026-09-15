@@ -60,6 +60,24 @@ export interface OfflineStoragePlugin {
   bindAccount(options: { personId: string }): Promise<void>;
   clearAccountData(): Promise<void>;
   clearSyncCredentials(): Promise<OfflineSyncState>;
+  commitTrainingSession(options: {
+    executionId: string;
+    planId: string;
+    revision: number;
+    sessionId: string;
+    sessionPayload: Readonly<Record<string, unknown>>;
+    snapshotPayload: Readonly<Record<string, unknown>>;
+    updatedAt: string;
+  }): Promise<void>;
+  commitTrainingTerminal(options: {
+    executionId: string;
+    expectedSessionRevision: number;
+    planId: string;
+    revision: number;
+    sessionId: string;
+    snapshotPayload: Readonly<Record<string, unknown>>;
+    updatedAt: string;
+  }): Promise<void>;
   downloadFile(options: {
     contentType: 'image/webp';
     expectedPlanRevision: number;
@@ -75,6 +93,8 @@ export interface OfflineStoragePlugin {
   }): Promise<{ file: OfflineFileMetadata }>;
   getActiveSession(): Promise<{ aggregate?: OfflineStoredAggregate }>;
   getFile(options: { fileId: string }): Promise<{ file?: OfflineFileMetadata }>;
+  getReadyFileUrl(options: { fileId: string }): Promise<{ url?: string }>;
+  getMonotonicTime(): Promise<{ elapsedRealtime: number }>;
   getPreparedPlan(): Promise<{ aggregate?: OfflineStoredAggregate }>;
   getSnapshot(options: {
     executionId: string;

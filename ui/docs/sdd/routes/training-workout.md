@@ -10,21 +10,25 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 
 - Problema resolvido: revisar, iniciar, executar, retomar ou abandonar um workout.
 - Ator: pessoa autenticada com plano ativo ou sessão retomável.
-- Resultado esperado: progresso confirmado no Redis e navegação ao resumo.
+- Resultado esperado: progresso confirmado na autoridade da plataforma; Web
+  navega ao resumo canônico e Android retorna à lista depois do terminal local.
 - Fluxo relacionado: [execução de treino](../../../../docs/sdd/flows/execucao-de-treino.md).
 
 ## Entradas e pré-condições
 
-`workoutId` identifica um item do plano ativo. Antes do início, a rota combina a
-prévia com `GET /training/session`. Depois do início, a sessão canônica é a fonte de
-verdade e pode sobreviver a refresh, outra aba ou troca do plano ativo por até 24
-horas. Existe no máximo uma sessão por pessoa.
+`workoutId` identifica um item do plano ativo. No Web, a rota combina prévia e
+sessão HTTP; depois do início, o Redis permanece canônico por até 24 horas. No
+Android, prévia, sessão e lease vêm do motor nativo e sobrevivem a refresh,
+background, recriação do WebView e morte do processo. Existe no máximo uma sessão
+por pessoa/aparelho.
 
 ## Conteúdo e caminho feliz
 
 Antes do início, todos os exercícios aparecem em ordem com tipo e métricas; mídia
 é somente preview e `Voltar para treinos` retorna à seleção. Esse retorno deixa de
-ser renderizado após o início. `Iniciar treino` cria a sessão. Durante a execução,
+ser renderizado após o início. `Iniciar treino` cria a sessão. No Android, a imagem
+preparada `ready` é exibida por URI de conteúdo local; arquivo ausente ou incompleto
+usa o mesmo fallback sem bloquear o exercício. Durante a execução,
 somente um card fica expandido, o próximo incompleto começa aberto e conclusão
 avança/foca o próximo. Toda a superfície do cabeçalho é um botão com
 `aria-expanded`, operação por teclado e feedback visual de hover e active em toda
@@ -54,7 +58,10 @@ estado reorganizam-se em duas linhas.
 `pause` e `duration` abrem timer; descanso de série/pausa pode ser pulado, duração
 pode ser finalizada ou cancelada. Atividade por duração apresenta também sua
 instrução e demonstração em vídeo quando fornecidas pelo plano. Timestamps do
-servidor dirigem o contador.
+servidor dirigem o contador Web. No Android, timestamp civil, duração e âncora de
+`elapsedRealtime` persistidos recompõem o contador; background não pausa, reboot
+usa fallback civil limitado e nenhum tick grava SQLite. Chegar a zero conserva o
+overlay até ação explícita, sem concluir série, exercício ou treino.
 `youtube-long` conclui manualmente. Exercício concluído pode ser reiniciado sem
 apagar cargas. Mídia e timers usam Drawer encostado ao rodapé em mobile e Modal em
 desktop. YouTube Short preserva 9:16; vídeo longo preserva 16:9; títulos podem
@@ -86,6 +93,15 @@ Mutations TanStack Query usam um `scope` por sessão, formando fila FIFO e lendo
 versão quando cada request começa. Sucesso substitui o cache pela response
 canônica. Não há atualização otimista de conclusão. Finalização limpa a query de
 sessão, invalida o domínio e navega com replace.
+
+No Android, a mesma UI consome `TrainingRepository`, mas cada ação vira uma
+transação curta de sessão + `PutOfflineTrainingSnapshotV1Request`. O commit local
+antecede cache, toast, foco e navegação; falha preserva a última revisão confirmada.
+Cada ação incrementa uma revisão, coalesce o snapshot da execução sem mudar sua
+ordem e nunca aguarda rede. Finalizar grava `completed` e remove a sessão no mesmo
+commit, então volta com replace para `/training`, sem abrir ou inventar resumo.
+Descartar grava `cancelled` da mesma forma. Expiração posterior ao início ou Bearer
+ausente não interrompem a sessão; apenas um novo início exige plano e lease válidos.
 
 ## Navegação e acessibilidade
 
@@ -137,6 +153,24 @@ body area, tempo exato e erros de campo são proibidos.
 - When: digita uma carga válida e aguarda o debounce sem desfocar o campo nem
   concluir a série.
 - Then: a UI envia o PUT da carga e mantém o valor digitado.
+
+### Cenário 5 — execução e conclusão offline no Android
+
+- Link para testar: não se aplica; exige bridge/SQLite Android ou repository nativo
+  injetado.
+- Given: plano e lease locais estão válidos no início.
+- When: a pessoa inicia, altera carga, conclui exercícios e finaliza completa ou
+  parcialmente sem rede.
+- Then: cada feedback sucede o commit local, a sessão só desaparece no terminal,
+  o snapshot `completed` permanece na fila e a navegação volta para `/training`.
+
+### Cenário 6 — timer e retomada nativos
+
+- Link para testar: não se aplica; relógio monotônico e recriação exigem Android.
+- Given: existe sessão local com timer confirmado.
+- When: o app vai ao background, o WebView é recriado ou o aparelho reinicia.
+- Then: progresso e timer são recompostos sem writes por tick ou resolução
+  automática, usando monotônico no mesmo boot e fallback civil limitado no reboot.
 
 ## Estrutura e cobertura
 

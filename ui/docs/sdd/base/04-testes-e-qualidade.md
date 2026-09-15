@@ -184,6 +184,13 @@ loop, envelope cifrado compatível e recuperação de snapshot. O smoke fecha o 
 restaura conectividade e confirma envio sem Activity/WebView; atraso por política do
 sistema operacional continua uma característica esperada, não uma falha do teste.
 
+A execução offline acrescenta Vitest do repository/reducer para materialização,
+revisão, confirmação posterior ao commit, validade e terminais. Testes Android com
+SQLite real comprovam as transações compostas de sessão + snapshot e terminal +
+remoção, inclusive CAS e rollback. Componentes e Playwright preservam a decisão
+obrigatória de retomada/descarte e a equivalência do adapter HTTP; lifecycle,
+relógio monotônico e modo avião completam a matriz no Android.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

@@ -21,6 +21,10 @@ exercícios, áreas, soma das cargas preenchidas e duração arredondada em minu
 Loading usa skeleton; execução ausente/alheia mostra Alert `Conclusão não
 encontrada` sem vazar sua existência.
 
+A conclusão offline Android não abre esta rota nesta etapa: depois do commit
+terminal, volta a `/training`. Resumo provisório e substituição posterior pelo
+canônico pertencem à evolução seguinte; esta tela continua exclusivamente online.
+
 ## Ações e navegação
 
 `Compartilhar` chama `navigator.share` diretamente na ativação da pessoa com

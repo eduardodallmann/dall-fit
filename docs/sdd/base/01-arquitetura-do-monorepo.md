@@ -64,6 +64,11 @@ dall-fit/
     nativo. Claim e commit usam o lock curto do storage; rede e backoff nunca
     bloqueiam persistência local. Unique work por fila e contingência periódica de
     seis horas apenas disparam o motor e não duplicam fila, transporte ou regras.
+12. A jornada Treinar usa um repository de domínio único: Web/PWA conserva a
+    autoridade HTTP e Android conserva sempre a autoridade SQLite, mesmo online.
+    A preparação Android registra o lease e persiste o fence; ações gravam sessão
+    e snapshot em uma transação antes de atualizar a UI, e terminais permanecem na
+    fila nativa para o sincronizador existente.
 
 ## Convenções de importação
 

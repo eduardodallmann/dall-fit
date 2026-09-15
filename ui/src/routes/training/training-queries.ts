@@ -1,58 +1,66 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import {
-  getTrainingOverview,
-  getTrainingSession,
-  getTrainingWorkoutPreview,
-  getWorkoutExecutionSummary,
-  type MockTrainingScenario,
-} from '~/routes/training/training-service';
+import type { TrainingRepository } from '~/routes/training/training-repository';
+import type { MockTrainingScenario } from '~/routes/training/training-service';
 
 export const trainingKeys = {
   all: ['training'] as const,
   completion: (executionId: string, scenario: MockTrainingScenario) =>
     [...trainingKeys.all, 'completion', executionId, scenario] as const,
-  overview: (scenario: MockTrainingScenario) =>
-    [...trainingKeys.all, 'overview', scenario] as const,
-  preview: (workoutId: string, scenario: MockTrainingScenario) =>
-    [...trainingKeys.all, 'preview', workoutId, scenario] as const,
-  session: (scenario: MockTrainingScenario) =>
-    [...trainingKeys.all, 'session', scenario] as const,
+  overview: (
+    source: TrainingRepository['source'],
+    scenario: MockTrainingScenario,
+  ) => [...trainingKeys.all, source, 'overview', scenario] as const,
+  preview: (
+    source: TrainingRepository['source'],
+    workoutId: string,
+    scenario: MockTrainingScenario,
+  ) => [...trainingKeys.all, source, 'preview', workoutId, scenario] as const,
+  session: (
+    source: TrainingRepository['source'],
+    scenario: MockTrainingScenario,
+  ) => [...trainingKeys.all, source, 'session', scenario] as const,
 };
 
-export function trainingOverviewQueryOptions(scenario: MockTrainingScenario) {
+export function trainingOverviewQueryOptions(
+  repository: TrainingRepository,
+  scenario: MockTrainingScenario,
+) {
   return queryOptions({
-    queryKey: trainingKeys.overview(scenario),
-    queryFn: ({ signal }) => getTrainingOverview(scenario, signal),
+    queryKey: trainingKeys.overview(repository.source, scenario),
+    queryFn: ({ signal }) => repository.getOverview(signal),
   });
 }
 
 export function trainingPreviewQueryOptions(
   workoutId: string,
+  repository: TrainingRepository,
   scenario: MockTrainingScenario,
 ) {
   return queryOptions({
-    queryKey: trainingKeys.preview(workoutId, scenario),
-    queryFn: ({ signal }) =>
-      getTrainingWorkoutPreview(workoutId, scenario, signal),
+    queryKey: trainingKeys.preview(repository.source, workoutId, scenario),
+    queryFn: ({ signal }) => repository.getPreview(workoutId, signal),
   });
 }
 
-export function trainingSessionQueryOptions(scenario: MockTrainingScenario) {
+export function trainingSessionQueryOptions(
+  repository: TrainingRepository,
+  scenario: MockTrainingScenario,
+) {
   return queryOptions({
-    queryKey: trainingKeys.session(scenario),
-    queryFn: ({ signal }) => getTrainingSession(scenario, signal),
+    queryKey: trainingKeys.session(repository.source, scenario),
+    queryFn: ({ signal }) => repository.getSession(signal),
     retry: false,
   });
 }
 
 export function trainingCompletionQueryOptions(
   executionId: string,
+  repository: TrainingRepository,
   scenario: MockTrainingScenario,
 ) {
   return queryOptions({
     queryKey: trainingKeys.completion(executionId, scenario),
-    queryFn: ({ signal }) =>
-      getWorkoutExecutionSummary(executionId, scenario, signal),
+    queryFn: ({ signal }) => repository.getCompletion(executionId, signal),
   });
 }

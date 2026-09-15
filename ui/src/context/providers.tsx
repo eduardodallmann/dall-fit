@@ -21,12 +21,17 @@ import {
   getPublicThemeState,
   type ThemeState,
 } from '~/core/theme/theme-storage';
+import {
+  TrainingRepositoryContext,
+  type TrainingRepository,
+} from '~/routes/training/training-repository';
 
 interface AppProvidersProps extends PropsWithChildren {
   initialTheme?: ThemeState;
   nativeSession?: NativeSessionCoordinator | null;
   offlinePreparation?: OfflinePreparationCoordinator | null;
   platform?: PlatformSnapshot;
+  trainingRepository?: TrainingRepository | null;
 }
 
 export function AppProviders({
@@ -35,22 +40,25 @@ export function AppProviders({
   nativeSession = null,
   offlinePreparation = null,
   platform = resolveApplicationPlatform(),
+  trainingRepository = null,
 }: Readonly<AppProvidersProps>) {
   return (
     <PlatformContext value={platform}>
       <NativeSessionContext value={nativeSession}>
         <OfflinePreparationContext value={offlinePreparation}>
-          <QueryClientProvider client={queryClient}>
-            <ThemeProvider initialTheme={initialTheme}>
-              <ReloadSafetyProvider>
-                <PwaProvider>
-                  {children}
-                  <PwaUpdateNotice />
-                  <Toast.Provider placement="bottom end" />
-                </PwaProvider>
-              </ReloadSafetyProvider>
-            </ThemeProvider>
-          </QueryClientProvider>
+          <TrainingRepositoryContext value={trainingRepository}>
+            <QueryClientProvider client={queryClient}>
+              <ThemeProvider initialTheme={initialTheme}>
+                <ReloadSafetyProvider>
+                  <PwaProvider>
+                    {children}
+                    <PwaUpdateNotice />
+                    <Toast.Provider placement="bottom end" />
+                  </PwaProvider>
+                </ReloadSafetyProvider>
+              </ThemeProvider>
+            </QueryClientProvider>
+          </TrainingRepositoryContext>
         </OfflinePreparationContext>
       </NativeSessionContext>
     </PlatformContext>
