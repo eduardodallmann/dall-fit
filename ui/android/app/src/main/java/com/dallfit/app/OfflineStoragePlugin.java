@@ -71,11 +71,16 @@ public final class OfflineStoragePlugin extends Plugin {
     public void triggerSync(PluginCall call) {
         resolve(call, () -> {
             Boolean rearmTemporary = call.getBoolean("rearmTemporary", false);
+            String apiBaseUrl = requiredString(call, "apiBaseUrl");
+            OfflineStorageProvider.getSessionStore(getContext()).writeApiBaseUrl(apiBaseUrl);
             syncEngine.trigger(
-                requiredString(call, "apiBaseUrl"),
+                apiBaseUrl,
                 requiredString(call, "accessToken"),
                 Boolean.TRUE.equals(rearmTemporary)
             );
+            if (service.getSyncState(false, false).getPendingCount() > 0) {
+                OfflineStorageProvider.getScheduler(getContext()).enqueueOneTime();
+            }
             return syncStateToJson(syncEngine.getState());
         });
     }
@@ -109,6 +114,7 @@ public final class OfflineStoragePlugin extends Plugin {
     public void clearAccountData(PluginCall call) {
         resolve(call, () -> {
             syncEngine.stop();
+            OfflineStorageProvider.getScheduler(getContext()).cancelOneTime();
             service.clearAccountDataAtomically();
             return new JSObject();
         });

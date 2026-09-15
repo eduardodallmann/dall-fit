@@ -176,6 +176,14 @@ condicionada. Conectividade é hint testável por callback, e o smoke Android co
 reconexão e ausência de Bearer no banco/logcat. Nenhum desses cenários cria request
 Playwright ou MSW porque o transporte pertence ao processo nativo.
 
+O WorkManager acrescenta testes de configuração para versão AndroidX, Application,
+ausência de Foreground Service, unique work e fronteira do cofre. A matriz Android
+instrumentada cobre requests com constraint exclusiva de conectividade, intervalo de
+seis horas, backoff exponencial, passagem do mesmo motor, retry temporário, `401` sem
+loop, envelope cifrado compatível e recuperação de snapshot. O smoke fecha o processo,
+restaura conectividade e confirma envio sem Activity/WebView; atraso por política do
+sistema operacional continua uma característica esperada, não uma falha do teste.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

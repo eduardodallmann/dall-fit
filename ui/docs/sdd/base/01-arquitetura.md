@@ -82,8 +82,19 @@ resposta tardia não alcança outra conta ou geração.
 Mudança local usa debounce, e abertura/resume, conectividade restaurada e a entrada
 manual acordam o mesmo motor. `syncStateChanged` é apenas hint; `getSyncState` repara
 evento perdido com estado e contagens sanitizados. O callback de rede é único e
-removido com o plugin. Esta etapa opera somente com o processo ativo, não registra
-Foreground Service nem WorkManager e não cria comportamento equivalente na Web/PWA.
+removido com o plugin. Cada snapshot também agenda um unique one-time work global da
+fila, e um unique periodic work de seis horas atua como contingência. Ambos exigem
+somente `NetworkType.CONNECTED`, usam backoff exponencial de 30 segundos e podem ser
+adiados pelo Android; não são expedited e não registram Foreground Service.
+
+`DallFitApplication` registra a contingência pelo WorkManager no processo principal.
+`OfflineSyncWorker` abre a mesma composição nativa sem Activity, WebView ou
+JavaScript, lê o envelope v1 no mesmo secure storage cifrado pelo Android Keystore e
+obtém a URL-base pública previamente validada. O Worker chama uma passagem aguardável
+do mesmo `OfflineSyncEngine`: falha temporária devolve retry ao WorkManager; ausência
+ou expiração de sessão, `401`, bloqueio ou ação necessária encerram sem loop e
+preservam a fila conforme sua categoria. Abertura/resume continua disparando o motor
+imediatamente, sem esperar a cadência do scheduler.
 
 Arquivos nascem como `.part` e só viram `.data` por rename no mesmo filesystem;
 temporários e órfãos são removidos na próxima inicialização. A limpeza de conta
@@ -593,8 +604,9 @@ outra aba até a remoção do bloqueador; não registra o worker do MSW.
 
 O empacotamento Capacitor não altera manifest, service worker, instalação ou
 atualização do PWA. O build Android consome o mesmo build otimizado e acrescenta
-autenticação, storage privado, preparação de treino e sincronização em primeiro
-plano atrás da fronteira nativa; Web/PWA não carregam essas capacidades.
+autenticação, storage privado, preparação de treino e sincronização nativa em
+foreground e por WorkManager atrás da fronteira de plataforma; Web/PWA não carregam
+essas capacidades.
 
 O documento compartilhado `index.html` declara a viewport com escala inicial e
 máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual

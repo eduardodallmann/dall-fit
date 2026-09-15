@@ -98,23 +98,34 @@ public final class OfflineSyncEngine {
         if (apiBaseUrl == null || apiBaseUrl.trim().isEmpty()) throw invalidInput();
         if (accessToken == null || accessToken.trim().isEmpty()) throw invalidInput();
         synchronized (this) {
-            this.apiBaseUrl = apiBaseUrl;
-            this.accessToken = accessToken;
-            authenticationRequired = false;
-            globalProtocolFailure = storage.hasSyncReason("auth-transport-ambiguous");
-            updateRequired = storage.hasSyncReason("update-required");
-            if (!initialized) {
-                logRecovery(storage.recoverInterruptedSync(now()));
-                initialized = true;
-            } else if (!running) {
-                logRecovery(storage.recoverInterruptedSync(now()));
-            }
-            if (rearmTemporary) {
-                storage.rearmTemporarySync(now());
-                cycleAttempts.clear();
-            }
+            configureLocked(apiBaseUrl, accessToken, rearmTemporary);
         }
         schedule(0);
+    }
+
+    public OfflineSyncWorkerOutcome runWorker(
+        String apiBaseUrl,
+        String accessToken,
+        String origin
+    ) {
+        if (apiBaseUrl == null || apiBaseUrl.trim().isEmpty()) throw invalidInput();
+        if (accessToken == null || accessToken.trim().isEmpty()) throw invalidInput();
+        if (!"one-time-worker".equals(origin) && !"periodic-worker".equals(origin)) {
+            throw invalidInput();
+        }
+        long expectedGeneration;
+        synchronized (this) {
+            if (running) {
+                runAgain = true;
+                return OfflineSyncWorkerOutcome.COMPLETED;
+            }
+            configureLocked(apiBaseUrl, accessToken, false);
+            if (scheduled != null) scheduled.cancel(false);
+            scheduled = null;
+            running = true;
+            expectedGeneration = generation;
+        }
+        return drainWorker(expectedGeneration, origin);
     }
 
     private void onSnapshotPending() {
@@ -215,6 +226,95 @@ public final class OfflineSyncEngine {
                 schedule(0);
             }
             else scheduleEarliestRetry(expectedGeneration);
+        }
+    }
+
+    private OfflineSyncWorkerOutcome drainWorker(long expectedGeneration, String origin) {
+        boolean retry = false;
+        Log.i(LOG_TAG, "OfflineSyncEngine -> drainWorker -> started: category=" + origin);
+        emitState();
+        try {
+            while (isCurrent(expectedGeneration)) {
+                OfflineSyncClaim claim = storage.claimNextSync(now());
+                if (claim == null) break;
+                String currentUrl;
+                String currentToken;
+                synchronized (this) {
+                    currentUrl = apiBaseUrl;
+                    currentToken = accessToken;
+                }
+                if (currentUrl == null || currentToken == null) {
+                    storage.releaseSyncPending(
+                        claim.getExecutionId(),
+                        claim.getRevision(),
+                        "authentication-required",
+                        now()
+                    );
+                    return OfflineSyncWorkerOutcome.AUTHENTICATION_REQUIRED;
+                }
+                Log.i(
+                    LOG_TAG,
+                    "OfflineSyncEngine -> drainWorker -> upload started: category=" + origin
+                );
+                OfflineSyncTransportResult result = transport.upload(currentUrl, currentToken, claim);
+                if (!isCurrent(expectedGeneration)) break;
+                if (result.getKind() == OfflineSyncTransportResult.Kind.TEMPORARY) retry = true;
+                boolean shouldContinue = applyResult(claim, result);
+                if (result.getKind() == OfflineSyncTransportResult.Kind.AUTHENTICATION_REQUIRED) {
+                    return OfflineSyncWorkerOutcome.AUTHENTICATION_REQUIRED;
+                }
+                if (!shouldContinue) break;
+            }
+            return retry ? OfflineSyncWorkerOutcome.RETRY : OfflineSyncWorkerOutcome.COMPLETED;
+        } catch (RuntimeException error) {
+            Log.e(
+                LOG_TAG,
+                "OfflineSyncEngine -> drainWorker -> failed: category=" +
+                error.getClass().getSimpleName()
+            );
+            logRecovery(storage.recoverInterruptedSync(now()));
+            return OfflineSyncWorkerOutcome.RETRY;
+        } finally {
+            boolean repeat;
+            boolean recoverBeforeRepeat;
+            synchronized (this) {
+                running = false;
+                recoverBeforeRepeat = expectedGeneration != generation;
+                repeat =
+                    runAgain &&
+                    accessToken != null &&
+                    apiBaseUrl != null &&
+                    !authenticationRequired &&
+                    !globalProtocolFailure &&
+                    !updateRequired;
+                runAgain = false;
+            }
+            emitState();
+            Log.i(LOG_TAG, "OfflineSyncEngine -> drainWorker -> completed: category=" + origin);
+            if (recoverBeforeRepeat) logRecovery(storage.recoverInterruptedSync(now()));
+            if (repeat) schedule(0);
+        }
+    }
+
+    private void configureLocked(
+        String apiBaseUrl,
+        String accessToken,
+        boolean rearmTemporary
+    ) {
+        this.apiBaseUrl = apiBaseUrl;
+        this.accessToken = accessToken;
+        authenticationRequired = false;
+        globalProtocolFailure = storage.hasSyncReason("auth-transport-ambiguous");
+        updateRequired = storage.hasSyncReason("update-required");
+        if (!initialized) {
+            logRecovery(storage.recoverInterruptedSync(now()));
+            initialized = true;
+        } else if (!running) {
+            logRecovery(storage.recoverInterruptedSync(now()));
+        }
+        if (rearmTemporary) {
+            storage.rearmTemporarySync(now());
+            cycleAttempts.clear();
         }
     }
 

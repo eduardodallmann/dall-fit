@@ -65,6 +65,12 @@ nenhum client secret ou `google-services.json` pertence ao repositório. Sessão
 UUID e dados privados são excluídos tanto de Auto Backup quanto de transferência
 entre dispositivos pelas regras versionadas do projeto Android.
 
+O Android usa `androidx.work:work-runtime` `2.11.2` para sincronização persistente
+best-effort. Cada snapshot pendente agenda um unique one-time work global da fila,
+e um unique periodic work de seis horas funciona como contingência. Ambos exigem
+somente conectividade disponível, não usam modo expedited nem Foreground Service e
+podem ser adiados pelo sistema operacional.
+
 `android:sync` sempre executa o build Vite antes de `cap sync android`.
 `android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
 Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
