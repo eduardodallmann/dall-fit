@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 final class OfflineStorageDatabase extends SQLiteOpenHelper {
     static final String DATABASE_NAME = "dall-fit-offline.db";
-    static final int SCHEMA_VERSION = 1;
+    static final int SCHEMA_VERSION = 2;
 
     OfflineStorageDatabase(Context context) {
         this(context, DATABASE_NAME);
@@ -29,10 +29,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase database, int oldVersion, int newVersion) {
         if (oldVersion == newVersion) return;
-        throw new OfflineStorageException(
-            "OFFLINE_STORAGE_MIGRATION_MISSING",
-            "Offline storage migration is unavailable."
-        );
+        if (oldVersion == 1 && newVersion >= 2) migrateFromOneToTwo(database);
+        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 2) throw missingMigration();
     }
 
     @Override
@@ -49,11 +47,13 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "id INTEGER PRIMARY KEY CHECK (id = 1)," +
             "state_revision INTEGER NOT NULL DEFAULT 0 CHECK (state_revision >= 0)," +
             "reset_generation INTEGER NOT NULL DEFAULT 0 CHECK (reset_generation >= 0)," +
+            "next_queue_sequence INTEGER NOT NULL DEFAULT 1 CHECK (next_queue_sequence > 0)," +
             "last_recovery TEXT NULL)"
         );
         database.execSQL(
-            "INSERT INTO engine_metadata (id, state_revision, reset_generation, last_recovery) " +
-            "VALUES (1, 0, 0, NULL)"
+            "INSERT INTO engine_metadata " +
+            "(id, state_revision, reset_generation, next_queue_sequence, last_recovery) " +
+            "VALUES (1, 0, 0, 1, NULL)"
         );
         database.execSQL(
             "CREATE TABLE account_state (" +
@@ -97,7 +97,12 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "CREATE TABLE sync_state (" +
             "execution_id TEXT PRIMARY KEY REFERENCES snapshots(execution_id) ON DELETE CASCADE," +
             "snapshot_revision INTEGER NOT NULL CHECK (snapshot_revision >= 0)," +
-            "status TEXT NOT NULL CHECK (status IN ('pending'))," +
+            "queue_sequence INTEGER NOT NULL UNIQUE CHECK (queue_sequence > 0)," +
+            "status TEXT NOT NULL CHECK (status IN ('pending', 'in_flight', 'retry_wait', 'blocked', 'action_required'))," +
+            "attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0)," +
+            "next_attempt_at TEXT NULL," +
+            "reason TEXT NULL," +
+            "action_details_json TEXT NULL," +
             "revision INTEGER NOT NULL CHECK (revision >= 0)," +
             "updated_at TEXT NOT NULL)"
         );
@@ -117,7 +122,65 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "CREATE INDEX snapshots_pending_order ON snapshots(updated_at, execution_id)"
         );
         database.execSQL(
+            "CREATE INDEX sync_state_eligible_order ON sync_state(status, next_attempt_at, queue_sequence)"
+        );
+        database.execSQL(
             "CREATE INDEX offline_files_plan ON offline_files(plan_id, status)"
+        );
+    }
+
+    private static void migrateFromOneToTwo(SQLiteDatabase database) {
+        database.execSQL(
+            "ALTER TABLE engine_metadata ADD COLUMN next_queue_sequence INTEGER NOT NULL DEFAULT 1 " +
+            "CHECK (next_queue_sequence > 0)"
+        );
+        database.execSQL("ALTER TABLE sync_state RENAME TO sync_state_v1");
+        database.execSQL(
+            "CREATE TABLE sync_state (" +
+            "execution_id TEXT PRIMARY KEY REFERENCES snapshots(execution_id) ON DELETE CASCADE," +
+            "snapshot_revision INTEGER NOT NULL CHECK (snapshot_revision >= 0)," +
+            "queue_sequence INTEGER NOT NULL UNIQUE CHECK (queue_sequence > 0)," +
+            "status TEXT NOT NULL CHECK (status IN ('pending', 'in_flight', 'retry_wait', 'blocked', 'action_required'))," +
+            "attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0)," +
+            "next_attempt_at TEXT NULL," +
+            "reason TEXT NULL," +
+            "action_details_json TEXT NULL," +
+            "revision INTEGER NOT NULL CHECK (revision >= 0)," +
+            "updated_at TEXT NOT NULL)"
+        );
+        long sequence = 1;
+        try (
+            android.database.Cursor cursor = database.rawQuery(
+                "SELECT execution_id, snapshot_revision, revision, updated_at " +
+                "FROM sync_state_v1 ORDER BY updated_at, execution_id",
+                null
+            )
+        ) {
+            while (cursor.moveToNext()) {
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put("execution_id", cursor.getString(0));
+                values.put("snapshot_revision", cursor.getLong(1));
+                values.put("queue_sequence", sequence++);
+                values.put("status", "pending");
+                values.put("attempt_count", 0);
+                values.put("revision", cursor.getLong(2));
+                values.put("updated_at", cursor.getString(3));
+                database.insertOrThrow("sync_state", null, values);
+            }
+        }
+        android.content.ContentValues metadata = new android.content.ContentValues();
+        metadata.put("next_queue_sequence", sequence);
+        database.update("engine_metadata", metadata, "id = 1", null);
+        database.execSQL("DROP TABLE sync_state_v1");
+        database.execSQL(
+            "CREATE INDEX sync_state_eligible_order ON sync_state(status, next_attempt_at, queue_sequence)"
+        );
+    }
+
+    private static OfflineStorageException missingMigration() {
+        return new OfflineStorageException(
+            "OFFLINE_STORAGE_MIGRATION_MISSING",
+            "Offline storage migration is unavailable."
         );
     }
 }

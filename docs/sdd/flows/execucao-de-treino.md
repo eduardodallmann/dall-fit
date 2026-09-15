@@ -26,7 +26,7 @@ por pessoa.
 |     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
 |     — | autorizar edição offline | consumidor Android futuro | `PUT /training/offline-lease`, `POST /training/offline-lease/takeover` |
-|     — | sincronizar, concluir ou cancelar offline | consumidor Android futuro | `PUT /training/offline-snapshot` |
+|     — | sincronizar, concluir ou cancelar offline | sincronizador Android em primeiro plano | `PUT /training/offline-snapshot` |
 
 ## Sequência e decisões
 
@@ -44,8 +44,11 @@ por pessoa.
    snapshot por sete dias; replay não renova. Conflitos devolvem a versão segura do
    servidor e exigem escolha local ou servidor vinculada ao token observado.
    Conclusão consolida o mesmo histórico e resumo do caminho online; cancelamento
-   só grava o recibo terminal. A UI, o motor Android e o sincronizador ainda não
-   chamam esses endpoints neste fluxo.
+   só grava o recibo terminal. O sincronizador Android em primeiro plano já envia
+   sequencialmente qualquer request v1 presente na fila nativa, preserva revisões
+   criadas durante o upload e classifica retry ou ação necessária. A jornada ainda
+   não produz esses snapshots nem registra o lease; essas integrações permanecem nas
+   issues posteriores.
 2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
@@ -81,7 +84,7 @@ por pessoa.
 | timers                   | API         | overlay da UI                          | timestamps no Redis                | nenhum interval é persistido                     |
 | resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
 | lease de edição offline  | API         | consumidor Android futuro              | Redis, sete dias condicionais      | plano/instalação no valor; `leaseId` cerca a concessão |
-| snapshot offline corrente | Android/API | sincronizador Android futuro            | Redis, uma chave por pessoa        | revisão monotônica; conflito exige escolha explícita |
+| snapshot offline corrente | Android/API | sincronizador Android em primeiro plano  | SQLite local + Redis corrente      | revisão monotônica; conflito exige escolha explícita |
 | terminal offline         | API         | retries e histórico                    | recibo MongoDB único por execução  | conclusão ou cancelamento imutável                |
 
 ## Estados e exceções
@@ -95,8 +98,8 @@ por pessoa.
 - Autorização offline: ausência expira, divergência de fence revoga e takeover
   substitui o editor sem ler ou apagar dados do aparelho anterior. A API já
   ingere snapshots idempotentes, resolve conflitos sem merge silencioso e impede
-  mutação depois de conclusão ou cancelamento; ainda não há cliente sincronizador
-  nesta jornada.
+  mutação depois de conclusão ou cancelamento. O cliente sincronizador em primeiro
+  plano já consome uma pendência v1, mas a jornada Treinar ainda não a produz.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
   sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
   alterna expansão, o input de carga recebe clique em toda a largura e o Drawer

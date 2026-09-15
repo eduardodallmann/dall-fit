@@ -57,6 +57,9 @@ export class NativeSessionCoordinator {
   private loginPromise: Promise<NativeLoginResult> | undefined;
   private logoutPromise: Promise<void> | undefined;
   private readonly now: () => number;
+  private readonly credentialListeners = new Set<
+    (accessToken: string | undefined) => void
+  >();
 
   constructor(
     google: NativeGoogleSignInPort,
@@ -89,6 +92,16 @@ export class NativeSessionCoordinator {
     }
     await this.localData.bindAccount(accountPersonId);
     this.envelope = envelope;
+    this.notifyCredentialChanged();
+  }
+
+  addCredentialListener(
+    listener: (accessToken: string | undefined) => void,
+  ): () => void {
+    this.credentialListeners.add(listener);
+    listener(this.envelope?.accessToken);
+
+    return () => this.credentialListeners.delete(listener);
   }
 
   async getAccessToken(): Promise<string | undefined> {
@@ -124,6 +137,7 @@ export class NativeSessionCoordinator {
   async expireSession(): Promise<void> {
     const hadEnvelope = this.envelope !== undefined;
     this.envelope = undefined;
+    this.notifyCredentialChanged();
     await this.credentials.clearEnvelope().catch(() => undefined);
     if (hadEnvelope) await endSession('expired');
   }
@@ -178,6 +192,7 @@ export class NativeSessionCoordinator {
         throw error;
       }
       this.envelope = envelope;
+      this.notifyCredentialChanged();
 
       if (
         previousEnvelope !== undefined &&
@@ -204,6 +219,7 @@ export class NativeSessionCoordinator {
   private async performLogout(): Promise<void> {
     const accessToken = this.envelope?.accessToken;
     this.envelope = undefined;
+    this.notifyCredentialChanged();
     await endSession('logout');
     const localResults = await Promise.allSettled([
       this.localData.clearAccountDataAtomically(),
@@ -225,6 +241,17 @@ export class NativeSessionCoordinator {
   private isExpired(envelope: NativeSessionEnvelope): boolean {
     const expiresAt = Date.parse(envelope.expiresAt);
     return !Number.isFinite(expiresAt) || expiresAt <= this.now();
+  }
+
+  private notifyCredentialChanged(): void {
+    const accessToken = this.envelope?.accessToken;
+    for (const listener of this.credentialListeners) {
+      try {
+        listener(accessToken);
+      } catch {
+        // Credential observers cannot interrupt the session lifecycle.
+      }
+    }
   }
 }
 

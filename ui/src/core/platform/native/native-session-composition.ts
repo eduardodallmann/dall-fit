@@ -4,6 +4,7 @@ import { GoogleSignInAdapter } from '~/core/platform/native/google-sign-in-adapt
 import { NativeLocalDataAdapter } from '~/core/platform/native/local-data-adapter';
 import { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { offlineStoragePlugin } from '~/core/platform/native/offline-storage-plugin';
+import { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
 import { SecureCredentialAdapter } from '~/core/platform/native/secure-credential-adapter';
 import {
   getTrainingOverview,
@@ -12,6 +13,7 @@ import {
 
 export interface NativeComposition {
   offlinePreparation: OfflinePreparationCoordinator;
+  offlineSync: OfflineSyncCoordinator;
   session: NativeSessionCoordinator;
 }
 
@@ -34,5 +36,7 @@ export async function createNativeComposition(): Promise<NativeComposition> {
       getTrainingWorkoutPreview(workoutId, 'active-plan'),
     plugin: offlineStoragePlugin,
   });
-  return { offlinePreparation, session: coordinator };
+  const offlineSync = new OfflineSyncCoordinator(coordinator);
+  await offlineSync.initialize();
+  return { offlinePreparation, offlineSync, session: coordinator };
 }

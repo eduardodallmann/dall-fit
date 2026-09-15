@@ -58,6 +58,11 @@ dall-fit/
     persiste primeiro um snapshot opaco no motor nativo e entrega signed URLs
     somente em memória ao downloader Java. O downloader grava apenas WebP
     `display` no filesystem privado; nenhum Bearer, URL ou pathname entra no banco.
+11. O sincronizador Android em primeiro plano reutiliza o singleton do motor e sua
+    fila SQLite, recebe o Bearer somente em memória pela bridge e envia snapshots
+    individuais por HTTP nativo. Claim e commit usam o lock curto do storage; rede e
+    backoff nunca bloqueiam persistência local. WorkManager continua uma evolução
+    separada que deverá chamar o mesmo motor, sem duplicar fila ou transporte.
 
 ## Convenções de importação
 

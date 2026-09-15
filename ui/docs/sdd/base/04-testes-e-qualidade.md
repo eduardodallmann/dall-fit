@@ -167,6 +167,15 @@ de um plano já substituído. Status HTTP/tipo/tamanho/corpo, redirects HTTPS,
 sincronização e promoção atômica pertencem ao downloader Java; o smoke final exige
 APK e dispositivo/emulador.
 
+O sincronizador em primeiro plano acrescenta Vitest do coordenador para Bearer
+efêmero, montagem, resume, expiração e teardown. A matriz Java separa classificação
+HTTP, backoff, `Retry-After` e executor serial; testes instrumentados com SQLite real
+cobrem migration v1→v2, sequência local, claim por revisão, alteração durante upload,
+recuperação de `in_flight`, retry rearmado, erro isolado, ação necessária e limpeza
+condicionada. Conectividade é hint testável por callback, e o smoke Android confirma
+reconexão e ausência de Bearer no banco/logcat. Nenhum desses cenários cria request
+Playwright ou MSW porque o transporte pertence ao processo nativo.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

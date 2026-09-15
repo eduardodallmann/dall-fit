@@ -54,12 +54,36 @@ arquivos de `src/core/platform/native/` importam o contrato Capacitor. Web/PWA n
 registra o plugin, não cria IndexedDB equivalente e conserva comportamento online.
 
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
-`files/offline/` e do lock justo que serializa mutações no processo. O schema v1
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v2
 mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
-sessão ativa, snapshots por execução, estado `pending` separado e metadados de
-arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON opacos com
-`payloadVersion` e revisão; apenas IDs, timestamps e estado operacional necessários
-ficam normalizados. A bridge não expõe SQL, path absoluto ou bytes.
+sessão ativa, snapshots por execução, estado operacional de sincronização e
+metadados de arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON
+opacos com `payloadVersion` e revisão; apenas IDs, timestamps, sequência monotônica
+local e estado necessários ficam normalizados. A bridge não expõe SQL, path absoluto
+ou bytes.
+
+`OfflineSyncEngine` é um singleton nativo associado ao mesmo provider. Um executor
+serial garante no máximo um upload da instalação em voo; o lock do storage protege
+somente claim e transições SQLite curtas e nunca permanece adquirido durante HTTP ou
+backoff. `snapshots` conserva uma versão por execução e `sync_state` faz claim por
+revisão. Uma gravação mais nova durante o request volta a execução para `pending`, e
+a resposta antiga não consegue removê-la. Ordem entre execuções usa
+`queue_sequence`, nunca UUID ou relógio do aparelho; claim interrompido volta a
+`pending` na próxima composição.
+
+O transporte nativo usa `HttpURLConnection` e `PUT /training/offline-snapshot`, sem
+cookie ou CSRF. O coordenador TypeScript lê o Bearer pelo contrato seguro da sessão e
+o entrega ao plugin somente em memória; SQLite, eventos e logs nunca o recebem. Rede,
+timeout, `408`, `429`, lock remoto e `5xx` usam backoff exponencial com jitter;
+autenticação pausa globalmente e conflito, imutabilidade ou lease ficam associados
+somente à execução afetada para a UI futura. Sucesso remove por ID + revisão, e uma
+resposta tardia não alcança outra conta ou geração.
+
+Mudança local usa debounce, e abertura/resume, conectividade restaurada e a entrada
+manual acordam o mesmo motor. `syncStateChanged` é apenas hint; `getSyncState` repara
+evento perdido com estado e contagens sanitizados. O callback de rede é único e
+removido com o plugin. Esta etapa opera somente com o processo ativo, não registra
+Foreground Service nem WorkManager e não cria comportamento equivalente na Web/PWA.
 
 Arquivos nascem como `.part` e só viram `.data` por rename no mesmo filesystem;
 temporários e órfãos são removidos na próxima inicialização. A limpeza de conta
@@ -569,8 +593,8 @@ outra aba até a remoção do bloqueador; não registra o worker do MSW.
 
 O empacotamento Capacitor não altera manifest, service worker, instalação ou
 atualização do PWA. O build Android consome o mesmo build otimizado e acrescenta
-autenticação, storage privado e preparação de treino atrás da fronteira nativa;
-Web/PWA não carregam essas capacidades.
+autenticação, storage privado, preparação de treino e sincronização em primeiro
+plano atrás da fronteira nativa; Web/PWA não carregam essas capacidades.
 
 O documento compartilhado `index.html` declara a viewport com escala inicial e
 máxima `1.0` e `user-scalable=no`. Essa política solicita o bloqueio de zoom manual

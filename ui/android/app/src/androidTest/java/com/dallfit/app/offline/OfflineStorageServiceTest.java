@@ -371,7 +371,7 @@ public final class OfflineStorageServiceTest {
             "CREATE TABLE engine_metadata (id INTEGER PRIMARY KEY, reset_generation INTEGER NOT NULL)"
         );
         incompatible.execSQL("INSERT INTO engine_metadata (id, reset_generation) VALUES (1, 4)");
-        incompatible.setVersion(2);
+        incompatible.setVersion(3);
         incompatible.close();
         File stale = new File(context.getFilesDir(), directoryName + "/account/files/stale.data");
         assertTrue(stale.getParentFile().mkdirs());
@@ -432,6 +432,159 @@ public final class OfflineStorageServiceTest {
     @Test
     public void providerSharesOneServiceInstance() {
         assertTrue(OfflineStorageProvider.get(context) == OfflineStorageProvider.get(context));
+        assertTrue(
+            OfflineStorageProvider.getSyncEngine(context) ==
+            OfflineStorageProvider.getSyncEngine(context)
+        );
+    }
+
+    @Test
+    public void migratesVersionOnePendingRowsInTheirExistingDeterministicOrder() {
+        service.close();
+        SQLiteDatabase versionOne = context.openOrCreateDatabase(
+            databaseName,
+            Context.MODE_PRIVATE,
+            null
+        );
+        createVersionOneSchema(versionOne);
+        versionOne.execSQL("INSERT INTO account_state (id, person_id) VALUES (1, 'person-a')");
+        versionOne.execSQL(
+            "INSERT INTO snapshots " +
+            "(execution_id, account_id, plan_id, payload_version, revision, payload_json, updated_at) " +
+            "VALUES ('z-first', 1, 'plan-a', 1, 2, '{\"revision\":2}', '2026-09-14T12:00:00Z')"
+        );
+        versionOne.execSQL(
+            "INSERT INTO snapshots " +
+            "(execution_id, account_id, plan_id, payload_version, revision, payload_json, updated_at) " +
+            "VALUES ('a-second', 1, 'plan-a', 1, 1, '{\"revision\":1}', '2026-09-14T12:01:00Z')"
+        );
+        versionOne.execSQL(
+            "INSERT INTO sync_state (execution_id, snapshot_revision, status, revision, updated_at) " +
+            "VALUES ('z-first', 2, 'pending', 4, '2026-09-14T12:00:00Z')"
+        );
+        versionOne.execSQL(
+            "INSERT INTO sync_state (execution_id, snapshot_revision, status, revision, updated_at) " +
+            "VALUES ('a-second', 1, 'pending', 3, '2026-09-14T12:01:00Z')"
+        );
+        versionOne.setVersion(1);
+        versionOne.close();
+
+        service = new OfflineStorageService(context, databaseName, directoryName);
+        OfflineStorageState state = service.initialize();
+        OfflineSyncClaim first = service.claimNextSync("2026-09-14T12:02:00Z");
+
+        assertEquals("none", state.getRecovery());
+        assertNotNull(first);
+        assertEquals("z-first", first.getExecutionId());
+        assertEquals(1, first.getQueueSequence());
+        service.putSnapshot(
+            "z-first",
+            "plan-a",
+            1,
+            3,
+            "{\"revision\":3}",
+            "2026-09-14T12:03:00Z"
+        );
+        OfflineSyncClaim updated = service.claimNextSync("2026-09-14T12:04:00Z");
+        assertNotNull(updated);
+        assertEquals("z-first", updated.getExecutionId());
+        assertEquals(1, updated.getQueueSequence());
+    }
+
+    @Test
+    public void claimsByLocalSequenceAndKeepsANewerRevisionWrittenDuringUpload() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.putSnapshot(
+            "ffff-execution",
+            "plan-a",
+            1,
+            0,
+            "{\"executionId\":\"ffff-execution\",\"revision\":0}",
+            "2026-09-14T12:00:00Z"
+        );
+        service.putSnapshot(
+            "aaaa-execution",
+            "plan-a",
+            1,
+            0,
+            "{\"executionId\":\"aaaa-execution\",\"revision\":0}",
+            "2026-09-14T12:01:00Z"
+        );
+
+        OfflineSyncClaim first = service.claimNextSync("2026-09-14T12:02:00Z");
+        assertNotNull(first);
+        assertEquals("ffff-execution", first.getExecutionId());
+        service.putSnapshot(
+            "ffff-execution",
+            "plan-a",
+            1,
+            1,
+            "{\"executionId\":\"ffff-execution\",\"revision\":1}",
+            "2026-09-14T12:03:00Z"
+        );
+
+        assertFalse(service.completeSync(first, "2026-09-14T12:04:00Z"));
+        OfflineSyncClaim newest = service.claimNextSync("2026-09-14T12:05:00Z");
+        assertNotNull(newest);
+        assertEquals("ffff-execution", newest.getExecutionId());
+        assertEquals(1, newest.getRevision());
+    }
+
+    @Test
+    public void recoversInterruptedClaimsAndRemovesOnlyOlderBlockedExecutions() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.putSnapshot("execution-a", "plan-a", 1, 0, "{\"revision\":0}", "2026-09-14T12:00:00Z");
+        service.putSnapshot("execution-b", "plan-a", 1, 0, "{\"revision\":0}", "2026-09-14T12:01:00Z");
+        OfflineSyncClaim first = service.claimNextSync("2026-09-14T12:02:00Z");
+        assertNotNull(first);
+        assertEquals(1, service.recoverInterruptedSync("2026-09-14T12:03:00Z"));
+        OfflineSyncClaim recovered = service.claimNextSync("2026-09-14T12:04:00Z");
+        assertEquals(first.getExecutionId(), recovered.getExecutionId());
+        assertTrue(service.markSyncBlocked(
+            recovered.getExecutionId(),
+            recovered.getRevision(),
+            "validation_error",
+            "2026-09-14T12:05:00Z"
+        ));
+
+        OfflineSyncClaim second = service.claimNextSync("2026-09-14T12:06:00Z");
+        assertEquals("execution-b", second.getExecutionId());
+        assertTrue(service.completeSync(second, "2026-09-14T12:07:00Z"));
+        assertNull(service.getSnapshot("execution-a"));
+        assertNull(service.getSnapshot("execution-b"));
+    }
+
+    @Test
+    public void preservesActionRequiredAndRearmsTemporaryFailures() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.putSnapshot("execution-a", "plan-a", 1, 0, "{\"revision\":0}", "2026-09-14T12:00:00Z");
+        OfflineSyncClaim claim = service.claimNextSync("2026-09-14T12:01:00Z");
+        assertTrue(service.markSyncRetry(
+            claim.getExecutionId(),
+            claim.getRevision(),
+            5,
+            null,
+            "network",
+            "2026-09-14T12:02:00Z"
+        ));
+        assertNull(service.claimNextSync("2026-09-14T12:03:00Z"));
+        assertEquals(1, service.rearmTemporarySync("2026-09-14T12:04:00Z"));
+        OfflineSyncClaim retried = service.claimNextSync("2026-09-14T12:05:00Z");
+        assertNotNull(retried);
+        assertTrue(service.markSyncActionRequired(
+            retried.getExecutionId(),
+            retried.getRevision(),
+            "conflict",
+            "{\"allowedResolution\":\"local-or-server\"}",
+            "2026-09-14T12:06:00Z"
+        ));
+        OfflineSyncState state = service.getSyncState(false, false);
+        assertEquals("action-required", state.getState());
+        assertTrue(state.isActionRequired());
+        assertEquals(1, state.getPendingCount());
     }
 
     private static void await(CountDownLatch latch) {
@@ -441,6 +594,49 @@ public final class OfflineStorageServiceTest {
             Thread.currentThread().interrupt();
             throw new AssertionError(error);
         }
+    }
+
+    private static void createVersionOneSchema(SQLiteDatabase database) {
+        database.execSQL(
+            "CREATE TABLE engine_metadata (" +
+            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+            "state_revision INTEGER NOT NULL DEFAULT 0," +
+            "reset_generation INTEGER NOT NULL DEFAULT 0," +
+            "last_recovery TEXT NULL)"
+        );
+        database.execSQL(
+            "INSERT INTO engine_metadata (id, state_revision, reset_generation, last_recovery) " +
+            "VALUES (1, 0, 0, NULL)"
+        );
+        database.execSQL(
+            "CREATE TABLE account_state (id INTEGER PRIMARY KEY, person_id TEXT NOT NULL)"
+        );
+        database.execSQL("CREATE TABLE prepared_plan (id INTEGER PRIMARY KEY)");
+        database.execSQL("CREATE TABLE active_session (id INTEGER PRIMARY KEY)");
+        database.execSQL(
+            "CREATE TABLE snapshots (" +
+            "execution_id TEXT PRIMARY KEY," +
+            "account_id INTEGER NOT NULL REFERENCES account_state(id) ON DELETE CASCADE," +
+            "plan_id TEXT NOT NULL," +
+            "payload_version INTEGER NOT NULL," +
+            "revision INTEGER NOT NULL," +
+            "payload_json TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+        database.execSQL(
+            "CREATE TABLE sync_state (" +
+            "execution_id TEXT PRIMARY KEY REFERENCES snapshots(execution_id) ON DELETE CASCADE," +
+            "snapshot_revision INTEGER NOT NULL," +
+            "status TEXT NOT NULL CHECK (status IN ('pending'))," +
+            "revision INTEGER NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+        database.execSQL(
+            "CREATE TABLE offline_files (" +
+            "file_id TEXT PRIMARY KEY," +
+            "relative_path TEXT NOT NULL," +
+            "status TEXT NOT NULL)"
+        );
     }
 
     private static void deleteRecursively(File file) {
