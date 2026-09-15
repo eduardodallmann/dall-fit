@@ -1,4 +1,4 @@
-import { lazy, Suspense, useSyncExternalStore } from 'react';
+import { lazy, Suspense } from 'react';
 
 import {
   Button,
@@ -13,20 +13,12 @@ import { ImageOff, Play } from 'lucide-react';
 import type { TrainingExerciseExecution } from '@dall-fit/types';
 
 import { trackTrainingAction } from '~/core/analytics';
+import { useConnectivity } from '~/core/connectivity';
 import { usePlatform } from '~/core/platform/platform';
 import { trainingStyles } from '~/routes/training/styles';
 
 const ReactPlayer = lazy(() => import('react-player'));
 const styles = trainingStyles();
-
-function subscribeConnectivity(listener: () => void): () => void {
-  window.addEventListener('online', listener);
-  window.addEventListener('offline', listener);
-  return () => {
-    window.removeEventListener('online', listener);
-    window.removeEventListener('offline', listener);
-  };
-}
 
 export function TrainingMediaViewer({
   exercise,
@@ -35,11 +27,7 @@ export function TrainingMediaViewer({
     defaultValue: true,
   });
   const platform = usePlatform();
-  const online = useSyncExternalStore(
-    subscribeConnectivity,
-    () => navigator.onLine,
-    () => true,
-  );
+  const online = useConnectivity();
   const state = useOverlayState();
   const hasImage = exercise.type === 'image' && exercise.image !== null;
   const hasRemoteVideo =

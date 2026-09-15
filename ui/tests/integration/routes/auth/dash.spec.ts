@@ -226,6 +226,35 @@ test.describe('Rota /dash', () => {
     ).toBeVisible();
   });
 
+  test('Cenário 20 — Perda e retomada de conexão preservam a rota', async ({
+    context,
+    page,
+  }) => {
+    await page.goto('/dash');
+    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+
+    await context.setOffline(true);
+
+    await expect(
+      page.getByRole('heading', { name: 'Conexão necessária' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Treinos offline estão disponíveis no aplicativo Android.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByText('alex.runner@example.test')).not.toBeVisible();
+    await expect(page).toHaveURL('/dash');
+
+    await context.setOffline(false);
+
+    await expect(page.getByText('alex.runner@example.test')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Conexão necessária' }),
+    ).not.toBeVisible();
+    await expect(page).toHaveURL('/dash');
+  });
+
   test('Cenário 13 — Rota privada sem sessão', async ({ page }) => {
     await page.goto('/dash?mockAuth=unauthenticated');
 

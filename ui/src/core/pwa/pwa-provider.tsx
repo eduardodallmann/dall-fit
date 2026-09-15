@@ -11,6 +11,7 @@ import {
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import { reportSystemFailure, trackUiEvent } from '~/core/analytics';
+import { isBrowserOnline, useConnectivity } from '~/core/connectivity';
 import {
   PwaContext,
   type PwaContextValue,
@@ -56,6 +57,8 @@ function isAbortError(error: unknown): boolean {
 }
 
 export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
+  const online = useConnectivity();
+  const previousOnlineRef = useRef(online);
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(isStandalone);
@@ -244,7 +247,7 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       if (
         registration === undefined ||
         swUrl === undefined ||
-        !navigator.onLine ||
+        !isBrowserOnline() ||
         !isDocumentVisible() ||
         registration.installing !== null ||
         (!force && !isUpdateCheckDue(lastCheckAtRef.current, now))
@@ -328,7 +331,6 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
 
     document.addEventListener('visibilitychange', handleResume);
     window.addEventListener('focus', handleResume);
-    window.addEventListener('online', handleResume);
     serviceWorkerContainer.addEventListener(
       'controllerchange',
       handleControllerChange,
@@ -338,13 +340,20 @@ export function PwaProvider({ children }: Readonly<PropsWithChildren>) {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', handleResume);
       window.removeEventListener('focus', handleResume);
-      window.removeEventListener('online', handleResume);
       serviceWorkerContainer.removeEventListener(
         'controllerchange',
         handleControllerChange,
       );
     };
   }, [markUpdatePending, pwaRegistered]);
+
+  useEffect(() => {
+    const connectionRestored = !previousOnlineRef.current && online;
+    previousOnlineRef.current = online;
+    if (!pwaRegistered || !connectionRestored || !isDocumentVisible()) return;
+    void applyPendingUpdateRef.current().catch(() => undefined);
+    void checkForUpdateRef.current().catch(() => undefined);
+  }, [online, pwaRegistered]);
 
   useEffect(() => {
     if (!isBlocked) void applyPendingUpdateRef.current().catch(() => undefined);

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  allowOnlineAnalyticsEvent,
   normalizeAnalyticsRoute,
   reportSystemFailure,
+  trackTrainingPlanAssistantAction,
   trackUiEvent,
 } from '~/core/analytics';
 
@@ -229,5 +231,30 @@ describe('analytics boundary', () => {
       category: 'bootstrap',
     });
     expect(JSON.stringify(trackMock.mock.calls)).not.toContain('session-value');
+  });
+
+  it('discards custom events and diagnostics created while offline', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    trackUiEvent({
+      control: 'retry',
+      eventName: 'ui_retry_requested',
+      resource: 'training_plans',
+      surface: 'training_plan_list',
+    });
+    reportSystemFailure('bootstrap');
+    trackTrainingPlanAssistantAction('assistant_open');
+
+    expect(trackMock).not.toHaveBeenCalled();
+  });
+
+  it('allows the SDK to send only events evaluated while online', () => {
+    const event = { type: 'pageview' as const, url: '/dash' };
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    expect(allowOnlineAnalyticsEvent(event)).toBeNull();
+
+    online.mockReturnValue(true);
+    expect(allowOnlineAnalyticsEvent(event)).toBe(event);
   });
 });

@@ -21,6 +21,12 @@ uma eventual sessão Redis; query ou body não escolhem owner. No Android, o
 repository nativo deriva esses dados do plano e da sessão vinculados à conta no
 SQLite.
 
+Web/PWA não oferece execução offline. Sem conexão, o guard global preserva
+`/training`, desmonta shell e conteúdo e mostra somente `Conexão necessária`, sem
+consultar sessão, plano, treino, SSE ou Analytics. Ao reconectar, a rota é remontada
+e consulta novamente as autoridades online. O Android não participa dessa barreira
+e conserva o caminho nativo descrito abaixo.
+
 ## Elementos, estados e ações
 
 Com plano ativo, a tela mostra nome do plano, instrução `Selecione o treino` e uma
@@ -103,6 +109,8 @@ sem persistência local de sessão.
 O pageview usa `/training`. Seleção emite `ui_training_action` com
 `select_workout`; retry usa `retry`. O menu emite `ui_navigation_selected` com
 `training_link`. Nenhum ID, nome, área, query de mock ou conteúdo é enviado.
+Enquanto o hint Web/PWA está offline, pageview e eventos são descartados antes do
+SDK e não são reproduzidos ao reconectar.
 
 ## Cenários funcionais
 
@@ -147,9 +155,22 @@ O pageview usa `/training`. Seleção emite `ui_training_action` com
 - Then: o primeiro caso substitui a rota por `/training`; o segundo mantém uma
   superfície acessível de conexão necessária, sem loop ou destino persistido.
 
+### Cenário 6 — PWA sem conexão não oferece treino offline
+
+- Link para testar: não se aplica — o início offline com app shell real é coberto
+  por `pnpm test:pwa-update`; a queda posterior é coberta no Playwright.
+- Given: a PWA está em `/training` sem conexão.
+- When: o guard global avalia o hint offline.
+- Then: preserva a URL e mostra somente `Conexão necessária`, sem plano, cards,
+  sessão, requests privados ou cache de dados.
+- And: a cópia direciona explicitamente a jornada offline ao aplicativo Android;
+  reconectar remonta a rota online.
+
 ## Estrutura e cobertura
 
 - Rota: `ui/src/routes/training/overview-page.tsx`.
+- Barreira Web/PWA: `ui/src/core/components/web-connectivity-guard/index.tsx` e
+  `ui/src/core/connectivity/index.ts`.
 - HeroUI: `Card`, `Chip`, `Button`, `Alert`, `Skeleton`.
 - Service/queries: `training-service.ts` e `training-queries.ts`.
 - Tipos: `TrainingOverview`, `TrainingWorkoutCard`.

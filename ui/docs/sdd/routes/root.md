@@ -19,6 +19,12 @@
   [retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação).
 - Permissões: pública.
 
+No Web/PWA, um início sem conexão é resolvido antes desta rota: a URL `/` é
+preservada, o probe de sessão e o login não são montados e a superfície global
+mostra `Conexão necessária`, a orientação para conectar e a disponibilidade de
+treinos offline somente no aplicativo Android. `Tentar novamente` relê o hint; a
+reconexão monta a rota e só então executa o probe normal.
+
 Antes de renderizar, a rota executa um probe de sessão em `beforeLoad`. Quando a
 sessão é válida, o router substitui a URL pelo destino privado pendente válido
 ou por `/dash` sem renderizar a entrada pública. Um bypass one-shot permite que a
@@ -125,6 +131,14 @@ Resultado esperado: a API inicia o fluxo OAuth.
 - Resultado: a mesma pessoa rearma a fila pelo listener de credenciais; outra conta
   segue a limpeza atômica já definida antes de expor seu conteúdo.
 
+### Alternativa 8 — Web/PWA sem conexão
+
+- Condição: o navegador inicia offline ou perde a conexão nesta rota.
+- Comportamento: toda a entrada pública é ocultada pela superfície global, sem
+  iniciar login, probe, Analytics ou outra integração privada e sem alterar `/`.
+- Resultado: `Tentar novamente` mantém a barreira enquanto offline; reconexão
+  remonta e revalida a entrada pública, sem repetir eventos descartados.
+
 ## Validações
 
 Não há formulário. A intenção de navegação é revalidada conforme
@@ -147,6 +161,8 @@ destinos inválidos ou expirados não são usados.
   e `Continuar` fica indisponível para impedir ações concorrentes.
 - Tema: local válido prevalece sobre o sistema; sem valor local válido, acompanha
   o sistema.
+- Sem conexão Web/PWA: somente a superfície global acessível permanece montada;
+  recebe foco inicial e não expõe o botão de login.
 
 ## Integrações
 
@@ -223,6 +239,8 @@ somente no secure storage nativo.
   enviados.
 - o componente global do Vercel Analytics permanece invisível e uma falha ou
   bloqueio de coleta não altera login, aviso de falha de atualização ou navegação.
+- eventos e pageviews produzidos enquanto o hint está offline são descartados antes
+  do transporte e não são reproduzidos após a reconexão.
 
 ## Referências visuais de layout — opcional
 
@@ -317,6 +335,16 @@ somente no secure storage nativo.
 - When: a pessoa cancela.
 - Then: permanece na entrada, sem alerta, persistência parcial ou ação bloqueada.
 
+### Cenário 11 — app shell público sem conexão
+
+- Link para testar: não se aplica — exige build previamente controlada por Service
+  Worker; `pnpm test:pwa-update` executa esse ambiente isolado.
+- Given: o app shell está instalado e o navegador abre `/` sem rede.
+- When: o documento inicia e depois recupera a conexão.
+- Then: mostra somente `Conexão necessária`, não executa o probe nem altera a URL.
+- And: após reconectar, monta a entrada pública e começa o fluxo online normal, sem
+  replay de Analytics.
+
 ## Estrutura técnica relevante
 
 - Arquivo da rota: `src/routes/routes.tsx` (homeRoute `beforeLoad`, `validateSearch`,
@@ -328,7 +356,8 @@ somente no secure storage nativo.
   (`HomeRouteComponent`, `HomeRoutePending`)
 - Arquivo do componente home: `src/routes/home/index.tsx`
 - Componentes HeroUI utilizados: `Alert`, `Button`, `Card`, `Skeleton`
-- Componentes core: `pwa-update-notice`, aplicado pelos providers globais
+- Componentes core: `pwa-update-notice` e `web-connectivity-guard`, aplicados pelos
+  providers globais
 - Infraestrutura core: `ThemeProvider`, `theme-storage`,
   `ApplicationErrorBoundary` e `ApplicationFallback`
 - Componentes exclusivos: estilos tipados em `src/routes/home/styles.ts`
@@ -348,6 +377,7 @@ somente no secure storage nativo.
 | mudança do sistema            | theme provider                        | rota root    |
 | probe redireciona autenticado | root-session-probe, session-lifecycle | rota root    |
 | bypass one-shot após logout   | app, session-lifecycle                | rota root    |
+| início offline e reconexão    | connectivity/guard                    | isolado real |
 
 - Retomada: Vitest em `src/routes/auth-return-navigation.test.ts` e Playwright
   no flow de login, incluindo recarga, erro OAuth e abas independentes.

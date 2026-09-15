@@ -36,6 +36,24 @@ describe('App', () => {
     expect(analyticsMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not mount the router or analytics when the web application is offline', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    render(
+      <AppProviders>
+        <App />
+      </AppProviders>,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Conexão necessária' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Entre para continuar' }),
+    ).not.toBeInTheDocument();
+    expect(analyticsMock).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     router.cancelMatches();
     vi.unstubAllEnvs();

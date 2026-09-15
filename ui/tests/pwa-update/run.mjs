@@ -1,4 +1,4 @@
-/* global URL, document, navigator, process, setTimeout */
+/* global URL, caches, document, navigator, process, setTimeout */
 
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
@@ -67,6 +67,59 @@ function sendJson(response, body) {
     'Content-Type': 'application/json; charset=utf-8',
   });
   response.end(body);
+}
+
+function assertGeneratedServiceWorker(serviceWorker) {
+  const forbiddenFragments = [
+    'workbox-background-sync',
+    'workbox-google-analytics',
+    'BackgroundSyncPlugin',
+    'offlineGoogleAnalytics',
+  ];
+  for (const fragment of forbiddenFragments) {
+    if (serviceWorker.includes(fragment))
+      throw new Error(`The generated service worker contains ${fragment}.`);
+  }
+  if (!serviceWorker.includes('NavigationRoute'))
+    throw new Error(
+      'The generated service worker lost its app-shell fallback.',
+    );
+}
+
+async function readCacheEntries(page) {
+  return page.evaluate(async () => {
+    const result = [];
+    for (const cacheName of await caches.keys()) {
+      const cache = await caches.open(cacheName);
+      for (const request of await cache.keys()) result.push(request.url);
+    }
+    return result.sort();
+  });
+}
+
+function assertAppShellCache(entries, expectedOrigin) {
+  if (entries.length === 0)
+    throw new Error('The service worker did not precache the app shell.');
+  const allowedExtensions = new Set([
+    '.css',
+    '.html',
+    '.ico',
+    '.js',
+    '.png',
+    '.svg',
+    '.webmanifest',
+    '.woff2',
+  ]);
+  for (const entry of entries) {
+    const url = new URL(entry);
+    if (url.origin !== expectedOrigin)
+      throw new Error(`The PWA cached a remote resource: ${entry}`);
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/'))
+      throw new Error(`The PWA cached a private route: ${entry}`);
+    const extension = extname(url.pathname);
+    if (url.pathname !== '/' && !allowedExtensions.has(extension))
+      throw new Error(`The PWA cached a non-shell resource: ${entry}`);
+  }
 }
 
 async function serveApplication(request, response) {
@@ -167,6 +220,8 @@ async function expectBuild(page, build) {
 try {
   await runBuild(buildA, 'A', `${origin}/api`);
   await runBuild(buildB, 'B', `${origin}/api`);
+  assertGeneratedServiceWorker(await readFile(join(buildA, 'sw.js'), 'utf8'));
+  assertGeneratedServiceWorker(await readFile(join(buildB, 'sw.js'), 'utf8'));
   publishedBuild = buildA;
 
   browser = await chromium.launch();
@@ -175,6 +230,44 @@ try {
   await safePage.goto(`${origin}/dash`);
   await waitUntilControlled(safePage);
   await expectBuild(safePage, 'A');
+  const initialCacheEntries = await readCacheEntries(safePage);
+  assertAppShellCache(initialCacheEntries, origin);
+
+  let offlineApiRequests = 0;
+  const offlinePage = await context.newPage();
+  offlinePage.on('request', (request) => {
+    if (new URL(request.url()).pathname.startsWith('/api/'))
+      offlineApiRequests += 1;
+  });
+  await context.setOffline(true);
+  await offlinePage.goto(`${origin}/dash`);
+  await offlinePage
+    .getByRole('heading', { name: 'Conexão necessária' })
+    .waitFor();
+  if (
+    !(await offlinePage
+      .getByText('Treinos offline estão disponíveis no aplicativo Android.')
+      .isVisible())
+  )
+    throw new Error(
+      'The offline shell did not promote the Android capability.',
+    );
+  if (offlineApiRequests !== 0)
+    throw new Error('The offline shell started a private API request.');
+  if (offlinePage.url() !== `${origin}/dash`)
+    throw new Error('The offline shell changed the requested URL.');
+  const offlineCacheEntries = await readCacheEntries(offlinePage);
+  assertAppShellCache(offlineCacheEntries, origin);
+  if (
+    JSON.stringify(offlineCacheEntries) !== JSON.stringify(initialCacheEntries)
+  )
+    throw new Error('The PWA cache grew while the application was offline.');
+
+  await context.setOffline(false);
+  await offlinePage.getByText('pwa-update@example.test').first().waitFor();
+  if (offlinePage.url() !== `${origin}/dash`)
+    throw new Error('The restored connection did not preserve the route.');
+  await offlinePage.close();
 
   const blockedPage = await context.newPage();
   await blockedPage.goto(`${origin}/global/training-plan`);
@@ -183,6 +276,13 @@ try {
   await blockedPage.getByRole('button', { name: 'Novo plano' }).click();
   const nameField = blockedPage.getByRole('dialog').getByLabel('Nome');
   await nameField.fill('Draft preservado');
+  const authenticatedCacheEntries = await readCacheEntries(blockedPage);
+  assertAppShellCache(authenticatedCacheEntries, origin);
+  if (
+    JSON.stringify(authenticatedCacheEntries) !==
+    JSON.stringify(initialCacheEntries)
+  )
+    throw new Error('Authenticated use added a private PWA cache entry.');
 
   let safeReloads = 0;
   safePage.on('framenavigated', (frame) => {
@@ -214,7 +314,7 @@ try {
   await expectBuild(blockedPage, 'B');
 
   process.stdout.write(
-    'PWA update validation passed: build B reloaded once and the blocked tab preserved its draft until safe.\n',
+    'PWA validation passed: the cache stayed shell-only, offline preserved the route, and build B reloaded once after the draft became safe.\n',
   );
 } finally {
   await browser?.close();

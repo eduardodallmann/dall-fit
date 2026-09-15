@@ -1,4 +1,6 @@
-import { track } from '@vercel/analytics';
+import { track, type BeforeSendEvent } from '@vercel/analytics';
+
+import { isBrowserOnline } from '~/core/connectivity';
 
 export type AnalyticsSurface =
   | 'application_menu'
@@ -386,6 +388,7 @@ export function trackTrainingAction(
 }
 
 export function trackUiEvent(event: UiAnalyticsEvent): void {
+  if (!isBrowserOnline()) return;
   const properties = buildProperties(event);
   const fingerprint = JSON.stringify([event.eventName, properties]);
 
@@ -404,6 +407,7 @@ export function trackUiEvent(event: UiAnalyticsEvent): void {
 }
 
 export function reportSystemFailure(category: SystemFailureCategory): void {
+  if (!isBrowserOnline()) return;
   const fingerprint = JSON.stringify(['ui_system_failure', category]);
   if (pendingEventFingerprints.has(fingerprint)) return;
   pendingEventFingerprints.add(fingerprint);
@@ -428,6 +432,7 @@ export function trackTrainingPlanAssistantAction(
   action: TrainingPlanAssistantAnalyticsAction,
   outcome?: 'blocked' | 'cancelled' | 'error' | 'success',
 ): void {
+  if (!isBrowserOnline()) return;
   try {
     track('training_plan_assistant', {
       action,
@@ -436,4 +441,10 @@ export function trackTrainingPlanAssistantAction(
   } catch {
     // Analytics is optional and never receives conversation content.
   }
+}
+
+export function allowOnlineAnalyticsEvent(
+  event: BeforeSendEvent,
+): BeforeSendEvent | null {
+  return isBrowserOnline() ? event : null;
 }

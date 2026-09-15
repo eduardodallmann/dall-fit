@@ -30,6 +30,11 @@ atende as rotas pessoais e administrativas sem conexão duplicada.
 - Permissões: sessão válida e pessoa existente. A rota é comum e não pertence ao
   layout administrativo.
 
+No Web/PWA, a ausência de conexão precede a proteção desta rota. O guard global
+preserva `/dash`, não monta probes, CSRF, SSE ou Analytics e não expõe identidade,
+menu nem ação privada. Se a rede cair depois do shell carregado, toda essa árvore é
+desmontada; ao reconectar, a mesma URL passa novamente pela proteção canônica.
+
 Ao chegar do callback, depois da confirmação de pessoa e CSRF, `/dash` consome o
 destino pendente válido e o Router substitui a URL antes de apresentar o dashboard
 como tela final. Sem intenção, com valor inválido/expirado ou sem storage confiável,
@@ -184,6 +189,14 @@ enquanto o dashboard permanece intencionalmente vazio.
 - Cancelar preserva sessão e dados sem chamada remota. Confirmar mantém o diálogo
   bloqueado durante a limpeza; falha remota nunca restaura dados locais.
 
+### Alternativa 11 — Web/PWA perde a conexão
+
+- Condição: o hint do navegador muda para offline antes ou depois da proteção.
+- Comportamento: a superfície `Conexão necessária` substitui integralmente o shell,
+  preserva `/dash` e não inicia nem mantém requests, SSE ou Analytics da árvore.
+- Resultado: identidade e ações ficam indisponíveis; reconexão remonta a rota e
+  exige novamente sessão e CSRF válidos, sem logout por inferência.
+
 ## Validações
 
 Não se aplica — a rota e o menu não possuem formulário nem entrada editável.
@@ -203,6 +216,8 @@ Não se aplica — a rota e o menu não possuem formulário nem entrada editáve
   `Tentar novamente` indica pending e desabilita `Continuar`. Os dois toggles de
   tema compartilham exatamente o mesmo pending; os dois botões icon-only de logout
   conservam seu slot, compartilham outra única mutation e o mesmo pending.
+- Sem conexão Web/PWA: somente a superfície global focável é visível; menu, pessoa
+  e região privada deixam de existir no DOM, mas a URL permanece `/dash`.
 
 ## Integrações
 
@@ -362,6 +377,8 @@ móvel não o reabre.
   sanitizado seguem os eventos documentados na rota `/`;
 - nome, e-mail, foto, `isAdmin`, preferência e seletores `mockAuth` nunca entram nas
   emissões.
+- qualquer evento ou pageview que coincida com o estado offline é descartado antes
+  do SDK e não volta a ser emitido na reconexão.
 
 ## Referências visuais de layout — opcional
 
@@ -529,6 +546,15 @@ móvel não o reabre.
 - Then: `Cancelar` preserva tudo; `Sair e apagar dados` limpa a conta, preserva o
   UUID e termina na raiz pública mesmo se API ou Credential Manager falhar.
 
+### Cenário 20 — Perda e retomada de conexão preservam a rota
+
+- Link para testar: `http://localhost:3000/dash` com MSW habilitado.
+- Given: identidade e menu já estão visíveis no shell Web.
+- When: o contexto do navegador fica offline e depois volta a ficar online.
+- Then: somente `Conexão necessária` permanece visível, identidade e menu somem e
+  a URL continua `/dash`.
+- And: ao reconectar, a proteção remonta e devolve o mesmo shell autenticado.
+
 ## Estrutura técnica relevante
 
 - Árvore e rota: `src/routes/routes.tsx` e `src/routes/route-components.tsx`
@@ -536,7 +562,8 @@ móvel não o reabre.
 - Componentes HeroUI: `Alert`, `Avatar`, `Button`, `Chip`, `Disclosure`, `Drawer`,
   `Skeleton` e `Typography`
 - Componentes core: `authenticated-shell`, `application-menu`,
-  `theme-toggle`, `pwa-install-action`, `pwa-update-notice` e `route-status`
+  `theme-toggle`, `pwa-install-action`, `pwa-update-notice`,
+  `web-connectivity-guard` e `route-status`
 - Componentes exclusivos da rota: não se aplica; `/dash` não possui conteúdo
 - Hooks e serviços: `useOverlayState`, `currentPersonQueryOptions`,
   `getCurrentPerson`, `ensureCsrfToken`, `logout`, `ThemeProvider` e
@@ -565,6 +592,7 @@ móvel não o reabre.
 | rollback para perfil ou sistema           | theme provider      | rota `/dash`     |
 | bootstrap CSRF e falha recuperável        | auth service/router | rota `/dash`     |
 | logout compartilhado, sucesso e erro      | shell/menu          | flow login       |
+| barreira offline e retomada da mesma URL  | connectivity/guard  | rota `/dash`     |
 
 - Handlers e fixtures MSW: `src/mocks/handlers/auth.ts` e
   `src/mocks/fixtures/person.ts`.

@@ -3,25 +3,13 @@ import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { Alert, Button } from '@heroui/react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 
+import { useConnectivity } from '~/core/connectivity';
 import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
 import { usePlatform } from '~/core/platform/platform';
 
 import { nativeOfflineGuardStyles } from './styles';
 
 const styles = nativeOfflineGuardStyles();
-
-function subscribe(listener: () => void): () => void {
-  window.addEventListener('online', listener);
-  window.addEventListener('offline', listener);
-  return () => {
-    window.removeEventListener('online', listener);
-    window.removeEventListener('offline', listener);
-  };
-}
-
-function getOnlineSnapshot(): boolean {
-  return navigator.onLine;
-}
 
 export function NativeOfflineGuard({
   children,
@@ -37,7 +25,7 @@ function ActiveNativeOfflineGuard({
   const preparation = useOfflinePreparation();
   const location = useLocation();
   const navigate = useNavigate();
-  const online = useSyncExternalStore(subscribe, getOnlineSnapshot, () => true);
+  const online = useConnectivity();
   const preparationSnapshot = useSyncExternalStore(
     preparation?.subscribe ?? (() => () => undefined),
     preparation?.getSnapshot ??

@@ -9,6 +9,8 @@ import { defineConfig } from 'vitest/config';
 import { MOCK_REQUEST_ID } from './src/mocks/mock-constants.js';
 
 const applicationBackgroundColor = '#f7f7f7';
+const pwaAppShellGlobPatterns = ['**/*.{js,css,html,woff2}'];
+const pwaNavigationFallbackDenylist = [/^\/api(?:\/|$)/, /^\/auth(?:\/|$)/];
 
 const pwaUpdateTestBuildMarker: Plugin = {
   name: 'dall-fit-pwa-update-test-build-marker',
@@ -118,9 +120,9 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         globIgnores: ['**/mockServiceWorker.js'],
-        globPatterns: ['**/*.{js,css,html,woff2}'],
+        globPatterns: pwaAppShellGlobPatterns,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/auth(?:\/|$)/],
+        navigateFallbackDenylist: pwaNavigationFallbackDenylist,
       },
     }),
   ],

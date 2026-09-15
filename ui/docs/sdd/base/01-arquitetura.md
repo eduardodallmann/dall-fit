@@ -53,6 +53,22 @@ Activity, WebView ou React e pode ser reutilizado por futuros Workers. Somente
 arquivos de `src/core/platform/native/` importam o contrato Capacitor. Web/PWA não
 registra o plugin, não cria IndexedDB equivalente e conserva comportamento online.
 
+No Web/PWA, `WebConnectivityGuard` envolve a árvore acionável acima do router e usa
+`src/core/connectivity` como fonte única do hint de conectividade. Se o documento
+inicia offline, router, sessão, requests privados, SSE e Analytics não são montados;
+se a conexão é perdida depois, toda a árvore pública ou privada é desmontada e
+substituída pela superfície global `Conexão necessária`. A URL corrente não muda e,
+ao receber `online` ou após `Tentar novamente`, a mesma rota é remontada e
+revalidada. `navigator.onLine` e seus eventos são apenas um hint local, não uma
+prova de alcance da API. O Android ignora esse guard global e seu guard nativo
+reutiliza a mesma fonte para conservar a jornada offline já suportada.
+
+O Workbox usa `generateSW` somente para precache do app shell versionado
+(`js`, `css`, `html`, `woff2`, manifesto e seus assets explícitos) e fallback de
+navegação para `index.html`. Não existe runtime cache, Background Sync nem
+offline Google Analytics. Rotas `/api` e `/auth`, SSE, signed URLs e recursos
+remotos não entram no cache e nunca recebem resposta privada do service worker.
+
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
 `files/offline/` e do lock justo que serializa mutações no processo. O schema v3
 mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
@@ -210,7 +226,8 @@ A estrutura deve crescer conforme funcionalidades reais, sem diretórios vazios.
 
 1. `main.tsx` carrega os estilos globais.
 2. `AppProviders` aplica `QueryClientProvider`, `ThemeProvider`, `PwaProvider` e o
-   único `Toast.Provider` global.
+   `WebConnectivityGuard`; somente conectado ele monta o único `Toast.Provider`
+   global e a aplicação acionável.
 3. `App` aplica o `RouterProvider` do TanStack Router e monta uma única instância
    de `Analytics` de `@vercel/analytics/react`. Breadcrumbs de domínio usam `Link`
    tipado diretamente para navegar sem recarregar o documento.
@@ -507,6 +524,11 @@ captura de teclas.
 carregamento inicial e as transições client-side produzidas pelo router sem mudar a
 árvore de providers ou provocar reload do documento. Desenvolvimento usa o modo do
 pacote sem envio de produção e os testes isolam componente e transporte.
+
+Quando o hint Web/PWA está offline, as fronteiras de eventos retornam antes de
+chamar o SDK e o `beforeSend` global descarta pageviews ou eventos que disputem com
+a mudança de conectividade. Nada é enfileirado ou repetido ao reconectar; somente
+interações novas, produzidas depois da remontagem online, podem ser emitidas.
 
 O contexto comum de eventos aceita somente `route`, `surface` e `control`. `route`
 é omitida quando o path não é conhecido; nos paths vigentes, aceita somente `/`,

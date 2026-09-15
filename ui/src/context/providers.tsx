@@ -7,6 +7,7 @@ import type { NativeSessionCoordinator } from '~/auth/native-session';
 import { NativeSessionContext } from '~/auth/native-session-context';
 import { queryClient } from '~/context/query-client';
 import { PwaUpdateNotice } from '~/core/components/pwa-update-notice';
+import { WebConnectivityGuard } from '~/core/components/web-connectivity-guard';
 import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { OfflinePreparationContext } from '~/core/platform/native/offline-preparation-context';
 import type { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
@@ -56,9 +57,11 @@ export function AppProviders({
                 <ThemeProvider initialTheme={initialTheme}>
                   <ReloadSafetyProvider>
                     <PwaProvider>
-                      {children}
-                      <PwaUpdateNotice />
-                      <Toast.Provider placement="bottom end" />
+                      <WebConnectivityGuard>
+                        {children}
+                        <PwaUpdateNotice />
+                        <Toast.Provider placement="bottom end" />
+                      </WebConnectivityGuard>
                     </PwaProvider>
                   </ReloadSafetyProvider>
                 </ThemeProvider>

@@ -30,7 +30,11 @@ por pessoa.
 
 ## Sequência e decisões
 
-1. No Android, entrar na listagem valida o snapshot local pela janela de sete dias
+1. No Web/PWA, um hint offline impede a montagem de toda a jornada, preserva a URL
+   solicitada e apresenta somente `Conexão necessária`; não há request, cache de
+   domínio, Background Sync, Analytics offline nem replay na reconexão. Recuperada
+   a rede, a mesma rota é remontada contra as autoridades online. No Android,
+   entrar na listagem valida o snapshot local pela janela de sete dias
    emitida pela API e já pode renderizar overview e previews locais enquanto
    atualiza online. A preparação registra silenciosamente o lease da instalação,
    persiste o fence com o payload v2 e confirma o snapshot essencial antes dos
@@ -101,6 +105,9 @@ por pessoa.
 - Interrupção Android: refresh, background ou recriação lê a sessão SQLite e exige
   continuar ou descartar; timer usa monotônico no mesmo boot e fallback civil
   limitado após reboot, sem resolução automática ao chegar a zero.
+- Interrupção Web/PWA: a perda da conexão desmonta shell e jornada, preserva a URL
+  e deixa somente a superfície global; reconexão remonta a etapa vigente sem
+  converter esse canal em execução offline.
 - Erro recuperável: falha de mutation mantém a sessão canônica e permite nova ação.
 - Conflito: draft local é descartado, GET canônico prevalece e a UI avisa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
@@ -144,6 +151,16 @@ por pessoa.
 - Then: cada ação sucede o commit local, `completed` permanece na fila e a UI
   retorna a `/training` sem consultar ou inventar um resumo.
 
+### Cenário 4 — bloquear a jornada offline no Web/PWA
+
+- Link para testar: não se aplica — o app shell offline real é validado por
+  `pnpm test:pwa-update` e a transição de rede por Playwright.
+- Given: a pessoa está em uma rota da execução no canal Web/PWA.
+- When: a conexão é perdida.
+- Then: conteúdo, identidade e ações são desmontados, a URL permanece igual e
+  somente `Conexão necessária` é apresentado, sem request ou cache privado.
+- And: ao reconectar, a etapa é remontada pela jornada online normal.
+
 ## Cobertura automatizada
 
 - Regras e caminhos de negócio protegidos: fluxo E2E real em
@@ -151,6 +168,9 @@ por pessoa.
 - Playwright: `ui/tests/integration/routes/training.spec.ts` valida listagem,
   início, carga vazia, concorrência com PUT atrasado, responsividade, mídia,
   finalização parcial e confirmação de descarte contra MSW.
+- Conectividade Web/PWA: Vitest valida a fonte e o guard, Playwright valida perda e
+  retomada após bootstrap e `pnpm test:pwa-update` audita app shell, Cache Storage e
+  início offline real.
 - Vitest: o repository nativo valida materialização, confirmação após commit,
   revisão, validade e terminais; o coordenador valida preparação e lease.
 - Android instrumentado: `OfflineStorageServiceTest` valida transações compostas

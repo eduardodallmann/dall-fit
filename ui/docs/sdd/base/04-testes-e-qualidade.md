@@ -41,7 +41,8 @@ geração nova sem estado privado antigo.
 Vercel Analytics é isolado nos testes: a composição global substitui o componente
 oficial para confirmar uma única montagem sem carregar coleta externa; testes da
 fronteira substituem apenas `track` e validam schema, normalização, deduplicação,
-privacidade e no-op em falha. Componentes e providers substituem a fronteira
+privacidade, bloqueio anterior ao SDK enquanto offline, `beforeSend` defensivo e
+ausência de replay ao reconectar. Componentes e providers substituem a fronteira
 interna para verificar os eventos produzidos por interações acessíveis. Valores de
 campos, IDs, query e mensagens de erro não podem aparecer nos asserts de emissão.
 Diagnósticos sistêmicos testam somente as categorias `bootstrap`, `render` e
@@ -133,7 +134,16 @@ fronteira de segurança cobre múltiplos owners, cleanup e mutations globais; os
 formulários e editores registram seus estados recuperáveis pela mesma fronteira.
 Como o Playwright integrado usa MSW Browser e mantém Workbox desabilitado,
 `pnpm test:pwa-update` executa separadamente dois builds reais na mesma origem e
-duas abas Chromium, preservando um draft até o reload se tornar seguro.
+duas abas Chromium, preservando um draft até o reload se tornar seguro. O mesmo
+gate audita o service worker gerado e o conteúdo real de Cache Storage, abre uma
+rota privada pelo app shell sem rede, comprova ausência de requests privados e de
+crescimento do cache, preserva a URL e valida a remontagem ao reconectar.
+
+Vitest cobre a fonte compartilhada de conectividade, foco inicial da superfície
+global, retry explícito, ocultação integral da árvore Web/PWA e bypass Android.
+Playwright alterna a rede depois do bootstrap para comprovar que identidade e ações
+privadas somem, a rota permanece estável e o shell reaparece somente após a
+reconexão.
 
 A fundação Capacitor possui testes unitários para seleção injetável do adapter,
 detecção Android, fallback Web diante de bridge ausente ou plataforma inesperada e
