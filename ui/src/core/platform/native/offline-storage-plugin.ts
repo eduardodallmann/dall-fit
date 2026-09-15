@@ -36,13 +36,30 @@ export interface OfflineFileMetadata {
   updatedAt: string;
 }
 
+export interface OfflineSyncState {
+  actionRequired: boolean;
+  pendingCount: number;
+  revision: number;
+  state:
+    | 'action-required'
+    | 'authentication-required'
+    | 'idle'
+    | 'pending'
+    | 'syncing';
+}
+
 export interface OfflineStoragePlugin {
   addListener(
     eventName: 'stateChanged',
     listener: (state: OfflineStorageState) => void,
   ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'syncStateChanged',
+    listener: (state: OfflineSyncState) => void,
+  ): Promise<PluginListenerHandle>;
   bindAccount(options: { personId: string }): Promise<void>;
   clearAccountData(): Promise<void>;
+  clearSyncCredentials(): Promise<OfflineSyncState>;
   downloadFile(options: {
     contentType: 'image/webp';
     expectedPlanRevision: number;
@@ -63,6 +80,7 @@ export interface OfflineStoragePlugin {
     executionId: string;
   }): Promise<{ aggregate?: OfflineStoredAggregate }>;
   getState(): Promise<OfflineStorageState>;
+  getSyncState(): Promise<OfflineSyncState>;
   hasPendingChanges(): Promise<{ value: boolean }>;
   initialize(): Promise<OfflineStorageState>;
   listSnapshots(): Promise<{ aggregates: OfflineStoredAggregate[] }>;
@@ -116,6 +134,11 @@ export interface OfflineStoragePlugin {
     executionId: string;
     expectedRevision: number;
   }): Promise<{ removed: boolean }>;
+  triggerSync(options: {
+    accessToken: string;
+    apiBaseUrl: string;
+    rearmTemporary: boolean;
+  }): Promise<OfflineSyncState>;
 }
 
 export const offlineStoragePlugin =

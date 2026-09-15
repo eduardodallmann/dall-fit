@@ -27,6 +27,10 @@ public final class OfflineStorageService {
         void onStateChanged(OfflineStorageState state);
     }
 
+    public interface SnapshotListener {
+        void onSnapshotPending();
+    }
+
     private interface DatabaseWork<T> {
         T run(SQLiteDatabase database);
     }
@@ -41,6 +45,7 @@ public final class OfflineStorageService {
     private final Context context;
     private final String databaseName;
     private final List<StateListener> listeners = new CopyOnWriteArrayList<>();
+    private final List<SnapshotListener> snapshotListeners = new CopyOnWriteArrayList<>();
     private final ReentrantLock mutationLock = new ReentrantLock(true);
     private final File rootDirectory;
     private final SnapshotWriteHook snapshotWriteHook;
@@ -75,6 +80,14 @@ public final class OfflineStorageService {
 
     public void removeStateListener(StateListener listener) {
         listeners.remove(listener);
+    }
+
+    public void addSnapshotListener(SnapshotListener listener) {
+        snapshotListeners.add(listener);
+    }
+
+    public void removeSnapshotListener(SnapshotListener listener) {
+        snapshotListeners.remove(listener);
     }
 
     public OfflineStorageState initialize() {
@@ -125,7 +138,7 @@ public final class OfflineStorageService {
         try {
             ensureOperationalLocked();
             SQLiteDatabase database = helper.getReadableDatabase();
-            return exists(database, "active_session") || count(database, "sync_state", "status = ?", new String[] { "pending" }) > 0;
+            return exists(database, "active_session") || count(database, "sync_state", null, null) > 0;
         } finally {
             mutationLock.unlock();
         }
@@ -335,7 +348,7 @@ public final class OfflineStorageService {
         String updatedAt
     ) {
         validateAggregate(executionId, planId, payloadVersion, revision, payloadJson, updatedAt);
-        mutate(database -> {
+        boolean changed = mutate(database -> {
             requireAccount(database);
             if (
                 !mayWriteRevision(
@@ -367,16 +380,23 @@ public final class OfflineStorageService {
             snapshotWriteHook.afterSnapshotWritten(revision);
 
             long syncRevision = nextSyncRevision(database, executionId);
+            long queueSequence = queueSequence(database, executionId);
             ContentValues syncValues = new ContentValues();
             syncValues.put("execution_id", executionId);
             syncValues.put("snapshot_revision", revision);
+            syncValues.put("queue_sequence", queueSequence);
             syncValues.put("status", "pending");
+            syncValues.put("attempt_count", 0);
+            syncValues.putNull("next_attempt_at");
+            syncValues.putNull("reason");
+            syncValues.putNull("action_details_json");
             syncValues.put("revision", syncRevision);
             syncValues.put("updated_at", updatedAt);
             database.insertWithOnConflict("sync_state", null, syncValues, SQLiteDatabase.CONFLICT_REPLACE);
             incrementStateRevision(database);
             return true;
         });
+        if (changed) notifySnapshotPending();
     }
 
     public boolean removeSnapshot(String executionId, long expectedRevision) {
@@ -392,6 +412,264 @@ public final class OfflineStorageService {
             incrementStateRevision(database);
             return true;
         });
+    }
+
+    public int recoverInterruptedSync(String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        final int[] recovered = { 0 };
+        mutate(database -> {
+            recovered[0] = count(database, "sync_state", "status = ?", new String[] { "in_flight" });
+            if (recovered[0] == 0) return false;
+            database.execSQL(
+                "UPDATE sync_state SET status = 'pending', next_attempt_at = NULL, " +
+                "reason = 'interrupted', revision = revision + 1, updated_at = ? " +
+                "WHERE status = 'in_flight'",
+                new Object[] { updatedAt }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+        return recovered[0];
+    }
+
+    public int rearmTemporarySync(String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        final int[] rearmed = { 0 };
+        mutate(database -> {
+            rearmed[0] = count(database, "sync_state", "status = ?", new String[] { "retry_wait" });
+            if (rearmed[0] == 0) return false;
+            database.execSQL(
+                "UPDATE sync_state SET status = 'pending', next_attempt_at = NULL, " +
+                "revision = revision + 1, updated_at = ? WHERE status = 'retry_wait'",
+                new Object[] { updatedAt }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+        return rearmed[0];
+    }
+
+    public OfflineSyncClaim claimNextSync(String now) {
+        requireIsoInstant(now, "now");
+        mutationLock.lock();
+        OfflineStorageState state = null;
+        try {
+            ensureOperationalLocked();
+            SQLiteDatabase database = helper.getWritableDatabase();
+            OfflineSyncClaim result = runTransaction(database, transaction -> {
+                try (
+                    Cursor cursor = transaction.rawQuery(
+                        "SELECT snapshots.execution_id, snapshots.revision, snapshots.payload_json, " +
+                        "sync_state.queue_sequence, sync_state.attempt_count " +
+                        "FROM sync_state JOIN snapshots ON snapshots.execution_id = sync_state.execution_id " +
+                        "WHERE sync_state.snapshot_revision = snapshots.revision AND " +
+                        "(sync_state.status = 'pending' OR " +
+                        "(sync_state.status = 'retry_wait' AND sync_state.next_attempt_at <= ?)) " +
+                        "ORDER BY sync_state.queue_sequence LIMIT 1",
+                        new String[] { now }
+                    )
+                ) {
+                    if (!cursor.moveToFirst()) return null;
+                    String executionId = cursor.getString(0);
+                    long revision = cursor.getLong(1);
+                    ContentValues values = new ContentValues();
+                    values.put("status", "in_flight");
+                    values.putNull("next_attempt_at");
+                    values.putNull("reason");
+                    values.put("updated_at", now);
+                    int updated = transaction.update(
+                        "sync_state",
+                        values,
+                        "execution_id = ? AND snapshot_revision = ? AND status IN ('pending', 'retry_wait')",
+                        new String[] { executionId, Long.toString(revision) }
+                    );
+                    if (updated != 1) return null;
+                    transaction.execSQL(
+                        "UPDATE sync_state SET revision = revision + 1 WHERE execution_id = ?",
+                        new Object[] { executionId }
+                    );
+                    incrementStateRevision(transaction);
+                    return new OfflineSyncClaim(
+                        executionId,
+                        revision,
+                        cursor.getString(2),
+                        cursor.getLong(3),
+                        cursor.getInt(4)
+                    );
+                }
+            });
+            if (result != null) state = readStateLocked();
+            return result;
+        } finally {
+            mutationLock.unlock();
+            if (state != null) notifyStateChanged(state);
+        }
+    }
+
+    public boolean markSyncRetry(
+        String executionId,
+        long expectedRevision,
+        int attemptCount,
+        String nextAttemptAt,
+        String reason,
+        String updatedAt
+    ) {
+        requireSyncTransition(executionId, expectedRevision, attemptCount, reason, updatedAt);
+        if (nextAttemptAt != null) requireIsoInstant(nextAttemptAt, "nextAttemptAt");
+        return updateClaimedSync(
+            executionId,
+            expectedRevision,
+            "retry_wait",
+            attemptCount,
+            nextAttemptAt,
+            reason,
+            null,
+            updatedAt
+        );
+    }
+
+    public boolean releaseSyncPending(
+        String executionId,
+        long expectedRevision,
+        String reason,
+        String updatedAt
+    ) {
+        requireSyncTransition(executionId, expectedRevision, 0, reason, updatedAt);
+        return updateClaimedSync(
+            executionId,
+            expectedRevision,
+            "pending",
+            0,
+            null,
+            reason,
+            null,
+            updatedAt
+        );
+    }
+
+    public boolean markSyncBlocked(
+        String executionId,
+        long expectedRevision,
+        String reason,
+        String updatedAt
+    ) {
+        requireSyncTransition(executionId, expectedRevision, 0, reason, updatedAt);
+        return updateClaimedSync(
+            executionId,
+            expectedRevision,
+            "blocked",
+            0,
+            null,
+            reason,
+            null,
+            updatedAt
+        );
+    }
+
+    public boolean markSyncActionRequired(
+        String executionId,
+        long expectedRevision,
+        String reason,
+        String actionDetailsJson,
+        String updatedAt
+    ) {
+        requireSyncTransition(executionId, expectedRevision, 0, reason, updatedAt);
+        if (actionDetailsJson != null) {
+            if (actionDetailsJson.length() > 1_048_576) throw invalidInput("actionDetails");
+            try {
+                new JSONObject(actionDetailsJson);
+            } catch (JSONException error) {
+                throw invalidInput("actionDetails");
+            }
+        }
+        return updateClaimedSync(
+            executionId,
+            expectedRevision,
+            "action_required",
+            0,
+            null,
+            reason,
+            actionDetailsJson,
+            updatedAt
+        );
+    }
+
+    public boolean completeSync(OfflineSyncClaim claim, String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        return mutate(database -> {
+            int deleted = database.delete(
+                "snapshots",
+                "execution_id = ? AND revision = ?",
+                new String[] { claim.getExecutionId(), Long.toString(claim.getRevision()) }
+            );
+            if (deleted != 1) return false;
+            database.execSQL(
+                "DELETE FROM snapshots WHERE execution_id IN (" +
+                "SELECT execution_id FROM sync_state WHERE status = 'blocked' AND queue_sequence < ?)",
+                new Object[] { claim.getQueueSequence() }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    public String earliestRetryAt() {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            try (
+                Cursor cursor = helper
+                    .getReadableDatabase()
+                    .rawQuery(
+                        "SELECT MIN(next_attempt_at) FROM sync_state WHERE status = 'retry_wait'",
+                        null
+                    )
+            ) {
+                return cursor.moveToFirst() && !cursor.isNull(0) ? cursor.getString(0) : null;
+            }
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public boolean hasSyncReason(String reason) {
+        requireText(reason, "reason");
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            return count(
+                helper.getReadableDatabase(),
+                "sync_state",
+                "reason = ?",
+                new String[] { reason }
+            ) > 0;
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public OfflineSyncState getSyncState(boolean syncing, boolean authenticationRequired) {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            SQLiteDatabase database = helper.getReadableDatabase();
+            int pendingCount = count(database, "sync_state", null, null);
+            boolean actionRequired = count(
+                database,
+                "sync_state",
+                "status = ?",
+                new String[] { "action_required" }
+            ) > 0;
+            String publicState;
+            if (authenticationRequired && pendingCount > 0) publicState = "authentication-required";
+            else if (syncing) publicState = "syncing";
+            else if (actionRequired) publicState = "action-required";
+            else if (pendingCount > 0) publicState = "pending";
+            else publicState = "idle";
+            return new OfflineSyncState(readStateRevision(database), publicState, pendingCount, actionRequired);
+        } finally {
+            mutationLock.unlock();
+        }
     }
 
     public OfflineFileMetadata registerTemporaryFile(
@@ -941,7 +1219,7 @@ public final class OfflineStorageService {
                 exists(database, "account_state"),
                 exists(database, "prepared_plan"),
                 exists(database, "active_session"),
-                count(database, "sync_state", "status = ?", new String[] { "pending" }),
+                count(database, "sync_state", null, null),
                 count(database, "offline_files", "status = ?", new String[] { "temporary" }),
                 count(database, "offline_files", "status = ?", new String[] { "ready" })
             );
@@ -956,6 +1234,20 @@ public final class OfflineStorageService {
                 Log.e(
                     LOG_TAG,
                     "category=listener-failed exception=" + error.getClass().getSimpleName()
+                );
+            }
+        }
+    }
+
+    private void notifySnapshotPending() {
+        for (SnapshotListener listener : snapshotListeners) {
+            try {
+                listener.onSnapshotPending();
+            } catch (RuntimeException error) {
+                Log.e(
+                    LOG_TAG,
+                    "OfflineStorageService -> notifySnapshotPending -> listener failed: category=" +
+                    error.getClass().getSimpleName()
                 );
             }
         }
@@ -1060,6 +1352,98 @@ public final class OfflineStorageService {
             )
         ) {
             return cursor.moveToFirst() ? cursor.getLong(0) + 1 : 0;
+        }
+    }
+
+    private long queueSequence(SQLiteDatabase database, String executionId) {
+        try (
+            Cursor cursor = database.rawQuery(
+                "SELECT queue_sequence FROM sync_state WHERE execution_id = ?",
+                new String[] { executionId }
+            )
+        ) {
+            if (cursor.moveToFirst()) return cursor.getLong(0);
+        }
+        try (
+            Cursor cursor = database.rawQuery(
+                "SELECT next_queue_sequence FROM engine_metadata WHERE id = 1",
+                null
+            )
+        ) {
+            if (!cursor.moveToFirst()) throw new OfflineStorageException(
+                "OFFLINE_STORAGE_STATE_INVALID",
+                "Offline storage queue sequence is unavailable."
+            );
+            long result = cursor.getLong(0);
+            database.execSQL(
+                "UPDATE engine_metadata SET next_queue_sequence = next_queue_sequence + 1 WHERE id = 1"
+            );
+            return result;
+        }
+    }
+
+    private boolean updateClaimedSync(
+        String executionId,
+        long expectedRevision,
+        String status,
+        int attemptCount,
+        String nextAttemptAt,
+        String reason,
+        String actionDetailsJson,
+        String updatedAt
+    ) {
+        return mutate(database -> {
+            ContentValues values = new ContentValues();
+            values.put("status", status);
+            values.put("attempt_count", attemptCount);
+            if (nextAttemptAt == null) values.putNull("next_attempt_at");
+            else values.put("next_attempt_at", nextAttemptAt);
+            values.put("reason", reason);
+            if (actionDetailsJson == null) values.putNull("action_details_json");
+            else values.put("action_details_json", actionDetailsJson);
+            values.put("updated_at", updatedAt);
+            int updated = database.update(
+                "sync_state",
+                values,
+                "execution_id = ? AND snapshot_revision = ? AND status = 'in_flight'",
+                new String[] { executionId, Long.toString(expectedRevision) }
+            );
+            if (updated != 1) return false;
+            database.execSQL(
+                "UPDATE sync_state SET revision = revision + 1 WHERE execution_id = ?",
+                new Object[] { executionId }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    private static void requireSyncTransition(
+        String executionId,
+        long expectedRevision,
+        int attemptCount,
+        String reason,
+        String updatedAt
+    ) {
+        requireText(executionId, "executionId");
+        requireRevision(expectedRevision);
+        if (attemptCount < 0) throw invalidInput("attemptCount");
+        requireText(reason, "reason");
+        requireIsoInstant(updatedAt, "updatedAt");
+    }
+
+    private static long readStateRevision(SQLiteDatabase database) {
+        try (
+            Cursor cursor = database.rawQuery(
+                "SELECT state_revision FROM engine_metadata WHERE id = 1",
+                null
+            )
+        ) {
+            if (!cursor.moveToFirst()) throw new OfflineStorageException(
+                "OFFLINE_STORAGE_STATE_INVALID",
+                "Offline storage state is unavailable."
+            );
+            return cursor.getLong(0);
         }
     }
 

@@ -102,5 +102,11 @@ describe('Android workspace configuration', () => {
     expect(androidManifest).not.toContain('READ_EXTERNAL_STORAGE');
     expect(androidManifest).not.toContain('WRITE_EXTERNAL_STORAGE');
     expect(androidManifest).not.toContain('MANAGE_EXTERNAL_STORAGE');
+    expect(androidManifest).toContain(
+      'android.permission.ACCESS_NETWORK_STATE',
+    );
+    expect(androidManifest).not.toContain(
+      'android.permission.FOREGROUND_SERVICE',
+    );
   });
 });

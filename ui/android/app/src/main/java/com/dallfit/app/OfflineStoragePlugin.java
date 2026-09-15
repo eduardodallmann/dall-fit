@@ -6,6 +6,9 @@ import com.dallfit.app.offline.OfflineStorageException;
 import com.dallfit.app.offline.OfflineStorageProvider;
 import com.dallfit.app.offline.OfflineStorageService;
 import com.dallfit.app.offline.OfflineStorageState;
+import com.dallfit.app.offline.OfflineSyncConnectivity;
+import com.dallfit.app.offline.OfflineSyncEngine;
+import com.dallfit.app.offline.OfflineSyncState;
 import com.dallfit.app.offline.StoredAggregate;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -24,19 +27,29 @@ public final class OfflineStoragePlugin extends Plugin {
 
     private OfflineStorageService service;
     private OfflineMediaDownloader mediaDownloader;
+    private OfflineSyncConnectivity syncConnectivity;
+    private OfflineSyncEngine syncEngine;
     private final OfflineStorageService.StateListener stateListener = state ->
         execute(() -> notifyListeners("stateChanged", stateToJson(state)));
+    private final OfflineSyncEngine.StateListener syncStateListener = state ->
+        execute(() -> notifyListeners("syncStateChanged", syncStateToJson(state)));
 
     @Override
     public void load() {
         service = OfflineStorageProvider.get(getContext());
         mediaDownloader = new OfflineMediaDownloader(service);
+        syncEngine = OfflineStorageProvider.getSyncEngine(getContext());
+        syncConnectivity = new OfflineSyncConnectivity(getContext(), syncEngine);
         service.addStateListener(stateListener);
+        syncEngine.addStateListener(syncStateListener);
+        syncConnectivity.start();
     }
 
     @Override
     protected void handleOnDestroy() {
         if (service != null) service.removeStateListener(stateListener);
+        if (syncEngine != null) syncEngine.removeStateListener(syncStateListener);
+        if (syncConnectivity != null) syncConnectivity.stop();
     }
 
     @PluginMethod
@@ -47,6 +60,32 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void getState(PluginCall call) {
         resolve(call, () -> stateToJson(service.getState()));
+    }
+
+    @PluginMethod
+    public void getSyncState(PluginCall call) {
+        resolve(call, () -> syncStateToJson(syncEngine.getState()));
+    }
+
+    @PluginMethod
+    public void triggerSync(PluginCall call) {
+        resolve(call, () -> {
+            Boolean rearmTemporary = call.getBoolean("rearmTemporary", false);
+            syncEngine.trigger(
+                requiredString(call, "apiBaseUrl"),
+                requiredString(call, "accessToken"),
+                Boolean.TRUE.equals(rearmTemporary)
+            );
+            return syncStateToJson(syncEngine.getState());
+        });
+    }
+
+    @PluginMethod
+    public void clearSyncCredentials(PluginCall call) {
+        resolve(call, () -> {
+            syncEngine.stop();
+            return syncStateToJson(syncEngine.getState());
+        });
     }
 
     @PluginMethod
@@ -69,6 +108,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void clearAccountData(PluginCall call) {
         resolve(call, () -> {
+            syncEngine.stop();
             service.clearAccountDataAtomically();
             return new JSObject();
         });
@@ -339,6 +379,15 @@ public final class OfflineStoragePlugin extends Plugin {
         result.put("pendingSnapshotCount", state.getPendingSnapshotCount());
         result.put("temporaryFileCount", state.getTemporaryFileCount());
         result.put("readyFileCount", state.getReadyFileCount());
+        return result;
+    }
+
+    private static JSObject syncStateToJson(OfflineSyncState state) {
+        JSObject result = new JSObject();
+        result.put("revision", state.getRevision());
+        result.put("state", state.getState());
+        result.put("pendingCount", state.getPendingCount());
+        result.put("actionRequired", state.isActionRequired());
         return result;
     }
 
