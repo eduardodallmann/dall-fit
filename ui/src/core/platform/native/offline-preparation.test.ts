@@ -61,6 +61,7 @@ function preparationDependencies() {
       .fn()
       .mockResolvedValue('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
     registerLease: vi.fn().mockResolvedValue(lease),
+    takeoverLease: vi.fn().mockResolvedValue({ ...lease, state: 'taken-over' }),
   };
 }
 

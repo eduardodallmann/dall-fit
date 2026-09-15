@@ -45,7 +45,10 @@ snapshot essencial válido, o conteúdo da rota mostra um gate acessível nos es
 planos, sem bloquear o shell. Depois do commit essencial, mídia pendente ou
 incompleta não bloqueia a lista. Os estados completos são `no-plan`,
 `preparing-data`, `data-ready-media-in-progress`, `ready`,
-`ready-media-incomplete`, `expired` e `failed`. Um snapshot válido não é invalidado
+`ready-media-incomplete`, `expired`, `takeover-required` e `failed`. Takeover só é
+oferecido quando a instalação não possui sessão ou snapshot pendente; a confirmação
+chama `POST /training/offline-lease/takeover` e avisa que o outro aparelho deixará
+de sincronizar. Um snapshot válido não é invalidado
 nem tem a validade estendida por falha de atualização. A rota renderiza a projeção
 local válida mesmo sem rede enquanto uma atualização online ocorre em paralelo.
 Mídia ausente, temporária ou remota offline usa fallback acessível sem bloquear.
@@ -54,6 +57,25 @@ Uma sessão local ativa marca o workout como `Em andamento` e abre um
 `AlertDialog` não descartável. `Continuar treino` navega ao workout capturado;
 `Descartar treino` espera o commit atômico de `cancelled`, remoção da sessão e
 preservação do terminal na fila. Somente então outra execução fica livre.
+
+Depois de uma conclusão Android, a rota mostra um único card compacto da conclusão
+local mais recente. Enquanto o snapshot aguarda envio, o card diz `Aguardando
+sincronização` e contém somente workout, instante e contagem integral/parcial; não
+estima semana ou histórico. O resumo canônico da mesma execução substitui o card no
+lugar. Uma resposta de execução anterior não altera uma conclusão local posterior.
+
+A menor ação pendente da fila abre uma superfície não descartável. Conflito compara
+os envelopes completos local e servidor, permite escolher uma versão e exige uma
+segunda confirmação antes de reenfileirar com o token observado. Execução terminal
+imutável permite somente descartar a revisão local. Lease expirado ou revogado
+permite somente limpar sessão, snapshots, plano, arquivos e apresentação cercados
+pelo fence antigo; esses dados nunca participam de takeover posterior. Token de
+conflito obsoleto remove a escolha e reapresenta o conflito corrente.
+
+Após a primeira preparação essencial bem-sucedida, o Android explica e solicita
+uma única vez a permissão opcional de notificações. Negar não bloqueia treino nem
+sync. Com permissão, login ou conflito detectado sem o app visível produz uma única
+notificação genérica cujo toque abre o app e provoca nova leitura do SQLite.
 
 ## Integração
 

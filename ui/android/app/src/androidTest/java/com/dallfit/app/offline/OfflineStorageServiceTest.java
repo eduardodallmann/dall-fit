@@ -654,6 +654,101 @@ public final class OfflineStorageServiceTest {
         assertEquals(1, state.getPendingCount());
     }
 
+    @Test
+    public void promotesOnlyTheLatestCompletionWithTheMatchingQueueSequence() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.commitTrainingSession(
+            "session-a",
+            "execution-a",
+            "plan-a",
+            0,
+            "{\"session\":{\"version\":0}}",
+            "{\"executionId\":\"execution-a\",\"revision\":0}",
+            "2026-09-14T12:00:00Z"
+        );
+        service.commitTrainingTerminal(
+            "session-a",
+            0,
+            "execution-a",
+            "plan-a",
+            1,
+            "{\"executionId\":\"execution-a\",\"revision\":1}",
+            "{\"workoutName\":\"Treino A\"}",
+            "2026-09-14T12:01:00Z"
+        );
+        OfflineSyncClaim first = service.claimNextSync("2026-09-14T12:02:00Z");
+        service.commitTrainingSession(
+            "session-b",
+            "execution-b",
+            "plan-a",
+            0,
+            "{\"session\":{\"version\":0}}",
+            "{\"executionId\":\"execution-b\",\"revision\":0}",
+            "2026-09-14T12:03:00Z"
+        );
+        service.commitTrainingTerminal(
+            "session-b",
+            0,
+            "execution-b",
+            "plan-a",
+            1,
+            "{\"executionId\":\"execution-b\",\"revision\":1}",
+            "{\"workoutName\":\"Treino B\"}",
+            "2026-09-14T12:04:00Z"
+        );
+
+        assertTrue(service.completeSync(
+            first,
+            "{\"id\":\"execution-a\",\"workoutName\":\"Canônico A\"}",
+            "2026-09-14T12:05:00Z"
+        ));
+
+        String latest = service.getLatestCompletionJson();
+        assertTrue(latest.contains("execution-b"));
+        assertTrue(latest.contains("Treino B"));
+        assertTrue(latest.contains("pending"));
+        assertFalse(latest.contains("Canônico A"));
+    }
+
+    @Test
+    public void resolvesTheCanonicalConflictActionByReusingTheSnapshot() {
+        service.initialize();
+        service.bindAccount("person-a");
+        service.putSnapshot(
+            "execution-a",
+            "plan-a",
+            1,
+            3,
+            "{\"executionId\":\"execution-a\",\"revision\":3}",
+            "2026-09-14T12:00:00Z"
+        );
+        OfflineSyncClaim claim = service.claimNextSync("2026-09-14T12:01:00Z");
+        assertTrue(service.markSyncActionRequired(
+            claim.getExecutionId(),
+            claim.getRevision(),
+            "conflict",
+            "{\"allowedResolution\":\"local-or-server\",\"conflictToken\":\"token-a\"}",
+            "2026-09-14T12:02:00Z"
+        ));
+        OfflineSyncAction action = service.getNextSyncAction();
+        assertNotNull(action);
+        assertEquals("conflict", action.getReason());
+
+        assertTrue(service.resolveSyncConflict(
+            action.getExecutionId(),
+            action.getRevision(),
+            "server",
+            "token-a",
+            "2026-09-14T12:03:00Z"
+        ));
+
+        assertNull(service.getNextSyncAction());
+        OfflineSyncClaim resolved = service.claimNextSync("2026-09-14T12:04:00Z");
+        assertTrue(resolved.getPayloadJson().contains("\"choice\":\"server\""));
+        assertTrue(resolved.getPayloadJson().contains("\"conflictToken\":\"token-a\""));
+    }
+
     private static void await(CountDownLatch latch) {
         try {
             latch.await();

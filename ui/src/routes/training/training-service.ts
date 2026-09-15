@@ -259,3 +259,14 @@ export async function registerOfflineTrainingLease(
   );
   return response.data.data;
 }
+
+export async function takeoverOfflineTrainingLease(
+  installationId: string,
+): Promise<OfflineTrainingLeaseResponse['data']> {
+  const input: RegisterOfflineTrainingLeaseRequest = { installationId };
+  const response = await apiClient.post<OfflineTrainingLeaseResponse>(
+    '/training/offline-lease/takeover',
+    input,
+  );
+  return response.data.data;
+}

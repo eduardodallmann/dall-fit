@@ -98,8 +98,10 @@ No Android, a mesma UI consome `TrainingRepository`, mas cada ação vira uma
 transação curta de sessão + `PutOfflineTrainingSnapshotV1Request`. O commit local
 antecede cache, toast, foco e navegação; falha preserva a última revisão confirmada.
 Cada ação incrementa uma revisão, coalesce o snapshot da execução sem mudar sua
-ordem e nunca aguarda rede. Finalizar grava `completed` e remove a sessão no mesmo
-commit, então volta com replace para `/training`, sem abrir ou inventar resumo.
+ordem e nunca aguarda rede. Finalizar grava `completed`, remove a sessão e persiste
+a projeção compacta da conclusão no mesmo commit, então volta com replace para
+`/training`, sem abrir o resumo semanal. A lista distingue essa projeção do
+histórico canônico até a sincronização.
 Descartar grava `cancelled` da mesma forma. Expiração posterior ao início ou Bearer
 ausente não interrompem a sessão; apenas um novo início exige plano e lease válidos.
 

@@ -5,6 +5,8 @@ import type {
   TrainingWorkoutPreview,
 } from '@dall-fit/types';
 
+import { getApiErrorCode } from '~/core/http/http-error';
+
 import type {
   OfflineStoragePlugin,
   OfflineStoredAggregate,
@@ -17,6 +19,7 @@ export type OfflinePreparationStatus =
   | 'ready'
   | 'ready-media-incomplete'
   | 'expired'
+  | 'takeover-required'
   | 'failed';
 
 export interface OfflinePreparationSnapshot {
@@ -59,6 +62,9 @@ interface OfflinePreparationDependencies {
   registerLease: (
     installationId: string,
   ) => Promise<OfflineTrainingLeaseResponse['data']>;
+  takeoverLease: (
+    installationId: string,
+  ) => Promise<OfflineTrainingLeaseResponse['data']>;
 }
 
 const payloadVersion = 2;
@@ -91,6 +97,17 @@ export class OfflinePreparationCoordinator {
 
   retry(): Promise<void> {
     return this.prepare(false);
+  }
+
+  async takeover(): Promise<void> {
+    const state = await this.dependencies.plugin.getState();
+    if (state.sessionAvailable || state.pendingSnapshotCount > 0) {
+      this.publish('failed', true);
+      return;
+    }
+    const installationId = await this.dependencies.getInstallationId();
+    await this.dependencies.takeoverLease(installationId);
+    await this.prepare(false);
   }
 
   async replaceActivePlan(): Promise<void> {
@@ -143,65 +160,79 @@ export class OfflinePreparationCoordinator {
     else this.publish(current === undefined ? 'preparing-data' : 'expired');
 
     try {
-      const overview = await this.dependencies.getOverview();
-      if (
-        overview.offlinePreparation === null ||
-        overview.offlineValidity === null
-      ) {
-        await this.clearPreparedPlan();
-        this.publish('no-plan');
+      await this.refreshPreparedData(current, generation);
+    } catch (error) {
+      await this.handlePreparationFailure(error, generation, validStatus);
+    }
+  }
+
+  private async handlePreparationFailure(
+    error: unknown,
+    generation: number,
+    validStatus: 'ready' | 'ready-media-incomplete' | null,
+  ): Promise<void> {
+    if (generation !== this.generation) return;
+    if (getApiErrorCode(error) === 'OFFLINE_LEASE_TAKEOVER_REQUIRED') {
+      const state = await this.dependencies.plugin.getState();
+      if (!state.sessionAvailable && state.pendingSnapshotCount === 0) {
+        this.publish('takeover-required');
         return;
       }
-      const previews = await mapWithConcurrency(
-        overview.offlinePreparation.workoutIds,
-        maxConcurrency,
-        (workoutId) => this.dependencies.getPreview(workoutId),
-      );
-      const installationId = await this.dependencies.getInstallationId();
-      const lease = await this.dependencies.registerLease(installationId);
-      if (lease.planId !== overview.offlinePreparation.plan.id)
-        throw new Error('Offline lease does not match the prepared plan.');
-      const { media, payload } = this.buildPayload(
-        overview,
-        overview.offlinePreparation.plan,
-        previews,
-        { ...lease, installationId },
-      );
-      this.assertGeneration(generation);
-      const revision = Math.max(Date.now(), (current?.revision ?? -1) + 1);
-      await this.dependencies.plugin.putPreparedPlan({
-        ...(current === undefined
-          ? {}
-          : {
-              expectedPlanId: current.planId,
-              expectedRevision: current.revision,
-            }),
-        expiresAt: overview.offlineValidity.expiresAt,
-        payload,
-        payloadVersion,
-        planId: overview.offlinePreparation.plan.id,
-        revision,
-        validatedAt: overview.offlineValidity.validatedAt,
-      });
-      this.assertGeneration(generation);
-      await this.removeStaleFiles(current, media);
-      this.publish(
-        media.length === 0 ? 'ready' : 'data-ready-media-in-progress',
-      );
-      const results = await mapWithConcurrency(media, maxConcurrency, (job) =>
-        this.downloadIfNeeded(
-          job,
-          overview.offlinePreparation!.plan.id,
-          revision,
-          generation,
-        ),
-      );
-      this.assertGeneration(generation);
-      this.publish(results.every(Boolean) ? 'ready' : 'ready-media-incomplete');
-    } catch {
-      if (generation === this.generation)
-        this.publish(validStatus ?? 'failed', true);
     }
+    this.publish(validStatus ?? 'failed', true);
+  }
+
+  private async refreshPreparedData(
+    current: OfflineStoredAggregate | undefined,
+    generation: number,
+  ): Promise<void> {
+    const overview = await this.dependencies.getOverview();
+    const preparation = overview.offlinePreparation;
+    const validity = overview.offlineValidity;
+    if (preparation === null || validity === null) {
+      await this.clearPreparedPlan();
+      this.publish('no-plan');
+      return;
+    }
+    const previews = await mapWithConcurrency(
+      preparation.workoutIds,
+      maxConcurrency,
+      (workoutId) => this.dependencies.getPreview(workoutId),
+    );
+    const installationId = await this.dependencies.getInstallationId();
+    const lease = await this.dependencies.registerLease(installationId);
+    if (lease.planId !== preparation.plan.id)
+      throw new Error('Offline lease does not match the prepared plan.');
+    const { media, payload } = this.buildPayload(
+      overview,
+      preparation.plan,
+      previews,
+      { ...lease, installationId },
+    );
+    this.assertGeneration(generation);
+    const revision = Math.max(Date.now(), (current?.revision ?? -1) + 1);
+    await this.dependencies.plugin.putPreparedPlan({
+      ...(current === undefined
+        ? {}
+        : {
+            expectedPlanId: current.planId,
+            expectedRevision: current.revision,
+          }),
+      expiresAt: validity.expiresAt,
+      payload,
+      payloadVersion,
+      planId: preparation.plan.id,
+      revision,
+      validatedAt: validity.validatedAt,
+    });
+    this.assertGeneration(generation);
+    await this.removeStaleFiles(current, media);
+    this.publish(media.length === 0 ? 'ready' : 'data-ready-media-in-progress');
+    const results = await mapWithConcurrency(media, maxConcurrency, (job) =>
+      this.downloadIfNeeded(job, preparation.plan.id, revision, generation),
+    );
+    this.assertGeneration(generation);
+    this.publish(results.every(Boolean) ? 'ready' : 'ready-media-incomplete');
   }
 
   private buildPayload(

@@ -36,6 +36,8 @@ pública. Cookie Web e CSRF não participam desse canal.
 - título `Entre para continuar`;
 - descrição curta de que a conta Google será usada;
 - botão `Entrar com Google`;
+- no Android, alerta genérico `Há dados aguardando envio` quando a fila exige nova
+  autenticação, sem conteúdo de treino, pessoa ou identificador;
 - alerta `Não foi possível entrar. Tente novamente.` após erro de callback;
 - aviso global somente se a ativação automática de uma nova versão falhar, com
   título `Não foi possível atualizar`, ações `Tentar novamente` e `Continuar` e
@@ -113,6 +115,15 @@ Resultado esperado: a API inicia o fluxo OAuth.
   `Não foi possível entrar. Tente novamente.`, sem token ou detalhe técnico.
 - Ativações concorrentes ficam bloqueadas pelo estado pending; não existe prompt
   automático no mount, retorno de background ou probe.
+
+### Alternativa 7 — fila Android exige autenticação
+
+- Condição: o sincronizador recebe `401` ou ausência de sessão enquanto conserva
+  snapshots locais.
+- Comportamento: a sessão expira, a raiz informa apenas que existem dados
+  aguardando envio e o login continua dependente do gesto `Entrar com Google`.
+- Resultado: a mesma pessoa rearma a fila pelo listener de credenciais; outra conta
+  segue a limpeza atômica já definida antes de expor seu conteúdo.
 
 ## Validações
 

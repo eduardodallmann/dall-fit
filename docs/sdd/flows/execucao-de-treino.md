@@ -25,7 +25,7 @@ por pessoa.
 |     3 | executar ou retomar | `/training/workout/:workoutId`             | `GET /training/session` e mutações de série, timer e exercício |
 |     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
-|     — | autorizar edição offline | preparação Android | `PUT /training/offline-lease`; takeover permanece na evolução seguinte |
+|     — | autorizar edição offline | preparação Android | `PUT /training/offline-lease` ou `POST /training/offline-lease/takeover` após confirmação |
 |     — | sincronizar, concluir ou cancelar offline | sincronizador Android em foreground ou WorkManager | `PUT /training/offline-snapshot` |
 
 ## Sequência e decisões
@@ -34,8 +34,10 @@ por pessoa.
    emitida pela API e já pode renderizar overview e previews locais enquanto
    atualiza online. A preparação registra silenciosamente o lease da instalação,
    persiste o fence com o payload v2 e confirma o snapshot essencial antes dos
-   downloads display; mídia incompleta nunca bloqueia. Takeover continua explícito
-   e pertence à evolução seguinte. Web/PWA permanecem exclusivamente online.
+   downloads display; mídia incompleta nunca bloqueia. Em instalação sem sessão ou
+   snapshot local, takeover explícito pode transferir o editor; dados de lease
+   revogado ou expirado precisam ser descartados antes e nunca atravessam a nova
+   concessão. Web/PWA permanecem exclusivamente online.
    O backend mantém lease Redis exclusivo e ingestão idempotente de snapshots v1.
    Uma revisão nova aceita renova atomicamente lease e snapshot por sete dias;
    replay não renova. Conflitos devolvem a versão segura do servidor. O
@@ -65,12 +67,19 @@ por pessoa.
    incompleto requer confirmação explícita para finalizar.
 7. A finalização Web grava execução e perfis no MongoDB, remove o snapshot Redis e
    navega para o resumo semanal compartilhável. A finalização Android grava
-   `completed`, remove a sessão no mesmo commit e volta para `/training`, sem resumo
-   provisório nesta etapa.
+   `completed`, remove a sessão e grava uma apresentação compacta provisória no
+   mesmo commit, então volta para `/training` sem abrir a tela semanal.
 8. Na sincronização offline, `completed` consolida a árvore capturada e devolve o mesmo
    resumo semanal; `cancelled` descarta a execução sem histórico. Ambos gravam um
    recibo imutável antes da limpeza condicionada do snapshot. Replay terminal
    continua idempotente mesmo após lease ou Redis expirarem.
+9. O sucesso canônico promove somente o card da mesma execução e sequência; resposta
+   antiga não substitui conclusão posterior. Conflito pausa apenas seu item, compara
+   versões completas e reenfileira escolha integral confirmada. Token obsoleto
+   reabre a comparação atual. Imutabilidade e lease inválido oferecem apenas
+   descarte confirmado. Autenticação preserva dados e exige login explícito da mesma
+   pessoa. Sem o app visível, somente autenticação ou conflito podem emitir uma
+   notificação Android genérica e deduplicada, se a permissão opcional foi aceita.
 
 ## Dados compartilhados
 

@@ -12,6 +12,7 @@ import {
   getTrainingOverview,
   getTrainingWorkoutPreview,
   registerOfflineTrainingLease,
+  takeoverOfflineTrainingLease,
 } from '~/routes/training/training-service';
 
 export interface NativeComposition {
@@ -41,6 +42,7 @@ export async function createNativeComposition(): Promise<NativeComposition> {
       getTrainingWorkoutPreview(workoutId, 'active-plan'),
     plugin: offlineStoragePlugin,
     registerLease: registerOfflineTrainingLease,
+    takeoverLease: takeoverOfflineTrainingLease,
   });
   const offlineSync = new OfflineSyncCoordinator(coordinator);
   await offlineSync.initialize();

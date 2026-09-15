@@ -36,6 +36,10 @@ public final class OfflineSyncTransportResult {
         return new OfflineSyncTransportResult(Kind.ACTION_REQUIRED, reason, detailsJson, null);
     }
 
+    public static OfflineSyncTransportResult success(String completionJson) {
+        return new OfflineSyncTransportResult(Kind.SUCCESS, "accepted", completionJson, null);
+    }
+
     public static OfflineSyncTransportResult temporary(String reason, String retryAfter) {
         return new OfflineSyncTransportResult(Kind.TEMPORARY, reason, null, retryAfter);
     }

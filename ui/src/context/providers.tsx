@@ -9,6 +9,8 @@ import { queryClient } from '~/context/query-client';
 import { PwaUpdateNotice } from '~/core/components/pwa-update-notice';
 import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import { OfflinePreparationContext } from '~/core/platform/native/offline-preparation-context';
+import type { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
+import { OfflineSyncContext } from '~/core/platform/native/offline-sync-context';
 import {
   PlatformContext,
   type PlatformSnapshot,
@@ -30,6 +32,7 @@ interface AppProvidersProps extends PropsWithChildren {
   initialTheme?: ThemeState;
   nativeSession?: NativeSessionCoordinator | null;
   offlinePreparation?: OfflinePreparationCoordinator | null;
+  offlineSync?: OfflineSyncCoordinator | null;
   platform?: PlatformSnapshot;
   trainingRepository?: TrainingRepository | null;
 }
@@ -39,6 +42,7 @@ export function AppProviders({
   initialTheme = getPublicThemeState(),
   nativeSession = null,
   offlinePreparation = null,
+  offlineSync = null,
   platform = resolveApplicationPlatform(),
   trainingRepository = null,
 }: Readonly<AppProvidersProps>) {
@@ -46,19 +50,21 @@ export function AppProviders({
     <PlatformContext value={platform}>
       <NativeSessionContext value={nativeSession}>
         <OfflinePreparationContext value={offlinePreparation}>
-          <TrainingRepositoryContext value={trainingRepository}>
-            <QueryClientProvider client={queryClient}>
-              <ThemeProvider initialTheme={initialTheme}>
-                <ReloadSafetyProvider>
-                  <PwaProvider>
-                    {children}
-                    <PwaUpdateNotice />
-                    <Toast.Provider placement="bottom end" />
-                  </PwaProvider>
-                </ReloadSafetyProvider>
-              </ThemeProvider>
-            </QueryClientProvider>
-          </TrainingRepositoryContext>
+          <OfflineSyncContext value={offlineSync}>
+            <TrainingRepositoryContext value={trainingRepository}>
+              <QueryClientProvider client={queryClient}>
+                <ThemeProvider initialTheme={initialTheme}>
+                  <ReloadSafetyProvider>
+                    <PwaProvider>
+                      {children}
+                      <PwaUpdateNotice />
+                      <Toast.Provider placement="bottom end" />
+                    </PwaProvider>
+                  </ReloadSafetyProvider>
+                </ThemeProvider>
+              </QueryClientProvider>
+            </TrainingRepositoryContext>
+          </OfflineSyncContext>
         </OfflinePreparationContext>
       </NativeSessionContext>
     </PlatformContext>

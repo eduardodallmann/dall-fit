@@ -124,6 +124,29 @@ function replaceExercise(
 }
 
 export const trainingHandlers = [
+  http.post(
+    `${apiBaseUrl}/training/offline-lease/takeover`,
+    async ({ request }) => {
+      const body = (await request.json()) as { installationId?: unknown };
+      if (typeof body.installationId !== 'string')
+        return error(
+          'VALIDATION_ERROR',
+          'Installation identifier is invalid.',
+          400,
+        );
+      return HttpResponse.json(
+        {
+          data: {
+            expiresAt: '2030-01-08T00:00:00.000Z',
+            leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            planId: '64b000000000000000000001',
+            state: 'taken-over',
+          },
+        },
+        createMockResponseInit(),
+      );
+    },
+  ),
   http.put(`${apiBaseUrl}/training/offline-lease`, async ({ request }) => {
     const body = (await request.json()) as { installationId?: unknown };
     if (

@@ -16,6 +16,12 @@ import type { TrainingOverview, TrainingWorkoutCard } from '@dall-fit/types';
 
 import { trackTrainingAction } from '~/core/analytics';
 import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
+import type {
+  OfflineCompletionPresentation,
+  OfflineSyncAction,
+} from '~/core/platform/native/offline-storage-plugin';
+import type { OfflineSyncSnapshot } from '~/core/platform/native/offline-sync';
+import { useOfflineSync } from '~/core/platform/native/offline-sync-context';
 import { bodyAreaLabels } from '~/routes/training-plan/exercise-presentation';
 import { createHttpTrainingRepository } from '~/routes/training/http-training-repository';
 import { trainingStyles } from '~/routes/training/styles';
@@ -42,6 +48,7 @@ export function TrainingOverviewPage({
   );
   const refetch = query.refetch;
   const offlinePreparation = useOfflinePreparation();
+  const offlineSync = useOfflineSync();
 
   useEffect(() => {
     void offlinePreparation?.enter().finally(() => void refetch());
@@ -52,6 +59,7 @@ export function TrainingOverviewPage({
       <NativeTrainingOverview
         mockTraining={mockTraining}
         offlinePreparation={offlinePreparation}
+        offlineSync={offlineSync}
         query={query}
         repository={repository}
       />
@@ -63,11 +71,13 @@ export function TrainingOverviewPage({
 function NativeTrainingOverview({
   mockTraining,
   offlinePreparation,
+  offlineSync,
   query,
   repository,
 }: Readonly<{
   mockTraining: MockTrainingScenario;
   offlinePreparation: NonNullable<ReturnType<typeof useOfflinePreparation>>;
+  offlineSync: ReturnType<typeof useOfflineSync>;
   query: UseQueryResult<TrainingOverview, Error>;
   repository: NonNullable<ReturnType<typeof useNativeTrainingRepository>>;
 }>) {
@@ -78,52 +88,59 @@ function NativeTrainingOverview({
   );
   const [retrying, setRetrying] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const syncSnapshot = useSyncExternalStore(
+    offlineSync?.subscribe ?? emptySubscribe,
+    offlineSync?.getSnapshot ?? emptySyncSnapshot,
+  );
   const activeWorkout = query.data?.workouts.find(
     (workout) => workout.indicator === 'in-progress',
   );
   const blocked =
-    snapshot.status === 'preparing-data' ||
-    snapshot.status === 'expired' ||
-    snapshot.status === 'failed';
-  let heading = 'Não foi possível preparar seus treinos';
-  if (snapshot.status === 'preparing-data') heading = 'Preparando seus treinos';
-  if (snapshot.status === 'expired') heading = 'Seus treinos offline expiraram';
+    syncSnapshot.action === undefined &&
+    (snapshot.status === 'preparing-data' ||
+      snapshot.status === 'takeover-required' ||
+      snapshot.status === 'expired' ||
+      snapshot.status === 'failed');
   if (blocked)
     return (
-      <main className={styles.page()}>
-        <Alert status={snapshot.status === 'failed' ? 'danger' : 'default'}>
-          <Alert.Title>{heading}</Alert.Title>
-          <Alert.Description>
-            {snapshot.status === 'preparing-data'
-              ? 'Aguarde enquanto os dados essenciais são salvos neste aparelho.'
-              : 'Conecte-se à internet para preparar os dados essenciais deste aparelho.'}
-          </Alert.Description>
-        </Alert>
-        <div aria-live="polite" className={styles.pageActions()} role="status">
-          {snapshot.status === 'preparing-data'
-            ? 'Preparação em andamento.'
-            : null}
-        </div>
-        {snapshot.status !== 'preparing-data' ? (
-          <Button
-            isDisabled={retrying}
-            isPending={retrying}
-            onPress={() => {
-              setRetrying(true);
-              void offlinePreparation.retry().finally(() => setRetrying(false));
-            }}
-          >
-            Tentar novamente
-          </Button>
-        ) : null}
-        <Link className={styles.backLink()} to="/training-plan">
-          Ir para Meus planos
-        </Link>
-      </main>
+      <NativePreparationGate
+        coordinator={offlinePreparation}
+        isPending={retrying}
+        onPendingChange={setRetrying}
+        status={snapshot.status}
+      />
     );
   return (
     <>
-      <OnlineTrainingOverview mockTraining={mockTraining} query={query} />
+      <OnlineTrainingOverview
+        completion={syncSnapshot.completion}
+        mockTraining={mockTraining}
+        query={query}
+      />
+      {offlineSync === null ? null : (
+        <>
+          <NativeRecoveryDialog
+            action={syncSnapshot.action}
+            key={`${syncSnapshot.action?.executionId ?? 'none'}:${syncSnapshot.action?.revision ?? 0}`}
+            onDiscard={(action) => offlineSync.discard(action)}
+            onResolve={(action, choice, token) =>
+              offlineSync.resolveConflict(action, choice, token)
+            }
+          />
+          <NotificationPermissionDialog
+            isOpen={
+              syncSnapshot.action === undefined &&
+              syncSnapshot.notificationPrompt === true &&
+              (snapshot.status === 'ready' ||
+                snapshot.status === 'data-ready-media-in-progress' ||
+                snapshot.status === 'ready-media-incomplete')
+            }
+            onFinish={(requestPermission) =>
+              offlineSync.finishNotificationPrompt(requestPermission)
+            }
+          />
+        </>
+      )}
       <AlertDialog isOpen={activeWorkout !== undefined}>
         <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
           <AlertDialog.Container>
@@ -173,9 +190,11 @@ function NativeTrainingOverview({
 }
 
 function OnlineTrainingOverview({
+  completion,
   mockTraining,
   query,
 }: Readonly<{
+  completion?: OfflineCompletionPresentation;
   mockTraining: MockTrainingScenario;
   query: UseQueryResult<TrainingOverview, Error>;
 }>) {
@@ -235,6 +254,9 @@ function OnlineTrainingOverview({
 
   return (
     <main className={styles.page()}>
+      {completion === undefined ? null : (
+        <LatestCompletionCard completion={completion} />
+      )}
       <header className={styles.header()}>
         <h1 className={styles.title()}>{query.data.plan.name}</h1>
         <p className={styles.subtitle()}>Selecione o treino</p>
@@ -269,6 +291,355 @@ function OnlineTrainingOverview({
     </main>
   );
 }
+
+function LatestCompletionCard({
+  completion,
+}: Readonly<{ completion: OfflineCompletionPresentation }>) {
+  const value = completion.presentation;
+  return (
+    <Card className={styles.provisionalCard()}>
+      <div className={styles.provisionalHeader()}>
+        <div>
+          <p className={styles.exerciseMeta()}>Último treino concluído</p>
+          <h2 className={styles.cardTitle()}>{value.workoutName}</h2>
+        </div>
+        <Chip color={completion.status === 'pending' ? 'warning' : 'success'}>
+          {completion.status === 'pending'
+            ? 'Aguardando sincronização'
+            : 'Sincronizado'}
+        </Chip>
+      </div>
+      <p className={styles.exerciseMeta()}>
+        {value.completedExerciseCount} de {value.totalExerciseCount} exercícios
+        concluídos ·{' '}
+        {value.fullCompletion ? 'Treino completo' : 'Treino parcial'}
+      </p>
+      <time className={styles.exerciseMeta()} dateTime={value.completedAt}>
+        Concluído em {new Date(value.completedAt).toLocaleString('pt-BR')}
+      </time>
+    </Card>
+  );
+}
+
+function NativePreparationGate({
+  coordinator,
+  isPending,
+  onPendingChange,
+  status,
+}: Readonly<{
+  coordinator: NonNullable<ReturnType<typeof useOfflinePreparation>>;
+  isPending: boolean;
+  onPendingChange: (pending: boolean) => void;
+  status: ReturnType<
+    NonNullable<ReturnType<typeof useOfflinePreparation>>['getSnapshot']
+  >['status'];
+}>) {
+  const [takeoverOpen, setTakeoverOpen] = useState(false);
+  const preparing = status === 'preparing-data';
+  const takeover = status === 'takeover-required';
+  let heading = 'Não foi possível preparar seus treinos';
+  let description =
+    'Conecte-se à internet para preparar os dados essenciais deste aparelho.';
+  if (preparing) {
+    heading = 'Preparando seus treinos';
+    description =
+      'Aguarde enquanto os dados essenciais são salvos neste aparelho.';
+  }
+  if (status === 'expired') heading = 'Seus treinos offline expiraram';
+  if (takeover) {
+    heading = 'Outro aparelho está com os treinos offline';
+    description =
+      'Você pode tornar este aparelho o único editor offline. O outro aparelho deixará de sincronizar.';
+  }
+  const retry = () => {
+    onPendingChange(true);
+    void coordinator.retry().finally(() => onPendingChange(false));
+  };
+  const confirmTakeover = () => {
+    onPendingChange(true);
+    void coordinator.takeover().finally(() => {
+      onPendingChange(false);
+      setTakeoverOpen(false);
+    });
+  };
+  return (
+    <main className={styles.page()}>
+      <Alert status={status === 'failed' ? 'danger' : 'default'}>
+        <Alert.Title>{heading}</Alert.Title>
+        <Alert.Description>{description}</Alert.Description>
+      </Alert>
+      <div aria-live="polite" className={styles.pageActions()} role="status">
+        {preparing ? 'Preparação em andamento.' : null}
+      </div>
+      {takeover ? (
+        <Button onPress={() => setTakeoverOpen(true)} variant="primary">
+          Usar este aparelho
+        </Button>
+      ) : null}
+      {!takeover && !preparing ? (
+        <Button isDisabled={isPending} isPending={isPending} onPress={retry}>
+          Tentar novamente
+        </Button>
+      ) : null}
+      <Link className={styles.backLink()} to="/training-plan">
+        Ir para Meus planos
+      </Link>
+      <AlertDialog isOpen={takeoverOpen} onOpenChange={setTakeoverOpen}>
+        <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  Transferir o acesso offline?
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                Este aparelho passará a ser o único editor offline. O outro não
+                poderá mais enviar alterações locais.
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button
+                  onPress={() => setTakeoverOpen(false)}
+                  variant="secondary"
+                >
+                  Manter outro aparelho
+                </Button>
+                <Button
+                  isPending={isPending}
+                  onPress={confirmTakeover}
+                  variant="danger"
+                >
+                  Confirmar transferência
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+    </main>
+  );
+}
+
+function NativeRecoveryDialog({
+  action,
+  onDiscard,
+  onResolve,
+}: Readonly<{
+  action?: OfflineSyncAction;
+  onDiscard: (action: OfflineSyncAction) => Promise<boolean>;
+  onResolve: (
+    action: OfflineSyncAction,
+    choice: 'local' | 'server',
+    token: string,
+  ) => Promise<boolean>;
+}>) {
+  if (action === undefined) return null;
+  const conflictDetails =
+    action.reason === 'conflict' &&
+    action.details?.allowedResolution === 'local-or-server'
+      ? action.details
+      : undefined;
+  if (conflictDetails !== undefined)
+    return (
+      <ConflictRecoveryDialog
+        action={action}
+        conflictDetails={conflictDetails}
+        onResolve={onResolve}
+      />
+    );
+  return <DiscardRecoveryDialog action={action} onDiscard={onDiscard} />;
+}
+
+function ConflictRecoveryDialog({
+  action,
+  conflictDetails,
+  onResolve,
+}: Readonly<{
+  action: OfflineSyncAction;
+  conflictDetails: Extract<
+    NonNullable<OfflineSyncAction['details']>,
+    { allowedResolution: 'local-or-server' }
+  >;
+  onResolve: (
+    action: OfflineSyncAction,
+    choice: 'local' | 'server',
+    token: string,
+  ) => Promise<boolean>;
+}>) {
+  const [choice, setChoice] = useState<'local' | 'server' | null>(null);
+  const [pending, setPending] = useState(false);
+  if (choice === null)
+    return (
+      <AlertDialog isOpen>
+        <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Heading>
+                  Escolha qual versão manter
+                </AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                <div className={styles.comparisonGrid()}>
+                  <section aria-label="Dados deste aparelho">
+                    <h3>Dados deste aparelho</h3>
+                    <pre className={styles.comparisonPanel()}>
+                      {JSON.stringify(action.local, null, 2)}
+                    </pre>
+                  </section>
+                  <section aria-label="Dados do servidor">
+                    <h3>Dados do servidor</h3>
+                    <pre className={styles.comparisonPanel()}>
+                      {JSON.stringify(conflictDetails.serverVersion, null, 2)}
+                    </pre>
+                  </section>
+                </div>
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button onPress={() => setChoice('local')} variant="primary">
+                  Usar dados deste aparelho
+                </Button>
+                <Button onPress={() => setChoice('server')} variant="secondary">
+                  Usar dados do servidor
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      </AlertDialog>
+    );
+  const discardedVersion =
+    choice === 'local' ? 'do servidor' : 'deste aparelho';
+  const confirm = () => {
+    setPending(true);
+    void onResolve(action, choice, conflictDetails.conflictToken).finally(() =>
+      setPending(false),
+    );
+  };
+  return (
+    <AlertDialog isOpen>
+      <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+        <AlertDialog.Container>
+          <AlertDialog.Dialog>
+            <AlertDialog.Header>
+              <AlertDialog.Heading>Confirmar substituição?</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>
+              A versão {discardedVersion} será descartada por inteiro. Esta ação
+              não pode ser desfeita.
+            </AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button
+                isDisabled={pending}
+                onPress={() => setChoice(null)}
+                variant="secondary"
+              >
+                Voltar à comparação
+              </Button>
+              <Button isPending={pending} onPress={confirm} variant="danger">
+                Confirmar escolha
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
+  );
+}
+
+function DiscardRecoveryDialog({
+  action,
+  onDiscard,
+}: Readonly<{
+  action: OfflineSyncAction;
+  onDiscard: (action: OfflineSyncAction) => Promise<boolean>;
+}>) {
+  const [pending, setPending] = useState(false);
+  let title = 'A execução já foi encerrada no servidor';
+  if (action.reason === 'lease-revoked')
+    title = 'Este aparelho perdeu o acesso offline';
+  if (action.reason === 'lease-expired') title = 'Os dados offline expiraram';
+  const discard = () => {
+    setPending(true);
+    void onDiscard(action).finally(() => setPending(false));
+  };
+  return (
+    <AlertDialog isOpen>
+      <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+        <AlertDialog.Container>
+          <AlertDialog.Dialog>
+            <AlertDialog.Header>
+              <AlertDialog.Heading>{title}</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>
+              Os dados locais vinculados a esta execução não podem ser enviados.
+              Confirme o descarte para continuar.
+            </AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button isPending={pending} onPress={discard} variant="danger">
+                Descartar dados deste aparelho
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
+  );
+}
+
+function NotificationPermissionDialog({
+  isOpen,
+  onFinish,
+}: Readonly<{
+  isOpen: boolean;
+  onFinish: (requestPermission: boolean) => Promise<void>;
+}>) {
+  const [pending, setPending] = useState(false);
+  const finish = (requestPermission: boolean) => {
+    setPending(true);
+    void onFinish(requestPermission).finally(() => setPending(false));
+  };
+  return (
+    <AlertDialog isOpen={isOpen}>
+      <AlertDialog.Backdrop isDismissable={false} isKeyboardDismissDisabled>
+        <AlertDialog.Container>
+          <AlertDialog.Dialog>
+            <AlertDialog.Header>
+              <AlertDialog.Heading>
+                Avisar quando você precisar agir?
+              </AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>
+              O Dall Fit pode enviar um aviso discreto quando for necessário
+              entrar novamente ou resolver um conflito. Negar não desativa seus
+              treinos.
+            </AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button
+                isDisabled={pending}
+                onPress={() => finish(false)}
+                variant="secondary"
+              >
+                Agora não
+              </Button>
+              <Button
+                isPending={pending}
+                onPress={() => finish(true)}
+                variant="primary"
+              >
+                Permitir avisos
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
+  );
+}
+
+const emptySubscribe = () => () => undefined;
+const emptySnapshot: OfflineSyncSnapshot = {};
+const emptySyncSnapshot = () => emptySnapshot;
 
 function WorkoutCard({ workout }: Readonly<{ workout: TrainingWorkoutCard }>) {
   return (

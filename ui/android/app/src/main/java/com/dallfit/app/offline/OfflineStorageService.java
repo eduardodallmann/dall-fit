@@ -57,6 +57,10 @@ public final class OfflineStorageService {
         this(context, OfflineStorageDatabase.DATABASE_NAME, OFFLINE_DIRECTORY, ignored -> {});
     }
 
+    Context getContext() {
+        return context;
+    }
+
     OfflineStorageService(Context context, String databaseName, String directoryName) {
         this(context, databaseName, directoryName, ignored -> {});
     }
@@ -359,6 +363,28 @@ public final class OfflineStorageService {
         String snapshotPayloadJson,
         String updatedAt
     ) {
+        commitTrainingTerminal(
+            sessionId,
+            expectedSessionRevision,
+            executionId,
+            planId,
+            revision,
+            snapshotPayloadJson,
+            null,
+            updatedAt
+        );
+    }
+
+    public void commitTrainingTerminal(
+        String sessionId,
+        long expectedSessionRevision,
+        String executionId,
+        String planId,
+        long revision,
+        String snapshotPayloadJson,
+        String completionPresentationJson,
+        String updatedAt
+    ) {
         Log.i(LOG_TAG, "OfflineStorageService -> commitTrainingTerminal -> params: revision=" + revision);
         requireText(sessionId, "sessionId");
         requireRevision(expectedSessionRevision);
@@ -388,6 +414,23 @@ public final class OfflineStorageService {
             );
             if (deleted != 1) throw revisionConflict();
             writeSnapshotLocked(database, executionId, planId, revision, snapshotPayloadJson, updatedAt);
+            if (completionPresentationJson != null) {
+                validateJsonObject(completionPresentationJson, "completionPresentation");
+                ContentValues presentation = new ContentValues();
+                presentation.put("id", 1);
+                presentation.put("account_id", 1);
+                presentation.put("execution_id", executionId);
+                presentation.put("queue_sequence", queueSequence(database, executionId));
+                presentation.put("status", "pending");
+                presentation.put("presentation_json", completionPresentationJson);
+                presentation.put("updated_at", updatedAt);
+                database.insertWithOnConflict(
+                    "latest_completion",
+                    null,
+                    presentation,
+                    SQLiteDatabase.CONFLICT_REPLACE
+                );
+            }
             incrementStateRevision(database);
             return true;
         });
@@ -698,7 +741,16 @@ public final class OfflineStorageService {
     }
 
     public boolean completeSync(OfflineSyncClaim claim, String updatedAt) {
+        return completeSync(claim, null, updatedAt);
+    }
+
+    public boolean completeSync(
+        OfflineSyncClaim claim,
+        String canonicalCompletionJson,
+        String updatedAt
+    ) {
         requireIsoInstant(updatedAt, "updatedAt");
+        if (canonicalCompletionJson != null) validateJsonObject(canonicalCompletionJson, "completion");
         return mutate(database -> {
             int deleted = database.delete(
                 "snapshots",
@@ -706,11 +758,234 @@ public final class OfflineStorageService {
                 new String[] { claim.getExecutionId(), Long.toString(claim.getRevision()) }
             );
             if (deleted != 1) return false;
+            if (canonicalCompletionJson != null) {
+                ContentValues presentation = new ContentValues();
+                presentation.put("status", "canonical");
+                presentation.put("presentation_json", canonicalCompletionJson);
+                presentation.put("updated_at", updatedAt);
+                database.update(
+                    "latest_completion",
+                    presentation,
+                    "id = 1 AND execution_id = ? AND queue_sequence = ?",
+                    new String[] {
+                        claim.getExecutionId(),
+                        Long.toString(claim.getQueueSequence())
+                    }
+                );
+            }
             database.execSQL(
                 "DELETE FROM snapshots WHERE execution_id IN (" +
                 "SELECT execution_id FROM sync_state WHERE status = 'blocked' AND queue_sequence < ?)",
                 new Object[] { claim.getQueueSequence() }
             );
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    public String getLatestCompletionJson() {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            try (Cursor cursor = helper.getReadableDatabase().rawQuery(
+                "SELECT execution_id, status, presentation_json, updated_at " +
+                "FROM latest_completion WHERE id = 1",
+                null
+            )) {
+                if (!cursor.moveToFirst()) return null;
+                JSONObject result = new JSONObject();
+                result.put("executionId", cursor.getString(0));
+                result.put("status", cursor.getString(1));
+                result.put("presentation", new JSONObject(cursor.getString(2)));
+                result.put("updatedAt", cursor.getString(3));
+                return result.toString();
+            } catch (JSONException error) {
+                throw new OfflineStorageException(
+                    "OFFLINE_STORAGE_STATE_INVALID",
+                    "Offline completion presentation is invalid.",
+                    error
+                );
+            }
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public OfflineSyncAction getNextSyncAction() {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            try (Cursor cursor = helper.getReadableDatabase().rawQuery(
+                "SELECT snapshots.execution_id, snapshots.revision, sync_state.reason, " +
+                "snapshots.payload_json, sync_state.action_details_json " +
+                "FROM sync_state JOIN snapshots ON snapshots.execution_id = sync_state.execution_id " +
+                "WHERE sync_state.status = 'action_required' " +
+                "AND sync_state.reason <> 'update-required' " +
+                "AND sync_state.snapshot_revision = snapshots.revision " +
+                "ORDER BY sync_state.queue_sequence LIMIT 1",
+                null
+            )) {
+                if (!cursor.moveToFirst()) return null;
+                return new OfflineSyncAction(
+                    cursor.getString(0),
+                    cursor.getLong(1),
+                    cursor.getString(2),
+                    cursor.getString(3),
+                    cursor.isNull(4) ? null : cursor.getString(4)
+                );
+            }
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public boolean resolveSyncConflict(
+        String executionId,
+        long expectedRevision,
+        String choice,
+        String conflictToken,
+        String updatedAt
+    ) {
+        requireText(executionId, "executionId");
+        requireRevision(expectedRevision);
+        if (!"local".equals(choice) && !"server".equals(choice)) throw invalidInput("choice");
+        requireText(conflictToken, "conflictToken");
+        requireIsoInstant(updatedAt, "updatedAt");
+        boolean changed = mutate(database -> {
+            try (Cursor cursor = database.rawQuery(
+                "SELECT snapshots.payload_json FROM snapshots JOIN sync_state " +
+                "ON snapshots.execution_id = sync_state.execution_id " +
+                "WHERE snapshots.execution_id = ? AND snapshots.revision = ? " +
+                "AND sync_state.status = 'action_required' AND sync_state.reason = 'conflict'",
+                new String[] { executionId, Long.toString(expectedRevision) }
+            )) {
+                if (!cursor.moveToFirst()) return false;
+                JSONObject payload = new JSONObject(cursor.getString(0));
+                JSONObject resolution = new JSONObject();
+                resolution.put("choice", choice);
+                resolution.put("conflictToken", conflictToken);
+                payload.put("resolution", resolution);
+                ContentValues snapshot = new ContentValues();
+                snapshot.put("payload_json", payload.toString());
+                snapshot.put("updated_at", updatedAt);
+                database.update(
+                    "snapshots",
+                    snapshot,
+                    "execution_id = ? AND revision = ?",
+                    new String[] { executionId, Long.toString(expectedRevision) }
+                );
+            } catch (JSONException error) {
+                throw invalidInput("conflict");
+            }
+            ContentValues sync = new ContentValues();
+            sync.put("status", "pending");
+            sync.put("attempt_count", 0);
+            sync.putNull("next_attempt_at");
+            sync.putNull("reason");
+            sync.putNull("action_details_json");
+            sync.put("updated_at", updatedAt);
+            int updated = database.update(
+                "sync_state",
+                sync,
+                "execution_id = ? AND snapshot_revision = ? AND status = 'action_required'",
+                new String[] { executionId, Long.toString(expectedRevision) }
+            );
+            if (updated != 1) throw revisionConflict();
+            database.execSQL(
+                "UPDATE sync_state SET revision = revision + 1 WHERE execution_id = ?",
+                new Object[] { executionId }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+        if (changed) notifySnapshotPending();
+        return changed;
+    }
+
+    public boolean reopenStaleConflict(OfflineSyncClaim claim, String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        boolean changed = mutate(database -> {
+            try (Cursor cursor = database.rawQuery(
+                "SELECT payload_json FROM snapshots WHERE execution_id = ? AND revision = ?",
+                new String[] { claim.getExecutionId(), Long.toString(claim.getRevision()) }
+            )) {
+                if (!cursor.moveToFirst()) return false;
+                JSONObject payload = new JSONObject(cursor.getString(0));
+                payload.remove("resolution");
+                ContentValues snapshot = new ContentValues();
+                snapshot.put("payload_json", payload.toString());
+                database.update(
+                    "snapshots",
+                    snapshot,
+                    "execution_id = ? AND revision = ?",
+                    new String[] { claim.getExecutionId(), Long.toString(claim.getRevision()) }
+                );
+            } catch (JSONException error) {
+                throw invalidInput("conflict");
+            }
+            ContentValues sync = new ContentValues();
+            sync.put("status", "pending");
+            sync.put("attempt_count", 0);
+            sync.putNull("next_attempt_at");
+            sync.putNull("reason");
+            sync.putNull("action_details_json");
+            sync.put("updated_at", updatedAt);
+            int updated = database.update(
+                "sync_state",
+                sync,
+                "execution_id = ? AND snapshot_revision = ? AND status = 'in_flight'",
+                new String[] { claim.getExecutionId(), Long.toString(claim.getRevision()) }
+            );
+            if (updated != 1) throw revisionConflict();
+            database.execSQL(
+                "UPDATE sync_state SET revision = revision + 1 WHERE execution_id = ?",
+                new Object[] { claim.getExecutionId() }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+        if (changed) notifySnapshotPending();
+        return changed;
+    }
+
+    public boolean discardSyncAction(String executionId, long expectedRevision) {
+        requireText(executionId, "executionId");
+        requireRevision(expectedRevision);
+        return mutate(database -> {
+            final String[] completionJson = { null };
+            try (Cursor cursor = database.rawQuery(
+                "SELECT action_details_json FROM sync_state WHERE execution_id = ? " +
+                "AND snapshot_revision = ? AND status = 'action_required'",
+                new String[] { executionId, Long.toString(expectedRevision) }
+            )) {
+                if (!cursor.moveToFirst()) return false;
+                if (!cursor.isNull(0)) {
+                    JSONObject details = new JSONObject(cursor.getString(0));
+                    JSONObject completion = details.optJSONObject("completion");
+                    if (completion != null) completionJson[0] = completion.toString();
+                }
+            } catch (JSONException error) {
+                throw invalidInput("actionDetails");
+            }
+            int deleted = database.delete(
+                "snapshots",
+                "execution_id = ? AND revision = ? AND execution_id IN (" +
+                "SELECT execution_id FROM sync_state WHERE status = 'action_required')",
+                new String[] { executionId, Long.toString(expectedRevision) }
+            );
+            if (deleted == 0) return false;
+            if (completionJson[0] != null) {
+                ContentValues presentation = new ContentValues();
+                presentation.put("status", "canonical");
+                presentation.put("presentation_json", completionJson[0]);
+                presentation.put("updated_at", Instant.now().toString());
+                database.update(
+                    "latest_completion",
+                    presentation,
+                    "id = 1 AND execution_id = ?",
+                    new String[] { executionId }
+                );
+            }
             incrementStateRevision(database);
             return true;
         });
@@ -1088,6 +1363,49 @@ public final class OfflineStorageService {
                 throw new OfflineStorageException("OFFLINE_STORAGE_CLEAR_FAILED", "Offline account data could not be removed.");
             }
             blocked = false;
+            state = readStateLocked();
+        } finally {
+            mutationLock.unlock();
+            if (state != null) notifyStateChanged(state);
+        }
+    }
+
+    public void clearInvalidLeaseDataAtomically() {
+        mutationLock.lock();
+        OfflineStorageState state = null;
+        try {
+            ensureOperationalLocked();
+            File accountDirectory = accountDirectory();
+            File discarded = null;
+            if (accountDirectory.exists()) {
+                ensureDirectory(discardDirectory());
+                discarded = new File(discardDirectory(), UUID.randomUUID().toString());
+                if (!accountDirectory.renameTo(discarded))
+                    throw new OfflineStorageException(
+                        "OFFLINE_STORAGE_CLEAR_FAILED",
+                        "Offline lease data could not be isolated."
+                    );
+            }
+            try {
+                SQLiteDatabase database = helper.getWritableDatabase();
+                runTransaction(database, transaction -> {
+                    transaction.delete("latest_completion", null, null);
+                    transaction.delete("active_session", null, null);
+                    transaction.delete("snapshots", null, null);
+                    transaction.delete("prepared_plan", null, null);
+                    transaction.delete("offline_files", null, null);
+                    incrementStateRevision(transaction);
+                    return null;
+                });
+            } catch (RuntimeException error) {
+                if (discarded != null) discarded.renameTo(accountDirectory);
+                throw error;
+            }
+            if (discarded != null && !deleteRecursively(discarded))
+                throw new OfflineStorageException(
+                    "OFFLINE_STORAGE_CLEAR_FAILED",
+                    "Offline lease data could not be removed."
+                );
             state = readStateLocked();
         } finally {
             mutationLock.unlock();
@@ -1600,6 +1918,14 @@ public final class OfflineStorageService {
             new JSONObject(payloadJson);
         } catch (JSONException | NullPointerException error) {
             throw invalidInput("payload");
+        }
+    }
+
+    private static void validateJsonObject(String value, String field) {
+        try {
+            new JSONObject(value);
+        } catch (JSONException | NullPointerException error) {
+            throw invalidInput(field);
         }
     }
 

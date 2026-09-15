@@ -254,9 +254,10 @@ plano ativo; previews de imagem podem fornecer signed URLs fictícias e
 sem o prefixo, mas fixam o relógio da fixture em `2026-08-01T12:00:00.000Z`. Eles
 existem exclusivamente para produzir referências visuais determinísticas; testes
 comportamentais continuam usando os cenários temporais normais.
-O mesmo grupo possui handler estrito para `PUT /training/offline-lease`, com UUID
-v4 fictício e response determinística, permitindo testar a preparação Android sem
-chamar takeover ou persistência real. O browser Web não registra nem chama o plugin
+O mesmo grupo possui handlers para `PUT /training/offline-lease` e
+`POST /training/offline-lease/takeover`, com UUID fictício e response determinística,
+permitindo testar registro e transferência da preparação Android sem persistência
+real. O browser Web não registra nem chama o plugin
 nativo; estados do repository Android são injetados diretamente nos testes de UI.
 
 ## Sessão fictícia através da navegação OAuth

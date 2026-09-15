@@ -54,13 +54,15 @@ arquivos de `src/core/platform/native/` importam o contrato Capacitor. Web/PWA n
 registra o plugin, não cria IndexedDB equivalente e conserva comportamento online.
 
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
-`files/offline/` e do lock justo que serializa mutações no processo. O schema v2
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v3
 mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
 sessão ativa, snapshots por execução, estado operacional de sincronização e
 metadados de arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON
 opacos com `payloadVersion` e revisão; apenas IDs, timestamps, sequência monotônica
 local e estado necessários ficam normalizados. A bridge não expõe SQL, path absoluto
-ou bytes.
+ou bytes. A migration v2→v3 acrescenta uma projeção singleton da conclusão mais
+recente, separada do snapshot de domínio e vinculada à identidade e sequência da
+fila para promoção canônica sem regressão.
 
 `OfflineSyncEngine` é um singleton nativo associado ao mesmo provider. Um executor
 serial garante no máximo um upload da instalação em voo; o lock do storage protege
@@ -76,8 +78,23 @@ cookie ou CSRF. O coordenador TypeScript lê o Bearer pelo contrato seguro da se
 o entrega ao plugin somente em memória; SQLite, eventos e logs nunca o recebem. Rede,
 timeout, `408`, `429`, lock remoto e `5xx` usam backoff exponencial com jitter;
 autenticação pausa globalmente e conflito, imutabilidade ou lease ficam associados
-somente à execução afetada para a UI futura. Sucesso remove por ID + revisão, e uma
+somente à execução afetada para a UI. A bridge lê a menor ação por sequência e
+oferece comandos CAS de resolução ou descarte; a UI nunca envia o snapshot por
+Axios. Sucesso remove por ID + revisão, captura a conclusão canônica opcional, e uma
 resposta tardia não alcança outra conta ou geração.
+
+`OfflineSyncCoordinator` publica estado, próxima ação e última conclusão por
+`useSyncExternalStore`. Detalhes não expõem credenciais, pessoa, paths nem a lista
+inteira. Resolução obsoleta remove o token do envelope e o reenvia para obter o
+conflito corrente. A limpeza de lease inválido preserva apenas o vínculo da conta e
+remove atomicamente todos os dados cercados pelo fence antigo.
+
+O plugin solicita `POST_NOTIFICATIONS` no Android 13+ somente depois da explicação
+contextual exibida após o primeiro preparo essencial; a decisão é lembrada em
+preferência privada excluída de backup. O processo rastreia visibilidade por
+callbacks de Activity. Um canal de importância padrão e ID fixo deduplicam a
+notificação genérica de autenticação ou conflito; toque abre a `MainActivity`, e a
+WebView relê o SQLite. Sucesso, retry, lease inválido e progresso não notificam.
 
 Mudança local usa debounce, e abertura/resume, conectividade restaurada e a entrada
 manual acordam o mesmo motor. `syncStateChanged` é apenas hint; `getSyncState` repara

@@ -22,8 +22,9 @@ Loading usa skeleton; execução ausente/alheia mostra Alert `Conclusão não
 encontrada` sem vazar sua existência.
 
 A conclusão offline Android não abre esta rota nesta etapa: depois do commit
-terminal, volta a `/training`. Resumo provisório e substituição posterior pelo
-canônico pertencem à evolução seguinte; esta tela continua exclusivamente online.
+terminal, volta a `/training`, onde um card compacto provisório é substituído no
+lugar pelo resumo canônico da mesma execução. Esta tela continua exclusivamente
+online e não participa desse retorno Android.
 
 ## Ações e navegação
 

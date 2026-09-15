@@ -1,5 +1,7 @@
 package com.dallfit.app;
 
+import android.Manifest;
+import android.os.Build;
 import com.dallfit.app.offline.OfflineFileMetadata;
 import com.dallfit.app.offline.OfflineMediaDownloader;
 import com.dallfit.app.offline.OfflineStorageException;
@@ -7,6 +9,7 @@ import com.dallfit.app.offline.OfflineStorageProvider;
 import com.dallfit.app.offline.OfflineStorageService;
 import com.dallfit.app.offline.OfflineStorageState;
 import com.dallfit.app.offline.OfflineSyncConnectivity;
+import com.dallfit.app.offline.OfflineSyncAction;
 import com.dallfit.app.offline.OfflineSyncEngine;
 import com.dallfit.app.offline.OfflineSyncState;
 import com.dallfit.app.offline.StoredAggregate;
@@ -16,12 +19,22 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.getcapacitor.PermissionState;
 import java.util.List;
 import android.os.SystemClock;
 import androidx.core.content.FileProvider;
 import org.json.JSONException;
 
-@CapacitorPlugin(name = "OfflineStorage")
+// Registered as @CapacitorPlugin(name = "OfflineStorage") with notification permission metadata.
+@CapacitorPlugin(
+    name = "OfflineStorage",
+    permissions = { @Permission(
+        alias = "notifications",
+        strings = { Manifest.permission.POST_NOTIFICATIONS }
+    ) }
+)
 public final class OfflineStoragePlugin extends Plugin {
     private interface PluginWork {
         JSObject run() throws JSONException;
@@ -67,6 +80,39 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void getSyncState(PluginCall call) {
         resolve(call, () -> syncStateToJson(syncEngine.getState()));
+    }
+
+    @PluginMethod
+    public void getActionNotificationPermission(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("prompted", notificationPreferences().getBoolean("prompted", false));
+        result.put("granted", notificationPermissionGranted());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void dismissActionNotificationPrompt(PluginCall call) {
+        notificationPreferences().edit().putBoolean("prompted", true).apply();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void requestActionNotificationPermission(PluginCall call) {
+        notificationPreferences().edit().putBoolean("prompted", true).apply();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || notificationPermissionGranted()) {
+            JSObject result = new JSObject();
+            result.put("granted", true);
+            call.resolve(result);
+            return;
+        }
+        requestPermissionForAlias("notifications", call, "notificationPermissionCallback");
+    }
+
+    @PermissionCallback
+    private void notificationPermissionCallback(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("granted", notificationPermissionGranted());
+        call.resolve(result);
     }
 
     @PluginMethod
@@ -118,6 +164,16 @@ public final class OfflineStoragePlugin extends Plugin {
             syncEngine.stop();
             OfflineStorageProvider.getScheduler(getContext()).cancelOneTime();
             service.clearAccountDataAtomically();
+            return new JSObject();
+        });
+    }
+
+    @PluginMethod
+    public void clearInvalidLeaseData(PluginCall call) {
+        resolve(call, () -> {
+            syncEngine.stop();
+            OfflineStorageProvider.getScheduler(getContext()).cancelOneTime();
+            service.clearInvalidLeaseDataAtomically();
             return new JSObject();
         });
     }
@@ -220,10 +276,76 @@ public final class OfflineStoragePlugin extends Plugin {
                 requiredString(call, "planId"),
                 requiredLong(call, "revision"),
                 requiredObject(call, "snapshotPayload").toString(),
+                optionalObject(call, "completionPresentation"),
                 requiredString(call, "updatedAt")
             );
             return new JSObject();
         }));
+    }
+
+    @PluginMethod
+    public void getLatestCompletion(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            String value = service.getLatestCompletionJson();
+            if (value != null) result.put("completion", new JSObject(value));
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void getNextSyncAction(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            OfflineSyncAction action = service.getNextSyncAction();
+            if (action == null) return result;
+            JSObject value = new JSObject();
+            value.put("executionId", action.getExecutionId());
+            value.put("revision", action.getRevision());
+            value.put("reason", action.getReason());
+            JSObject request = new JSObject(action.getSnapshotJson());
+            JSObject local = new JSObject();
+            local.put("revision", request.opt("revision"));
+            local.put("clientUpdatedAt", request.opt("clientUpdatedAt"));
+            local.put("snapshot", request.opt("snapshot"));
+            value.put("local", local);
+            if (action.getDetailsJson() != null)
+                value.put("details", new JSObject(action.getDetailsJson()));
+            result.put("action", value);
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void resolveSyncConflict(PluginCall call) {
+        resolve(call, () -> {
+            boolean resolved = service.resolveSyncConflict(
+                requiredString(call, "executionId"),
+                requiredLong(call, "expectedRevision"),
+                requiredString(call, "choice"),
+                requiredString(call, "conflictToken"),
+                java.time.Instant.now().toString()
+            );
+            if (resolved) syncEngine.triggerCurrentCredentials();
+            JSObject result = new JSObject();
+            result.put("resolved", resolved);
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void discardSyncAction(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            result.put(
+                "discarded",
+                service.discardSyncAction(
+                    requiredString(call, "executionId"),
+                    requiredLong(call, "expectedRevision")
+                )
+            );
+            return result;
+        });
     }
 
     @PluginMethod
@@ -431,8 +553,22 @@ public final class OfflineStoragePlugin extends Plugin {
         return value;
     }
 
+    private static String optionalObject(PluginCall call, String name) {
+        JSObject value = call.getObject(name);
+        return value == null ? null : value.toString();
+    }
+
     private static OfflineStorageException invalidInput() {
         return new OfflineStorageException("OFFLINE_STORAGE_INVALID_INPUT", "Offline storage input is invalid.");
+    }
+
+    private android.content.SharedPreferences notificationPreferences() {
+        return getContext().getSharedPreferences("offline-notifications", android.content.Context.MODE_PRIVATE);
+    }
+
+    private boolean notificationPermissionGranted() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            getPermissionState("notifications") == PermissionState.GRANTED;
     }
 
     private static JSObject stateToJson(OfflineStorageState state) {

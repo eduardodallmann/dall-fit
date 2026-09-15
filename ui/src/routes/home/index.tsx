@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 import { Alert, Button, Card } from '@heroui/react';
 
 import { getGoogleLoginUrl } from '~/auth/auth-service';
 import { useNativeSession } from '~/auth/native-session-context';
 import { trackUiEvent } from '~/core/analytics';
+import type { OfflineSyncSnapshot } from '~/core/platform/native/offline-sync';
+import { useOfflineSync } from '~/core/platform/native/offline-sync-context';
 import { usePlatform } from '~/core/platform/platform';
 import { homeStyles } from '~/routes/home/styles';
 
@@ -21,6 +23,11 @@ export function HomePage({
 }: Readonly<HomePageProps>) {
   const nativeSession = useNativeSession();
   const platform = usePlatform();
+  const offlineSync = useOfflineSync();
+  const syncSnapshot = useSyncExternalStore(
+    offlineSync?.subscribe ?? emptySubscribe,
+    offlineSync?.getSnapshot ?? emptySnapshotReader,
+  );
   const [isPending, setIsPending] = useState(false);
   const [hasNativeError, setHasNativeError] = useState(false);
 
@@ -69,6 +76,14 @@ export function HomePage({
   return (
     <main className={styles.page()}>
       <div className={styles.pageContent()}>
+        {syncSnapshot.authenticationRequired === true ? (
+          <Alert status="warning">
+            <Alert.Title>Há dados aguardando envio</Alert.Title>
+            <Alert.Description>
+              Entre novamente com a mesma conta para continuar a sincronização.
+            </Alert.Description>
+          </Alert>
+        ) : null}
         {hasAuthError || hasNativeError ? (
           <Alert status="danger">
             <Alert.Indicator />
@@ -102,3 +117,7 @@ export function HomePage({
     </main>
   );
 }
+
+const emptySubscribe = () => () => undefined;
+const emptySnapshot: OfflineSyncSnapshot = {};
+const emptySnapshotReader = () => emptySnapshot;

@@ -26,6 +26,7 @@ public final class OfflineSyncEngine {
     private final ScheduledExecutorService executor;
     private final List<StateListener> listeners = new CopyOnWriteArrayList<>();
     private final OfflineSyncRetryPolicy retryPolicy;
+    private final OfflineActionNotifier notifier;
     private final OfflineStorageService storage;
     private final OfflineStorageService.SnapshotListener snapshotListener = this::onSnapshotPending;
     private final OfflineSyncTransport transport;
@@ -46,7 +47,8 @@ public final class OfflineSyncEngine {
             new OfflineSyncHttpTransport(),
             new ScheduledThreadPoolExecutor(1),
             Instant::now,
-            Math::random
+            Math::random,
+            new OfflineActionNotifier(storage.getContext())
         );
     }
 
@@ -57,10 +59,22 @@ public final class OfflineSyncEngine {
         Supplier<Instant> clock,
         DoubleSupplier random
     ) {
+        this(storage, transport, executor, clock, random, null);
+    }
+
+    private OfflineSyncEngine(
+        OfflineStorageService storage,
+        OfflineSyncTransport transport,
+        ScheduledExecutorService executor,
+        Supplier<Instant> clock,
+        DoubleSupplier random,
+        OfflineActionNotifier notifier
+    ) {
         this.storage = storage;
         this.transport = transport;
         this.executor = executor;
         this.clock = clock;
+        this.notifier = notifier;
         retryPolicy = new OfflineSyncRetryPolicy(clock, random);
         storage.addSnapshotListener(snapshotListener);
     }
@@ -79,6 +93,10 @@ public final class OfflineSyncEngine {
 
     public void onConnectivityAvailable() {
         triggerCurrent(true, 0);
+    }
+
+    public void triggerCurrentCredentials() {
+        triggerCurrent(false, 0);
     }
 
     public synchronized void stop() {
@@ -327,7 +345,7 @@ public final class OfflineSyncEngine {
         );
         switch (result.getKind()) {
             case SUCCESS:
-                storage.completeSync(claim, updatedAt);
+                storage.completeSync(claim, result.getDetailsJson(), updatedAt);
                 clearCycleAttempt(claim);
                 Log.i(LOG_TAG, "OfflineSyncEngine -> applyResult -> upload completed: category=success");
                 return true;
@@ -369,6 +387,7 @@ public final class OfflineSyncEngine {
                     authenticationRequired = true;
                 }
                 clearCycleAttempt(claim);
+                if (notifier != null) notifier.notifyActionRequired();
                 return false;
             case UPDATE_REQUIRED:
                 storage.markSyncActionRequired(
@@ -384,6 +403,11 @@ public final class OfflineSyncEngine {
                 clearCycleAttempt(claim);
                 return false;
             case ACTION_REQUIRED:
+                if ("conflict-stale".equals(result.getReason())) {
+                    storage.reopenStaleConflict(claim, updatedAt);
+                    clearCycleAttempt(claim);
+                    return true;
+                }
                 storage.markSyncActionRequired(
                     claim.getExecutionId(),
                     claim.getRevision(),
@@ -392,6 +416,8 @@ public final class OfflineSyncEngine {
                     updatedAt
                 );
                 clearCycleAttempt(claim);
+                if (notifier != null && "conflict".equals(result.getReason()))
+                    notifier.notifyActionRequired();
                 return true;
             case BLOCKED:
                 storage.markSyncBlocked(

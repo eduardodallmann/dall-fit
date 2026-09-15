@@ -13,6 +13,7 @@ import {
   ApplicationFallback,
 } from '~/core/components/application-fallback';
 import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
+import type { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
 import { resolveApplicationPlatform } from '~/core/platform/platform-composition';
 import { bootstrapTheme } from '~/core/theme/theme-storage';
 import type { TrainingRepository } from '~/routes/training/training-repository';
@@ -30,6 +31,7 @@ export async function bootstrap() {
     const platform = resolveApplicationPlatform();
     let nativeSession: NativeSessionCoordinator | null = null;
     let offlinePreparation: OfflinePreparationCoordinator | null = null;
+    let offlineSync: OfflineSyncCoordinator | null = null;
     let trainingRepository: TrainingRepository | null = null;
     if (platform.capabilities.nativeAuthentication) {
       const { createNativeComposition } =
@@ -37,6 +39,7 @@ export async function bootstrap() {
       const composition = await createNativeComposition();
       nativeSession = composition.session;
       offlinePreparation = composition.offlinePreparation;
+      offlineSync = composition.offlineSync;
       trainingRepository = composition.trainingRepository;
       configureSessionChannel('native', {
         getAccessToken: () => composition.session.getAccessToken(),
@@ -61,6 +64,7 @@ export async function bootstrap() {
             initialTheme={initialTheme}
             nativeSession={nativeSession}
             offlinePreparation={offlinePreparation}
+            offlineSync={offlineSync}
             platform={platform}
             trainingRepository={trainingRepository}
           >

@@ -1,5 +1,10 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
+import type {
+  OfflineTrainingSnapshotConflictDetails,
+  WorkoutExecutionSummary,
+} from '@dall-fit/types';
+
 export type OfflineStorageRecovery = 'migration-reset' | 'none';
 
 export interface OfflineStorageState {
@@ -48,6 +53,29 @@ export interface OfflineSyncState {
     | 'syncing';
 }
 
+export interface OfflineCompletionPresentation {
+  executionId: string;
+  presentation:
+    | WorkoutExecutionSummary
+    | {
+        completedAt: string;
+        completedExerciseCount: number;
+        fullCompletion: boolean;
+        totalExerciseCount: number;
+        workoutName: string;
+      };
+  status: 'canonical' | 'pending';
+  updatedAt: string;
+}
+
+export interface OfflineSyncAction {
+  details?: OfflineTrainingSnapshotConflictDetails;
+  executionId: string;
+  local: Readonly<Record<string, unknown>>;
+  reason: 'conflict' | 'discard-local-only' | 'lease-expired' | 'lease-revoked';
+  revision: number;
+}
+
 export interface OfflineStoragePlugin {
   addListener(
     eventName: 'stateChanged',
@@ -59,6 +87,7 @@ export interface OfflineStoragePlugin {
   ): Promise<PluginListenerHandle>;
   bindAccount(options: { personId: string }): Promise<void>;
   clearAccountData(): Promise<void>;
+  clearInvalidLeaseData(): Promise<void>;
   clearSyncCredentials(): Promise<OfflineSyncState>;
   commitTrainingSession(options: {
     executionId: string;
@@ -67,6 +96,7 @@ export interface OfflineStoragePlugin {
     sessionId: string;
     sessionPayload: Readonly<Record<string, unknown>>;
     snapshotPayload: Readonly<Record<string, unknown>>;
+    completionPresentation?: Readonly<Record<string, unknown>>;
     updatedAt: string;
   }): Promise<void>;
   commitTrainingTerminal(options: {
@@ -95,6 +125,14 @@ export interface OfflineStoragePlugin {
   getFile(options: { fileId: string }): Promise<{ file?: OfflineFileMetadata }>;
   getReadyFileUrl(options: { fileId: string }): Promise<{ url?: string }>;
   getMonotonicTime(): Promise<{ elapsedRealtime: number }>;
+  getActionNotificationPermission(): Promise<{
+    granted: boolean;
+    prompted: boolean;
+  }>;
+  getLatestCompletion(): Promise<{
+    completion?: OfflineCompletionPresentation;
+  }>;
+  getNextSyncAction(): Promise<{ action?: OfflineSyncAction }>;
   getPreparedPlan(): Promise<{ aggregate?: OfflineStoredAggregate }>;
   getSnapshot(options: {
     executionId: string;
@@ -138,6 +176,8 @@ export interface OfflineStoragePlugin {
     revision: number;
     updatedAt: string;
   }): Promise<{ file: OfflineFileMetadata }>;
+  dismissActionNotificationPrompt(): Promise<void>;
+  requestActionNotificationPermission(): Promise<{ granted: boolean }>;
   removeActiveSession(options: {
     expectedRevision: number;
     sessionId: string;
@@ -154,6 +194,16 @@ export interface OfflineStoragePlugin {
     executionId: string;
     expectedRevision: number;
   }): Promise<{ removed: boolean }>;
+  resolveSyncConflict(options: {
+    choice: 'local' | 'server';
+    conflictToken: string;
+    executionId: string;
+    expectedRevision: number;
+  }): Promise<{ resolved: boolean }>;
+  discardSyncAction(options: {
+    executionId: string;
+    expectedRevision: number;
+  }): Promise<{ discarded: boolean }>;
   triggerSync(options: {
     accessToken: string;
     apiBaseUrl: string;

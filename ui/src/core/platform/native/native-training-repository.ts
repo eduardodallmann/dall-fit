@@ -365,6 +365,21 @@ export class NativeTrainingRepository implements TrainingRepository {
     const updatedAt = new Date(this.now()).toISOString();
     const snapshot = snapshotFrom(active, state, updatedAt, timezone);
     const request = requestFrom(active, snapshot, revision, updatedAt);
+    const exercises = active.session.exercises;
+    const completionPresentation =
+      state === 'completed'
+        ? {
+            completedAt: updatedAt,
+            completedExerciseCount: exercises.filter(
+              (exercise) => exercise.completedAt !== null,
+            ).length,
+            fullCompletion: exercises.every(
+              (exercise) => exercise.completedAt !== null,
+            ),
+            totalExerciseCount: exercises.length,
+            workoutName: active.session.workout.name,
+          }
+        : undefined;
     await this.plugin.commitTrainingTerminal({
       executionId: active.executionId,
       expectedSessionRevision: active.session.version,
@@ -372,6 +387,9 @@ export class NativeTrainingRepository implements TrainingRepository {
       revision,
       sessionId: active.session.id,
       snapshotPayload: request as unknown as Readonly<Record<string, unknown>>,
+      ...(completionPresentation === undefined
+        ? {}
+        : { completionPresentation }),
       updatedAt,
     });
   }

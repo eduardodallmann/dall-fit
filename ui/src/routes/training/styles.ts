@@ -24,6 +24,11 @@ export const trainingStyles = tv({
     completionMetric:
       'flex flex-col gap-1 rounded-2xl border border-border bg-surface p-4',
     completionValue: 'text-2xl font-semibold text-foreground',
+    provisionalCard: 'flex flex-col gap-3 border border-warning/40 p-4',
+    provisionalHeader: 'flex flex-wrap items-start justify-between gap-3',
+    comparisonGrid: 'grid min-h-0 gap-4 md:grid-cols-2',
+    comparisonPanel:
+      'max-h-72 overflow-auto rounded-xl border border-border bg-surface-secondary p-3 text-xs whitespace-pre-wrap break-words',
     empty:
       'flex min-h-72 flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-surface p-8 text-center',
     exerciseCard: 'overflow-hidden border border-border p-0',

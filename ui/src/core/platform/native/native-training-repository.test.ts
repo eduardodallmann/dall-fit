@@ -245,4 +245,27 @@ describe('NativeTrainingRepository', () => {
       'cancelled',
     );
   });
+
+  it('commits a provisional completion projection with the terminal snapshot', async () => {
+    const { commitTrainingTerminal, repository } = createHarness();
+    const session = await repository.startSession('workout-a');
+
+    await repository.completeSession(
+      true,
+      'America/Sao_Paulo',
+      session.version,
+    );
+
+    expect(commitTrainingTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completionPresentation: {
+          completedAt: '2030-01-02T00:00:00.000Z',
+          completedExerciseCount: 0,
+          fullCompletion: false,
+          totalExerciseCount: 1,
+          workoutName: 'Treino A',
+        },
+      }),
+    );
+  });
 });

@@ -87,7 +87,10 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
                 OfflineSyncTransportResult.Kind.BLOCKED,
                 "invalid-response"
             );
-            return OfflineSyncTransportResult.of(OfflineSyncTransportResult.Kind.SUCCESS, "accepted");
+            JSONObject completion = data.optJSONObject("completion");
+            return OfflineSyncTransportResult.success(
+                completion == null ? null : completion.toString()
+            );
         }
 
         String code = response == null ? "HTTP_" + status : response.optString("code", "HTTP_" + status);
@@ -119,9 +122,8 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
             JSONObject details = response == null ? null : response.optJSONObject("details");
             return OfflineSyncTransportResult.action(reason, details == null ? null : details.toString());
         }
-        if ("OFFLINE_TRAINING_CONFLICT_TOKEN_STALE".equals(code)) {
+        if ("OFFLINE_TRAINING_CONFLICT_TOKEN_STALE".equals(code))
             return OfflineSyncTransportResult.action("conflict-stale", null);
-        }
         if ("OFFLINE_LEASE_REVOKED".equals(code)) {
             return OfflineSyncTransportResult.action("lease-revoked", null);
         }

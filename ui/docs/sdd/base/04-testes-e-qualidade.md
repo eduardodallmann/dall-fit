@@ -191,6 +191,13 @@ remoção, inclusive CAS e rollback. Componentes e Playwright preservam a decis�
 obrigatória de retomada/descarte e a equivalência do adapter HTTP; lifecycle,
 relógio monotônico e modo avião completam a matriz no Android.
 
+A integração da fila com a UI acrescenta cobertura para projeção provisória no
+commit terminal, promoção canônica condicionada por execução/sequência, leitura da
+menor ação, resolução CAS, token obsoleto, descarte terminal e limpeza de lease.
+Componentes cobrem comparação completa, confirmação destrutiva, takeover e aviso
+de autenticação. Instrumentados cobrem migration v2→v3, notificação deduplicada e
+permissão opcional; negação nunca altera storage ou sincronização.
+
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
 API 29+ permanece manual enquanto CI e release Android não forem adotados.

@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 final class OfflineStorageDatabase extends SQLiteOpenHelper {
     static final String DATABASE_NAME = "dall-fit-offline.db";
-    static final int SCHEMA_VERSION = 2;
+    static final int SCHEMA_VERSION = 3;
 
     OfflineStorageDatabase(Context context) {
         this(context, DATABASE_NAME);
@@ -30,7 +30,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase database, int oldVersion, int newVersion) {
         if (oldVersion == newVersion) return;
         if (oldVersion == 1 && newVersion >= 2) migrateFromOneToTwo(database);
-        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 2) throw missingMigration();
+        if (oldVersion <= 2 && newVersion >= 3) migrateFromTwoToThree(database);
+        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 3) throw missingMigration();
     }
 
     @Override
@@ -118,6 +119,7 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0)," +
             "updated_at TEXT NOT NULL)"
         );
+        createLatestCompletionTable(database);
         database.execSQL(
             "CREATE INDEX snapshots_pending_order ON snapshots(updated_at, execution_id)"
         );
@@ -174,6 +176,23 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         database.execSQL("DROP TABLE sync_state_v1");
         database.execSQL(
             "CREATE INDEX sync_state_eligible_order ON sync_state(status, next_attempt_at, queue_sequence)"
+        );
+    }
+
+    private static void migrateFromTwoToThree(SQLiteDatabase database) {
+        createLatestCompletionTable(database);
+    }
+
+    private static void createLatestCompletionTable(SQLiteDatabase database) {
+        database.execSQL(
+            "CREATE TABLE latest_completion (" +
+            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+            "account_id INTEGER NOT NULL DEFAULT 1 REFERENCES account_state(id) ON DELETE CASCADE," +
+            "execution_id TEXT NOT NULL CHECK (length(execution_id) > 0)," +
+            "queue_sequence INTEGER NOT NULL CHECK (queue_sequence > 0)," +
+            "status TEXT NOT NULL CHECK (status IN ('pending', 'canonical'))," +
+            "presentation_json TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
         );
     }
 
