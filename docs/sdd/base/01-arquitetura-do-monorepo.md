@@ -74,6 +74,10 @@ dall-fit/
     aplicativo consulta a política somente no canal nativo, conserva o maior
     mínimo já observado e bloqueia preparação, novas sessões e sincronização
     incompatíveis; Web/PWA não participa desse protocolo.
+14. Releases Android usam uma app signing key própria importada no Play App
+    Signing e uma upload key distinta. A chave permanente permanece offline; o CI
+    manual protegido recebe somente a upload key, gera o AAB e nunca publica ou
+    promove na Play Console.
 
 ## Convenções de importação
 

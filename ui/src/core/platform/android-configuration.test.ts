@@ -1,18 +1,27 @@
 import { describe, expect, it } from 'vitest';
 
+import androidReleaseWorkflow from '../../../../.github/workflows/android-release.yml?raw';
 import rootPackageSource from '../../../../package.json?raw';
+import androidGitignore from '../../../android/.gitignore?raw';
 import androidAppBuild from '../../../android/app/build.gradle?raw';
 import androidManifest from '../../../android/app/src/main/AndroidManifest.xml?raw';
 import androidApplication from '../../../android/app/src/main/java/com/dallfit/app/DallFitApplication.java?raw';
 import mainActivity from '../../../android/app/src/main/java/com/dallfit/app/MainActivity.java?raw';
 import nativeSyncSessionStore from '../../../android/app/src/main/java/com/dallfit/app/offline/NativeSyncSessionStore.java?raw';
+import offlineActionNotifier from '../../../android/app/src/main/java/com/dallfit/app/offline/OfflineActionNotifier.java?raw';
 import offlineSyncWorker from '../../../android/app/src/main/java/com/dallfit/app/offline/OfflineSyncWorker.java?raw';
 import offlineSyncScheduler from '../../../android/app/src/main/java/com/dallfit/app/offline/OfflineSyncWorkScheduler.java?raw';
 import offlineStoragePlugin from '../../../android/app/src/main/java/com/dallfit/app/OfflineStoragePlugin.java?raw';
+import launcherIcon from '../../../android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml?raw';
+import themedLauncherIcon from '../../../android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml?raw';
+import legacyLauncherIcon from '../../../android/app/src/main/res/mipmap-anydpi/ic_launcher.xml?raw';
+import launchStyles from '../../../android/app/src/main/res/values/styles.xml?raw';
 import backupRules from '../../../android/app/src/main/res/xml/backup_rules.xml?raw';
 import dataExtractionRules from '../../../android/app/src/main/res/xml/data_extraction_rules.xml?raw';
+import fileProviderPaths from '../../../android/app/src/main/res/xml/file_paths.xml?raw';
 import androidVariables from '../../../android/variables.gradle?raw';
 import uiPackageSource from '../../../package.json?raw';
+import releaseScript from '../../../scripts/android-release.mjs?raw';
 
 interface PackageManifest {
   dependencies?: Record<string, string>;
@@ -79,16 +88,80 @@ describe('Android workspace configuration', () => {
     expect(uiPackage.scripts['android:build:debug']).toMatch(
       /^pnpm android:sync &&/,
     );
+    expect(uiPackage.scripts['android:build:release']).toBe(
+      'node scripts/android-release.mjs',
+    );
     expect(uiPackage.scripts['android:test']).toBe(
       'pnpm android:sync && ./android/gradlew -p android connectedDebugAndroidTest',
     );
     expect(rootPackage.scripts).toMatchObject({
       'android:build:debug': 'pnpm -C ui android:build:debug',
+      'android:build:release': 'pnpm -C ui android:build:release',
       'android:open': 'pnpm -C ui android:open',
       'android:run': 'pnpm -C ui android:run',
       'android:sync': 'pnpm -C ui android:sync',
       'android:test': 'pnpm -C ui android:test',
     });
+  });
+
+  it('fails closed for release signing and keeps keystores ignored', () => {
+    for (const variable of [
+      'DALL_FIT_UPLOAD_KEYSTORE_PATH',
+      'DALL_FIT_UPLOAD_STORE_PASSWORD',
+      'DALL_FIT_UPLOAD_KEY_ALIAS',
+      'DALL_FIT_UPLOAD_KEY_PASSWORD',
+    ]) {
+      expect(androidAppBuild).toContain(variable);
+      expect(releaseScript).toContain(variable);
+    }
+    expect(androidAppBuild).toContain('signingConfig signingConfigs.release');
+    expect(androidAppBuild).toContain(
+      'Release signing configuration is incomplete',
+    );
+    expect(androidGitignore).toContain('*.jks');
+    expect(androidGitignore).toContain('*.keystore');
+    expect(releaseScript).toContain("['-verify', bundlePath]");
+    expect(releaseScript).toContain("createHash('sha256')");
+  });
+
+  it('keeps the release workflow manual, protected and unable to publish', () => {
+    expect(androidReleaseWorkflow).toContain('workflow_dispatch: {}');
+    expect(androidReleaseWorkflow).toContain('contents: read');
+    expect(androidReleaseWorkflow).toContain('environment: android-production');
+    expect(androidReleaseWorkflow).toContain('pnpm android:build:release');
+    expect(androidReleaseWorkflow).toContain('DALL_FIT_UPLOAD_KEYSTORE_BASE64');
+    expect(androidReleaseWorkflow).toContain('if: always()');
+    expect(androidReleaseWorkflow).not.toContain('pull_request:');
+    expect(androidReleaseWorkflow).not.toContain('service_account');
+    expect(androidReleaseWorkflow).not.toContain('google-play');
+  });
+
+  it('uses Dall Fit launcher, splash and notification resources', () => {
+    expect(mainActivity).toContain('SplashScreen.installSplashScreen(this)');
+    expect(launchStyles).toContain(
+      '<item name="windowSplashScreenAnimatedIcon">@drawable/ic_dall_fit_mark</item>',
+    );
+    expect(launchStyles).toContain(
+      '<item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>',
+    );
+    expect(launcherIcon).toContain('@drawable/ic_dall_fit_mark');
+    expect(themedLauncherIcon).toContain('@drawable/ic_dall_fit_mark');
+    expect(themedLauncherIcon).toContain('@drawable/ic_dall_fit_monochrome');
+    expect(legacyLauncherIcon).toContain('#863BFF');
+    expect(legacyLauncherIcon).not.toContain('Android');
+    expect(offlineActionNotifier).toContain(
+      '.setSmallIcon(R.drawable.ic_notification)',
+    );
+  });
+
+  it('limits FileProvider to the private offline media directory', () => {
+    expect(fileProviderPaths).toContain(
+      '<files-path name="offline_media" path="offline/account/files/" />',
+    );
+    expect(fileProviderPaths).not.toContain('external-path');
+    expect(fileProviderPaths).not.toContain('cache-path');
+    expect(androidManifest).toContain('android:exported="false"');
+    expect(androidManifest).toContain('android:grantUriPermissions="true"');
   });
 
   it('registers the local offline plugin before the Capacitor bridge is created', () => {

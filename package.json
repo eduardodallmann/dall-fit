@@ -10,6 +10,7 @@
   },
   "scripts": {
     "android:build:debug": "pnpm -C ui android:build:debug",
+    "android:build:release": "pnpm -C ui android:build:release",
     "android:open": "pnpm -C ui android:open",
     "android:run": "pnpm -C ui android:run",
     "android:sync": "pnpm -C ui android:sync",

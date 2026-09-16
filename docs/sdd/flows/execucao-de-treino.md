@@ -39,6 +39,10 @@ por pessoa.
    a build abre e migra v1/v2/v3 até o schema v4 antes de rearmar os envelopes
    compatíveis na mesma ordem. Reset é último recurso e exige reconhecimento do
    aviso persistido fora do banco novo.
+   A build distribuída mantém `com.dallfit.app` e a app signing key entre updates.
+   Antes da produção, a mesma versão passa pelo teste interno com preparação,
+   modo avião, reconexão, WorkManager, update e reinstalação; depois é promovida sem
+   recompilação para 100% da produção.
 2. No Web/PWA, um hint offline impede a montagem de toda a jornada, preserva a URL
    solicitada e apresenta somente `Conexão necessária`; não há request, cache de
    domínio, Background Sync, Analytics offline nem replay na reconexão. Recuperada
@@ -184,6 +188,18 @@ por pessoa.
   global aparece ao sair. A build atualizada migra o banco antes de retomar a mesma
   fila.
 
+### Cenário 6 — validar a distribuição Android antes da produção
+
+- Link para testar: não se aplica; exige AAB instalado pelo teste interno da Play
+  Store em aparelho Android.
+- Given: o AAB assinado foi aceito no teste interno com o mesmo application ID e
+  app signing certificate da produção.
+- When: QA executa primeira preparação, modo avião, terminal local, reconexão com o
+  app fechado, update e reinstalação.
+- Then: offline e sync mantêm o comportamento documentado, update preserva a fila,
+  reinstalação não restaura dados privados e exatamente essa versão pode ser
+  promovida para 100% da produção.
+
 ## Cobertura automatizada
 
 - Regras e caminhos de negócio protegidos: fluxo E2E real em
@@ -198,6 +214,9 @@ por pessoa.
   revisão, validade e terminais; o coordenador valida preparação e lease.
 - Android instrumentado: `OfflineStorageServiceTest` valida transações compostas
   de sessão + snapshot e terminal + remoção com SQLite real.
+- Release Android: testes de configuração validam ambiente, assinatura, workflow,
+  permissões, FileProvider, ícone e splash; o smoke do teste interno cobre os
+  comportamentos dependentes da Play Store, aparelho e WorkManager.
 - Handlers e fixtures MSW: `ui/src/mocks/handlers/training.ts` e
   `ui/src/mocks/fixtures/training.ts`.
 - Cenários não automatizados: compartilhamento nativo depende da API do sistema

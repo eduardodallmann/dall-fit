@@ -228,6 +228,22 @@ O template Capacitor 8.5.2 conserva compile/target SDK 36, Android Gradle Plugin
 web copiados, configuração gerada, caches e outputs Gradle não são versionados;
 configuração, wrapper e código nativo necessários para reproduzir o build são.
 
+O build publicável é exclusivamente `pnpm android:build:release`. Antes de tocar o
+Gradle, o script exige `VITE_API_URL` HTTPS público,
+`VITE_GOOGLE_SERVER_CLIENT_ID`, mocks desativados e as quatro entradas da upload
+key; remove `dist`, recompila, sincroniza o Capacitor e executa `bundleRelease`.
+Depois verifica a assinatura e grava SHA-256 e metadados públicos ao lado do AAB.
+Ausência ou inconsistência falha fechado, sem fallback unsigned/debug. A app
+signing key própria não alcança o projeto nem o CI; somente a upload key separada
+entra no environment protegido `android-production`.
+
+O launcher usa o símbolo Dall Fit em adaptive icon com camada monocromática, e a
+abertura usa `androidx.core:core-splashscreen` sem Activity ou timer adicional. O
+manifest release mantém somente `INTERNET`, `ACCESS_NETWORK_STATE` e a permissão
+opcional `POST_NOTIFICATIONS`. O `FileProvider` não é exportado e expõe somente
+`files/offline/account/files/`; não existem paths genéricos de cache ou external
+storage.
+
 ## Estrutura alvo
 
 Quando as funcionalidades surgirem, organizar por responsabilidade:

@@ -1,5 +1,27 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningVariableNames = [
+    'DALL_FIT_UPLOAD_KEYSTORE_PATH',
+    'DALL_FIT_UPLOAD_STORE_PASSWORD',
+    'DALL_FIT_UPLOAD_KEY_ALIAS',
+    'DALL_FIT_UPLOAD_KEY_PASSWORD'
+]
+def releaseSigningValues = releaseSigningVariableNames.collectEntries { name ->
+    [(name): System.getenv(name)]
+}
+def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.toLowerCase().contains('release')
+}
+def missingReleaseSigningVariables = releaseSigningVariableNames.findAll { name ->
+    !releaseSigningValues[name]?.trim()
+}
+
+if (releaseTaskRequested && !missingReleaseSigningVariables.isEmpty()) {
+    throw new GradleException(
+        "Release signing configuration is incomplete. Missing environment variables: ${missingReleaseSigningVariables.join(', ')}"
+    )
+}
+
 android {
     namespace = "com.dallfit.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +38,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (missingReleaseSigningVariables.isEmpty()) {
+                storeFile file(releaseSigningValues.DALL_FIT_UPLOAD_KEYSTORE_PATH)
+                storePassword releaseSigningValues.DALL_FIT_UPLOAD_STORE_PASSWORD
+                keyAlias releaseSigningValues.DALL_FIT_UPLOAD_KEY_ALIAS
+                keyPassword releaseSigningValues.DALL_FIT_UPLOAD_KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }

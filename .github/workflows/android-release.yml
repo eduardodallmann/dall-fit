@@ -1,0 +1,97 @@
+name: Android release bundle
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-production-release
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    environment: android-production
+    env:
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      VITE_ENABLE_API_MOCKS: 'false'
+      VITE_GOOGLE_SERVER_CLIENT_ID: ${{ vars.VITE_GOOGLE_SERVER_CLIENT_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Require the main branch
+        run: test "$GITHUB_REF" = "refs/heads/main"
+
+      - name: Run quality gates
+        run: |
+          pnpm lint
+          pnpm test
+          pnpm test:coverage:ci
+          pnpm build
+
+      - name: Run local Android tests
+        run: |
+          pnpm android:sync
+          ./ui/android/gradlew -p ui/android --no-daemon testDebugUnitTest
+
+      - name: Prepare upload key
+        env:
+          DALL_FIT_UPLOAD_KEYSTORE_BASE64: ${{ secrets.DALL_FIT_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$DALL_FIT_UPLOAD_KEYSTORE_BASE64"
+          upload_keystore="$RUNNER_TEMP/dall-fit-upload.jks"
+          printf '%s' "$DALL_FIT_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$upload_keystore"
+          chmod 600 "$upload_keystore"
+          echo "DALL_FIT_UPLOAD_KEYSTORE_PATH=$upload_keystore" >> "$GITHUB_ENV"
+
+      - name: Build signed Android App Bundle
+        env:
+          DALL_FIT_UPLOAD_KEY_ALIAS: ${{ secrets.DALL_FIT_UPLOAD_KEY_ALIAS }}
+          DALL_FIT_UPLOAD_KEY_PASSWORD: ${{ secrets.DALL_FIT_UPLOAD_KEY_PASSWORD }}
+          DALL_FIT_UPLOAD_STORE_PASSWORD: ${{ secrets.DALL_FIT_UPLOAD_STORE_PASSWORD }}
+        run: pnpm android:build:release
+
+      - name: Upload verified release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dall-fit-android-release
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ui/android/app/build/outputs/bundle/release/app-release.aab
+            ui/android/app/build/outputs/bundle/release/app-release.aab.sha256
+            ui/android/app/build/outputs/bundle/release/app-release.aab.metadata.json
+
+      - name: Remove temporary upload key
+        if: always()
+        run: |
+          if [ -n "${DALL_FIT_UPLOAD_KEYSTORE_PATH:-}" ]; then
+            rm -f -- "$DALL_FIT_UPLOAD_KEYSTORE_PATH"
+          fi

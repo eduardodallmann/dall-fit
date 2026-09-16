@@ -55,6 +55,7 @@ pnpm android:sync
 pnpm android:open
 pnpm android:run
 pnpm android:build:debug
+pnpm android:build:release
 pnpm android:test
 ```
 
@@ -76,8 +77,17 @@ podem ser adiados pelo sistema operacional.
 Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
 debug em `ui/android/app/build/outputs/apk/debug/`. `android:open` exige Android
 Studio, mas não altera o bundle. `android:test` sincroniza o bundle e executa os
-testes instrumentados em dispositivo ou emulador conectado. Nenhum desses caminhos
-assina release ou exige segredo.
+testes instrumentados em dispositivo ou emulador conectado. Esses caminhos de
+desenvolvimento não assinam release nem exigem segredo.
+
+`android:build:release` é o caminho publicável separado. Ele exige API HTTPS
+pública, client OAuth Web/server e upload key fora do repositório; recompila a UI,
+sincroniza Capacitor, assina o AAB e gera checksum e metadados públicos. A app
+signing key própria permanece offline e é importada no Play App Signing. O
+workflow manual `Android release bundle` usa o environment protegido
+`android-production`, recebe somente a upload key e não publica na Play Console.
+Configuração, cerimônia de chaves, checklist e smoke estão no
+[runbook de release Android](06-release-android-play-store.md).
 
 MongoDB e Redis usam os binários reais gerenciados por `mongodb-memory-server` e
 `redis-memory-server`, sem Docker. O MongoDB usa `wiredTiger` e conserva seus dados
@@ -104,6 +114,7 @@ Todos os quality gates são iniciados na raiz:
 | `pnpm android:open`     | Abre o projeto nativo versionado no Android Studio                     |
 | `pnpm android:run`      | Prepara e executa o aplicativo em dispositivo ou emulador             |
 | `pnpm android:build:debug` | Prepara e compila o APK debug com o Gradle Wrapper                  |
+| `pnpm android:build:release` | Valida, assina e verifica o AAB de produção                       |
 | `pnpm android:test`     | Sincroniza e executa testes Android instrumentados conectados         |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
 | `pnpm lint:fix`         | Formata, faz typecheck e corrige violações seguras de ESLint          |

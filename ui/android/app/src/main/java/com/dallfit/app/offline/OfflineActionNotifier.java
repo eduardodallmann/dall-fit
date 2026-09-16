@@ -49,7 +49,7 @@ final class OfflineActionNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Ação necessária no Dall Fit")
             .setContentText("Abra o app para continuar a sincronização.")
             .setContentIntent(pendingIntent)

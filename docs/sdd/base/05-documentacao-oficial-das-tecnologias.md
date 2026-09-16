@@ -72,6 +72,7 @@ desatualizado ou sem contexto de licença.
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Vitest     | [`llms.txt`](https://vitest.dev/llms.txt) e [Writing Tests with AI](https://vitest.dev/guide/learn/writing-tests-with-ai) | Configuração, mocks, execução, cobertura e escrita de testes unitários ou E2E da API  |
 | Prettier   | [`llms.txt`](https://prettier.io/llms.txt)                                                                                | Configuração, plugin de imports, integração com ESLint ou comportamento de formatação |
+| GitHub Actions | [documentação](https://docs.github.com/actions) e [segurança](https://docs.github.com/actions/security-for-github-actions) | Workflows, environments, permissions, secrets, artifacts e hardening de CI/CD |
 
 ### API e dados
 
@@ -130,6 +131,7 @@ indicado na tabela.
 | Google Auth Library | [Referência Node.js](https://cloud.google.com/nodejs/docs/reference/google-auth-library/latest) e [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect) | Consultar autenticação, validação de token e OAuth/OIDC com atenção especial à segurança                                                                               |
 | Workbox             | [Documentação](https://developer.chrome.com/docs/workbox/)                                                                                                                               | Complementa Vite PWA quando a mudança alcançar estratégias ou APIs próprias do service worker gerado                                                                   |
 | Android WorkManager | [Guia de trabalho persistente](https://developer.android.com/develop/background-work/background-tasks/persistent), [referência](https://developer.android.com/reference/androidx/work/WorkManager) e [releases](https://developer.android.com/jetpack/androidx/releases/work) | Consultar work único/periódico, constraints, retry, testes, persistência e compatibilidade da versão AndroidX instalada                                                  |
+| Android/Google Play | [assinatura](https://developer.android.com/studio/publish/app-signing), [preparação](https://developer.android.com/studio/publish/preparing), [versionamento](https://developer.android.com/studio/publish/versioning) e [Play Console](https://support.google.com/googleplay/android-developer/answer/9859348) | AAB, app signing/upload keys, versões, configuração de release, tracks e publicação |
 
 Bibliotecas pequenas ou auxiliares não precisam de uma entrada permanente somente
 porque oferecem documentação consumível por IA. Ao afetar uma delas, localizar sua

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "android:build:debug": "pnpm android:sync && ./android/gradlew -p android assembleDebug",
+    "android:build:release": "node scripts/android-release.mjs",
     "android:open": "cap open android",
     "android:run": "pnpm android:sync && cap run android",
     "android:sync": "pnpm build && cap sync android",
@@ -17,7 +18,7 @@
     "lint:fix": "pnpm --dir .. exec eslint ui --fix",
     "preview": "vite preview",
     "sonar": "dotenv -e ../.env -- sh -c 'test -n \"$SONAR_TOKEN\" || { echo \"Error: SONAR_TOKEN is required. See docs/sdd/base/02-workspace-e-qualidade.md\"; exit 1; }; pnpm test:coverage:ci && sonar-scanner-npm'",
-    "test": "node tests/eslint/capacitor-boundary.mjs && vitest run",
+    "test": "node tests/eslint/capacitor-boundary.mjs && node --test tests/android-release.test.mjs && vitest run",
     "test:integration": "playwright test",
     "test:integration:debug": "playwright test --debug",
     "test:integration:install": "playwright install chromium",

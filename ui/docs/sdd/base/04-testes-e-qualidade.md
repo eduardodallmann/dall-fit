@@ -215,9 +215,11 @@ API cobrem configuração, política pública e recusa antes das dependências. 
 Java valida package info, classificação exata de `APP_UPDATE_REQUIRED` e migrations
 v1/v2/v3→v4 preservando envelope, fila, ação e conclusão provisória.
 
-Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
-locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador
-API 29+ permanece manual enquanto CI e release Android não forem adotados.
+Os gates web não exigem Android SDK. Sync, execução, APK debug e testes
+instrumentados permanecem comandos explícitos. O workflow manual de release roda
+os gates web, testes Java locais e o build AAB assinado em environment protegido;
+ele não substitui `connectedDebugAndroidTest` nem o smoke manual da build instalada
+pelo teste interno em API 29 e API 33+/36.
 
 Esses cenários não precisam existir todos no Playwright. Funções puras, hooks e
 componentes cobrem a matriz combinatória; Playwright preserva os caminhos
@@ -241,13 +243,16 @@ pnpm -C ui test:coverage
 pnpm -C ui test:coverage:ci
 pnpm -C ui typecheck
 pnpm test:pwa-update
+pnpm android:build:release
 pnpm android:test
 ```
 
 `pnpm android:test` exige dispositivo ou emulador API 29+ conectado e uma JDK
 compatível com o projeto. O comando sincroniza o bundle antes de executar
-`connectedDebugAndroidTest`; ele permanece fora dos gates web e do CI enquanto a
-infraestrutura Android não for adotada.
+`connectedDebugAndroidTest`; ele permanece fora dos gates web e do workflow de
+release porque exige dispositivo ou emulador. `pnpm android:build:release` exige a
+configuração pública e a upload key descritas no runbook transversal, e produz AAB,
+checksum e metadados somente depois de validar a assinatura.
 
 Os gates completos são executados na raiz. Não excluir código testável apenas para
 melhorar a métrica de cobertura e não criar testes sem comportamento relevante

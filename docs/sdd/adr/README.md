@@ -44,3 +44,5 @@ substituída permanece no histórico e aponta para a sucessora.
 - [`ADR-0016`](ADR-0016-compatibilidade-android-e-recuperacao-visivel.md): política
   mínima Android, metadados de compatibilidade na fila e aviso persistente após
   reset irrecuperável.
+- [`ADR-0017`](ADR-0017-assinatura-release-android-play-store.md): chave própria no
+  Play App Signing, upload key separada, AAB em CI protegido e promoção manual.
