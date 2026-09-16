@@ -17,6 +17,16 @@ const optionalSecret = z.preprocess(
   z.string().min(32).optional(),
 );
 
+const androidPlayStoreUrl = z.url().refine((value) => {
+  const url = new URL(value);
+  return (
+    url.protocol === 'https:' &&
+    url.hostname === 'play.google.com' &&
+    url.pathname === '/store/apps/details' &&
+    url.searchParams.get('id') === 'com.dallfit.app'
+  );
+}, 'must be the HTTPS Google Play listing for com.dallfit.app');
+
 const environmentSchema = z.looseObject({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
@@ -26,6 +36,8 @@ const environmentSchema = z.looseObject({
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   VERCEL_URL: optionalNonEmptyString,
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+  ANDROID_MIN_VERSION_CODE: z.coerce.number().int().positive(),
+  ANDROID_PLAY_STORE_URL: androidPlayStoreUrl,
   LOG_LEVEL: z.enum(LOG_LEVELS).default('log'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   CORS_ORIGIN: z.url().default('http://localhost:3000'),
@@ -76,6 +88,16 @@ const environmentSchema = z.looseObject({
     .int()
     .min(1_000)
     .default(600_000),
+  RATE_LIMIT_APP_COMPATIBILITY_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(60),
+  RATE_LIMIT_APP_COMPATIBILITY_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .default(60_000),
   RATE_LIMIT_TEST_LOGIN_LIMIT: z.coerce.number().int().min(1).default(5),
   RATE_LIMIT_TEST_LOGIN_WINDOW_MS: z.coerce
     .number()

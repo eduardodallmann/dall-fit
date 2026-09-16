@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { AppCompatibilityModule } from '~/app-compatibility/app-compatibility.module';
 import { AuthModule } from '~/auth/auth.module';
 import { validateEnvironment } from '~/config/environment';
 import { ObservabilityModule } from '~/observability/observability.module';
@@ -21,6 +22,7 @@ import { TrainingModule } from '~/training/training.module';
       validate: validateEnvironment,
     }),
     ObservabilityModule,
+    AppCompatibilityModule,
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

@@ -22,6 +22,13 @@ Android, prévia, sessão e lease vêm do motor nativo e sobrevivem a refresh,
 background, recriação do WebView e morte do processo. Existe no máximo uma sessão
 por pessoa/aparelho.
 
+Se a política de compatibilidade ficar obsoleta durante uma sessão já ativa,
+somente o path exato desse workout permanece utilizável. Timer, cargas, conclusão
+e cancelamento continuam nas mesmas transações locais, mas nenhum snapshot é
+enviado e não há preparação, lease, takeover ou início alternativo. Sair preserva
+os dados e revela o bloqueio global; depois do terminal, o snapshot e sua sequência
+ficam no SQLite e a navegação volta obrigatoriamente à superfície de atualização.
+
 ## Conteúdo e caminho feliz
 
 Antes do início, todos os exercícios aparecem em ordem com tipo e métricas; mídia

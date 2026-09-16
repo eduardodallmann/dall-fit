@@ -70,7 +70,7 @@ offline Google Analytics. Rotas `/api` e `/auth`, SSE, signed URLs e recursos
 remotos não entram no cache e nunca recebem resposta privada do service worker.
 
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
-`files/offline/` e do lock justo que serializa mutações no processo. O schema v3
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v4
 mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
 sessão ativa, snapshots por execução, estado operacional de sincronização e
 metadados de arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON
@@ -79,6 +79,10 @@ local e estado necessários ficam normalizados. A bridge não expõe SQL, path a
 ou bytes. A migration v2→v3 acrescenta uma projeção singleton da conclusão mais
 recente, separada do snapshot de domínio e vinculada à identidade e sequência da
 fila para promoção canônica sem regressão.
+A migration v3→v4 acrescenta a cada snapshot o `producer_version_code` e o
+`sync_contract_version`; linhas legadas recebem 1 sem alterar JSON, revisão,
+sequência, ação ou conclusão provisória. Bancos v1 e v2 atravessam todas as
+migrations intermediárias na mesma ordem.
 
 `OfflineSyncEngine` é um singleton nativo associado ao mesmo provider. Um executor
 serial garante no máximo um upload da instalação em voo; o lock do storage protege
@@ -98,6 +102,12 @@ somente à execução afetada para a UI. A bridge lê a menor ação por sequên
 oferece comandos CAS de resolução ou descarte; a UI nunca envia o snapshot por
 Axios. Sucesso remove por ID + revisão, captura a conclusão canônica opcional, e uma
 resposta tardia não alcança outra conta ou geração.
+Cada upload usa a versão do pacote atualmente instalado em
+`X-App-Version-Code` e o contrato persistido no envelope em
+`X-Sync-Contract-Version`; a versão produtora permanece auditável no SQLite.
+`409 APP_UPDATE_REQUIRED` com
+detalhes válidos grava monotonicamente a política, mantém a fila e encerra a
+passagem como `update-required`, sem retry ou backoff.
 
 `OfflineSyncCoordinator` publica estado, próxima ação e última conclusão por
 `useSyncExternalStore`. Detalhes não expõem credenciais, pessoa, paths nem a lista
@@ -123,7 +133,8 @@ adiados pelo Android; não são expedited e não registram Foreground Service.
 `DallFitApplication` registra a contingência pelo WorkManager no processo principal.
 `OfflineSyncWorker` abre a mesma composição nativa sem Activity, WebView ou
 JavaScript, lê o envelope v1 no mesmo secure storage cifrado pelo Android Keystore e
-obtém a URL-base pública previamente validada. O Worker chama uma passagem aguardável
+obtém a URL-base pública previamente validada. Ele abre e migra o banco e consulta
+a política de compatibilidade antes de vincular conta ou chamar uma passagem aguardável
 do mesmo `OfflineSyncEngine`: falha temporária devolve retry ao WorkManager; ausência
 ou expiração de sessão, `401`, bloqueio ou ação necessária encerram sem loop e
 preservam a fila conforme sua categoria. Abertura/resume continua disparando o motor
@@ -171,10 +182,26 @@ O shell Android observa conectividade como hint. Fora de `/training` e
 houver plano local válido; sem ele, mantém uma superfície acessível de conexão
 necessária. Web/PWA não participa desse guard.
 
+`NativeAppCompatibilityCoordinator` lê `PackageInfo.getLongVersionCode()` e
+`versionName` pela bridge e consulta `GET /app-compatibility/android` na abertura,
+no resume e ao recuperar conectividade. Consultas concorrentes compartilham uma
+operação e respostas de composição encerrada são ignoradas. O maior mínimo já
+observado e a URL validada ficam em preferência privada excluída de backup; falha
+de rede sem mínimo conhecido permanece aberta somente para o uso local permitido.
+O pacote que introduz o schema v4 usa `versionCode 2`; `versionName` continua
+somente informativo e não participa da comparação.
+Com pacote obsoleto, o guard global substitui toda navegação por `main`, heading e
+ação da Play Store. Somente o path exato do workout capturado antes da detecção
+permanece montado até `completed` ou `cancelled`; preparação, takeover, nova sessão
+e todas as entradas do sincronizador permanecem bloqueados. A bridge tenta primeiro
+o intent restrito a `com.android.vending` e depois a mesma URL HTTPS no navegador.
+
 Criação e migrations pertencem ao `SQLiteOpenHelper`. Falha de abertura é tentada
 novamente com outro handle; falha persistente, migration ausente ou downgrade
 recria banco, sidecars e arquivos e registra somente diagnóstico sanitizado. O
-reset é deliberadamente invisível: não aciona toast, modal, navegação ou Analytics.
+registro `migration-reset` fica fora do banco recriado e sobrevive até a UI mostrar
+um `AlertDialog` persistente sobre possível perda e a pessoa reconhecer `Entendi`.
+Não há restauração fictícia, envio parcial ou Analytics desse conteúdo.
 Falha no próprio reset rejeita comandos sem fallback Web.
 
 O coordenador nativo mantém um envelope v1 mínimo (`accessToken`, `expiresAt` e

@@ -27,6 +27,12 @@ consultar sessão, plano, treino, SSE ou Analytics. Ao reconectar, a rota é rem
 e consulta novamente as autoridades online. O Android não participa dessa barreira
 e conserva o caminho nativo descrito abaixo.
 
+Antes da rota ser liberada, o Android avalia a política de compatibilidade. Uma
+versão obsoleta sem sessão ativa substitui a rota pelo bloqueio global e não inicia
+preparação, lease, takeover nem navegação a workout. Se a detecção ocorreu durante
+um workout capturado, `/training` continua bloqueada até a atualização, inclusive
+depois que o terminal local voltar a este path.
+
 ## Elementos, estados e ações
 
 Com plano ativo, a tela mostra nome do plano, instrução `Selecione o treino` e uma

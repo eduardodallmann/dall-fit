@@ -4,6 +4,7 @@ import android.content.Context;
 
 public final class OfflineStorageProvider {
     private static volatile OfflineStorageService instance;
+    private static volatile AppCompatibilityManager compatibilityManager;
     private static volatile OfflineSyncWorkScheduler scheduler;
     private static volatile NativeSyncSessionStore sessionStore;
     private static volatile OfflineSyncEngine syncEngine;
@@ -21,11 +22,25 @@ public final class OfflineStorageProvider {
         }
     }
 
+    public static AppCompatibilityManager getCompatibilityManager(Context context) {
+        AppCompatibilityManager current = compatibilityManager;
+        if (current != null) return current;
+        synchronized (OfflineStorageProvider.class) {
+            if (compatibilityManager == null) {
+                compatibilityManager = new AppCompatibilityManager(context.getApplicationContext());
+            }
+            return compatibilityManager;
+        }
+    }
+
     public static OfflineSyncEngine getSyncEngine(Context context) {
         OfflineSyncEngine current = syncEngine;
         if (current != null) return current;
         synchronized (OfflineStorageProvider.class) {
-            if (syncEngine == null) syncEngine = new OfflineSyncEngine(get(context));
+            if (syncEngine == null) syncEngine = new OfflineSyncEngine(
+                get(context),
+                getCompatibilityManager(context)
+            );
             return syncEngine;
         }
     }

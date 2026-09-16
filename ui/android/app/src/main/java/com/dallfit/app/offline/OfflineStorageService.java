@@ -41,6 +41,8 @@ public final class OfflineStorageService {
     private static final String LOG_TAG = "DallFitOfflineStorage";
     private static final String OFFLINE_DIRECTORY = "offline";
     private static final String RECOVERY_MIGRATION_RESET = "migration-reset";
+    private static final String RECOVERY_PREFERENCES = "offline-storage-recovery";
+    private static final String RECOVERY_KEY = "pending-recovery";
 
     private final Context context;
     private final String databaseName;
@@ -112,6 +114,27 @@ public final class OfflineStorageService {
         } finally {
             mutationLock.unlock();
         }
+    }
+
+    public void acknowledgeRecovery() {
+        mutationLock.lock();
+        OfflineStorageState state;
+        try {
+            ensureOperationalLocked();
+            if (!context.getSharedPreferences(RECOVERY_PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .remove(RECOVERY_KEY)
+                .commit()) {
+                throw new OfflineStorageException(
+                    "OFFLINE_STORAGE_RECOVERY_ACKNOWLEDGEMENT_FAILED",
+                    "Offline storage recovery could not be acknowledged."
+                );
+            }
+            state = readStateLocked();
+        } finally {
+            mutationLock.unlock();
+        }
+        notifyStateChanged(state);
     }
 
     public void bindAccount(String personId) {
@@ -525,6 +548,11 @@ public final class OfflineStorageService {
         ContentValues snapshotValues = aggregateValues(planId, payloadVersion, revision, payloadJson, updatedAt);
         snapshotValues.put("execution_id", executionId);
         snapshotValues.put("account_id", 1);
+        snapshotValues.put("producer_version_code", installedVersionCode());
+        snapshotValues.put(
+            "sync_contract_version",
+            AppCompatibilityManager.SYNC_CONTRACT_VERSION
+        );
         int updated = database.update("snapshots", snapshotValues, "execution_id = ?", new String[] { executionId });
         if (updated == 0) database.insertOrThrow("snapshots", null, snapshotValues);
         snapshotWriteHook.afterSnapshotWritten(revision);
@@ -595,6 +623,37 @@ public final class OfflineStorageService {
         return rearmed[0];
     }
 
+    public int rearmUpdateRequiredSync(String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        final int[] rearmed = { 0 };
+        mutate(database -> {
+            rearmed[0] = count(
+                database,
+                "sync_state",
+                "status = ? AND reason = ? AND execution_id IN " +
+                "(SELECT execution_id FROM snapshots WHERE sync_contract_version = ?)",
+                new String[] {
+                    "action_required",
+                    "update-required",
+                    Integer.toString(AppCompatibilityManager.SYNC_CONTRACT_VERSION)
+                }
+            );
+            if (rearmed[0] == 0) return false;
+            database.execSQL(
+                "UPDATE sync_state SET status = 'pending', attempt_count = 0, " +
+                "next_attempt_at = NULL, reason = NULL, action_details_json = NULL, " +
+                "revision = revision + 1, updated_at = ? " +
+                "WHERE status = 'action_required' AND reason = 'update-required' " +
+                "AND execution_id IN (SELECT execution_id FROM snapshots " +
+                "WHERE sync_contract_version = ?)",
+                new Object[] { updatedAt, AppCompatibilityManager.SYNC_CONTRACT_VERSION }
+            );
+            incrementStateRevision(database);
+            return true;
+        });
+        return rearmed[0];
+    }
+
     public OfflineSyncClaim claimNextSync(String now) {
         requireIsoInstant(now, "now");
         mutationLock.lock();
@@ -606,7 +665,8 @@ public final class OfflineStorageService {
                 try (
                     Cursor cursor = transaction.rawQuery(
                         "SELECT snapshots.execution_id, snapshots.revision, snapshots.payload_json, " +
-                        "sync_state.queue_sequence, sync_state.attempt_count " +
+                        "sync_state.queue_sequence, sync_state.attempt_count, " +
+                        "snapshots.sync_contract_version " +
                         "FROM sync_state JOIN snapshots ON snapshots.execution_id = sync_state.execution_id " +
                         "WHERE sync_state.snapshot_revision = snapshots.revision AND " +
                         "(sync_state.status = 'pending' OR " +
@@ -640,7 +700,9 @@ public final class OfflineStorageService {
                         revision,
                         cursor.getString(2),
                         cursor.getLong(3),
-                        cursor.getInt(4)
+                        cursor.getInt(4),
+                        installedVersionCode(),
+                        cursor.getInt(5)
                     );
                 }
             });
@@ -1038,9 +1100,16 @@ public final class OfflineStorageService {
                 "status = ?",
                 new String[] { "action_required" }
             ) > 0;
+            boolean updateRequired = count(
+                database,
+                "sync_state",
+                "reason = ?",
+                new String[] { "update-required" }
+            ) > 0;
             String publicState;
             if (authenticationRequired && pendingCount > 0) publicState = "authentication-required";
             else if (syncing) publicState = "syncing";
+            else if (updateRequired) publicState = "update-required";
             else if (actionRequired) publicState = "action-required";
             else if (pendingCount > 0) publicState = "pending";
             else publicState = "idle";
@@ -1496,6 +1565,15 @@ public final class OfflineStorageService {
                 values.put("reset_generation", previousGeneration + 1);
                 values.put("last_recovery", RECOVERY_MIGRATION_RESET);
                 database.update("engine_metadata", values, "id = 1", null);
+                boolean recorded = context
+                    .getSharedPreferences(RECOVERY_PREFERENCES, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(RECOVERY_KEY, RECOVERY_MIGRATION_RESET)
+                    .commit();
+                if (!recorded) throw new OfflineStorageException(
+                    "OFFLINE_STORAGE_RECOVERY_RECORD_FAILED",
+                    "Offline storage recovery could not be recorded."
+                );
             } catch (RuntimeException resetFailure) {
                 blocked = true;
                 throw new OfflineStorageException(
@@ -1653,7 +1731,8 @@ public final class OfflineStorageService {
             return new OfflineStorageState(
                 cursor.getLong(0),
                 cursor.getLong(1),
-                cursor.isNull(2) ? "none" : cursor.getString(2),
+                context.getSharedPreferences(RECOVERY_PREFERENCES, Context.MODE_PRIVATE)
+                    .getString(RECOVERY_KEY, "none"),
                 exists(database, "account_state"),
                 exists(database, "prepared_plan"),
                 exists(database, "active_session"),
@@ -1662,6 +1741,10 @@ public final class OfflineStorageService {
                 count(database, "offline_files", "status = ?", new String[] { "ready" })
             );
         }
+    }
+
+    private long installedVersionCode() {
+        return new AppCompatibilityManager(context).getState().getInstalledVersionCode();
     }
 
     private void notifyStateChanged(OfflineStorageState state) {

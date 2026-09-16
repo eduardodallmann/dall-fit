@@ -27,6 +27,7 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
       serializedSnapshot: '{}',
     })),
   };
+  const compatibility = { validateSnapshotClient: vi.fn() };
   const lock = { key: 'hidden-key', token: 'hidden-token' };
   const locks = { acquire: vi.fn(), release: vi.fn() };
   const snapshots = { ingest: vi.fn() };
@@ -52,6 +53,7 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
     });
     terminals.replay.mockResolvedValue(null);
     command = new PutOfflineTrainingSnapshotCommand(
+      compatibility as never,
       content as unknown as OfflineTrainingSnapshotContentService,
       locks as unknown as OfflineTrainingSnapshotLockService,
       snapshots as unknown as OfflineTrainingSnapshotService,
@@ -99,5 +101,20 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
     });
     expect(snapshots.ingest).not.toHaveBeenCalled();
     expect(locks.release).not.toHaveBeenCalled();
+  });
+
+  it('rejects an incompatible client before content preparation or locking', async () => {
+    compatibility.validateSnapshotClient.mockImplementationOnce(() => {
+      throw new Error('incompatible');
+    });
+
+    await expect(
+      command.execute('hidden-person', request, {
+        appVersionCode: '0',
+        syncContractVersion: '1',
+      }),
+    ).rejects.toThrow('incompatible');
+    expect(content.prepare).not.toHaveBeenCalled();
+    expect(locks.acquire).not.toHaveBeenCalled();
   });
 });

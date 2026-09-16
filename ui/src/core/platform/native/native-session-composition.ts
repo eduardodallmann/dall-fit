@@ -1,5 +1,6 @@
 import { createNativeSession, revokeNativeSession } from '~/auth/auth-service';
 import { NativeSessionCoordinator } from '~/auth/native-session';
+import { NativeAppCompatibilityCoordinator } from '~/core/platform/native/app-compatibility';
 import { GoogleSignInAdapter } from '~/core/platform/native/google-sign-in-adapter';
 import { NativeLocalDataAdapter } from '~/core/platform/native/local-data-adapter';
 import { NativeTrainingRepository } from '~/core/platform/native/native-training-repository';
@@ -16,6 +17,7 @@ import {
 } from '~/routes/training/training-service';
 
 export interface NativeComposition {
+  appCompatibility: NativeAppCompatibilityCoordinator;
   offlinePreparation: OfflinePreparationCoordinator;
   offlineSync: OfflineSyncCoordinator;
   session: NativeSessionCoordinator;
@@ -35,6 +37,8 @@ export async function createNativeComposition(): Promise<NativeComposition> {
     },
   );
   await coordinator.initialize();
+  const appCompatibility = new NativeAppCompatibilityCoordinator();
+  await appCompatibility.initialize();
   const offlinePreparation = new OfflinePreparationCoordinator({
     getInstallationId: () => coordinator.getInstallationId(),
     getOverview: () => getTrainingOverview('active-plan'),
@@ -47,6 +51,7 @@ export async function createNativeComposition(): Promise<NativeComposition> {
   const offlineSync = new OfflineSyncCoordinator(coordinator);
   await offlineSync.initialize();
   return {
+    appCompatibility,
     offlinePreparation,
     offlineSync,
     session: coordinator,

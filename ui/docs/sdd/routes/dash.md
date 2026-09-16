@@ -42,6 +42,12 @@ permanece neste dashboard. A regra completa de validação, duração e consumo 
 [retomada após autenticação](../base/02-rotas-e-comportamento.md#retomada-após-autenticação).
 O destino não muda o redirect HTTP do callback nem dispensa os guards da rota final.
 
+No Android, uma política já conhecida ou recém-consultada que exija versão maior
+substitui inclusive o shell e `/dash` pela superfície `Atualização necessária`.
+Nenhuma identidade, menu, pendência ou conteúdo privado permanece visível. A ação
+abre a listagem oficial na Play Store, com fallback para navegador; uma falha
+terminal fica visível e permite repetir. Web/PWA não consulta essa política.
+
 ## Elementos e conteúdo
 
 Depois da proteção, o layout autenticado apresenta:

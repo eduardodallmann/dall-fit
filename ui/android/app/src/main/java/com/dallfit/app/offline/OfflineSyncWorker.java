@@ -23,14 +23,22 @@ public final class OfflineSyncWorker extends Worker {
         Log.i(LOG_TAG, "OfflineSyncWorker -> doWork -> started: category=" + category);
         try {
             OfflineStorageProvider.initializeBackground(getApplicationContext());
+            OfflineStorageService storage = OfflineStorageProvider.get(getApplicationContext());
+            storage.initialize();
             NativeSyncSessionStore sessionStore = OfflineStorageProvider.getSessionStore(
                 getApplicationContext()
             );
             NativeSyncSession session = sessionStore.readSession();
             String apiBaseUrl = sessionStore.readApiBaseUrl();
             if (session == null || apiBaseUrl == null) return complete(category, "configuration");
+            AppCompatibilityState compatibility = OfflineStorageProvider
+                .getCompatibilityManager(getApplicationContext())
+                .check(apiBaseUrl);
+            if (compatibility.isUpdateRequired()) {
+                return complete(category, "update-required");
+            }
             try {
-                OfflineStorageProvider.get(getApplicationContext()).bindAccount(session.getPersonId());
+                storage.bindAccount(session.getPersonId());
             } catch (OfflineStorageException error) {
                 if ("OFFLINE_STORAGE_ACCOUNT_MISMATCH".equals(error.getCode())) {
                     return complete(category, "account-mismatch");

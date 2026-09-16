@@ -35,6 +35,7 @@ public final class OfflineStorageServiceTest {
     @Before
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
+        clearRecoveryPreference();
         String suffix = UUID.randomUUID().toString();
         databaseName = "offline-test-" + suffix + ".db";
         directoryName = "offline-test-" + suffix;
@@ -46,6 +47,7 @@ public final class OfflineStorageServiceTest {
         if (service != null) service.close();
         context.deleteDatabase(databaseName);
         deleteRecursively(new File(context.getFilesDir(), directoryName));
+        clearRecoveryPreference();
     }
 
     @Test
@@ -455,6 +457,9 @@ public final class OfflineStorageServiceTest {
         assertEquals(5, state.getResetGeneration());
         assertFalse(stale.exists());
         assertFalse(state.isAccountBound());
+
+        service.acknowledgeRecovery();
+        assertEquals("none", service.getState().getRecovery());
     }
 
     @Test
@@ -544,6 +549,8 @@ public final class OfflineStorageServiceTest {
         assertNotNull(first);
         assertEquals("z-first", first.getExecutionId());
         assertEquals(1, first.getQueueSequence());
+        assertEquals(installedVersionCode(), first.getAppVersionCode());
+        assertEquals(1, first.getSyncContractVersion());
         service.putSnapshot(
             "z-first",
             "plan-a",
@@ -556,6 +563,104 @@ public final class OfflineStorageServiceTest {
         assertNotNull(updated);
         assertEquals("z-first", updated.getExecutionId());
         assertEquals(1, updated.getQueueSequence());
+    }
+
+    @Test
+    public void migratesVersionTwoPendingRowsWithoutChangingTheirEnvelopeOrOrder() {
+        service.close();
+        SQLiteDatabase versionTwo = context.openOrCreateDatabase(
+            databaseName,
+            Context.MODE_PRIVATE,
+            null
+        );
+        createVersionTwoSchema(versionTwo);
+        versionTwo.execSQL("INSERT INTO account_state (id, person_id) VALUES (1, 'person-a')");
+        versionTwo.execSQL(
+            "INSERT INTO snapshots " +
+            "(execution_id, account_id, plan_id, payload_version, revision, payload_json, updated_at) " +
+            "VALUES ('execution-v2', 1, 'plan-a', 1, 7, '{\"revision\":7}', '2026-09-14T12:00:00Z')"
+        );
+        versionTwo.execSQL(
+            "INSERT INTO sync_state " +
+            "(execution_id, snapshot_revision, queue_sequence, status, attempt_count, revision, updated_at) " +
+            "VALUES ('execution-v2', 7, 9, 'pending', 0, 2, '2026-09-14T12:00:00Z')"
+        );
+        versionTwo.setVersion(2);
+        versionTwo.close();
+
+        service = new OfflineStorageService(context, databaseName, directoryName);
+        OfflineStorageState state = service.initialize();
+        OfflineSyncClaim claim = service.claimNextSync("2026-09-14T12:01:00Z");
+
+        assertEquals("none", state.getRecovery());
+        assertNotNull(claim);
+        assertEquals("execution-v2", claim.getExecutionId());
+        assertEquals(7, claim.getRevision());
+        assertEquals(9, claim.getQueueSequence());
+        assertEquals("{\"revision\":7}", claim.getPayloadJson());
+        assertEquals(installedVersionCode(), claim.getAppVersionCode());
+        assertEquals(1, claim.getSyncContractVersion());
+    }
+
+    @Test
+    public void migratesVersionThreeActionsAndLatestCompletionWithoutDataLoss() {
+        service.close();
+        SQLiteDatabase versionThree = context.openOrCreateDatabase(
+            databaseName,
+            Context.MODE_PRIVATE,
+            null
+        );
+        createVersionTwoSchema(versionThree);
+        createLatestCompletionSchema(versionThree);
+        versionThree.execSQL("INSERT INTO account_state (id, person_id) VALUES (1, 'person-a')");
+        versionThree.execSQL(
+            "INSERT INTO snapshots " +
+            "(execution_id, account_id, plan_id, payload_version, revision, payload_json, updated_at) " +
+            "VALUES ('execution-v3', 1, 'plan-a', 1, 4, '{\"revision\":4}', '2026-09-14T12:00:00Z')"
+        );
+        versionThree.execSQL(
+            "INSERT INTO sync_state " +
+            "(execution_id, snapshot_revision, queue_sequence, status, attempt_count, reason, " +
+            "action_details_json, revision, updated_at) VALUES " +
+            "('execution-v3', 4, 12, 'action_required', 1, 'conflict', " +
+            "'{\"allowedResolution\":\"local-or-server\",\"conflictToken\":\"token-v3\"}', " +
+            "3, '2026-09-14T12:00:00Z')"
+        );
+        versionThree.execSQL(
+            "INSERT INTO latest_completion " +
+            "(id, account_id, execution_id, queue_sequence, status, presentation_json, updated_at) " +
+            "VALUES (1, 1, 'execution-v3', 12, 'pending', " +
+            "'{\"workoutName\":\"Treino preservado\"}', '2026-09-14T12:00:00Z')"
+        );
+        versionThree.setVersion(3);
+        versionThree.close();
+
+        service = new OfflineStorageService(context, databaseName, directoryName);
+        OfflineStorageState state = service.initialize();
+        OfflineSyncAction action = service.getNextSyncAction();
+
+        assertEquals("none", state.getRecovery());
+        assertNotNull(action);
+        assertEquals("execution-v3", action.getExecutionId());
+        assertEquals(4, action.getRevision());
+        assertEquals("conflict", action.getReason());
+        assertTrue(action.getDetailsJson().contains("token-v3"));
+        assertTrue(service.getLatestCompletionJson().contains("Treino preservado"));
+        try (SQLiteDatabase migrated = SQLiteDatabase.openDatabase(
+            context.getDatabasePath(databaseName).getPath(),
+            null,
+            SQLiteDatabase.OPEN_READONLY
+        )) {
+            try (android.database.Cursor cursor = migrated.rawQuery(
+                "SELECT producer_version_code, sync_contract_version FROM snapshots " +
+                "WHERE execution_id = 'execution-v3'",
+                null
+            )) {
+                assertTrue(cursor.moveToFirst());
+                assertEquals(1, cursor.getInt(0));
+                assertEquals(1, cursor.getInt(1));
+            }
+        }
     }
 
     @Test
@@ -799,6 +904,53 @@ public final class OfflineStorageServiceTest {
             "relative_path TEXT NOT NULL," +
             "status TEXT NOT NULL)"
         );
+    }
+
+    private static void createVersionTwoSchema(SQLiteDatabase database) {
+        createVersionOneSchema(database);
+        database.execSQL(
+            "ALTER TABLE engine_metadata ADD COLUMN next_queue_sequence INTEGER NOT NULL " +
+            "DEFAULT 20 CHECK (next_queue_sequence > 0)"
+        );
+        database.execSQL("ALTER TABLE sync_state RENAME TO sync_state_v1");
+        database.execSQL(
+            "CREATE TABLE sync_state (" +
+            "execution_id TEXT PRIMARY KEY REFERENCES snapshots(execution_id) ON DELETE CASCADE," +
+            "snapshot_revision INTEGER NOT NULL," +
+            "queue_sequence INTEGER NOT NULL UNIQUE," +
+            "status TEXT NOT NULL," +
+            "attempt_count INTEGER NOT NULL DEFAULT 0," +
+            "next_attempt_at TEXT NULL," +
+            "reason TEXT NULL," +
+            "action_details_json TEXT NULL," +
+            "revision INTEGER NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+        database.execSQL("DROP TABLE sync_state_v1");
+    }
+
+    private static void createLatestCompletionSchema(SQLiteDatabase database) {
+        database.execSQL(
+            "CREATE TABLE latest_completion (" +
+            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+            "account_id INTEGER NOT NULL DEFAULT 1 REFERENCES account_state(id) ON DELETE CASCADE," +
+            "execution_id TEXT NOT NULL," +
+            "queue_sequence INTEGER NOT NULL," +
+            "status TEXT NOT NULL," +
+            "presentation_json TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+    }
+
+    private void clearRecoveryPreference() {
+        context.getSharedPreferences("offline-storage-recovery", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit();
+    }
+
+    private long installedVersionCode() {
+        return new AppCompatibilityManager(context).getState().getInstalledVersionCode();
     }
 
     private static void deleteRecursively(File file) {

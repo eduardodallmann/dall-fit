@@ -44,6 +44,15 @@ public final class OfflineSyncTransportResult {
         return new OfflineSyncTransportResult(Kind.TEMPORARY, reason, null, retryAfter);
     }
 
+    public static OfflineSyncTransportResult updateRequired(String detailsJson) {
+        return new OfflineSyncTransportResult(
+            Kind.UPDATE_REQUIRED,
+            "update-required",
+            detailsJson,
+            null
+        );
+    }
+
     public String getDetailsJson() {
         return detailsJson;
     }

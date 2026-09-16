@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
+import { AppUpdateRequiredError } from '~/app-compatibility/errors/app-update-required.error';
 import {
   OfflineTrainingLeaseExpiredError,
   OfflineTrainingLeaseRevokedError,
@@ -23,6 +24,14 @@ function snapshotHttpError(
 }
 
 export function mapOfflineTrainingSnapshotHttpError(error: unknown): never {
+  if (error instanceof AppUpdateRequiredError) {
+    throw snapshotHttpError(
+      HttpStatus.CONFLICT,
+      'APP_UPDATE_REQUIRED',
+      'The Android application must be updated before synchronizing.',
+      { ...error.details },
+    );
+  }
   if (error instanceof OfflineTrainingSnapshotResolutionExpiredError) {
     throw snapshotHttpError(
       HttpStatus.CONFLICT,

@@ -41,3 +41,6 @@ substituída permanece no histórico e aponta para a sucessora.
   consumidores nativos.
 - [`ADR-0015`](ADR-0015-lease-offline-de-treino-no-redis.md): lease Redis único
   por pessoa, fence por concessão e renovação condicionada à sincronização aceita.
+- [`ADR-0016`](ADR-0016-compatibilidade-android-e-recuperacao-visivel.md): política
+  mínima Android, metadados de compatibilidade na fila e aviso persistente após
+  reset irrecuperável.

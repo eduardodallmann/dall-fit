@@ -164,7 +164,7 @@ O motor offline acrescenta Vitest para o adapter da bridge, vínculo de conta,
 pendências e limpeza, além de testes instrumentados Java com SQLite e filesystem
 reais. A matriz nativa cobre round-trip de payload opaco, revisão regressiva e
 idempotente, transação composta de snapshot, disputa entre threads, lifecycle de
-arquivo temporário, limpeza repetida, rollback de migration e reset silencioso de
+arquivo temporário, limpeza repetida, rollback de migration e reset reconhecível de
 banco incompatível. Testes de configuração protegem registro antecipado do plugin,
 ausência de permissões de armazenamento e exclusões de backup. Como eventos são
 best-effort, consumidores reparam ausência ou atraso consultando `getState`.
@@ -207,6 +207,13 @@ menor ação, resolução CAS, token obsoleto, descarte terminal e limpeza de le
 Componentes cobrem comparação completa, confirmação destrutiva, takeover e aviso
 de autenticação. Instrumentados cobrem migration v2→v3, notificação deduplicada e
 permissão opcional; negação nunca altera storage ou sincronização.
+
+A compatibilidade obrigatória acrescenta Vitest para single-flight, falha aberta
+sem política, mínimo nativo monotônico, exceção exclusiva do workout ativo,
+superfície global, abertura repetível da loja e aviso de reset. Unitários/E2E da
+API cobrem configuração, política pública e recusa antes das dependências. A matriz
+Java valida package info, classificação exata de `APP_UPDATE_REQUIRED` e migrations
+v1/v2/v3→v4 preservando envelope, fila, ação e conclusão provisória.
 
 Os gates web não exigem Android SDK. Sync, execução e APK debug são validações
 locais explícitas conforme o SDD do workspace; smoke em dispositivo ou emulador

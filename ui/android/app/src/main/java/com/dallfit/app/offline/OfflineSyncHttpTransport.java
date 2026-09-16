@@ -47,6 +47,14 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
             connection.setRequestProperty("accept", "application/json");
             connection.setRequestProperty("authorization", "Bearer " + accessToken);
             connection.setRequestProperty("content-type", "application/json; charset=utf-8");
+            connection.setRequestProperty(
+                "X-App-Version-Code",
+                Long.toString(claim.getAppVersionCode())
+            );
+            connection.setRequestProperty(
+                "X-Sync-Contract-Version",
+                Integer.toString(claim.getSyncContractVersion())
+            );
             connection.setUseCaches(false);
             connection.setDoOutput(true);
             byte[] body = claim.getPayloadJson().getBytes(StandardCharsets.UTF_8);
@@ -100,11 +108,13 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
                 "authentication-required"
             );
         }
-        if (status == 426 || "UPDATE_REQUIRED".equals(code)) {
-            return OfflineSyncTransportResult.of(
-                OfflineSyncTransportResult.Kind.UPDATE_REQUIRED,
-                "update-required"
+        if (status == HttpURLConnection.HTTP_CONFLICT && "APP_UPDATE_REQUIRED".equals(code)) {
+            JSONObject details = response == null ? null : response.optJSONObject("details");
+            if (!validUpdateDetails(details)) return OfflineSyncTransportResult.of(
+                OfflineSyncTransportResult.Kind.BLOCKED,
+                "invalid-response"
             );
+            return OfflineSyncTransportResult.updateRequired(details.toString());
         }
         if ("AUTH_TRANSPORT_AMBIGUOUS".equals(code)) {
             return OfflineSyncTransportResult.of(
@@ -175,6 +185,14 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
         JSONObject request = parseObject(claim.getPayloadJson());
         JSONObject resolution = request == null ? null : request.optJSONObject("resolution");
         return resolution != null && "server".equals(resolution.optString("choice"));
+    }
+
+    private static boolean validUpdateDetails(JSONObject details) {
+        if (details == null) return false;
+        String storeUrl = details.optString("storeUrl", "");
+        return details.optLong("minimumVersionCode", 0) > 0 &&
+            details.optInt("syncContractVersion", 0) > 0 &&
+            AppCompatibilityManager.validStoreUrl(storeUrl);
     }
 
     private static String readBody(HttpURLConnection connection, int status) throws IOException {

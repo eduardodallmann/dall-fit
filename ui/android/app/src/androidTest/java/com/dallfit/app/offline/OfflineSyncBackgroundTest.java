@@ -49,6 +49,7 @@ public final class OfflineSyncBackgroundTest {
     @Before
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
+        clearCompatibilityPreference();
         String suffix = Long.toString(System.nanoTime());
         databaseName = "offline-background-" + suffix + ".db";
         directoryName = "offline-background-" + suffix;
@@ -66,6 +67,7 @@ public final class OfflineSyncBackgroundTest {
         java.io.File directory = new java.io.File(context.getFilesDir(), directoryName);
         deleteRecursively(directory);
         context.getSharedPreferences(SECURE_PREFERENCES, Context.MODE_PRIVATE).edit().clear().commit();
+        clearCompatibilityPreference();
         KeyStore keyStore = keyStore();
         if (keyStore.containsAlias(ENVELOPE_KEY)) keyStore.deleteEntry(ENVELOPE_KEY);
     }
@@ -183,6 +185,63 @@ public final class OfflineSyncBackgroundTest {
     }
 
     @Test
+    public void updateRequiredStopsWorkerAndForegroundUntilCompatibilityReturns() throws Exception {
+        AppCompatibilityManager compatibility = new AppCompatibilityManager(context);
+        long installedVersionCode = compatibility.getState().getInstalledVersionCode();
+        compatibility.applyPolicy(
+            installedVersionCode,
+            2,
+            "https://play.google.com/store/apps/details?id=com.dallfit.app"
+        );
+        QueueTransport transport = new QueueTransport();
+        OfflineSyncEngine engine = new OfflineSyncEngine(
+            storage,
+            transport,
+            executor,
+            () -> Instant.parse("2026-09-14T12:00:00Z"),
+            () -> 0.5
+        );
+        storage.putSnapshot(
+            "execution-a",
+            "plan-a",
+            1,
+            0,
+            "{\"executionId\":\"execution-a\",\"revision\":0}",
+            "2026-09-14T11:59:00Z"
+        );
+
+        assertEquals(
+            OfflineSyncWorkerOutcome.COMPLETED,
+            engine.runWorker(
+                "https://api.example.test",
+                "fictitious-token",
+                "one-time-worker"
+            )
+        );
+        assertEquals(0, transport.uploadCount);
+        assertTrue(storage.hasPendingChanges());
+
+        transport.results.add(OfflineSyncTransportResult.of(
+            OfflineSyncTransportResult.Kind.SUCCESS,
+            "synced"
+        ));
+        compatibility.applyPolicy(
+            installedVersionCode,
+            1,
+            "https://play.google.com/store/apps/details?id=com.dallfit.app"
+        );
+        engine.onCompatibilityChanged();
+
+        assertTrue(transport.uploaded.await(5, TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (storage.hasPendingChanges() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(1, transport.uploadCount);
+        assertFalse(storage.hasPendingChanges());
+    }
+
+    @Test
     @SuppressLint("RestrictedApi")
     public void workRequestsUseOnlyConnectedConstraintAndExpectedBackoff() {
         OneTimeWorkRequest oneTime = OfflineSyncWorkScheduler.oneTimeRequest();
@@ -266,6 +325,13 @@ public final class OfflineSyncBackgroundTest {
         return result;
     }
 
+    private void clearCompatibilityPreference() {
+        context.getSharedPreferences("app-compatibility", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit();
+    }
+
     private static void deleteRecursively(java.io.File target) {
         if (!target.exists()) return;
         java.io.File[] children = target.listFiles();
@@ -275,6 +341,7 @@ public final class OfflineSyncBackgroundTest {
 
     private static final class QueueTransport implements OfflineSyncTransport {
         private final Queue<OfflineSyncTransportResult> results = new ArrayDeque<>();
+        private final CountDownLatch uploaded = new CountDownLatch(1);
         private int uploadCount;
 
         @Override
@@ -284,6 +351,7 @@ public final class OfflineSyncBackgroundTest {
             OfflineSyncClaim claim
         ) {
             uploadCount++;
+            uploaded.countDown();
             OfflineSyncTransportResult result = results.poll();
             if (result == null) throw new AssertionError("Missing transport result.");
             return result;

@@ -46,6 +46,10 @@ funcionais declarados pelos contratos, incluindo `Idempotency-Key`, na request;
 expõe somente `X-Request-Id` e `X-Resource-Version` na response, sem ampliar origem
 ou métodos.
 
+O CORS também permite `X-App-Version-Code` e `X-Sync-Contract-Version` no request
+de snapshot Android. Eles são metadados de negociação, não credenciais nem fonte
+de autorização.
+
 O `ValidationPipe` global transforma entradas, mantém somente propriedades dos
 DTOs e rejeita campos adicionais. Toda falha de query, param ou body validado por
 esse pipe responde `400` com `code: VALIDATION_ERROR`, `details: {}` e mensagem
@@ -69,6 +73,12 @@ obrigatório ou mudar semântica exige migração coordenada e atualização de:
 6. testes de contrato e comportamento.
 
 Não expor diretamente entidades de banco. A resposta HTTP é montada explicitamente.
+
+O rollout inicial do snapshot Android interpreta somente a ausência conjunta dos
+dois headers de compatibilidade como pacote 1 e contrato 1. Ausência parcial,
+formato não inteiro positivo, pacote abaixo do mínimo ou contrato diferente do
+aceito responde `409 APP_UPDATE_REQUIRED` antes de lock, Redis ou MongoDB. Quando
+o mínimo for maior que 1, o cliente legado sem headers também é recusado.
 
 ## Streaming SSE
 

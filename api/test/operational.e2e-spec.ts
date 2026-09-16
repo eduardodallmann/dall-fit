@@ -35,6 +35,9 @@ async function createOperationalFixture(
   process.env.REDIS_URL = `redis://${await redisServer.getHost()}:${await redisServer.getPort()}`;
   process.env.REDIS_NAMESPACE = `dall-fit-${dependency}-e2e`;
   process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64 = googleCredential;
+  process.env.ANDROID_MIN_VERSION_CODE = '1';
+  process.env.ANDROID_PLAY_STORE_URL =
+    'https://play.google.com/store/apps/details?id=com.dallfit.app';
   process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
   process.env.AUTH_COOKIE_SECURE = 'false';
   process.env.UI_URL = 'http://localhost:3000';

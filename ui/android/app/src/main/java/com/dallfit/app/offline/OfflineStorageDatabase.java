@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 final class OfflineStorageDatabase extends SQLiteOpenHelper {
     static final String DATABASE_NAME = "dall-fit-offline.db";
-    static final int SCHEMA_VERSION = 3;
+    static final int SCHEMA_VERSION = 4;
 
     OfflineStorageDatabase(Context context) {
         this(context, DATABASE_NAME);
@@ -31,7 +31,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         if (oldVersion == newVersion) return;
         if (oldVersion == 1 && newVersion >= 2) migrateFromOneToTwo(database);
         if (oldVersion <= 2 && newVersion >= 3) migrateFromTwoToThree(database);
-        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 3) throw missingMigration();
+        if (oldVersion <= 3 && newVersion >= 4) migrateFromThreeToFour(database);
+        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 4) throw missingMigration();
     }
 
     @Override
@@ -90,6 +91,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "account_id INTEGER NOT NULL DEFAULT 1 REFERENCES account_state(id) ON DELETE CASCADE," +
             "plan_id TEXT NOT NULL CHECK (length(plan_id) > 0)," +
             "payload_version INTEGER NOT NULL CHECK (payload_version > 0)," +
+            "producer_version_code INTEGER NOT NULL CHECK (producer_version_code > 0)," +
+            "sync_contract_version INTEGER NOT NULL CHECK (sync_contract_version > 0)," +
             "revision INTEGER NOT NULL CHECK (revision >= 0)," +
             "payload_json TEXT NOT NULL," +
             "updated_at TEXT NOT NULL)"
@@ -181,6 +184,17 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
 
     private static void migrateFromTwoToThree(SQLiteDatabase database) {
         createLatestCompletionTable(database);
+    }
+
+    private static void migrateFromThreeToFour(SQLiteDatabase database) {
+        database.execSQL(
+            "ALTER TABLE snapshots ADD COLUMN producer_version_code INTEGER NOT NULL DEFAULT 1 " +
+            "CHECK (producer_version_code > 0)"
+        );
+        database.execSQL(
+            "ALTER TABLE snapshots ADD COLUMN sync_contract_version INTEGER NOT NULL DEFAULT 1 " +
+            "CHECK (sync_contract_version > 0)"
+        );
     }
 
     private static void createLatestCompletionTable(SQLiteDatabase database) {

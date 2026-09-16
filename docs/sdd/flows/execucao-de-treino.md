@@ -27,10 +27,19 @@ por pessoa.
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
 |     — | autorizar edição offline | preparação Android | `PUT /training/offline-lease` ou `POST /training/offline-lease/takeover` após confirmação |
 |     — | sincronizar, concluir ou cancelar offline | sincronizador Android em foreground ou WorkManager | `PUT /training/offline-snapshot` |
+|     — | negociar compatibilidade Android | composição nativa e Worker | `GET /app-compatibility/android` |
 
 ## Sequência e decisões
 
-1. No Web/PWA, um hint offline impede a montagem de toda a jornada, preserva a URL
+1. Na abertura, resume e recuperação de conectividade, somente o Android consulta
+   a política pública e compara o `versionCode` real do pacote com o maior mínimo
+   já observado. Pacote obsoleto bloqueia a jornada e o sincronizador; falha sem
+   política conhecida não inventa bloqueio. Se já existe sessão local, somente seu
+   path de workout pode chegar ao terminal local, sem envio. Depois da atualização,
+   a build abre e migra v1/v2/v3 até o schema v4 antes de rearmar os envelopes
+   compatíveis na mesma ordem. Reset é último recurso e exige reconhecimento do
+   aviso persistido fora do banco novo.
+2. No Web/PWA, um hint offline impede a montagem de toda a jornada, preserva a URL
    solicitada e apresenta somente `Conexão necessária`; não há request, cache de
    domínio, Background Sync, Analytics offline nem replay na reconexão. Recuperada
    a rede, a mesma rota é remontada contra as autoridades online. No Android,
@@ -48,18 +57,18 @@ por pessoa.
    sincronizador Android envia sequencialmente os envelopes produzidos pela jornada
    em foreground ou pelo WorkManager, preservando revisões concorrentes e terminais
    distintos na ordem local.
-2. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
+3. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
    uma resposta anterior sem plano não sobreviva à próxima navegação.
-3. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
+4. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
    Antes de iniciar, a pessoa pode retornar à seleção por um link próprio; ele não
    aparece durante a sessão.
-4. No Web, iniciar cria o snapshot Redis exclusivo com TTL absoluto de 24 horas.
+5. No Web, iniciar cria o snapshot Redis exclusivo com TTL absoluto de 24 horas.
    No Android, iniciar valida plano/lease locais, captura a árvore preparada e grava
    sessão + snapshot `in-progress` em uma transação SQLite. Se outro workout já
    estiver ativo, a pessoa continua ou confirma o descarte terminal antes do novo.
-5. Cada mutation Web envia a versão canônica; cada ação Android incrementa uma
+6. Cada mutation Web envia a versão canônica; cada ação Android incrementa uma
    revisão e confirma sessão + envelope coalescido localmente antes do feedback.
    Carga é inteira entre 0 e 9999 ou vazia;
    concluir série aceita ambos atomicamente. Descansos e exercícios temporizados
@@ -67,17 +76,17 @@ por pessoa.
    por sessão, lendo a versão somente ao chegar à cabeça. Um PUT de carga pendente
    não bloqueia campos incompletos nem ações de conclusão; a ação usa o draft mais
    novo e respostas antigas não o sobrescrevem.
-6. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
+7. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
    incompleto requer confirmação explícita para finalizar.
-7. A finalização Web grava execução e perfis no MongoDB, remove o snapshot Redis e
+8. A finalização Web grava execução e perfis no MongoDB, remove o snapshot Redis e
    navega para o resumo semanal compartilhável. A finalização Android grava
    `completed`, remove a sessão e grava uma apresentação compacta provisória no
    mesmo commit, então volta para `/training` sem abrir a tela semanal.
-8. Na sincronização offline, `completed` consolida a árvore capturada e devolve o mesmo
+9. Na sincronização offline, `completed` consolida a árvore capturada e devolve o mesmo
    resumo semanal; `cancelled` descarta a execução sem histórico. Ambos gravam um
    recibo imutável antes da limpeza condicionada do snapshot. Replay terminal
    continua idempotente mesmo após lease ou Redis expirarem.
-9. O sucesso canônico promove somente o card da mesma execução e sequência; resposta
+10. O sucesso canônico promove somente o card da mesma execução e sequência; resposta
    antiga não substitui conclusão posterior. Conflito pausa apenas seu item, compara
    versões completas e reenfileira escolha integral confirmada. Token obsoleto
    reabre a comparação atual. Imutabilidade e lease inválido oferecem apenas
@@ -118,6 +127,9 @@ por pessoa.
   mutação depois de conclusão ou cancelamento. A jornada produz pendências v1 e o
   sincronizador as consome em foreground e pelo WorkManager. Falha local não usa o
   caminho HTTP como fallback.
+- Atualização obrigatória: `APP_UPDATE_REQUIRED` conserva fila, sessão e arquivos,
+  pausa foreground e WorkManager sem loop e só rearma itens quando a build instalada
+  satisfaz o mínimo monotônico e o contrato persistido continua aceito.
 - Responsividade: em `390px`, cabeçalhos e linhas de série quebram sem truncar,
   sobrepor ou criar rolagem horizontal; todo o cabeçalho do exercício reage e
   alterna expansão, o input de carga recebe clique em toda a largura e o Drawer
@@ -160,6 +172,17 @@ por pessoa.
 - Then: conteúdo, identidade e ações são desmontados, a URL permanece igual e
   somente `Conexão necessária` é apresentado, sem request ou cache privado.
 - And: ao reconectar, a etapa é remontada pela jornada online normal.
+
+### Cenário 5 — exigir atualização sem perder o terminal local
+
+- Link para testar: não se aplica; exige pacote Android e política controlados.
+- Given: existe uma sessão SQLite ativa e a API passa a exigir `versionCode` maior.
+- When: o coordenador detecta a incompatibilidade e a pessoa conclui ou cancela o
+  workout capturado.
+- Then: somente a execução permanece disponível até o commit terminal, nenhum
+  upload ocorre, a fila e a conclusão provisória são preservadas e o bloqueio
+  global aparece ao sair. A build atualizada migra o banco antes de retomar a mesma
+  fila.
 
 ## Cobertura automatizada
 

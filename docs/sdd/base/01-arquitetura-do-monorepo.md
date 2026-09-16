@@ -69,6 +69,11 @@ dall-fit/
     A preparação Android registra o lease e persiste o fence; ações gravam sessão
     e snapshot em uma transação antes de atualizar a UI, e terminais permanecem na
     fila nativa para o sincronizador existente.
+13. A compatibilidade Android é coordenada entre a política pública da API, a
+    versão real do pacote e metadados persistidos em cada envelope SQLite. O
+    aplicativo consulta a política somente no canal nativo, conserva o maior
+    mínimo já observado e bloqueia preparação, novas sessões e sincronização
+    incompatíveis; Web/PWA não participa desse protocolo.
 
 ## Convenções de importação
 

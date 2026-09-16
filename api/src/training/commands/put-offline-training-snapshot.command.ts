@@ -5,6 +5,10 @@ import type {
   PutOfflineTrainingSnapshotV1Request,
 } from '@dall-fit/types';
 
+import {
+  AndroidAppCompatibilityService,
+  type AndroidSnapshotClientHeaders,
+} from '~/app-compatibility/services/android-app-compatibility.service';
 import { mapOfflineTrainingSnapshotHttpError } from '~/training/errors/offline-training-snapshot-http.errors';
 import { OfflineTrainingSnapshotContentService } from '~/training/services/offline-training-snapshot-content.service';
 import { OfflineTrainingSnapshotLockService } from '~/training/services/offline-training-snapshot-lock.service';
@@ -16,6 +20,7 @@ export class PutOfflineTrainingSnapshotCommand {
   private readonly logger = new Logger(PutOfflineTrainingSnapshotCommand.name);
 
   constructor(
+    private readonly compatibility: AndroidAppCompatibilityService,
     private readonly content: OfflineTrainingSnapshotContentService,
     private readonly locks: OfflineTrainingSnapshotLockService,
     private readonly snapshots: OfflineTrainingSnapshotService,
@@ -25,19 +30,28 @@ export class PutOfflineTrainingSnapshotCommand {
   async execute(
     personId: string,
     request: PutOfflineTrainingSnapshotV1Request,
+    clientHeaders: AndroidSnapshotClientHeaders = {},
   ): Promise<PutOfflineTrainingSnapshotResponse> {
     this.logger.log('PutOfflineTrainingSnapshotCommand -> execute -> params:', {
       params: {
         payloadVersion: request.payloadVersion,
         revisionCategory: request.revision === 0 ? 'initial' : 'advanced',
+        appVersionCodePresent: clientHeaders.appVersionCode !== undefined,
+        syncContractVersionPresent:
+          clientHeaders.syncContractVersion !== undefined,
       },
     });
-    const prepared = this.content.prepare(request);
-    this.logger.log(
-      'PutOfflineTrainingSnapshotCommand -> execute -> content return:',
-      { data: { prepared: true } },
-    );
     try {
+      this.compatibility.validateSnapshotClient(clientHeaders);
+      this.logger.log(
+        'PutOfflineTrainingSnapshotCommand -> execute -> compatibility return:',
+        { data: { compatible: true } },
+      );
+      const prepared = this.content.prepare(request);
+      this.logger.log(
+        'PutOfflineTrainingSnapshotCommand -> execute -> content return:',
+        { data: { prepared: true } },
+      );
       const lock = await this.locks.acquire(request.installationId);
       this.logger.log(
         'PutOfflineTrainingSnapshotCommand -> execute -> locks acquire return:',

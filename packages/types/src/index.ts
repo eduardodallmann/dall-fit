@@ -1,6 +1,9 @@
 export type {
+  AndroidAppCompatibility,
+  AndroidAppCompatibilityResponse,
   ApiError,
   ApiResponse,
+  AppUpdateRequiredDetails,
   ActivatePersonalTrainingPlanRequest,
   ActivatePersonalTrainingPlanResponse,
   CollectionResponse,
@@ -64,6 +67,7 @@ export type {
   UpdateExerciseRequest,
   UpdateExerciseResponse,
 } from './contracts.js';
+export { ANDROID_SYNC_CONTRACT_VERSION } from './contracts.js';
 export type {
   BodyArea,
   DurationExercise,

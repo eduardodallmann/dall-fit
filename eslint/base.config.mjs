@@ -15,6 +15,8 @@ export function baseConfig(rootDirectory) {
         '**/.vercel/**',
         '**/.workflow-data/**',
         '**/.workflow-vitest/**',
+        '.kilo/worktrees/**',
+        '.kilocode/worktrees/**',
         'workflow/workflow/**',
         'ui/public/**',
         'ui/android/app/src/main/assets/**',

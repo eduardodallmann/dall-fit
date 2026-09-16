@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { AppCompatibilityModule } from '~/app-compatibility/app-compatibility.module';
 import { AuthModule } from '~/auth/auth.module';
 import { TrainingPlanModule } from '~/training-plan/training-plan.module';
 import { PutOfflineTrainingSnapshotCommand } from '~/training/commands/put-offline-training-snapshot.command';
@@ -34,6 +35,7 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
 
 @Module({
   imports: [
+    AppCompatibilityModule,
     AuthModule,
     TrainingPlanModule,
     MongooseModule.forFeature([

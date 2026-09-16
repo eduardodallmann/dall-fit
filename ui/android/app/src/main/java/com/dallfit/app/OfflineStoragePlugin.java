@@ -6,6 +6,8 @@ import com.dallfit.app.offline.OfflineFileMetadata;
 import com.dallfit.app.offline.OfflineMediaDownloader;
 import com.dallfit.app.offline.OfflineStorageException;
 import com.dallfit.app.offline.OfflineStorageProvider;
+import com.dallfit.app.offline.AppCompatibilityManager;
+import com.dallfit.app.offline.AppCompatibilityState;
 import com.dallfit.app.offline.OfflineStorageService;
 import com.dallfit.app.offline.OfflineStorageState;
 import com.dallfit.app.offline.OfflineSyncConnectivity;
@@ -41,6 +43,7 @@ public final class OfflineStoragePlugin extends Plugin {
     }
 
     private OfflineStorageService service;
+    private AppCompatibilityManager compatibility;
     private OfflineMediaDownloader mediaDownloader;
     private OfflineSyncConnectivity syncConnectivity;
     private OfflineSyncEngine syncEngine;
@@ -51,6 +54,7 @@ public final class OfflineStoragePlugin extends Plugin {
 
     @Override
     public void load() {
+        compatibility = OfflineStorageProvider.getCompatibilityManager(getContext());
         service = OfflineStorageProvider.get(getContext());
         mediaDownloader = new OfflineMediaDownloader(service);
         syncEngine = OfflineStorageProvider.getSyncEngine(getContext());
@@ -58,6 +62,29 @@ public final class OfflineStoragePlugin extends Plugin {
         service.addStateListener(stateListener);
         syncEngine.addStateListener(syncStateListener);
         syncConnectivity.start();
+    }
+
+    @PluginMethod
+    public void getAppCompatibility(PluginCall call) {
+        resolve(call, () -> appCompatibilityToJson(compatibility.getState()));
+    }
+
+    @PluginMethod
+    public void checkAppCompatibility(PluginCall call) {
+        execute(() -> resolve(call, () -> {
+            AppCompatibilityState state = compatibility.check(requiredString(call, "apiBaseUrl"));
+            syncEngine.onCompatibilityChanged();
+            return appCompatibilityToJson(state);
+        }));
+    }
+
+    @PluginMethod
+    public void openAppStore(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            result.put("opened", compatibility.openStore(requiredString(call, "storeUrl")));
+            return result;
+        });
     }
 
     @Override
@@ -75,6 +102,14 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void getState(PluginCall call) {
         resolve(call, () -> stateToJson(service.getState()));
+    }
+
+    @PluginMethod
+    public void acknowledgeRecovery(PluginCall call) {
+        resolve(call, () -> {
+            service.acknowledgeRecovery();
+            return new JSObject();
+        });
     }
 
     @PluginMethod
@@ -583,6 +618,19 @@ public final class OfflineStoragePlugin extends Plugin {
         result.put("pendingSnapshotCount", state.getPendingSnapshotCount());
         result.put("temporaryFileCount", state.getTemporaryFileCount());
         result.put("readyFileCount", state.getReadyFileCount());
+        return result;
+    }
+
+    private static JSObject appCompatibilityToJson(AppCompatibilityState state) {
+        JSObject result = new JSObject();
+        result.put("installedVersionCode", state.getInstalledVersionCode());
+        result.put("installedVersionName", state.getInstalledVersionName());
+        if (state.getMinimumVersionCode() != null) {
+            result.put("minimumVersionCode", state.getMinimumVersionCode());
+        }
+        if (state.getStoreUrl() != null) result.put("storeUrl", state.getStoreUrl());
+        result.put("syncContractVersion", AppCompatibilityManager.SYNC_CONTRACT_VERSION);
+        result.put("updateRequired", state.isUpdateRequired());
         return result;
     }
 

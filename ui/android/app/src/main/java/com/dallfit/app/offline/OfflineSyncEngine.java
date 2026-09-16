@@ -22,6 +22,7 @@ public final class OfflineSyncEngine {
     private static final String LOG_TAG = "DallFitOfflineSync";
 
     private final Supplier<Instant> clock;
+    private final AppCompatibilityManager compatibility;
     private final Map<String, Integer> cycleAttempts = new HashMap<>();
     private final ScheduledExecutorService executor;
     private final List<StateListener> listeners = new CopyOnWriteArrayList<>();
@@ -42,8 +43,16 @@ public final class OfflineSyncEngine {
     private boolean updateRequired;
 
     public OfflineSyncEngine(OfflineStorageService storage) {
+        this(storage, new AppCompatibilityManager(storage.getContext()));
+    }
+
+    public OfflineSyncEngine(
+        OfflineStorageService storage,
+        AppCompatibilityManager compatibility
+    ) {
         this(
             storage,
+            compatibility,
             new OfflineSyncHttpTransport(),
             new ScheduledThreadPoolExecutor(1),
             Instant::now,
@@ -59,11 +68,20 @@ public final class OfflineSyncEngine {
         Supplier<Instant> clock,
         DoubleSupplier random
     ) {
-        this(storage, transport, executor, clock, random, null);
+        this(
+            storage,
+            new AppCompatibilityManager(storage.getContext()),
+            transport,
+            executor,
+            clock,
+            random,
+            null
+        );
     }
 
     private OfflineSyncEngine(
         OfflineStorageService storage,
+        AppCompatibilityManager compatibility,
         OfflineSyncTransport transport,
         ScheduledExecutorService executor,
         Supplier<Instant> clock,
@@ -71,6 +89,7 @@ public final class OfflineSyncEngine {
         OfflineActionNotifier notifier
     ) {
         this.storage = storage;
+        this.compatibility = compatibility;
         this.transport = transport;
         this.executor = executor;
         this.clock = clock;
@@ -93,6 +112,22 @@ public final class OfflineSyncEngine {
 
     public void onConnectivityAvailable() {
         triggerCurrent(true, 0);
+    }
+
+    public synchronized void onCompatibilityChanged() {
+        boolean blockedByVersion = compatibility.getState().isUpdateRequired();
+        if (blockedByVersion) {
+            updateRequired = true;
+            generation++;
+            runAgain = false;
+            if (scheduled != null) scheduled.cancel(false);
+            scheduled = null;
+        } else {
+            storage.rearmUpdateRequiredSync(now());
+            updateRequired = storage.hasSyncReason("update-required");
+        }
+        emitState();
+        if (!updateRequired) triggerCurrent(false, 0);
     }
 
     public void triggerCurrentCredentials() {
@@ -323,7 +358,9 @@ public final class OfflineSyncEngine {
         this.accessToken = accessToken;
         authenticationRequired = false;
         globalProtocolFailure = storage.hasSyncReason("auth-transport-ambiguous");
-        updateRequired = storage.hasSyncReason("update-required");
+        boolean installedVersionBlocked = compatibility.getState().isUpdateRequired();
+        if (!installedVersionBlocked) storage.rearmUpdateRequiredSync(now());
+        updateRequired = installedVersionBlocked || storage.hasSyncReason("update-required");
         if (!initialized) {
             logRecovery(storage.recoverInterruptedSync(now()));
             initialized = true;
@@ -390,6 +427,7 @@ public final class OfflineSyncEngine {
                 if (notifier != null) notifier.notifyActionRequired();
                 return false;
             case UPDATE_REQUIRED:
+                compatibility.recordUpdateRequired(result.getDetailsJson());
                 storage.markSyncActionRequired(
                     claim.getExecutionId(),
                     claim.getRevision(),

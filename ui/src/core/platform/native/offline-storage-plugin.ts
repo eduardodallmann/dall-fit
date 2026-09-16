@@ -50,7 +50,17 @@ export interface OfflineSyncState {
     | 'authentication-required'
     | 'idle'
     | 'pending'
-    | 'syncing';
+    | 'syncing'
+    | 'update-required';
+}
+
+export interface AppCompatibilityState {
+  installedVersionCode: number;
+  installedVersionName: string;
+  minimumVersionCode?: number;
+  storeUrl?: string;
+  syncContractVersion: 1;
+  updateRequired: boolean;
 }
 
 export interface OfflineCompletionPresentation {
@@ -86,6 +96,10 @@ export interface OfflineStoragePlugin {
     listener: (state: OfflineSyncState) => void,
   ): Promise<PluginListenerHandle>;
   bindAccount(options: { personId: string }): Promise<void>;
+  acknowledgeRecovery(): Promise<void>;
+  checkAppCompatibility(options: {
+    apiBaseUrl: string;
+  }): Promise<AppCompatibilityState>;
   clearAccountData(): Promise<void>;
   clearInvalidLeaseData(): Promise<void>;
   clearSyncCredentials(): Promise<OfflineSyncState>;
@@ -122,6 +136,7 @@ export interface OfflineStoragePlugin {
     updatedAt: string;
   }): Promise<{ file: OfflineFileMetadata }>;
   getActiveSession(): Promise<{ aggregate?: OfflineStoredAggregate }>;
+  getAppCompatibility(): Promise<AppCompatibilityState>;
   getFile(options: { fileId: string }): Promise<{ file?: OfflineFileMetadata }>;
   getReadyFileUrl(options: { fileId: string }): Promise<{ url?: string }>;
   getMonotonicTime(): Promise<{ elapsedRealtime: number }>;
@@ -209,6 +224,7 @@ export interface OfflineStoragePlugin {
     apiBaseUrl: string;
     rearmTemporary: boolean;
   }): Promise<OfflineSyncState>;
+  openAppStore(options: { storeUrl: string }): Promise<{ opened: boolean }>;
 }
 
 export const offlineStoragePlugin =

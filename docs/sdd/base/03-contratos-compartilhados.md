@@ -171,6 +171,12 @@ request; o Workflow os lê no MongoDB.
   exercícios/séries e timer sem totais derivados, pessoa, validade, mídia ou
   capacidades temporárias. A resolução opcional leva a escolha explícita
   `local | server` e o token do conflito observado.
+- `AndroidAppCompatibilityResponse` publica `platform: 'android'`, o
+  `minimumVersionCode`, a constante positiva `ANDROID_SYNC_CONTRACT_VERSION` e a
+  URL HTTPS oficial da listagem. `AppUpdateRequiredDetails` repete somente o
+  mínimo, o contrato aceito e a URL pública quando o sync é recusado. O transporte
+  envia `X-App-Version-Code` e `X-Sync-Contract-Version`; esses headers negociam
+  compatibilidade e não substituem autenticação, lease ou validação do snapshot.
 - `RegisterOfflineTrainingLeaseRequest` contém somente o UUID v4 da instalação.
   `OfflineTrainingLeaseResponse` publica plano, fence, vencimento e o estado
   `created | unchanged | plan-rebound | taken-over`; pessoa e instalação não

@@ -33,6 +33,24 @@ export interface ApiResponse<TData> {
   data: TData;
 }
 
+export const ANDROID_SYNC_CONTRACT_VERSION = 1 as const;
+
+export interface AndroidAppCompatibility {
+  minimumVersionCode: number;
+  platform: 'android';
+  storeUrl: string;
+  syncContractVersion: typeof ANDROID_SYNC_CONTRACT_VERSION;
+}
+
+export type AndroidAppCompatibilityResponse =
+  ApiResponse<AndroidAppCompatibility>;
+
+export interface AppUpdateRequiredDetails {
+  minimumVersionCode: number;
+  storeUrl: string;
+  syncContractVersion: typeof ANDROID_SYNC_CONTRACT_VERSION;
+}
+
 export type RealtimeResourceInvalidation =
   | {
       resource: 'global-training-plan';

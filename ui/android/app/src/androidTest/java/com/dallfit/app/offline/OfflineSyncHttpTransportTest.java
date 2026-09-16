@@ -13,7 +13,9 @@ public final class OfflineSyncHttpTransportTest {
         3,
         "{\"executionId\":\"execution-a\",\"revision\":3}",
         1,
-        0
+        0,
+        1,
+        1
     );
 
     @Test
@@ -54,6 +56,33 @@ public final class OfflineSyncHttpTransportTest {
             ).getKind()
         );
         assertEquals(
+            OfflineSyncTransportResult.Kind.UPDATE_REQUIRED,
+            classify(
+                409,
+                "{\"code\":\"APP_UPDATE_REQUIRED\",\"details\":{" +
+                "\"minimumVersionCode\":1,\"syncContractVersion\":2," +
+                "\"storeUrl\":\"https://play.google.com/store/apps/details?id=com.dallfit.app\"}}"
+            ).getKind()
+        );
+        assertEquals(
+            OfflineSyncTransportResult.Kind.UPDATE_REQUIRED,
+            classify(
+                409,
+                "{\"code\":\"APP_UPDATE_REQUIRED\",\"details\":{" +
+                "\"minimumVersionCode\":2,\"syncContractVersion\":1," +
+                "\"storeUrl\":\"https://play.google.com/store/apps/details?id=com.dallfit.app\"}}"
+            ).getKind()
+        );
+        assertEquals(
+            OfflineSyncTransportResult.Kind.BLOCKED,
+            classify(
+                409,
+                "{\"code\":\"APP_UPDATE_REQUIRED\",\"details\":{" +
+                "\"minimumVersionCode\":2,\"syncContractVersion\":1," +
+                "\"storeUrl\":\"https://play.google.com/store/apps/detailsevil?id=com.dallfit.app\"}}"
+            ).getKind()
+        );
+        assertEquals(
             OfflineSyncTransportResult.Kind.TEMPORARY,
             classify(503, "{\"code\":\"SERVICE_UNAVAILABLE\"}").getKind()
         );
@@ -67,7 +96,9 @@ public final class OfflineSyncHttpTransportTest {
             "{\"executionId\":\"execution-a\",\"revision\":3," +
             "\"resolution\":{\"choice\":\"server\",\"conflictToken\":\"opaque\"}}",
             1,
-            0
+            0,
+            1,
+            1
         );
 
         assertEquals(

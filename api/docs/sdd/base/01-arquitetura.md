@@ -309,6 +309,10 @@ comando Redis. Somente `RedisKeyService` compõe as chaves injetando o namespace
 nenhum adapter executa `KEYS`, `FLUSH*` ou limpeza por prefixo em runtime publicado.
 Falha, timeout, saturação, reset do dataset ou rejeição por `noeviction` nunca
 desabilitam autenticação, CSRF ou rate limit: o caminho protegido falha fechado.
+A leitura pública de compatibilidade Android é a exceção deliberada: para não
+tocar Redis, usa uma janela fixa em memória por IP, limitada a 10.000
+identificadores por runtime. Ela não protege sessão nem mutação; instâncias podem
+ter janelas independentes.
 
 `OfflineTrainingLeaseService`, no módulo de treino, usa o mesmo singleton e uma
 chave `offline-training-lease` por pessoa. Ele não recebe DTO HTTP nem persiste no
@@ -318,7 +322,10 @@ específica, sem autorização otimista ou lease local por instância.
 
 O mesmo módulo recebe snapshots Android v1 em uma chave
 `offline-training-snapshot` por pessoa. Validação Zod e hash canônico acontecem
-antes da região crítica. Um lock Redis curto por instalação usa token e release
+antes da região crítica. Antes de ambos, o `AppCompatibilityModule` valida a
+versão do pacote e do contrato informadas pelo transporte. Cliente incompatível
+recebe `APP_UPDATE_REQUIRED` sem lock nem acesso a Redis ou MongoDB. Um lock Redis
+curto por instalação usa token e release
 condicionado; sob ele, um único script Lua confronta lease, execução, revisão e
 hash, resolve conflitos por token da versão observada e grava o agregado completo
 com lease e snapshot no mesmo `PXAT` de sete dias. Replay idêntico e escolha da
@@ -331,6 +338,14 @@ da limpeza condicionada do Redis. O recibo torna retries idempotentes mesmo depo
 da limpeza ou expiração do lease e impede que uma execução terminal seja
 ressuscitada. A árvore capturada determina o resultado; apenas a elegibilidade dos
 perfis de carga consulta o plano atual, como na finalização online.
+
+`AppCompatibilityModule` também expõe a política pública Android sem sessão,
+MongoDB ou Redis. `ANDROID_MIN_VERSION_CODE` e `ANDROID_PLAY_STORE_URL` são
+obrigatórios e validados no bootstrap; a URL deve ser HTTPS e apontar para
+`com.dallfit.app`. O endpoint usa rate limit público por IP e `no-store`. A
+elevação do mínimo ocorre somente após a build correspondente estar disponível na
+Play Store e depois de backend, migration e sync terem sido validados com as duas
+versões; reduzir o valor não constitui downgrade do banco local.
 
 `OperationalModule` expõe liveness em `GET /health` sem dependências e readiness
 em `GET /ready`. A readiness usa Terminus para pingar a conexão Mongoose vigente e

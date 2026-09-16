@@ -12,6 +12,7 @@ import {
   ApplicationErrorBoundary,
   ApplicationFallback,
 } from '~/core/components/application-fallback';
+import type { NativeAppCompatibilityCoordinator } from '~/core/platform/native/app-compatibility';
 import type { OfflinePreparationCoordinator } from '~/core/platform/native/offline-preparation';
 import type { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
 import { resolveApplicationPlatform } from '~/core/platform/platform-composition';
@@ -30,6 +31,7 @@ export async function bootstrap() {
     const initialTheme = bootstrapTheme();
     const platform = resolveApplicationPlatform();
     let nativeSession: NativeSessionCoordinator | null = null;
+    let appCompatibility: NativeAppCompatibilityCoordinator | null = null;
     let offlinePreparation: OfflinePreparationCoordinator | null = null;
     let offlineSync: OfflineSyncCoordinator | null = null;
     let trainingRepository: TrainingRepository | null = null;
@@ -38,6 +40,7 @@ export async function bootstrap() {
         await import('~/core/platform/native/native-session-composition');
       const composition = await createNativeComposition();
       nativeSession = composition.session;
+      appCompatibility = composition.appCompatibility;
       offlinePreparation = composition.offlinePreparation;
       offlineSync = composition.offlineSync;
       trainingRepository = composition.trainingRepository;
@@ -61,6 +64,7 @@ export async function bootstrap() {
       <StrictMode>
         <ApplicationErrorBoundary>
           <AppProviders
+            appCompatibility={appCompatibility}
             initialTheme={initialTheme}
             nativeSession={nativeSession}
             offlinePreparation={offlinePreparation}

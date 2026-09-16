@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Header,
+  Headers,
   HttpCode,
   Logger,
   Put,
@@ -32,11 +33,20 @@ export class OfflineTrainingSnapshotController {
     @CurrentPerson() person: PersonEntity,
     @Body(OfflineTrainingSnapshotValidationPipe)
     body: PutOfflineTrainingSnapshotV1Request,
+    @Headers('x-app-version-code') appVersionCode?: string,
+    @Headers('x-sync-contract-version') syncContractVersion?: string,
   ): Promise<PutOfflineTrainingSnapshotResponse> {
     this.logger.log('OfflineTrainingSnapshotController -> put -> params:', {
-      params: { payloadVersion: body.payloadVersion },
+      params: {
+        appVersionCodePresent: appVersionCode !== undefined,
+        payloadVersion: body.payloadVersion,
+        syncContractVersionPresent: syncContractVersion !== undefined,
+      },
     });
-    const result = await this.command.execute(person.id, body);
+    const result = await this.command.execute(person.id, body, {
+      appVersionCode,
+      syncContractVersion,
+    });
     this.logger.log(
       'OfflineTrainingSnapshotController -> put -> command return:',
       { data: { state: result.data.state } },

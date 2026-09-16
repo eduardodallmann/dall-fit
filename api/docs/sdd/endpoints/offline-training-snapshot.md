@@ -14,6 +14,7 @@ duráveis e imutáveis.
 | Controller | [`OfflineTrainingSnapshotController`](../../../src/training/controllers/offline-training-snapshot.controller.ts) | recebe a entrada validada e devolve a resposta do command |
 | Validação | [`OfflineTrainingSnapshotValidationPipe`](../../../src/training/dto/offline-training-snapshot.dto.ts) e [`offlineTrainingSnapshotRequestSchema`](../../../src/training/domain/offline-training-snapshot.schema.ts) | limitam o JSON a 1 MiB e validam envelope, estado e relações |
 | Command | [`PutOfflineTrainingSnapshotCommand`](../../../src/training/commands/put-offline-training-snapshot.command.ts) | calcula o conteúdo, adquire o lock, consulta recibo, ingere, consolida terminal e limpa |
+| Compatibilidade | [`AndroidAppCompatibilityService`](../../../src/app-compatibility/services/android-app-compatibility.service.ts) | recusa pacote ou contrato incompatível antes das dependências do snapshot |
 | Conteúdo | [`OfflineTrainingSnapshotContentService`](../../../src/training/services/offline-training-snapshot-content.service.ts) | produz serialização canônica e SHA-256 sem incluir a escolha de resolução |
 | Lock | [`OfflineTrainingSnapshotLockService`](../../../src/training/services/offline-training-snapshot-lock.service.ts) | serializa por instalação com token e release condicionado |
 | Redis | [`OfflineTrainingSnapshotService`](../../../src/training/services/offline-training-snapshot.service.ts) | aplica lease, CAS, resolução, TTL e limpeza condicionada em Lua |
@@ -28,6 +29,11 @@ duráveis e imutáveis.
   NATIVE_SESSION_REQUIRED`, e cookie com Bearer recebe `400
   AUTH_TRANSPORT_AMBIGUOUS`. Sessão nativa dispensa CSRF.
 - Rate limit: política `training-mutation`, por pessoa/sessão e IP.
+- Compatibilidade: `X-App-Version-Code` e `X-Sync-Contract-Version` são inteiros
+  positivos gravados no envelope nativo. Ausência conjunta representa pacote e
+  contrato 1 somente no rollout inicial; ausência parcial, formato inválido,
+  pacote abaixo do mínimo ou contrato diferente responde `409
+  APP_UPDATE_REQUIRED` antes do conteúdo, lock, Redis ou MongoDB.
 - Entrada: envelope estrito `payloadVersion: 1`, UUID v4 de instalação e execução,
   fence do lease, revisão inteira, timestamp com timezone e snapshot completo.
 - Estado: `snapshot.state` discrimina `in-progress`, `completed` e `cancelled`.
@@ -45,7 +51,9 @@ duráveis e imutáveis.
 
 ## Fluxo completo
 
-O controller chama o command com a pessoa autenticada. O content service ordena
+O controller chama o command com a pessoa autenticada e os dois headers. O command
+primeiro pede ao `AndroidAppCompatibilityService` para compará-los com a política
+vigente. Somente um cliente compatível alcança o content service, que ordena
 recursivamente nomes de propriedades, preserva a ordem semântica de arrays e
 calcula o hash do envelope sem `resolution`. O command adquire um lock Redis curto
 por instalação; contenção retorna `OFFLINE_TRAINING_SYNC_IN_PROGRESS`, e o
@@ -100,6 +108,7 @@ idempotente.
 | lock ocupado | `409 OFFLINE_TRAINING_SYNC_IN_PROGRESS` | nenhum efeito |
 | lease ausente/divergente | `410 OFFLINE_LEASE_EXPIRED` / `409 OFFLINE_LEASE_REVOKED` | nenhum efeito inicial |
 | shape/tamanho inválido | `400 VALIDATION_ERROR` / `413 OFFLINE_TRAINING_SNAPSHOT_TOO_LARGE` | para antes do lock |
+| app ou contrato incompatível | `409 APP_UPDATE_REQUIRED` | devolve mínimo, contrato aceito e URL; não toca lock, Redis ou MongoDB |
 | Redis indisponível | `503 OFFLINE_TRAINING_SNAPSHOT_UNAVAILABLE` | nenhum aceite declarado |
 
 ## Cenários reproduzíveis
@@ -119,6 +128,8 @@ pnpm -C api seed -- offline-training-snapshot:ready
 ```bash
 curl --include --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
   --header 'content-type: application/json' \
   --data-binary @/tmp/dall-fit-offline-training-snapshot.json
 ```
@@ -139,6 +150,8 @@ pnpm -C api seed -- offline-training-snapshot:current
 jq '.revision = 1' /tmp/dall-fit-offline-training-snapshot.json | curl --include \
   --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
   --header 'content-type: application/json' --data-binary @-
 ```
 
@@ -166,6 +179,8 @@ jq '.snapshot.state = "completed" |
   /tmp/dall-fit-offline-training-snapshot.json | curl --include \
   --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
   --header 'content-type: application/json' --data-binary @-
 ```
 
@@ -188,6 +203,8 @@ pnpm -C api seed -- offline-training-snapshot:expired
 ```bash
 curl --include --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
   --header 'content-type: application/json' \
   --data-binary @/tmp/dall-fit-offline-training-snapshot.json
 ```
@@ -209,6 +226,8 @@ pnpm -C api seed -- offline-training-snapshot:invalid
 jq '.payloadVersion = 2' /tmp/dall-fit-offline-training-snapshot.json | curl --include \
   --request PUT http://localhost:4000/training/offline-snapshot \
   --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
   --header 'content-type: application/json' --data-binary @-
 ```
 
@@ -229,6 +248,25 @@ curl --include http://localhost:4000/ready
 
 O cURL apenas observa a infraestrutura. O E2E ocupa o lock e interrompe adapters
 controladamente para validar contenção, falha fechada e ausência de estado parcial.
+
+### Cenário 7 — atualização obrigatória
+
+**Seed:** use `offline-training-snapshot:ready`; o cenário depende adicionalmente
+de iniciar a API com `ANDROID_MIN_VERSION_CODE=2`.
+
+**cURL**
+
+```bash
+curl --include --request PUT http://localhost:4000/training/offline-snapshot \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 1' \
+  --header 'x-sync-contract-version: 1' \
+  --header 'content-type: application/json' \
+  --data-binary @/tmp/dall-fit-offline-training-snapshot.json
+```
+
+O resultado é `409 APP_UPDATE_REQUIRED` com somente mínimo 2, contrato 1 e URL
+pública nos detalhes. Lease, TTL, snapshot, recibo e execução permanecem intactos.
 
 ## Cobertura automatizada
 

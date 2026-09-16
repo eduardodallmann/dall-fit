@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
@@ -20,6 +21,7 @@ import {
 import { AuthSessionService } from '~/auth/services/auth-session.service';
 import { configureApplication } from '~/configure-application';
 import { PersonDocument } from '~/person/repositories/person.schema';
+import { RateLimitService } from '~/redis/rate-limit.service';
 import { RedisClientService } from '~/redis/redis-client.service';
 import {
   PersonalTrainingPlanActiveDocument,
@@ -96,6 +98,7 @@ describe('Offline training lease (e2e)', () => {
   let executionModel: Model<WorkoutExecutionDocument>;
   let authSessions: AuthSessionService;
   let leases: OfflineTrainingLeaseService;
+  let configService: ConfigService;
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create({
@@ -108,6 +111,9 @@ describe('Offline training lease (e2e)', () => {
     process.env.REDIS_URL = `redis://${await redisServer.getHost()}:${await redisServer.getPort()}`;
     process.env.REDIS_NAMESPACE = 'dall-fit-offline-lease-e2e';
     process.env.GOOGLE_OAUTH_CREDENTIALS_BASE64 = googleCredential;
+    process.env.ANDROID_MIN_VERSION_CODE = '1';
+    process.env.ANDROID_PLAY_STORE_URL =
+      'https://play.google.com/store/apps/details?id=com.dallfit.app';
     process.env.AUTH_SESSION_SECRET = 'e2e-session-secret-with-32-characters';
     process.env.AUTH_NATIVE_SESSION_AUDIENCE = 'dall-fit-android-e2e';
     process.env.AUTH_COOKIE_SECURE = 'false';
@@ -131,6 +137,7 @@ describe('Offline training lease (e2e)', () => {
     );
     authSessions = app.get(AuthSessionService);
     leases = app.get(OfflineTrainingLeaseService);
+    configService = app.get(ConfigService);
     receiptModel = app.get(
       getModelToken(OfflineTrainingTerminalReceiptDocument.name),
     );
@@ -148,6 +155,7 @@ describe('Offline training lease (e2e)', () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
+    configService.set('ANDROID_MIN_VERSION_CODE', 1);
     await Promise.all([
       personModel.deleteMany({}).exec(),
       planModel.deleteMany({}).exec(),
@@ -164,6 +172,75 @@ describe('Offline training lease (e2e)', () => {
       name: 'Offline Runner',
       photoUrl: null,
     });
+  });
+
+  it('publishes the public Android compatibility policy without caching', async () => {
+    const redisRateLimit = vi.spyOn(app.get(RateLimitService), 'consume');
+    const response = await request(app.getHttpServer())
+      .get('/app-compatibility/android')
+      .expect(200);
+
+    expect(redisRateLimit).not.toHaveBeenCalled();
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['x-request-id']).toBeTypeOf('string');
+    expect(response.body).toEqual({
+      data: {
+        minimumVersionCode: 1,
+        platform: 'android',
+        storeUrl:
+          'https://play.google.com/store/apps/details?id=com.dallfit.app',
+        syncContractVersion: 1,
+      },
+    });
+  });
+
+  it('rejects incompatible snapshot metadata before touching lease or snapshot state', async () => {
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const leaseBefore = await redisClient.get(leaseKey());
+    const leaseTtlBefore = await redisClient.pttl(leaseKey());
+    configService.set('ANDROID_MIN_VERSION_CODE', 2);
+
+    const cases = [
+      {},
+      { 'X-App-Version-Code': '1', 'X-Sync-Contract-Version': '1' },
+      { 'X-App-Version-Code': '2', 'X-Sync-Contract-Version': '2' },
+      { 'X-App-Version-Code': 'invalid', 'X-Sync-Contract-Version': '1' },
+    ];
+    for (const headers of cases) {
+      const response = await request(app.getHttpServer())
+        .put('/training/offline-snapshot')
+        .set('Authorization', `Bearer ${token}`)
+        .set(headers)
+        .send(snapshotRequest(lease.data.leaseId))
+        .expect(409);
+      expect(response.body).toMatchObject({
+        code: 'APP_UPDATE_REQUIRED',
+        details: {
+          minimumVersionCode: 2,
+          storeUrl:
+            'https://play.google.com/store/apps/details?id=com.dallfit.app',
+          syncContractVersion: 1,
+        },
+      });
+    }
+
+    expect(await redisClient.get(leaseKey())).toBe(leaseBefore);
+    expect(await redisClient.pttl(leaseKey())).toBeLessThanOrEqual(
+      leaseTtlBefore,
+    );
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+    expect(await receiptModel.countDocuments()).toBe(0);
+    expect(await executionModel.countDocuments()).toBe(0);
+
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-App-Version-Code', '2')
+      .set('X-Sync-Contract-Version', '1')
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(200);
   });
 
   afterAll(async () => {

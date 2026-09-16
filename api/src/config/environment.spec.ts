@@ -11,6 +11,9 @@ const credentialDocument = {
   },
 };
 const validEnvironment = {
+  ANDROID_MIN_VERSION_CODE: '1',
+  ANDROID_PLAY_STORE_URL:
+    'https://play.google.com/store/apps/details?id=com.dallfit.app',
   AUTH_SESSION_SECRET: 'a'.repeat(32),
   GOOGLE_OAUTH_CREDENTIALS_BASE64: Buffer.from(
     JSON.stringify(credentialDocument),
@@ -23,6 +26,7 @@ describe('validateEnvironment', () => {
 
     expect(result).toMatchObject({
       PORT: 4000,
+      ANDROID_MIN_VERSION_CODE: 1,
       LOG_LEVEL: 'log',
       CORS_ORIGIN: 'http://localhost:3000',
       UI_URL: 'http://localhost:3000',
@@ -46,6 +50,28 @@ describe('validateEnvironment', () => {
         redirectUri: credentialDocument.web.redirect_uris[0],
       },
     });
+  });
+
+  it('rejects missing or invalid Android compatibility policy without exposing the URL', () => {
+    const missing = { ...validEnvironment };
+    delete (missing as Partial<typeof validEnvironment>)
+      .ANDROID_MIN_VERSION_CODE;
+    expect(() => validateEnvironment(missing)).toThrow(
+      'ANDROID_MIN_VERSION_CODE',
+    );
+
+    const invalidUrl = 'https://example.test/store/com.dallfit.app';
+    const execute = () =>
+      validateEnvironment({
+        ...validEnvironment,
+        ANDROID_PLAY_STORE_URL: invalidUrl,
+      });
+    expect(execute).toThrow('ANDROID_PLAY_STORE_URL');
+    try {
+      execute();
+    } catch (error: unknown) {
+      expect((error as Error).message).not.toContain(invalidUrl);
+    }
   });
 
   it('coerces values and preserves predefined environment variables', () => {
