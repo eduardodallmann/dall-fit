@@ -237,7 +237,8 @@ Ausência ou inconsistência falha fechado, sem fallback unsigned/debug. A app
 signing key própria não alcança o projeto nem o CI; somente a upload key separada
 entra no environment protegido `android-production`.
 
-O launcher usa o símbolo Dall Fit em adaptive icon com camada monocromática, e a
+O launcher usa o símbolo azul-claro Dall Fit (`#21B9E5`) em adaptive icon com
+camada monocromática; o mesmo desenho identifica as notificações em silhueta, e a
 abertura usa `androidx.core:core-splashscreen` sem Activity ou timer adicional. O
 manifest release mantém somente `INTERNET`, `ACCESS_NETWORK_STATE` e a permissão
 opcional `POST_NOTIFICATIONS`. O `FileProvider` não é exportado e expõe somente
@@ -647,9 +648,11 @@ o erro é anunciado pelo toast global.
 
 O build de produção usa `vite-plugin-pwa` 1.3 com a estratégia `generateSW`. O
 manifest identifica a aplicação como `Dall Fit`, inicia em `/dash`, possui escopo
-raiz e usa apresentação `standalone`. Os ícones versionados em `public/` incluem
-as variantes `192x192`, `512x512`, `maskable 512x512` e Apple Touch `180x180`; o
-script `pnpm -C ui generate:pwa-assets` os reproduz a partir do `favicon.svg`.
+raiz e usa apresentação `standalone`. `public/favicon.svg` é a fonte vetorial
+canônica do símbolo azul-claro Dall Fit (`#21B9E5`). Os demais ícones versionados
+em `public/` incluem favicon ICO, variantes `64x64`, `192x192`, `512x512`, maskable
+`512x512` e Apple Touch `180x180`; o script `pnpm -C ui generate:pwa-assets` os
+reproduz a partir desse SVG.
 
 O registro é manual pelo módulo React do plugin e ocorre no `PwaProvider` global.
 Esse provider concentra o único estado de instalação, mesmo que as apresentações

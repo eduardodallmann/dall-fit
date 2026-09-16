@@ -12,6 +12,9 @@ import offlineActionNotifier from '../../../android/app/src/main/java/com/dallfi
 import offlineSyncWorker from '../../../android/app/src/main/java/com/dallfit/app/offline/OfflineSyncWorker.java?raw';
 import offlineSyncScheduler from '../../../android/app/src/main/java/com/dallfit/app/offline/OfflineSyncWorkScheduler.java?raw';
 import offlineStoragePlugin from '../../../android/app/src/main/java/com/dallfit/app/OfflineStoragePlugin.java?raw';
+import launcherMark from '../../../android/app/src/main/res/drawable/ic_dall_fit_mark.xml?raw';
+import monochromeLauncherMark from '../../../android/app/src/main/res/drawable/ic_dall_fit_monochrome.xml?raw';
+import notificationIcon from '../../../android/app/src/main/res/drawable/ic_notification.xml?raw';
 import launcherIcon from '../../../android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml?raw';
 import themedLauncherIcon from '../../../android/app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml?raw';
 import legacyLauncherIcon from '../../../android/app/src/main/res/mipmap-anydpi/ic_launcher.xml?raw';
@@ -147,7 +150,10 @@ describe('Android workspace configuration', () => {
     expect(launcherIcon).toContain('@drawable/ic_dall_fit_mark');
     expect(themedLauncherIcon).toContain('@drawable/ic_dall_fit_mark');
     expect(themedLauncherIcon).toContain('@drawable/ic_dall_fit_monochrome');
-    expect(legacyLauncherIcon).toContain('#863BFF');
+    expect(launcherMark).toContain('#21B9E5');
+    expect(monochromeLauncherMark).toContain('#000000');
+    expect(notificationIcon).toContain('#FFFFFFFF');
+    expect(legacyLauncherIcon).toContain('#21B9E5');
     expect(legacyLauncherIcon).not.toContain('Android');
     expect(offlineActionNotifier).toContain(
       '.setSmallIcon(R.drawable.ic_notification)',
