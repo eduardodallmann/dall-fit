@@ -88,8 +88,8 @@ describe('Android workspace configuration', () => {
       'pnpm build && cap sync android',
     );
     expect(uiPackage.scripts['android:run']).toMatch(/^pnpm android:sync &&/);
-    expect(uiPackage.scripts['android:build:debug']).toMatch(
-      /^pnpm android:sync &&/,
+    expect(uiPackage.scripts['android:build:debug']).toBe(
+      'pnpm android:sync && ./android/gradlew -p android assembleDebug && mv ./android/app/build/outputs/apk/debug/app-debug.apk ./android/app-debug.apk',
     );
     expect(uiPackage.scripts['android:build:release']).toBe(
       'node scripts/android-release.mjs',
@@ -123,6 +123,7 @@ describe('Android workspace configuration', () => {
     );
     expect(androidGitignore).toContain('*.jks');
     expect(androidGitignore).toContain('*.keystore');
+    expect(androidGitignore).toContain('/app-debug.apk');
     expect(releaseScript).toContain("['-verify', bundlePath]");
     expect(releaseScript).toContain("createHash('sha256')");
   });

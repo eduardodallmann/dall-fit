@@ -227,6 +227,9 @@ O template Capacitor 8.5.2 conserva compile/target SDK 36, Android Gradle Plugin
 8.13.0 e Gradle Wrapper 8.14.3. Apenas `minSdkVersion` é elevado para 29. Assets
 web copiados, configuração gerada, caches e outputs Gradle não são versionados;
 configuração, wrapper e código nativo necessários para reproduzir o build são.
+Depois de `assembleDebug` concluir, o comando `pnpm android:build:debug` move o
+artefato para `ui/android/app-debug.apk`, caminho local canônico ignorado pelo Git;
+uma falha anterior não publica nem substitui esse APK.
 
 O build publicável é exclusivamente `pnpm android:build:release`. Antes de tocar o
 Gradle, o script exige `VITE_API_URL` HTTPS público,

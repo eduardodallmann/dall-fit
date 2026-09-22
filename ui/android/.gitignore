@@ -6,6 +6,9 @@
 *.ap_
 *.aab
 
+# Canonical local debug artifact published by pnpm android:build:debug
+/app-debug.apk
+
 # Files for the ART/Dalvik VM
 *.dex
 

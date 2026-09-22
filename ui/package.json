@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "android:build:debug": "pnpm android:sync && ./android/gradlew -p android assembleDebug",
+    "android:build:debug": "pnpm android:sync && ./android/gradlew -p android assembleDebug && mv ./android/app/build/outputs/apk/debug/app-debug.apk ./android/app-debug.apk",
     "android:build:release": "node scripts/android-release.mjs",
     "android:open": "cap open android",
     "android:run": "pnpm android:sync && cap run android",

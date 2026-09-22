@@ -74,11 +74,12 @@ podem ser adiados pelo sistema operacional.
 
 `android:sync` sempre executa o build Vite antes de `cap sync android`.
 `android:run` repete essa preparação e escolhe um dispositivo ou emulador pelo
-Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e produz o APK de
-debug em `ui/android/app/build/outputs/apk/debug/`. `android:open` exige Android
-Studio, mas não altera o bundle. `android:test` sincroniza o bundle e executa os
-testes instrumentados em dispositivo ou emulador conectado. Esses caminhos de
-desenvolvimento não assinam release nem exigem segredo.
+Capacitor. `android:build:debug` usa o Gradle Wrapper versionado e, depois de uma
+compilação bem-sucedida, move o APK de debug produzido pelo Gradle para o caminho
+local canônico `ui/android/app-debug.apk`, ignorado pelo Git. `android:open` exige
+Android Studio, mas não altera o bundle. `android:test` sincroniza o bundle e
+executa os testes instrumentados em dispositivo ou emulador conectado. Esses
+caminhos de desenvolvimento não assinam release nem exigem segredo.
 
 `android:build:release` é o caminho publicável separado. Ele exige API HTTPS
 pública, client OAuth Web/server e upload key fora do repositório; recompila a UI,
@@ -113,7 +114,7 @@ Todos os quality gates são iniciados na raiz:
 | `pnpm android:sync`     | Gera o bundle Vite e sincroniza o projeto Android Capacitor            |
 | `pnpm android:open`     | Abre o projeto nativo versionado no Android Studio                     |
 | `pnpm android:run`      | Prepara e executa o aplicativo em dispositivo ou emulador             |
-| `pnpm android:build:debug` | Prepara e compila o APK debug com o Gradle Wrapper                  |
+| `pnpm android:build:debug` | Prepara, compila e move o APK debug para `ui/android/app-debug.apk` |
 | `pnpm android:build:release` | Valida, assina e verifica o AAB de produção                       |
 | `pnpm android:test`     | Sincroniza e executa testes Android instrumentados conectados         |
 | `pnpm lint`             | Executa typecheck e ESLint no monorepo                                |
