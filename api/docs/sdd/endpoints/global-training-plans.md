@@ -77,8 +77,10 @@ Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-stor
 ## Seeds globais do catálogo do assistente
 
 O cenário `assistant:global-training-plans` não passa pelos endpoints
-administrativos. `pnpm -C api seed:assistant-globals` valida MongoDB e os 45
-`catalogKey` e mostra `would-create` sem gravar. Para aplicar localmente:
+administrativos. `pnpm -C api seed:assistant-globals` valida o documento v2, os
+limites do aggregate, a compatibilidade de parâmetros e as 52 `catalogKey`
+distintas usadas nas árvores; depois valida o MongoDB e mostra `would-create` sem
+gravar. Para aplicar localmente:
 
 ```bash
 pnpm -C api seed -- auth:person-admin
@@ -92,13 +94,18 @@ curl --request POST http://localhost:4000/auth/test-login \
   --cookie /tmp/dall-fit-fit73-admin.txt
 ```
 
-As duas execuções deixam somente dois planos com IDs
-determinísticos, 3/5 workouts, 18/27 exercícios e 45 vídeos distintos em 3×12/60;
-a segunda reporta `unchanged` e não sobrescreve edição. Em ambiente publicado, a
-aplicação exige também:
+As duas execuções convergem os oito IDs determinísticos do catálogo v2 para 25
+workouts e 170 exercícios: 71 de força com volumes de duas a quatro séries e 99
+atividades por duração. Os modelos cobrem alongamento pós-atividade, força guiada
+sem impacto, caminhada, bicicleta, musculação expressa, força com cardio, corrida
+para quem já corre e musculação intensa. Todo workout termina em alongamento;
+blocos de caminhada, corrida e bicicleta respeitam os limites do catálogo. A segunda
+execução reporta `unchanged` e não sobrescreve edição administrativa. O comando
+não remove planos alheios nem os IDs históricos da v1 que já tenham sido
+materializados. Em ambiente publicado, a aplicação exige também:
 
 ```bash
-ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v1 \
+ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v2 \
   pnpm -C api seed:assistant-globals -- --execute
 ```
 

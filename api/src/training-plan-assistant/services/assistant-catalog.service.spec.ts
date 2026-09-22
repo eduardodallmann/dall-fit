@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BODY_AREAS } from '@dall-fit/types';
 
-import seedDocument from '~/training-plan-assistant/data/global-training-plan-seeds.v1.json';
+import seedDocument from '~/training-plan-assistant/data/global-training-plan-seeds.v2.json';
 import { AssistantCatalogService } from '~/training-plan-assistant/services/assistant-catalog.service';
 
 describe('AssistantCatalogService', () => {
@@ -144,17 +144,39 @@ describe('AssistantCatalogService', () => {
     ).toBe(false);
   });
 
-  it('keeps the two global seeds on 45 distinct catalog entries with 3x12/60 materialization', () => {
+  it('keeps the global seeds aligned with the catalog across duration, impact and volume variants', () => {
     const service = new AssistantCatalogService();
-    const keys = seedDocument.plans.flatMap((plan) =>
-      plan.workouts.flatMap((workout) => workout.catalogKeys),
+    const exercises = seedDocument.plans.flatMap((plan) =>
+      plan.workouts.flatMap((workout) => workout.exercises),
+    );
+    const keys = exercises.map((exercise) => exercise.catalogKey);
+    const strengthExercises = exercises.filter(
+      (exercise) => !('durationMinutes' in exercise),
+    );
+    const durationExercises = exercises.filter(
+      (exercise) => 'durationMinutes' in exercise,
     );
 
     expect(seedDocument.plans.map((plan) => plan.workouts.length)).toEqual([
-      3, 5,
+      1, 2, 3, 3, 3, 4, 4, 5,
     ]);
-    expect(keys).toHaveLength(45);
-    expect(new Set(keys).size).toBe(45);
+    expect(seedDocument.version).toBe('assistant-global-training-plans.v2');
     expect(keys.every((key) => service.findByKey(key) !== null)).toBe(true);
+    expect(
+      seedDocument.plans.every((plan) =>
+        plan.workouts.every((workout) =>
+          workout.exercises.at(-1)?.catalogKey.includes('-stretch'),
+        ),
+      ),
+    ).toBe(true);
+    expect(new Set(strengthExercises.map((exercise) => exercise.sets))).toEqual(
+      new Set([2, 3, 4]),
+    );
+    expect(
+      new Set(durationExercises.map((exercise) => exercise.durationMinutes)),
+    ).toEqual(new Set([2, 5, 10, 15, 20, 30]));
+    expect(keys).toContain('duration:treadmill-walk');
+    expect(keys).toContain('duration:stationary-bike');
+    expect(keys).toContain('duration:treadmill-run');
   });
 });

@@ -1,0 +1,750 @@
+{
+  "version": "assistant-global-training-plans.v2",
+  "plans": [
+    {
+      "id": "73c000000000000000000001",
+      "name": "Alongamento pós-atividade — rotina curta",
+      "description": "Rotina breve e sem impacto para finalizar caminhada, bicicleta, corrida ou musculação com alongamentos suaves, sem balanços nem dor.",
+      "workouts": [
+        {
+          "name": "Alongamento geral — 6 min",
+          "exercises": [
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000002",
+      "name": "Força guiada sem impacto — 2 dias",
+      "description": "Plano básico de dois dias, com exercícios guiados, volume reduzido e alongamentos finais para quem prefere evitar impacto e pesos livres.",
+      "workouts": [
+        {
+          "name": "A — Corpo inteiro",
+          "exercises": [
+            {
+              "catalogKey": "youtube-short:n4rakmCKJkg",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:V2mOGF6yp6g",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:hqdrlc4Jgqc",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:YaGW1J7aIC8",
+              "sets": 2,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "B — Corpo inteiro",
+          "exercises": [
+            {
+              "catalogKey": "youtube-short:ZxiI-W391ds",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:5Nb-KZ6gOaQ",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:LZxcm2C-tck",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:ueMZZ4iv_Rc",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000003",
+      "name": "Caminhada progressiva — 3 dias",
+      "description": "Três sessões curtas de caminhada, do primeiro passo a um bloco moderado de 20 minutos, sempre com aquecimento, desaquecimento e alongamento.",
+      "workouts": [
+        {
+          "name": "A — Caminhada de 10 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 10 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "B — Caminhada de 15 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 15 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Caminhada de 20 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000004",
+      "name": "Bicicleta de baixo impacto — 3 dias",
+      "description": "Plano aeróbico progressivo na bicicleta ergométrica, com resistência leve a moderada, ritmo de conversa e blocos de 15 a 30 minutos.",
+      "workouts": [
+        {
+          "name": "A — Pedal de 15 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 15 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "B — Pedal de 20 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Pedal de 30 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 30 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000005",
+      "name": "Musculação expressa — 3 dias",
+      "description": "Treinos enxutos para pouca disponibilidade, com aquecimento, quatro exercícios de força em duas séries, desaquecimento e alongamento.",
+      "workouts": [
+        {
+          "name": "A — Pernas express",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:n4rakmCKJkg",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:1XTX22zHV-U",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:T18xxjCw33I",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:sJgUYTJWncw",
+              "sets": 2,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            }
+          ]
+        },
+        {
+          "name": "B — Costas e braços express",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:WiOlNR2g3rA",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:EXAikbHGpJ4",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:o0dVK46WVIs",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:YUnL8IFg7sc",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Peito e ombros express",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:hqdrlc4Jgqc",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:FSe7LTfIFUg",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:LZxcm2C-tck",
+              "sets": 2,
+              "repetitions": 10,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:19JmtPaN_k4",
+              "sets": 2,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000006",
+      "name": "Musculação e cardio — 4 dias",
+      "description": "Plano intermediário de quatro dias que combina força de membros superiores e inferiores com caminhada ou bicicleta em ritmo moderado.",
+      "workouts": [
+        {
+          "name": "A — Pernas e caminhada leve",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:ZxiI-W391ds",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:sEY9GRdpHVU",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:RKnynl1Xt7o",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:YaGW1J7aIC8",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 10 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            }
+          ]
+        },
+        {
+          "name": "B — Superiores e bicicleta",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:V2mOGF6yp6g",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:5Nb-KZ6gOaQ",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:K3M6pAbaUDw",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:GalcGw9Pfw8",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Posteriores e caminhada leve",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:ssc8-WgGH1c",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:XSqeC0u8Qdo",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:gSZXyLd8YNI",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:Irb6l1iSmrU",
+              "sets": 3,
+              "repetitions": 15,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 10 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "D — Superiores e cardio longo",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:tF4yilwuCzk",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:hKnT97d10WM",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:Mfu-m391YFs",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:_YaUOyLeXOU",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 30 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000007",
+      "name": "Corrida confortável e força — 4 dias",
+      "description": "Plano de maior impacto para quem já corre regularmente sem desconforto, sem tiros, com dois dias de corrida confortável e dois de musculação.",
+      "workouts": [
+        {
+          "name": "A — Corrida confortável de 15 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:treadmill-run", "durationMinutes": 15 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "B — Força de superiores",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:tF4yilwuCzk",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:_c8NXVnlb8I",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:Mfu-m391YFs",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:KiFCxrczVao",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:jY5tG4O8BjM",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Força de pernas",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:8DksEpvZBNM",
+              "sets": 3,
+              "repetitions": 8,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:sEY9GRdpHVU",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:RKnynl1Xt7o",
+              "sets": 3,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:YaGW1J7aIC8",
+              "sets": 3,
+              "repetitions": 12,
+              "restSeconds": 45
+            },
+            {
+              "catalogKey": "youtube-short:bpoDDqwzVGQ",
+              "sets": 3,
+              "repetitions": 15,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "D — Corrida confortável de 20 min",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:treadmill-run", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "73c000000000000000000008",
+      "name": "Musculação intensa — 5 dias",
+      "description": "Divisão longa para pessoa experiente, com quatro séries, descansos maiores nos movimentos compostos, cardio moderado e alongamento ao final.",
+      "workouts": [
+        {
+          "name": "A — Quadríceps e panturrilhas",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 10 },
+            {
+              "catalogKey": "youtube-short:8DksEpvZBNM",
+              "sets": 4,
+              "repetitions": 8,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:ZxiI-W391ds",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:RKnynl1Xt7o",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:gSZXyLd8YNI",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:5WHXKjq7isA",
+              "sets": 4,
+              "repetitions": 15,
+              "restSeconds": 45
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "B — Costas e bíceps",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:_c8NXVnlb8I",
+              "sets": 4,
+              "repetitions": 8,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:V2mOGF6yp6g",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 75
+            },
+            {
+              "catalogKey": "youtube-short:5Nb-KZ6gOaQ",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:KiFCxrczVao",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:NIlDUWXwC58",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "C — Peito e tríceps",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:tF4yilwuCzk",
+              "sets": 4,
+              "repetitions": 8,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:erggHEES3tg",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 75
+            },
+            {
+              "catalogKey": "youtube-short:ueMZZ4iv_Rc",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:GalcGw9Pfw8",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:Ng4Vf2rmamE",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:treadmill-walk", "durationMinutes": 20 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        },
+        {
+          "name": "D — Posteriores e glúteos",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 10 },
+            {
+              "catalogKey": "youtube-short:ssc8-WgGH1c",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 90
+            },
+            {
+              "catalogKey": "youtube-short:sEY9GRdpHVU",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 75
+            },
+            {
+              "catalogKey": "youtube-short:O5qg1SS_M30",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:YaGW1J7aIC8",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:kRws_E6AoSQ",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:glute-stretch", "durationMinutes": 2 },
+            {
+              "catalogKey": "duration:quadriceps-stretch",
+              "durationMinutes": 2
+            }
+          ]
+        },
+        {
+          "name": "E — Ombros, braços e cardio",
+          "exercises": [
+            { "catalogKey": "duration:warmup-walk", "durationMinutes": 5 },
+            {
+              "catalogKey": "youtube-short:Mfu-m391YFs",
+              "sets": 4,
+              "repetitions": 8,
+              "restSeconds": 75
+            },
+            {
+              "catalogKey": "youtube-short:Fxc0UMrgBmo",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:p57O4yOkh3E",
+              "sets": 4,
+              "repetitions": 12,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:xOX9DRiQ3BQ",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            {
+              "catalogKey": "youtube-short:TVlQeGLMjwc",
+              "sets": 4,
+              "repetitions": 10,
+              "restSeconds": 60
+            },
+            { "catalogKey": "duration:stationary-bike", "durationMinutes": 30 },
+            { "catalogKey": "duration:cooldown-walk", "durationMinutes": 5 },
+            { "catalogKey": "duration:adductor-stretch", "durationMinutes": 2 }
+          ]
+        }
+      ]
+    }
+  ]
+}

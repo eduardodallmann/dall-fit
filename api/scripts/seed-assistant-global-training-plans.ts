@@ -3,13 +3,54 @@ import { createHash } from 'node:crypto';
 import 'dotenv/config';
 
 import mongoose from 'mongoose';
+import { z } from 'zod';
 
 import catalogDocument from '../src/training-plan-assistant/data/exercise-catalog.v2.json';
-import seedDocument from '../src/training-plan-assistant/data/global-training-plan-seeds.v1.json';
+import rawSeedDocument from '../src/training-plan-assistant/data/global-training-plan-seeds.v2.json';
 import {
   TrainingPlanDocument,
   TrainingPlanSchema,
 } from '../src/training-plan/repositories/training-plan.schema';
+
+const strengthSeedExerciseSchema = z.strictObject({
+  catalogKey: z.string().regex(/^youtube-short:[A-Za-z0-9_-]{11}$/),
+  repetitions: z.number().int().min(1).max(1000),
+  restSeconds: z.number().int().min(0).max(3600),
+  sets: z.number().int().min(1).max(100),
+});
+const durationSeedExerciseSchema = z.strictObject({
+  catalogKey: z.string().regex(/^duration:[a-z0-9-]+$/),
+  durationMinutes: z.number().int().min(1).max(1440),
+});
+const seedDocumentSchema = z.strictObject({
+  plans: z
+    .array(
+      z.strictObject({
+        description: z.string().min(1).max(1000),
+        id: z.string().regex(/^[a-f0-9]{24}$/),
+        name: z.string().min(1).max(120),
+        workouts: z
+          .array(
+            z.strictObject({
+              exercises: z
+                .array(
+                  z.union([
+                    strengthSeedExerciseSchema,
+                    durationSeedExerciseSchema,
+                  ]),
+                )
+                .min(1)
+                .max(50),
+              name: z.string().min(1).max(120),
+            }),
+          )
+          .min(1)
+          .max(25),
+      }),
+    )
+    .min(1),
+  version: z.literal('assistant-global-training-plans.v2'),
+});
 
 // The CLI deliberately keeps validation, dry-run and set-on-insert reporting in one visible operational flow.
 // eslint-disable-next-line sonarjs/cognitive-complexity
@@ -23,29 +64,68 @@ async function main(): Promise<void> {
     published &&
     (!execute ||
       process.env.ASSISTANT_GLOBAL_SEED_CONFIRMATION !==
-        'seed-dall-fit-assistant-globals-v1')
+        'seed-dall-fit-assistant-globals-v2')
   ) {
     throw new Error(
-      'Published environments require --execute and ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v1.',
+      'Published environments require --execute and ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v2.',
     );
   }
+  const seedDocument = seedDocumentSchema.parse(rawSeedDocument);
   const catalog = new Map(
-    catalogDocument.entries.map((entry) => [
-      `youtube-short:${entry.youtubeId}`,
-      entry,
-    ]),
+    catalogDocument.entries.map((entry) => [entry.key, entry]),
   );
   const usedKeys = seedDocument.plans.flatMap((plan) =>
-    plan.workouts.flatMap((workout) => workout.catalogKeys),
+    plan.workouts.flatMap((workout) =>
+      workout.exercises.map((exercise) => exercise.catalogKey),
+    ),
   );
-  if (usedKeys.length !== 45 || new Set(usedKeys).size !== 45) {
-    throw new Error(
-      'The global assistant seeds must use exactly 45 unique videos.',
-    );
-  }
+  if (
+    new Set(seedDocument.plans.map((plan) => plan.id)).size !==
+    seedDocument.plans.length
+  )
+    throw new Error('The global assistant seeds must use unique plan IDs.');
   for (const key of usedKeys) {
     if (!catalog.has(key))
       throw new Error(`Unknown assistant catalog key: ${key}`);
+  }
+  for (const plan of seedDocument.plans) {
+    const exercises = plan.workouts.flatMap((workout) => workout.exercises);
+    if (
+      plan.workouts.some(
+        (workout) => !workout.exercises.at(-1)?.catalogKey.includes('-stretch'),
+      )
+    )
+      throw new Error(
+        `Every workout in seed ${plan.id} must end in stretching.`,
+      );
+    for (const exercise of exercises) {
+      const entry = catalog.get(exercise.catalogKey);
+      if (entry === undefined)
+        throw new Error(
+          `Unknown assistant catalog key: ${exercise.catalogKey}`,
+        );
+      if ('durationMinutes' in exercise) {
+        if (
+          entry.type !== 'duration' ||
+          entry.minDurationMinutes === undefined ||
+          entry.maxDurationMinutes === undefined
+        )
+          throw new Error(
+            `Seed ${plan.id} uses duration parameters for ${exercise.catalogKey}.`,
+          );
+        if (
+          exercise.durationMinutes < entry.minDurationMinutes ||
+          exercise.durationMinutes > entry.maxDurationMinutes
+        )
+          throw new Error(
+            `Seed ${plan.id} uses an invalid duration for ${exercise.catalogKey}.`,
+          );
+      } else if (entry.type !== 'youtube-short') {
+        throw new Error(
+          `Seed ${plan.id} uses strength parameters for ${exercise.catalogKey}.`,
+        );
+      }
+    }
   }
   const uri = process.env.MONGODB_URI;
   if (uri === undefined) throw new Error('MONGODB_URI is required.');
@@ -76,17 +156,41 @@ async function main(): Promise<void> {
         version: 0,
         workouts: plan.workouts.map((workout, workoutIndex) => ({
           _id: stableObjectId(`${plan.id}:workout:${workoutIndex}`),
-          exercises: workout.catalogKeys.map((key) => {
-            const entry = catalog.get(key);
+          exercises: workout.exercises.map((exercise, exerciseIndex) => {
+            const entry = catalog.get(exercise.catalogKey);
             if (entry === undefined)
-              throw new Error(`Unknown catalog key: ${key}`);
+              throw new Error(`Unknown catalog key: ${exercise.catalogKey}`);
+            const id = stableObjectId(
+              `${plan.id}:workout:${workoutIndex}:exercise:${exerciseIndex}`,
+            );
+            if ('durationMinutes' in exercise) {
+              if (entry.type !== 'duration')
+                throw new Error(
+                  `Invalid duration catalog entry: ${exercise.catalogKey}`,
+                );
+              return {
+                _id: id,
+                bodyArea: entry.bodyArea,
+                durationMinutes: exercise.durationMinutes,
+                instructions: entry.instructions,
+                name: entry.name,
+                type: 'duration',
+                ...(entry.youtubeId === undefined
+                  ? {}
+                  : { youtubeId: entry.youtubeId }),
+              };
+            }
+            if (entry.type !== 'youtube-short')
+              throw new Error(
+                `Invalid strength catalog entry: ${exercise.catalogKey}`,
+              );
             return {
-              _id: stableObjectId(`${plan.id}:${key}`),
+              _id: id,
               bodyArea: entry.bodyArea,
               name: entry.name,
-              repetitions: 12,
-              restSeconds: 60,
-              sets: 3,
+              repetitions: exercise.repetitions,
+              restSeconds: exercise.restSeconds,
+              sets: exercise.sets,
               type: 'youtube-short',
               youtubeId: entry.youtubeId,
             };

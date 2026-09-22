@@ -166,18 +166,24 @@ uma vez no drop e recarga de conflito é retry.
 
 ## Modelos globais originados pelo catálogo do assistente
 
-Dois modelos versionados — musculação básica de três e cinco dias — são
+Oito modelos versionados são
 materializados exclusivamente pelo comando `pnpm -C api seed:assistant-globals`.
 O dry-run é o padrão; `--execute` aplica `set-on-insert` com IDs determinísticos.
 O comando não roda no startup, não sobrescreve edição administrativa e interrompe
 ao encontrar identidade divergente. Em ambiente publicado exige também
-`ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v1`.
+`ASSISTANT_GLOBAL_SEED_CONFIRMATION=seed-dall-fit-assistant-globals-v2`.
 
-O catálogo v1 é a única origem dos 45 exercícios distintos. Cada árvore possui
-respectivamente 3/18 e 5/27 workouts/exercícios, owner global nulo e parâmetros
-3×12 com 60 segundos. O cenário operacional `assistant:global-training-plans`
-executa dry-run, aplicação e nova aplicação; a segunda execução reporta os mesmos
-dois planos como inalterados.
+O catálogo de exercícios é a única origem dos 52 itens distintos usados. As oito
+árvores somam 25 workouts e 170 exercícios, todos com owner global nulo. Elas vão
+de uma rotina curta de alongamento e força guiada sem impacto até caminhada,
+bicicleta, musculação expressa, força com cardio, corrida confortável para quem já
+corre e musculação intensa de cinco dias. Os 71 exercícios de força variam entre
+duas e quatro séries; as 99 atividades cronometradas incluem aquecimento,
+desaquecimento e alongamento ao final de todo workout. O cenário operacional
+`assistant:global-training-plans` executa dry-run, aplicação e nova aplicação; a
+segunda execução reporta os oito planos como inalterados. IDs históricos da v1 já
+materializados não são removidos automaticamente, preservando referências e
+edições administrativas existentes.
 
 ## Cobertura automatizada
 
