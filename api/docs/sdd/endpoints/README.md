@@ -31,6 +31,8 @@ somente quando constituir requisito funcional excepcional.
 - [`GET /realtime/events`](realtime-events.md): stream autenticado de invalidações.
 - [`Treinar`](training.md): plano ativo, sessão Redis versionada, séries, timers e
   conclusão durável.
+- [`Dashboard`](dashboard.md): orientação pessoal, métricas históricas e agregados
+  administrativos.
 - [`Lease offline de treino`](offline-training-lease.md): registro e takeover
   atômicos da única instalação editora de uma pessoa.
 - [`PUT /training/offline-snapshot`](offline-training-snapshot.md): ingestão

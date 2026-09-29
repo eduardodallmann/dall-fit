@@ -41,3 +41,4 @@ export class PersonDocument {
 
 export type PersonHydratedDocument = HydratedDocument<PersonDocument>;
 export const PersonSchema = SchemaFactory.createForClass(PersonDocument);
+PersonSchema.index({ createdAt: -1 });

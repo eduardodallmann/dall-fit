@@ -25,6 +25,7 @@ por pessoa.
 |     3 | executar ou retomar | `/training/workout/:workoutId`             | `GET /training/session` e mutações de série, timer e exercício |
 |     4 | finalizar           | mesma rota                                 | `POST /training/session/complete`                              |
 |     5 | consultar resultado | `/training/completion/:workoutExecutionId` | `GET /training/completions/:workoutExecutionId`                |
+|     — | entrar pela orientação pessoal | `/dash` | `GET /dashboard`; para admin, também `GET /admin/dashboard` |
 |     — | autorizar edição offline | preparação Android | `PUT /training/offline-lease` ou `POST /training/offline-lease/takeover` após confirmação |
 |     — | sincronizar, concluir ou cancelar offline | sincronizador Android em foreground ou WorkManager | `PUT /training/offline-snapshot` |
 |     — | negociar compatibilidade Android | composição nativa e Worker | `GET /app-compatibility/android` |
@@ -61,7 +62,10 @@ por pessoa.
    sincronizador Android envia sequencialmente os envelopes produzidos pela jornada
    em foreground ou pelo WorkManager, preservando revisões concorrentes e terminais
    distintos na ordem local.
-3. A listagem resolve o plano ativo e marca como atual o workout seguinte ao último
+3. A dashboard oferece a mesma decisão de entrada: sem seleção orienta escolher
+   plano, com seleção aponta o workout seguinte e com sessão aponta retomada usando
+   o snapshot. Atividades recentes abrem diretamente o resumo durável. A listagem
+   resolve o plano ativo e marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
    uma resposta anterior sem plano não sobreviva à próxima navegação.
@@ -82,7 +86,8 @@ por pessoa.
    novo e respostas antigas não o sobrescrevem.
 7. Conflito descarta drafts, refaz a leitura canônica e exige nova ação. Um treino
    incompleto requer confirmação explícita para finalizar.
-8. A finalização Web grava execução e perfis no MongoDB, remove o snapshot Redis e
+8. A finalização Web grava execução e perfis no MongoDB, remove o snapshot Redis,
+   invalida os caches pessoal e administrativo de dashboard da geração corrente e
    navega para o resumo semanal compartilhável. A finalização Android grava
    `completed`, remove a sessão e grava uma apresentação compacta provisória no
    mesmo commit, então volta para `/training` sem abrir a tela semanal.

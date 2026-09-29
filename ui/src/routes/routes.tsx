@@ -29,6 +29,7 @@ import {
   ProtectedRoutePending,
 } from '~/core/components/route-status';
 import { assertAdminAccess } from '~/routes/admin-access';
+import type { MockDashboardScenario } from '~/routes/dashboard/dashboard-service';
 import { probeRootSession } from '~/routes/root-session-probe';
 import {
   AuthenticatedRouteComponent,
@@ -60,6 +61,7 @@ interface HomeSearch {
 
 interface DashSearch {
   mockAuth?: MockAuthScenario;
+  mockDashboard?: MockDashboardScenario;
 }
 
 interface TrainingPlanSearch extends DashSearch {
@@ -216,7 +218,13 @@ const dashRoute = createRoute({
     )
       ? search.mockAuth
       : undefined;
-    const result = mockAuth === undefined ? {} : { mockAuth };
+    const mockDashboard = isMockDashboardScenario(search.mockDashboard)
+      ? search.mockDashboard
+      : undefined;
+    const result = {
+      ...(mockAuth === undefined ? {} : { mockAuth }),
+      ...(mockDashboard === undefined ? {} : { mockDashboard }),
+    };
 
     return result;
   },
@@ -482,6 +490,20 @@ function isMockAuthScenario(value: unknown): value is MockAuthScenario {
     value === 'session-expired' ||
     value === 'unauthenticated';
 
+  return result;
+}
+
+function isMockDashboardScenario(
+  value: unknown,
+): value is MockDashboardScenario {
+  const result = [
+    'admin',
+    'admin-error',
+    'empty',
+    'personal',
+    'personal-error',
+    'session-running',
+  ].includes(String(value));
   return result;
 }
 

@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { authReturnTo } from '~/auth/auth-return-to';
 import { resetSessionLifecycleForTests } from '~/auth/session-lifecycle';
 import { resetAuthScenarioStates } from '~/mocks/handlers/auth';
+import { resetDashboardScenarioStates } from '~/mocks/handlers/dashboard';
 import { resetTrainingScenarioStates } from '~/mocks/handlers/training';
 import { resetTrainingPlanAssistantScenarioStates } from '~/mocks/handlers/training-plan-assistant';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
@@ -21,6 +22,7 @@ afterEach(() => {
   toast.clear();
   mockServer.resetHandlers();
   resetAuthScenarioStates();
+  resetDashboardScenarioStates();
   resetSessionLifecycleForTests();
   authReturnTo.clear();
   resetTrainingPlanScenarioStates();

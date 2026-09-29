@@ -84,3 +84,4 @@ WorkoutExecutionSchema.index({
   completedAt: -1,
 });
 WorkoutExecutionSchema.index({ personId: 1, completedAt: -1 });
+WorkoutExecutionSchema.index({ status: 1, completedAt: -1 });

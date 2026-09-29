@@ -473,3 +473,94 @@ export interface WorkoutExecutionSummary extends Entity {
   workoutId: EntityId;
   workoutName: string;
 }
+
+export type DashboardNextAction =
+  | { type: 'select-plan' }
+  | {
+      catalogEntryId: EntityId;
+      planName: string;
+      type: 'start-workout';
+      workoutId: EntityId;
+      workoutName: string;
+    }
+  | {
+      planName: string;
+      type: 'resume-workout';
+      workoutId: EntityId;
+      workoutName: string;
+    };
+
+export type DashboardWeekDay = TrainingWeekDay;
+
+export interface DashboardWeeklyTrendItem {
+  completedWorkoutCount: number;
+  endDate: string;
+  startDate: string;
+}
+
+export interface DashboardRecentWorkout {
+  bodyAreas: readonly BodyArea[];
+  completedAt: Timestamp;
+  completedExerciseCount: number;
+  durationSeconds: number;
+  fullCompletion: boolean;
+  id: EntityId;
+  planName: string;
+  totalExerciseCount: number;
+  workoutName: string;
+}
+
+export interface Dashboard {
+  currentWeek: {
+    completedWorkoutCount: number;
+    days: readonly DashboardWeekDay[];
+    endDate: string;
+    startDate: string;
+    workoutCount: number | null;
+  };
+  generatedAt: Timestamp;
+  last30Days: {
+    completedWorkoutCount: number;
+    fullCompletionCount: number;
+    fullCompletionPercentage: number;
+    totalDurationSeconds: number;
+  };
+  nextAction: DashboardNextAction;
+  recentWorkouts: readonly DashboardRecentWorkout[];
+  weeklyTrend: readonly DashboardWeeklyTrendItem[];
+}
+
+export interface AdminDashboardWeeklyTrendItem extends DashboardWeeklyTrendItem {
+  activePeopleCount: number;
+}
+
+export interface AdminDashboardTopGlobalPlan {
+  activePeopleCount: number;
+  id: EntityId;
+  linkedPeopleCount: number;
+  name: string;
+}
+
+export interface AdminDashboard {
+  generatedAt: Timestamp;
+  people: {
+    activePlanCount: number;
+    newLast30DaysCount: number;
+    totalCount: number;
+    trainedLast30DaysCount: number;
+  };
+  plans: {
+    activeSelectionCount: number;
+    globalReferenceCount: number;
+    globalTemplateCount: number;
+    ownedCount: number;
+  };
+  topGlobalPlans: readonly AdminDashboardTopGlobalPlan[];
+  training: {
+    completedWorkoutCount: number;
+    fullCompletionCount: number;
+    fullCompletionPercentage: number;
+    totalDurationSeconds: number;
+  };
+  weeklyTrend: readonly AdminDashboardWeeklyTrendItem[];
+}

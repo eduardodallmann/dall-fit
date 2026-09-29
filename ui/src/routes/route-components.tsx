@@ -15,6 +15,7 @@ import { endSession } from '~/auth/session-lifecycle';
 import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { usePlatform } from '~/core/platform/platform';
 import { useTheme } from '~/core/theme/theme-context';
+import { DashboardPage } from '~/routes/dashboard';
 import { HomePage } from '~/routes/home';
 import { homeStyles } from '~/routes/home/styles';
 import { TrainingPlanRealtimeBridge } from '~/routes/training-plan/realtime-bridge';
@@ -108,7 +109,13 @@ export function HomeRoutePending() {
 }
 
 export function DashRouteComponent() {
-  const result = null;
+  const { person } = useRouteContext({ from: '/_authenticated' });
+  const search = useSearch({ from: '/_authenticated/dash' });
+  const scenario =
+    search.mockDashboard ?? (person.isAdmin === true ? 'admin' : 'personal');
+  const result = (
+    <DashboardPage isAdmin={person.isAdmin === true} scenario={scenario} />
+  );
 
   return result;
 }

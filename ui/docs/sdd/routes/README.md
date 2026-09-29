@@ -6,7 +6,7 @@ Este diretório contém a documentação funcional viva das telas. Use
 Índice atual:
 
 - [`/`](root.md): entrada pública e início do login Google.
-- [`/dash`](dash.md): entrada autenticada com menu responsivo e conteúdo vazio.
+- [`/dash`](dash.md): dashboard pessoal e agregados exclusivos de administradores.
 - [`/training-plan`](training-plan.md): catálogo pessoal unificado e clonagem.
 - [`/training-plan/:catalogEntryId`](training-plan-detail.md): detalhe próprio ou
   referência global somente leitura.

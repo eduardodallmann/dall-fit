@@ -160,6 +160,21 @@ request; o Workflow os lê no MongoDB.
   TTL e mídia privada persistida permanecem exclusivos da API.
 - mutations de carga e conclusão usam `TrainingLoadRequest` ou
   `CompleteRemainingTrainingSeriesRequest`; conclusão não obriga carga.
+
+## Dashboard
+
+- `DashboardResponse` envolve `Dashboard`, que publica `generatedAt`, próxima ação,
+  sete dias da semana civil, totais dos últimos 30 dias, oito semanas de tendência
+  e até cinco conclusões recentes da pessoa autenticada.
+- `DashboardNextAction` é discriminada em `select-plan`, `start-workout` e
+  `resume-workout`; somente início inclui `catalogEntryId`, enquanto início e
+  retomada incluem IDs e nomes do workout/plano necessários à apresentação.
+- `AdminDashboardResponse` envolve somente agregados de pessoas, treino e planos,
+  oito buckets com pessoas ativas distintas e até cinco modelos globais com
+  contagens. Não existe entidade ou ID de pessoa nessa estrutura.
+- Datas civis de dashboard usam `YYYY-MM-DD`; `generatedAt`, `completedAt` e demais
+  instantes continuam strings ISO 8601. Duração permanece em segundos e
+  percentuais já chegam como inteiros.
 - `WorkoutExecutionSummary` é o resultado durável com métricas, áreas treinadas e
   os sete dias da semana calculados no timezone informado na finalização.
 - respostas seguem `ApiResponse`; mutations de sessão devolvem a versão também no

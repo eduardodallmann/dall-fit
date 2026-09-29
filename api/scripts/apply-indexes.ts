@@ -4,7 +4,7 @@ import process from 'node:process';
 
 import { connect, disconnect } from 'mongoose';
 
-const confirmation = 'apply-dall-fit-indexes-v3';
+const confirmation = 'apply-dall-fit-indexes-v4';
 const trainingPlanIndexName = 'ownerPersonId_1_createdAt_-1__id_-1';
 const legacyTrainingPlanIndexName = 'ownerPersonId_1_createdAt_-1';
 const peopleIndexName = 'googleSubject_1';
@@ -33,11 +33,16 @@ async function main(): Promise<void> {
     const offlineTerminalReceipts = database.collection(
       'offline_training_terminal_receipts',
     );
+    const catalog = database.collection('training_plan_catalog_entries');
+    const activeSelections = database.collection(
+      'training_plan_active_selections',
+    );
 
     await people.createIndex(
       { googleSubject: 1 },
       { name: peopleIndexName, unique: true },
     );
+    await people.createIndex({ createdAt: -1 }, { name: 'createdAt_-1' });
     await trainingPlans.createIndex(
       { ownerPersonId: 1, createdAt: -1, _id: -1 },
       { name: trainingPlanIndexName },
@@ -45,6 +50,22 @@ async function main(): Promise<void> {
     await workoutExecutions.createIndex(
       { personId: 1, sessionId: 1 },
       { name: 'personId_1_sessionId_1', unique: true },
+    );
+    await workoutExecutions.createIndex(
+      { status: 1, completedAt: -1 },
+      { name: 'status_1_completedAt_-1' },
+    );
+    await catalog.createIndex(
+      { kind: 1, globalTrainingPlanId: 1, personId: 1 },
+      { name: 'kind_1_globalTrainingPlanId_1_personId_1' },
+    );
+    await activeSelections.createIndex(
+      { personId: 1 },
+      { name: 'personId_1', unique: true },
+    );
+    await activeSelections.createIndex(
+      { catalogEntryId: 1 },
+      { name: 'catalogEntryId_1' },
     );
     await workoutExecutions.createIndex(
       { personId: 1, trainingPlanId: 1, completedAt: -1 },
@@ -78,7 +99,7 @@ async function main(): Promise<void> {
     if (indexes.some((index) => index.name === legacyTrainingPlanIndexName)) {
       await trainingPlans.dropIndex(legacyTrainingPlanIndexName);
     }
-    process.stdout.write('Index set v3 applied successfully.\n');
+    process.stdout.write('Index set v4 applied successfully.\n');
   } finally {
     await disconnect();
   }

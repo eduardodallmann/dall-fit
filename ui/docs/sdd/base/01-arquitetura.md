@@ -586,7 +586,7 @@ completa e valores concretos dos segmentos nunca são propriedades.
 
 | Evento                    | Propriedades adicionais vigentes                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ui_navigation_selected`  | `destination`, `navigation_kind` (`menu`, `breadcrumb`, `row_link`, `pagination`)                                      |
+| `ui_navigation_selected`  | `destination`, `navigation_kind` (`menu`, `breadcrumb`, `row_link`, `pagination`, `dashboard_action`)                  |
 | `ui_button_pressed`       | `action` enumerada pela fronteira                                                                                      |
 | `ui_menu_opened`          | `menu` (`application`, `row_actions`)                                                                                  |
 | `ui_menu_action_selected` | `menu`, `action` (`edit`, `delete`)                                                                                    |
@@ -597,7 +597,7 @@ completa e valores concretos dos segmentos nunca são propriedades.
 | `ui_form_submitted`       | `form`, `mode` (`create`, `edit`, `inline_edit`)                                                                       |
 | `ui_operation_started`    | `operation`                                                                                                            |
 | `ui_operation_completed`  | `operation`, `outcome` (`success`, `error`, `dismissed`, `unavailable`)                                                |
-| `ui_retry_requested`      | `resource` (`training_plans`, `training_plan`, `workout`)                                                              |
+| `ui_retry_requested`      | `resource` (`training_plans`, `training_plan`, `workout`, `dashboard`, `admin_dashboard`)                               |
 | `ui_disclosure_toggled`   | `disclosure`, `state` (`open`, `closed`)                                                                               |
 | `ui_system_failure`       | `category` (`bootstrap`, `render`, `pwa_registration`)                                                                 |
 

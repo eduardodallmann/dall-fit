@@ -260,6 +260,14 @@ permitindo testar registro e transferência da preparação Android sem persist�
 real. O browser Web não registra nem chama o plugin
 nativo; estados do repository Android são injetados diretamente nos testes de UI.
 
+O seletor `mockDashboard` vira o header fictício
+`x-dall-fit-mock-dashboard` somente em desenvolvimento com MSW. Os valores
+`empty`, `personal` e `session-running` controlam a leitura pessoal; `admin`
+fornece também agregados. `personal-error` e `admin-error` falham nas duas requests
+automáticas (tentativa inicial e único retry transitório) e aceitam a repetição
+explícita seguinte, permitindo validar erro, Analytics e recuperação reais. O
+estado de tentativas é limpo pelo setup global entre testes.
+
 ## Sessão fictícia através da navegação OAuth
 
 Para jornadas que atravessam documentos, o cookie exclusivamente fictício

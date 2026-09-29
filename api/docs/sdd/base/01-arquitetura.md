@@ -71,9 +71,25 @@ Essa reconciliação preserva tanto referências materializadas quanto origens d
 snapshot e destinos já confirmados de jobs de clone não terminais.
 `autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
 `pnpm -C api indexes:apply -- --execute` com
-`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v3`. O comando cria primeiro
+`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v4`. O comando cria primeiro
 os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
 usa `syncIndexes()`.
+
+## Read model de dashboard
+
+`DashboardModule` expõe as leituras autenticada e administrativa sem transformar
+o domínio de treino em DTO de relatório. Controller e commands entregam o fluxo a
+`DashboardService`; este calcula limites civis pelo calendário compartilhado,
+resolve a próxima ação pela interface pública `TrainingDashboardContextService` e
+consome o port `DashboardReadRepository`. O adapter MongoDB usa agregações e
+projeções server-side sobre pessoas, execuções, catálogo, seleções e planos.
+
+O dashboard pessoal sempre filtra pela pessoa da sessão. O administrativo passa
+por `AdminOnly` e publica somente contagens agregadas. As queries são apoiadas por
+`people.createdAt`, `workout_executions.status/completedAt`,
+`training_plan_catalog_entries.kind/globalTrainingPlanId/personId` e
+`training_plan_active_selections.catalogEntryId`; produção aplica esses índices
+pelo mesmo comando operacional v4.
 
 ## Assistente de planos
 

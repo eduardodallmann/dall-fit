@@ -96,6 +96,13 @@ const assistantScenarios = [
   'assistant:ready',
 ] as const;
 
+const dashboardScenarios = [
+  'dashboard:admin',
+  'dashboard:empty',
+  'dashboard:personal',
+  'dashboard:timezone',
+] as const;
+
 function assertSeedCanRun(
   environment: string,
   mongodbUri: string,
@@ -113,6 +120,7 @@ function assertSeedCanRun(
   const knownScenarios: readonly string[] = [
     ...assistantScenarios,
     ...authScenarios,
+    ...dashboardScenarios,
     ...offlineLeaseScenarios,
     ...offlineSnapshotScenarios,
     ...trainingPlanScenarios,
@@ -599,6 +607,91 @@ async function main(): Promise<void> {
           workouts: [],
         },
       ]);
+      if (scenario?.startsWith('dashboard:')) {
+        const regularPersonId = new Types.ObjectId('64b000000000000000000003');
+        const regular = await personModel
+          .findOneAndUpdate(
+            { _id: regularPersonId },
+            {
+              $set: {
+                email: 'dashboard.runner@example.test',
+                googleSubject: 'google-dashboard-001',
+                name: 'Dashboard Runner',
+                photoUrl: null,
+              },
+              $unset: { isAdmin: 1 },
+            },
+            { new: true, setDefaultsOnInsert: true, upsert: true },
+          )
+          .orFail()
+          .exec();
+        const admin = await personModel
+          .findOne({ googleSubject: 'google-admin-001' })
+          .orFail()
+          .exec();
+        const people = [regular, admin];
+        const personIds = people.map((person) => person._id);
+        await Promise.all([
+          catalogModel.deleteMany({ personId: { $in: personIds } }).exec(),
+          activeModel.deleteMany({ personId: { $in: personIds } }).exec(),
+          workoutExecutionModel
+            .deleteMany({ personId: { $in: personIds } })
+            .exec(),
+        ]);
+        if (scenario !== 'dashboard:empty') {
+          for (const [index, person] of people.entries()) {
+            const entry = await catalogModel.create({
+              _id: new Types.ObjectId(
+                `74b00000000000000000001${String(index + 1)}`,
+              ),
+              globalTrainingPlanId: planId,
+              kind: 'global-reference',
+              personId: person._id,
+              trainingPlanId: null,
+            });
+            await activeModel.create({
+              catalogEntryId: entry._id,
+              personId: person._id,
+            });
+            await workoutExecutionModel.create({
+              bodyAreas: ['quadriceps'],
+              catalogEntryId: entry._id,
+              completedAt: new Date(
+                index === 0
+                  ? '2026-09-28T03:00:00.000Z'
+                  : '2026-09-29T12:00:00.000Z',
+              ),
+              completedExerciseCount: 5,
+              durationSeconds: 2700,
+              fullCompletion: true,
+              personId: person._id,
+              planName: 'Plano global de exemplo',
+              sessionId: `dashboard-seed-${index + 1}`,
+              source: 'global-reference',
+              startedAt: new Date(
+                index === 0
+                  ? '2026-09-28T02:15:00.000Z'
+                  : '2026-09-29T11:15:00.000Z',
+              ),
+              status: 'completed',
+              timezone: 'America/Sao_Paulo',
+              totalExerciseCount: 5,
+              totalLoadKg: 120,
+              trainingPlanId: planId,
+              workoutCount: 1,
+              workoutId,
+              workoutName: 'Treino A',
+            });
+          }
+        }
+        await seedSession(
+          scenario === 'dashboard:admin'
+            ? admin._id.toString()
+            : regular._id.toString(),
+          'web',
+          webCookieFile,
+        );
+      }
       if (
         scenario?.startsWith('personal-training-plans:') ||
         scenario?.startsWith('offline-training-lease:') ||

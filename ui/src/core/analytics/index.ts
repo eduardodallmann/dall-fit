@@ -5,6 +5,7 @@ import { isBrowserOnline } from '~/core/connectivity';
 export type AnalyticsSurface =
   | 'application_menu'
   | 'authenticated_shell'
+  | 'dashboard'
   | 'home'
   | 'pwa_install'
   | 'pwa_update'
@@ -23,6 +24,7 @@ export type AnalyticsControl =
   | 'breadcrumb_training_plans'
   | 'cancel'
   | 'delete_confirmation'
+  | 'dashboard_action'
   | 'description_field'
   | 'delete_exercise'
   | 'edit_plan'
@@ -48,6 +50,7 @@ export type AnalyticsControl =
   | 'pwa_update'
   | 'pwa_update_dismiss'
   | 'retry'
+  | 'recent_workout'
   | 'reorder_handle'
   | 'row_actions'
   | 'submit'
@@ -84,12 +87,17 @@ type UiAnalyticsEvent =
   | (CommonEvent & {
       destination:
         | 'dash'
+        | 'training_completion'
+        | 'training_plans'
+        | 'training_resume'
+        | 'training_start'
         | 'training'
         | 'training_plan_detail'
         | 'training_plan_list'
         | 'workout';
       eventName: 'ui_navigation_selected';
-      navigationKind: 'breadcrumb' | 'menu' | 'pagination' | 'row_link';
+      navigationKind:
+        'breadcrumb' | 'dashboard_action' | 'menu' | 'pagination' | 'row_link';
     })
   | (CommonEvent & {
       action:
@@ -201,7 +209,12 @@ type UiAnalyticsEvent =
     })
   | (CommonEvent & {
       eventName: 'ui_retry_requested';
-      resource: 'training_plan' | 'training_plans' | 'workout';
+      resource:
+        | 'admin_dashboard'
+        | 'dashboard'
+        | 'training_plan'
+        | 'training_plans'
+        | 'workout';
     })
   | (CommonEvent & {
       disclosure: 'pwa_install_instructions';

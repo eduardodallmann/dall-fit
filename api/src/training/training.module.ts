@@ -30,6 +30,7 @@ import { OfflineTrainingSnapshotLockService } from '~/training/services/offline-
 import { OfflineTrainingSnapshotService } from '~/training/services/offline-training-snapshot.service';
 import { OfflineTrainingTerminalService } from '~/training/services/offline-training-terminal.service';
 import { TrainingClockService } from '~/training/services/training-clock.service';
+import { TrainingDashboardContextService } from '~/training/services/training-dashboard-context.service';
 import { TrainingService } from '~/training/services/training.service';
 import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
 
@@ -64,6 +65,7 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
     RegisterOfflineTrainingLeaseCommand,
     TakeoverOfflineTrainingLeaseCommand,
     TrainingClockService,
+    TrainingDashboardContextService,
     TrainingCommand,
     TrainingService,
     WorkoutSessionStore,
@@ -76,5 +78,6 @@ import { WorkoutSessionStore } from '~/training/stores/workout-session.store';
       useExisting: MongoWorkoutExecutionRepository,
     },
   ],
+  exports: [TrainingClockService, TrainingDashboardContextService],
 })
 export class TrainingModule {}

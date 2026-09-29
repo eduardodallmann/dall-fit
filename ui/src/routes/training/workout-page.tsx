@@ -24,6 +24,7 @@ import { trackTrainingAction } from '~/core/analytics';
 import { getApiErrorCode } from '~/core/http/http-error';
 import { NativeTrainingRepositoryError } from '~/core/platform/native/native-training-repository';
 import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
+import { dashboardKeys } from '~/routes/dashboard/dashboard-queries';
 import {
   bodyAreaLabels,
   exerciseTypeIcons,
@@ -446,6 +447,7 @@ function ActiveWorkout({
     onSuccess: (completion) => {
       queryClient.removeQueries({ queryKey: sessionQueryKey });
       void queryClient.invalidateQueries({ queryKey: trainingKeys.all });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       if (completion === null) {
         void navigate({
           replace: true,

@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 
 import { appCompatibilityHandlers } from '~/mocks/handlers/app-compatibility';
 import { authHandlers } from '~/mocks/handlers/auth';
+import { dashboardHandlers } from '~/mocks/handlers/dashboard';
 import { realtimeHandlers } from '~/mocks/handlers/realtime';
 import { trainingHandlers } from '~/mocks/handlers/training';
 import { trainingPlanAssistantHandlers } from '~/mocks/handlers/training-plan-assistant';
@@ -16,6 +17,7 @@ const apiBaseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, '');
 export const handlers = [
   ...appCompatibilityHandlers,
   ...authHandlers,
+  ...dashboardHandlers,
   ...realtimeHandlers,
   ...trainingPlanHandlers,
   ...trainingPlanAssistantHandlers,

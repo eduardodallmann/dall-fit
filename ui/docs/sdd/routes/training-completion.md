@@ -33,6 +33,11 @@ somente o texto visível. Cancelamento nativo não vira erro. Sem suporte, copia
 mesmo texto pelo clipboard e anuncia sucesso; falha mostra toast. `Voltar para
 treinos` navega com replace para `/training`, que recalcula o workout atual.
 
+O sucesso que cria esta conclusão invalida, antes da navegação, todas as queries
+de dashboard da geração autenticada. Voltar depois a `/dash` refaz tanto a leitura
+pessoal quanto a administrativa que já estivesse em cache, sem aguardar o minuto
+de `staleTime`.
+
 ## Integração e acessibilidade
 
 `GET /training/completions/:workoutExecutionId`, documentado em

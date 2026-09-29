@@ -184,7 +184,7 @@ test.describe('Rota /dash', () => {
     await expect(page.getByRole('img', { name: 'Alex Runner' })).toBeVisible();
     await expect(page.getByText('Alex Runner')).toBeVisible();
     await expect(page.getByText('alex.runner@example.test')).toBeVisible();
-    await expect(page.getByText('Admin')).toBeVisible();
+    await expect(page.getByText('Admin', { exact: true })).toBeVisible();
     const avatar = page.getByRole('img', { name: 'Alex Runner' });
     const theme = page.getByRole('button', { name: 'Ativar tema escuro' });
     const logout = page.getByRole('button', { name: 'Sair' });

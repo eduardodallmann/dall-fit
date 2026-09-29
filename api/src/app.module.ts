@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppCompatibilityModule } from '~/app-compatibility/app-compatibility.module';
 import { AuthModule } from '~/auth/auth.module';
 import { validateEnvironment } from '~/config/environment';
+import { DashboardModule } from '~/dashboard/dashboard.module';
 import { ObservabilityModule } from '~/observability/observability.module';
 import { OperationalModule } from '~/operational/operational.module';
 import { PersonModule } from '~/person/person.module';
@@ -40,6 +41,7 @@ import { TrainingModule } from '~/training/training.module';
     TrainingPlanModule,
     TrainingPlanAssistantModule,
     TrainingModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

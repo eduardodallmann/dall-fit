@@ -1,4 +1,6 @@
 import type {
+  AdminDashboard,
+  Dashboard,
   Exercise,
   ExerciseImage,
   ExerciseType,
@@ -206,6 +208,8 @@ export type TrainingWorkoutPreviewResponse =
 export type TrainingSessionResponse = ApiResponse<TrainingSession>;
 export type WorkoutExecutionSummaryResponse =
   ApiResponse<WorkoutExecutionSummary>;
+export type DashboardResponse = ApiResponse<Dashboard>;
+export type AdminDashboardResponse = ApiResponse<AdminDashboard>;
 
 export interface RegisterOfflineTrainingLeaseRequest {
   installationId: string;

@@ -22,6 +22,11 @@ import type {
 } from '~/training-plan/domain/training-plan.entity';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
+import {
+  assertValidTimezone,
+  formatLocalDate,
+  getWeekRange,
+} from '~/training/domain/training-calendar';
 import type {
   NewWorkoutExecution,
   StoredTrainingExerciseExecution,
@@ -873,7 +878,7 @@ export class TrainingService {
 
   private assertTimezone(timezone: string): void {
     try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
+      assertValidTimezone(timezone);
     } catch {
       throw createWorkoutTimezoneInvalidException();
     }
@@ -1197,61 +1202,17 @@ export class TrainingService {
   }
 
   private weekRange(date: Date, timezone: string) {
-    const localDate = this.localDate(date, timezone);
-    const [year, month, day] = localDate.split('-').map(Number) as [
-      number,
-      number,
-      number,
-    ];
-    const ordinal = Date.UTC(year, month - 1, day);
-    const weekday = new Date(ordinal).getUTCDay() || 7;
-    const mondayOrdinal = ordinal - (weekday - 1) * 86_400_000;
-    const nextMondayOrdinal = mondayOrdinal + 7 * 86_400_000;
-    const start = this.localMidnightToUtc(mondayOrdinal, timezone);
-    const end = this.localMidnightToUtc(nextMondayOrdinal, timezone);
-    const result = { end, mondayOrdinal, start };
+    const range = getWeekRange(date, timezone);
+    const result = {
+      end: range.end,
+      mondayOrdinal: range.startOrdinal,
+      start: range.start,
+    };
     return result;
   }
 
   private localDate(date: Date, timezone: string): string {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      day: '2-digit',
-      month: '2-digit',
-      timeZone: timezone,
-      year: 'numeric',
-    }).formatToParts(date);
-    const read = (type: Intl.DateTimeFormatPartTypes) =>
-      parts.find((part) => part.type === type)?.value ?? '';
-    const result = `${read('year')}-${read('month')}-${read('day')}`;
-    return result;
-  }
-
-  private localMidnightToUtc(localOrdinal: number, timezone: string): Date {
-    let candidate = localOrdinal;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const parts = new Intl.DateTimeFormat('en-US', {
-        day: '2-digit',
-        hour: '2-digit',
-        hourCycle: 'h23',
-        minute: '2-digit',
-        month: '2-digit',
-        second: '2-digit',
-        timeZone: timezone,
-        year: 'numeric',
-      }).formatToParts(new Date(candidate));
-      const read = (type: Intl.DateTimeFormatPartTypes) =>
-        Number(parts.find((part) => part.type === type)?.value ?? 0);
-      const represented = Date.UTC(
-        read('year'),
-        read('month') - 1,
-        read('day'),
-        read('hour'),
-        read('minute'),
-        read('second'),
-      );
-      candidate -= represented - localOrdinal;
-    }
-    const result = new Date(candidate);
+    const result = formatLocalDate(date, timezone);
     return result;
   }
 

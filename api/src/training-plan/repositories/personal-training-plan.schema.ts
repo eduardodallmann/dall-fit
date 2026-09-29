@@ -62,6 +62,11 @@ PersonalTrainingPlanCatalogSchema.index({
   createdAt: -1,
   _id: -1,
 });
+PersonalTrainingPlanCatalogSchema.index({
+  kind: 1,
+  globalTrainingPlanId: 1,
+  personId: 1,
+});
 
 @Schema({
   collection: 'training_plan_active_selections',
