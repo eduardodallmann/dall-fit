@@ -123,14 +123,15 @@ export async function deletePersonalTrainingPlan(
 
 export async function activatePersonalTrainingPlan(
   catalogEntryId: string,
+  active: boolean,
   scenario: MockTrainingPlansScenario,
-): Promise<string> {
+): Promise<readonly string[]> {
   const response = await apiClient.put<ActivatePersonalTrainingPlanResponse>(
     '/training-plans/active',
-    { catalogEntryId },
+    { active, catalogEntryId },
     requestConfig(scenario),
   );
-  return response.data.data.activeCatalogEntryId;
+  return response.data.data.activeCatalogEntryIds;
 }
 
 export async function createGlobalTrainingPlanReference(

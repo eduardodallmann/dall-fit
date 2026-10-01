@@ -39,9 +39,10 @@ export function createHttpTrainingRepository(
       completeTrainingSession(confirmIncomplete, timezone, version, scenario),
     getCompletion: (executionId, signal) =>
       getWorkoutExecutionSummary(executionId, scenario, signal),
-    getOverview: (signal) => getTrainingOverview(scenario, signal),
-    getPreview: (workoutId, signal) =>
-      getTrainingWorkoutPreview(workoutId, scenario, signal),
+    getOverview: (catalogEntryId, signal) =>
+      getTrainingOverview(scenario, catalogEntryId, signal),
+    getPreview: (workoutId, catalogEntryId, signal) =>
+      getTrainingWorkoutPreview(workoutId, scenario, catalogEntryId, signal),
     getSession: (signal) => getTrainingSession(scenario, signal),
     resolveTimer: (outcome, version) =>
       resolveTrainingTimer(outcome, version, scenario),
@@ -49,7 +50,8 @@ export function createHttpTrainingRepository(
       restartTrainingExercise(exerciseId, version, scenario),
     saveLoad: (exerciseId, seriesNumber, loadKg, version) =>
       saveTrainingLoad(exerciseId, seriesNumber, loadKg, version, scenario),
-    startSession: (workoutId) => startTrainingSession(workoutId, scenario),
+    startSession: (workoutId, catalogEntryId) =>
+      startTrainingSession(workoutId, scenario, catalogEntryId),
     startTimer: (exerciseId, kind, version) =>
       startTrainingTimer(exerciseId, kind, version, scenario),
   };

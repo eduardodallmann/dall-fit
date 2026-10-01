@@ -15,15 +15,14 @@ describe('offline training lease commands', () => {
   const lease = {
     expiresAt: '2026-09-20T12:00:00.000Z',
     leaseId: 'lease-001',
-    planId: 'plan-001',
     state: 'created' as const,
   };
-  const personalPlans = { getActiveExecutionPlan: vi.fn() };
+  const personalPlans = { getActiveExecutionPlans: vi.fn() };
   const leases = { register: vi.fn(), takeover: vi.fn() };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    personalPlans.getActiveExecutionPlan.mockResolvedValue(active);
+    personalPlans.getActiveExecutionPlans.mockResolvedValue([active]);
     leases.register.mockResolvedValue(lease);
     leases.takeover.mockResolvedValue({ ...lease, state: 'taken-over' });
   });
@@ -41,7 +40,6 @@ describe('offline training lease commands', () => {
     });
     expect(leases.register).toHaveBeenCalledWith(
       'person-001',
-      'plan-001',
       'installation-001',
     );
   });
@@ -57,7 +55,6 @@ describe('offline training lease commands', () => {
     expect(result.data.state).toBe('taken-over');
     expect(leases.takeover).toHaveBeenCalledWith(
       'person-001',
-      'plan-001',
       'installation-002',
     );
   });
@@ -68,7 +65,7 @@ describe('offline training lease commands', () => {
   ])(
     'fails before Redis when the active plan is absent',
     async (CommandType) => {
-      personalPlans.getActiveExecutionPlan.mockResolvedValueOnce(null);
+      personalPlans.getActiveExecutionPlans.mockResolvedValueOnce([]);
       const command = new CommandType(
         personalPlans as unknown as PersonalTrainingPlanService,
         leases as unknown as OfflineTrainingLeaseService,

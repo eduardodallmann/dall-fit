@@ -25,6 +25,7 @@ interface LeasePayload {
 interface PreparedPlanPayload extends Readonly<Record<string, unknown>> {
   lease: LeasePayload;
   overview: TrainingOverview;
+  plan: NonNullable<TrainingOverview['plan']>;
   previews: readonly TrainingWorkoutPreview[];
 }
 
@@ -70,24 +71,59 @@ export class NativeTrainingRepository implements TrainingRepository {
     this.createUuid = createUuid;
   }
 
-  async getOverview(): Promise<TrainingOverview> {
-    const prepared = await this.readPrepared();
+  async getOverview(catalogEntryId?: string): Promise<TrainingOverview> {
     const active = await this.readActive();
-    if (active === undefined) return prepared.overview;
-    return {
-      ...prepared.overview,
-      workouts: prepared.overview.workouts.map((workout) => ({
-        ...workout,
-        indicator:
-          workout.id === active.session.workout.id
-            ? 'in-progress'
-            : workout.indicator,
-      })),
-    };
+    if (active !== undefined) {
+      const prepared = (await this.plugin.listPreparedPlans()).aggregates
+        .filter(
+          (item) =>
+            item.payloadVersion === 2 &&
+            isPreparedPlanPayload(item.payload) &&
+            preparedAggregateExpiresAt(item) > this.now(),
+        )
+        .map((item) => item.payload as PreparedPlanPayload);
+      return {
+        availablePlans: prepared.map((item) => item.plan),
+        offlinePreparations: prepared.flatMap(
+          (item) => item.overview.offlinePreparations,
+        ),
+        plan: active.session.plan,
+        workouts: active.snapshotPlan.workouts.map((workout) => ({
+          ...workout,
+          indicator:
+            workout.id === active.session.workout.id ? 'in-progress' : null,
+          media: null,
+        })),
+      };
+    }
+    if (catalogEntryId === undefined) {
+      const stored = (await this.plugin.listPreparedPlans()).aggregates
+        .filter(
+          (item) =>
+            item.payloadVersion === 2 &&
+            isPreparedPlanPayload(item.payload) &&
+            preparedAggregateExpiresAt(item) > this.now(),
+        )
+        .map((item) => item.payload as PreparedPlanPayload);
+      if (stored.length > 1)
+        return {
+          availablePlans: stored.map((item) => item.plan),
+          offlinePreparations: stored.flatMap(
+            (item) => item.overview.offlinePreparations,
+          ),
+          plan: null,
+          workouts: [],
+        };
+    }
+    const prepared = await this.readPrepared(catalogEntryId);
+    return prepared.overview;
   }
 
-  async getPreview(workoutId: string): Promise<TrainingWorkoutPreview> {
-    const prepared = await this.readPrepared();
+  async getPreview(
+    workoutId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingWorkoutPreview> {
+    const prepared = await this.readPrepared(catalogEntryId);
     const preview = prepared.previews.find(
       (item) => item.workout.id === workoutId,
     );
@@ -103,12 +139,15 @@ export class NativeTrainingRepository implements TrainingRepository {
     return this.projectSession(active);
   }
 
-  async startSession(workoutId: string): Promise<TrainingSession> {
+  async startSession(
+    workoutId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingSession> {
     if ((await this.readActive()) !== undefined)
       throw new NativeTrainingRepositoryError(
         'WORKOUT_SESSION_VERSION_CONFLICT',
       );
-    const prepared = await this.readPrepared(true);
+    const prepared = await this.readPrepared(catalogEntryId, true);
     const preview = prepared.previews.find(
       (item) => item.workout.id === workoutId,
     );
@@ -442,9 +481,22 @@ export class NativeTrainingRepository implements TrainingRepository {
   }
 
   private async readPrepared(
+    catalogEntryId?: string,
     requireValid = false,
   ): Promise<PreparedPlanPayload> {
-    const aggregate = (await this.plugin.getPreparedPlan()).aggregate;
+    const aggregates = (await this.plugin.listPreparedPlans()).aggregates;
+    const candidates = aggregates.filter(
+      (item) =>
+        item.payloadVersion === 2 && isPreparedPlanPayload(item.payload),
+    );
+    const aggregate =
+      candidates.find((item) => {
+        const payload = item.payload as PreparedPlanPayload;
+        return payload.plan.catalogEntryId === catalogEntryId;
+      }) ??
+      (catalogEntryId === undefined && candidates.length === 1
+        ? candidates[0]
+        : undefined);
     if (aggregate === undefined || aggregate.payloadVersion !== 2)
       throw new NativeTrainingRepositoryError('CONNECTION_REQUIRED');
     const payload = aggregate.payload;
@@ -543,12 +595,26 @@ function isPreparedPlanPayload(
     typeof lease.leaseId === 'string' &&
     'planId' in lease &&
     typeof lease.planId === 'string' &&
+    'plan' in value &&
+    typeof value.plan === 'object' &&
+    value.plan !== null &&
     typeof overviewValue === 'object' &&
     overviewValue !== null &&
     'plan' in overviewValue &&
     'workouts' in overviewValue &&
     Array.isArray(overviewValue.workouts) &&
     Array.isArray(value.previews)
+  );
+}
+
+function preparedAggregateExpiresAt(aggregate: {
+  expiresAt?: string;
+  payload: Readonly<Record<string, unknown>>;
+}): number {
+  const payload = aggregate.payload as Partial<PreparedPlanPayload>;
+  return Math.min(
+    Date.parse(aggregate.expiresAt ?? ''),
+    Date.parse(payload.lease?.expiresAt ?? ''),
   );
 }
 

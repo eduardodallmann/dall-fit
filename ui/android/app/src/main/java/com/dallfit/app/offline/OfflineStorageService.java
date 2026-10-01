@@ -171,11 +171,31 @@ public final class OfflineStorageService {
         }
     }
 
-    public StoredAggregate getPreparedPlan() {
+    public StoredAggregate getPreparedPlan(String planId) {
+        requireText(planId, "planId");
         return readAggregate(
             "SELECT plan_id, plan_id, payload_version, revision, payload_json, updated_at, validated_at, expires_at " +
-            "FROM prepared_plan WHERE id = 1"
+            "FROM prepared_plan WHERE plan_id = ?",
+            new String[] { planId }
         );
+    }
+
+    public List<StoredAggregate> listPreparedPlans() {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            List<StoredAggregate> plans = new ArrayList<>();
+            try (Cursor cursor = helper.getReadableDatabase().rawQuery(
+                "SELECT plan_id, plan_id, payload_version, revision, payload_json, updated_at, validated_at, expires_at " +
+                "FROM prepared_plan ORDER BY plan_id",
+                null
+            )) {
+                while (cursor.moveToNext()) plans.add(readAggregate(cursor));
+            }
+            return plans;
+        } finally {
+            mutationLock.unlock();
+        }
     }
 
     public OfflineFileMetadata registerTemporaryFileForPreparedPlan(
@@ -226,18 +246,12 @@ public final class OfflineStorageService {
         }
         mutate(database -> {
             requireAccount(database);
-            boolean replacingCurrentPlan = validatePreparedPlanReplacement(
-                database,
-                planId,
-                expectedPlanId,
-                expectedRevision
-            );
-            if (!replacingCurrentPlan &&
-                !mayWriteRevision(
+            validatePreparedPlanExpectation(database, planId, expectedPlanId, expectedRevision);
+            if (!mayWriteRevision(
                     database,
                     "prepared_plan",
-                    "id = 1",
-                    new String[0],
+                    "plan_id = ?",
+                    new String[] { planId },
                     revision,
                     payloadJson,
                     planId,
@@ -247,14 +261,12 @@ public final class OfflineStorageService {
                     null,
                     "expires_at",
                     expiresAt
-                )
-            ) return false;
+                )) return false;
             ContentValues values = aggregateValues(planId, payloadVersion, revision, payloadJson, validatedAt);
-            values.put("id", 1);
             values.put("account_id", 1);
             values.put("validated_at", validatedAt);
             values.put("expires_at", expiresAt);
-            int updated = database.update("prepared_plan", values, "id = 1", null);
+            int updated = database.update("prepared_plan", values, "plan_id = ?", new String[] { planId });
             if (updated == 0) database.insertOrThrow("prepared_plan", null, values);
             incrementStateRevision(database);
             return true;
@@ -267,7 +279,7 @@ public final class OfflineStorageService {
         return mutate(database -> {
             int deleted = database.delete(
                 "prepared_plan",
-                "id = 1 AND plan_id = ? AND revision = ?",
+                "plan_id = ? AND revision = ?",
                 new String[] { planId, Long.toString(expectedRevision) }
             );
             if (deleted == 0) return false;
@@ -1685,7 +1697,7 @@ public final class OfflineStorageService {
             Cursor cursor = helper
                 .getReadableDatabase()
                 .rawQuery(
-                    "SELECT 1 FROM prepared_plan WHERE id = 1 AND plan_id = ? AND revision = ?",
+                    "SELECT 1 FROM prepared_plan WHERE plan_id = ? AND revision = ?",
                     new String[] { planId, Long.toString(revision) }
                 )
         ) {
@@ -1836,25 +1848,24 @@ public final class OfflineStorageService {
         }
     }
 
-    private boolean validatePreparedPlanReplacement(
+    private void validatePreparedPlanExpectation(
         SQLiteDatabase database,
         String planId,
         String expectedPlanId,
         Long expectedRevision
     ) {
-        try (Cursor cursor = database.rawQuery("SELECT plan_id, revision FROM prepared_plan WHERE id = 1", null)) {
+        try (Cursor cursor = database.rawQuery(
+            "SELECT revision FROM prepared_plan WHERE plan_id = ?",
+            new String[] { planId }
+        )) {
             if (!cursor.moveToFirst()) {
                 if (expectedPlanId != null) throw revisionConflict();
-                return false;
+                return;
             }
-            String currentPlanId = cursor.getString(0);
-            if (planId.equals(currentPlanId)) return false;
             if (
-                expectedPlanId == null ||
-                !expectedPlanId.equals(currentPlanId) ||
-                expectedRevision.longValue() != cursor.getLong(1)
+                expectedPlanId != null &&
+                (!expectedPlanId.equals(planId) || expectedRevision.longValue() != cursor.getLong(0))
             ) throw revisionConflict();
-            return true;
         }
     }
 

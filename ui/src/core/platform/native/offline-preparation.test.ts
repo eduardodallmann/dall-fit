@@ -21,8 +21,8 @@ const plan = {
   workoutCount: 1,
 };
 const overview: TrainingOverview = {
-  offlinePreparation: { plan, workoutIds: ['workout-a'] },
-  offlineValidity: validity,
+  availablePlans: [plan],
+  offlinePreparations: [{ plan, validity, workoutIds: ['workout-a'] }],
   plan,
   workouts: [],
 };
@@ -51,7 +51,6 @@ const preview: TrainingWorkoutPreview = {
 const lease = {
   expiresAt: validity.expiresAt,
   leaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-  planId: plan.id,
   state: 'created' as const,
 };
 
@@ -87,6 +86,8 @@ function createPlugin() {
     Promise.resolve({ file: files.get(fileId) });
   const getPreparedPlan: OfflineStoragePlugin['getPreparedPlan'] = () =>
     Promise.resolve({ aggregate: prepared });
+  const listPreparedPlans: OfflineStoragePlugin['listPreparedPlans'] = () =>
+    Promise.resolve({ aggregates: prepared === undefined ? [] : [prepared] });
   const putPreparedPlan: OfflineStoragePlugin['putPreparedPlan'] = (input) => {
     prepared = {
       expiresAt: input.expiresAt,
@@ -114,6 +115,8 @@ function createPlugin() {
     | 'downloadFile'
     | 'getFile'
     | 'getPreparedPlan'
+    | 'getState'
+    | 'listPreparedPlans'
     | 'putPreparedPlan'
     | 'removeFile'
     | 'removePreparedPlan'
@@ -121,6 +124,11 @@ function createPlugin() {
     downloadFile,
     getFile: vi.fn(getFile),
     getPreparedPlan: vi.fn(getPreparedPlan),
+    getState: vi.fn().mockResolvedValue({
+      pendingSnapshotCount: 0,
+      sessionAvailable: false,
+    }),
+    listPreparedPlans: vi.fn(listPreparedPlans),
     putPreparedPlan: vi.fn(putPreparedPlan),
     removeFile: vi.fn(removeFile),
     removePreparedPlan: vi.fn(removePreparedPlan),
@@ -140,7 +148,7 @@ describe('OfflinePreparationCoordinator', () => {
             resolve({
               file: {
                 contentType: 'image/webp',
-                fileId: 'display-opaque-a',
+                fileId: 'display-plan-a-opaque-a',
                 planId: 'plan-a',
                 revision: 1,
                 sizeBytes: 10,
@@ -166,11 +174,11 @@ describe('OfflinePreparationCoordinator', () => {
     );
     expect(JSON.stringify(readPrepared()?.payload)).not.toContain('https://');
     expect(JSON.stringify(readPrepared()?.payload)).toContain(
-      'display-opaque-a',
+      'display-plan-a-opaque-a',
     );
     expect(downloadFile).toHaveBeenCalledWith(
       expect.objectContaining({
-        fileId: 'display-opaque-a',
+        fileId: 'display-plan-a-opaque-a',
         url:
           preview.exercises[0]?.type === 'image'
             ? preview.exercises[0].image?.displayUrl
@@ -186,7 +194,7 @@ describe('OfflinePreparationCoordinator', () => {
     const { plugin } = createPlugin();
     const getOverview = vi.fn().mockResolvedValue({
       ...overview,
-      offlinePreparation: { plan, workoutIds: [] },
+      offlinePreparations: [{ plan, validity, workoutIds: [] }],
     });
     const coordinator = new OfflinePreparationCoordinator({
       ...preparationDependencies(),
@@ -195,7 +203,7 @@ describe('OfflinePreparationCoordinator', () => {
       plugin,
     });
     await Promise.all([coordinator.enter(), coordinator.enter()]);
-    expect(getOverview).toHaveBeenCalledTimes(1);
+    expect(getOverview).toHaveBeenCalledTimes(2);
     expect(coordinator.getSnapshot().status).toBe('ready');
   });
 
@@ -207,6 +215,7 @@ describe('OfflinePreparationCoordinator', () => {
         lease: {
           ...lease,
           installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          planId: plan.id,
         },
         overview,
         plan,

@@ -73,6 +73,7 @@ interface TrainingPlanListSearch extends TrainingPlanSearch {
 }
 
 interface TrainingSearch extends DashSearch {
+  catalogEntryId?: string;
   mockTraining?: MockTrainingScenario;
 }
 
@@ -543,6 +544,8 @@ function parseTrainingPlanSearch(
     'loading',
     'not-found',
     'personal-mixed',
+    'multiple-active',
+    'active-limit',
     'personal-reference',
     'clone-running',
     'clone-failed',
@@ -579,6 +582,7 @@ function parseTrainingSearch(search: Record<string, unknown>): TrainingSearch {
     : undefined;
   const scenarios: readonly MockTrainingScenario[] = [
     'active-plan',
+    'multiple-active',
     'duration-running',
     'exercise-completed',
     'load-pending',
@@ -596,6 +600,10 @@ function parseTrainingSearch(search: Record<string, unknown>): TrainingSearch {
     (scenario) => scenario === search.mockTraining,
   );
   const result = {
+    ...(typeof search.catalogEntryId === 'string' &&
+    /^[a-f\d]{24}$/i.test(search.catalogEntryId)
+      ? { catalogEntryId: search.catalogEntryId }
+      : {}),
     ...(mockAuth === undefined ? {} : { mockAuth }),
     ...(mockTraining === undefined ? {} : { mockTraining }),
   };
@@ -696,7 +704,10 @@ function PersonalTrainingPlanWorkoutRouteComponent() {
 function TrainingOverviewRouteComponent() {
   const search = trainingOverviewRoute.useSearch();
   return (
-    <TrainingOverviewPage mockTraining={search.mockTraining ?? 'active-plan'} />
+    <TrainingOverviewPage
+      catalogEntryId={search.catalogEntryId}
+      mockTraining={search.mockTraining ?? 'active-plan'}
+    />
   );
 }
 
@@ -707,6 +718,7 @@ function TrainingWorkoutRouteComponent() {
   return (
     <TrainingWorkoutPage
       mockTraining={search.mockTraining ?? 'workout-preview'}
+      catalogEntryId={search.catalogEntryId}
       workoutId={params.workoutId}
     />
   );

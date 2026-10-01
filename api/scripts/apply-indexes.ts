@@ -64,8 +64,8 @@ async function main(): Promise<void> {
       { name: 'personId_1', unique: true },
     );
     await activeSelections.createIndex(
-      { catalogEntryId: 1 },
-      { name: 'catalogEntryId_1' },
+      { catalogEntryIds: 1 },
+      { name: 'catalogEntryIds_1' },
     );
     await workoutExecutions.createIndex(
       { personId: 1, trainingPlanId: 1, completedAt: -1 },

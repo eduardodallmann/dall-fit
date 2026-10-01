@@ -70,30 +70,18 @@ public final class OfflineStorageServiceTest {
             "2026-09-13T12:00:00Z",
             "2026-09-20T12:00:00Z"
         );
-        assertThrows(
-            OfflineStorageException.class,
-            () -> service.putPreparedPlan(
-                "plan-b",
-                1,
-                0,
-                "{\"workouts\":[]}",
-                "2026-09-13T12:00:00Z",
-                "2026-09-20T12:00:00Z"
-            )
-        );
         service.putPreparedPlan(
             "plan-b",
             1,
             0,
             "{\"workouts\":[]}",
             "2026-09-13T12:00:00Z",
-            "2026-09-20T12:00:00Z",
-            "plan-a",
-            0L
+            "2026-09-20T12:00:00Z"
         );
-        assertEquals("plan-b", service.getPreparedPlan().getPlanId());
-        assertEquals("2026-09-13T12:00:00Z", service.getPreparedPlan().getValidatedAt());
-        assertEquals("2026-09-20T12:00:00Z", service.getPreparedPlan().getExpiresAt());
+        assertEquals(2, service.listPreparedPlans().size());
+        assertEquals("plan-b", service.getPreparedPlan("plan-b").getPlanId());
+        assertEquals("2026-09-13T12:00:00Z", service.getPreparedPlan("plan-b").getValidatedAt());
+        assertEquals("2026-09-20T12:00:00Z", service.getPreparedPlan("plan-b").getExpiresAt());
         service.putActiveSession(
             "session-a",
             "plan-a",
@@ -499,6 +487,49 @@ public final class OfflineStorageServiceTest {
         }
         reopened.close();
         context.deleteDatabase(migrationDatabase);
+    }
+
+    @Test
+    public void migratesTheVersionFourPreparedPlanIntoTheCollection() {
+        service.close();
+        SQLiteDatabase versionFour = context.openOrCreateDatabase(
+            databaseName,
+            Context.MODE_PRIVATE,
+            null
+        );
+        versionFour.execSQL("PRAGMA foreign_keys = OFF");
+        versionFour.execSQL("DROP TABLE prepared_plan");
+        versionFour.execSQL(
+            "CREATE TABLE prepared_plan (" +
+            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+            "account_id INTEGER NOT NULL DEFAULT 1," +
+            "plan_id TEXT NOT NULL," +
+            "payload_version INTEGER NOT NULL," +
+            "revision INTEGER NOT NULL," +
+            "payload_json TEXT NOT NULL," +
+            "validated_at TEXT NOT NULL," +
+            "expires_at TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+        versionFour.execSQL(
+            "INSERT INTO prepared_plan VALUES " +
+            "(1, 1, 'plan-legacy', 2, 7, '{}', " +
+            "'2026-09-13T12:00:00Z', '2026-09-20T12:00:00Z', '2026-09-13T12:00:00Z')"
+        );
+        versionFour.setVersion(4);
+        versionFour.close();
+
+        OfflineStorageDatabase migrated = new OfflineStorageDatabase(context, databaseName);
+        SQLiteDatabase database = migrated.getWritableDatabase();
+        try (android.database.Cursor cursor = database.rawQuery(
+            "SELECT plan_id, revision FROM prepared_plan",
+            null
+        )) {
+            assertTrue(cursor.moveToFirst());
+            assertEquals("plan-legacy", cursor.getString(0));
+            assertEquals(7L, cursor.getLong(1));
+        }
+        migrated.close();
     }
 
     @Test

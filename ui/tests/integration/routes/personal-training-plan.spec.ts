@@ -238,7 +238,7 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toBeVisible();
   });
 
-  test('lista próprios e referências juntos e mantém exatamente um radio ativo', async ({
+  test('lista próprios e referências e alterna checkboxes independentes', async ({
     page,
   }) => {
     await page.goto(
@@ -254,8 +254,9 @@ test.describe('Rotas pessoais de planos de treino', () => {
         name: 'Modelo disponibilizado',
       }),
     ).toBeVisible();
-    const radios = page.getByRole('radio');
-    await expect(radios).toHaveCount(2);
+    const checkboxes = page.getByRole('checkbox');
+    const checkboxLabels = page.locator('[data-slot="checkbox-content"]');
+    await expect(checkboxes).toHaveCount(2);
     const firstRow = page.getByRole('row', {
       name: /Hipertrofia iniciante/,
     });
@@ -265,9 +266,9 @@ test.describe('Rotas pessoais de planos de treino', () => {
     const idleBackground = await firstCell.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
     );
-    await radios.first().click();
+    await checkboxLabels.first().click();
     await page.mouse.move(0, 0);
-    await expect(radios.first()).toBeChecked();
+    await expect(checkboxes.first()).toBeChecked();
     await expect
       .poll(() =>
         firstCell.evaluate(
@@ -275,11 +276,14 @@ test.describe('Rotas pessoais de planos de treino', () => {
         ),
       )
       .not.toBe(idleBackground);
-    await expect(radios.nth(1)).toBeEnabled();
-    await radios.nth(1).click();
+    await expect(checkboxes.nth(1)).toBeEnabled();
+    await checkboxLabels.nth(1).click();
     await page.mouse.move(0, 0);
-    await expect(radios.first()).not.toBeChecked();
-    await expect(radios.nth(1)).toBeChecked();
+    await expect(checkboxes.first()).toBeChecked();
+    await expect(checkboxes.nth(1)).toBeChecked();
+    await checkboxLabels.first().click();
+    await page.mouse.move(0, 0);
+    await expect(checkboxes.first()).not.toBeChecked();
     await expect
       .poll(() =>
         firstCell.evaluate(
@@ -453,7 +457,7 @@ test.describe('Rotas pessoais de planos de treino', () => {
     ).toBeVisible();
     await page.getByRole('link', { name: 'Meus planos' }).click();
     const row = page.getByRole('row', { name: /Hipertrofia iniciante/ });
-    await row.getByRole('radio').click();
+    await row.locator('[data-slot="checkbox-content"]').click();
     await row.getByRole('button', { name: /Ações de Hipertrofia/ }).click();
     await page.getByRole('menuitem', { name: 'Excluir' }).click();
     await page
@@ -486,17 +490,19 @@ test.describe('Rotas pessoais de planos de treino', () => {
     expect(readsAfterEmptyState).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Ir para Meus planos' }).click();
-    const activeRadio = page
+    const activeCheckbox = page
       .getByRole('row', { name: /Hipertrofia iniciante/ })
-      .getByRole('radio');
+      .getByRole('checkbox');
     const activation = page.waitForResponse(
       (response) =>
         response.request().method() === 'PUT' &&
         new URL(response.url()).pathname.endsWith('/training-plans/active'),
     );
-    await activeRadio.click();
+    await activeCheckbox
+      .locator('xpath=ancestor::label[@data-slot="checkbox-content"]')
+      .click();
     await activation;
-    await expect(activeRadio).toBeChecked();
+    await expect(activeCheckbox).toBeChecked();
 
     await page.goBack();
     await expect(

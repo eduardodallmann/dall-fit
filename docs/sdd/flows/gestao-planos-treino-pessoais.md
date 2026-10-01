@@ -28,7 +28,7 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 |     5 | Clonar          | modal/linha       | `POST /training-plan-clone-jobs`          |
 |     6 | Executar clone  | não se aplica     | `POST /internal/training-plan-clone-runs` |
 |     7 | Navegar/editar  | detalhe e workout | `/training-plans/:catalogEntryId/**`      |
-|     8 | Marcar ativo    | lista             | `PUT /training-plans/active`              |
+|     8 | Alternar uso    | lista             | `PUT /training-plans/active`              |
 |     9 | Pedir ajuda     | modal da lista    | `/training-plan-assistant/session/**`     |
 
 ## Sequência e decisões
@@ -46,12 +46,11 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
    imagens e materializa a árvore. Cancelamento limpa destinos.
 6. Conclusão remove a linha do job e torna o plano próprio navegável; falha mantém
    retry/cancelamento. Timeout ambíguo mantém geração e permite reentrega.
-7. O radio substitui a seleção anterior; clicar o já ativo não o desmarca. Após
-   ativar, a UI remove o cache de `/training`, evitando reutilizar um estado vazio
-   lido antes da nova seleção. No Android, o sucesso limpa imediatamente o plano e
-   as mídias preparados e inicia a composição do novo ativo; falha dessa preparação
-   não reverte a seleção nem restaura a réplica anterior.
-8. Excluir próprio ou desvincular limpa a seleção se necessário, sem fallback.
+7. Cada checkbox ativa ou desativa sua entrada independentemente. A API mantém de
+   zero a cinco IDs únicos e rejeita atomicamente a sexta ativação; no limite, a
+   UI desabilita somente itens desmarcados. Após sucesso, a UI invalida catálogo,
+   dashboard e `/training`. No Android, o coordenador reconcilia todos os ativos.
+8. Excluir próprio ou desvincular remove a entrada do conjunto, sem fallback.
    Se a entrada era ativa, a UI remove o cache de `/training` para obrigar leitura
    canônica na próxima visita e limpa o preparado Android, preservando sessão e
    snapshots de execução independentes.
@@ -116,8 +115,9 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 
 - Link para testar: `http://localhost:3000/training-plan?mockAuth=person&mockTrainingPlans=personal-mixed`
 - Given: pessoa com plano próprio e referência global.
-- When: abre a lista e troca o radio.
-- Then: ambos aparecem juntos e somente o novo item permanece ativo.
+- When: abre a lista e marca os dois checkboxes.
+- Then: ambos aparecem juntos e permanecem ativos; qualquer um pode ser
+  desmarcado sem escolher substituto.
 
 ### Cenário 2 — Referência somente leitura
 

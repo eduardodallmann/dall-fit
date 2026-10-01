@@ -25,15 +25,15 @@ export class TrainingDashboardContextService {
     this.logger.log('TrainingDashboardContextService -> resolve -> params:', {
       params: { personId },
     });
-    const [session, active] = await Promise.all([
+    const [session, activePlans] = await Promise.all([
       this.sessions.get(personId),
-      this.personalPlans.getActiveExecutionPlan(personId),
+      this.personalPlans.getActiveExecutionPlans(personId),
     ]);
     this.logger.log(
       'TrainingDashboardContextService -> resolve -> dependencies return:',
       {
         data: {
-          activePlanFound: active !== null,
+          activePlanCount: activePlans.length,
           sessionFound: session !== null,
         },
       },
@@ -53,10 +53,32 @@ export class TrainingDashboardContextService {
       });
       return result;
     }
-    if (active === null || active.plan.workouts.length === 0) {
+    if (activePlans.length === 0) {
       const result = {
         nextAction: { type: 'select-plan' as const },
-        workoutCount: active?.plan.workouts.length ?? null,
+        workoutCount: null,
+      };
+      this.logger.log('TrainingDashboardContextService -> resolve -> return:', {
+        data: { action: result.nextAction.type, personId },
+      });
+      return result;
+    }
+    if (activePlans.length > 1) {
+      const result = {
+        nextAction: { type: 'choose-training-plan' as const },
+        workoutCount: null,
+      };
+      this.logger.log('TrainingDashboardContextService -> resolve -> return:', {
+        data: { action: result.nextAction.type, personId },
+      });
+      return result;
+    }
+    const active = activePlans[0];
+    if (active === undefined) throw new Error('Active plan is missing.');
+    if (active.plan.workouts.length === 0) {
+      const result = {
+        nextAction: { type: 'select-plan' as const },
+        workoutCount: 0,
       };
       this.logger.log('TrainingDashboardContextService -> resolve -> return:', {
         data: { action: result.nextAction.type, personId },

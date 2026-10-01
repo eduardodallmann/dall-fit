@@ -1,6 +1,7 @@
 import type {
   OfflineTrainingLeaseResponse,
   TrainingExercisePreview,
+  TrainingOfflinePreparation,
   TrainingOverview,
   TrainingWorkoutPreview,
 } from '@dall-fit/types';
@@ -38,9 +39,12 @@ type PreparedExercise =
   Exclude<TrainingExercisePreview, { type: 'image' }> | PreparedImageExercise;
 
 interface PreparedPlanPayload extends Readonly<Record<string, unknown>> {
-  lease: OfflineTrainingLeaseResponse['data'] & { installationId: string };
+  lease: OfflineTrainingLeaseResponse['data'] & {
+    installationId: string;
+    planId: string;
+  };
   overview: TrainingOverview;
-  plan: NonNullable<TrainingOverview['offlinePreparation']>['plan'];
+  plan: TrainingOfflinePreparation['plan'];
   previews: readonly TrainingWorkoutPreview[];
   workouts: readonly {
     exercises: readonly PreparedExercise[];
@@ -55,8 +59,11 @@ interface MediaJob {
 
 interface OfflinePreparationDependencies {
   getInstallationId: () => Promise<string>;
-  getOverview: () => Promise<TrainingOverview>;
-  getPreview: (workoutId: string) => Promise<TrainingWorkoutPreview>;
+  getOverview: (catalogEntryId?: string) => Promise<TrainingOverview>;
+  getPreview: (
+    workoutId: string,
+    catalogEntryId: string,
+  ) => Promise<TrainingWorkoutPreview>;
   now?: () => number;
   plugin: OfflineStoragePlugin;
   registerLease: (
@@ -114,19 +121,7 @@ export class OfflinePreparationCoordinator {
     try {
       this.generation += 1;
       this.inFlight = null;
-      await this.clearPreparedPlan();
-      await this.prepare(true);
-    } catch {
-      this.publish('failed', true);
-    }
-  }
-
-  async clearActivePlan(): Promise<void> {
-    try {
-      this.generation += 1;
-      this.inFlight = null;
-      await this.clearPreparedPlan();
-      this.publish('no-plan');
+      await this.prepare(false);
     } catch {
       this.publish('failed', true);
     }
@@ -145,19 +140,23 @@ export class OfflinePreparationCoordinator {
   }
 
   private async runPreparation(
-    alreadyCleared: boolean,
+    _alreadyCleared: boolean,
     generation: number,
   ): Promise<void> {
-    const current = alreadyCleared
-      ? undefined
-      : (await this.dependencies.plugin.getPreparedPlan()).aggregate;
-    const validCurrent = this.isValid(current);
-    const validStatus =
-      validCurrent && current !== undefined
-        ? await this.statusForStoredPlan(current)
-        : null;
+    const current = (await this.dependencies.plugin.listPreparedPlans())
+      .aggregates;
+    const validPlans = current.filter((plan) => this.isValid(plan));
+    let validStatus: 'ready' | 'ready-media-incomplete' | null = null;
+    if (validPlans.length > 0) {
+      const statuses = await Promise.all(
+        validPlans.map((plan) => this.statusForStoredPlan(plan)),
+      );
+      validStatus = statuses.every((status) => status === 'ready')
+        ? 'ready'
+        : 'ready-media-incomplete';
+    }
     if (validStatus !== null) this.publish(validStatus);
-    else this.publish(current === undefined ? 'preparing-data' : 'expired');
+    else this.publish(current.length === 0 ? 'preparing-data' : 'expired');
 
     try {
       await this.refreshPreparedData(current, generation);
@@ -179,74 +178,111 @@ export class OfflinePreparationCoordinator {
         return;
       }
     }
-    this.publish(validStatus ?? 'failed', true);
+    if (validStatus !== null) {
+      this.publish(validStatus, true);
+      return;
+    }
+    const retained = (
+      await this.dependencies.plugin.listPreparedPlans()
+    ).aggregates.filter((plan) => this.isValid(plan));
+    if (retained.length === 0) {
+      this.publish('failed', true);
+      return;
+    }
+    const statuses = await Promise.all(
+      retained.map((plan) => this.statusForStoredPlan(plan)),
+    );
+    this.publish(
+      statuses.every((status) => status === 'ready')
+        ? 'ready'
+        : 'ready-media-incomplete',
+      true,
+    );
   }
 
   private async refreshPreparedData(
-    current: OfflineStoredAggregate | undefined,
+    current: readonly OfflineStoredAggregate[],
     generation: number,
   ): Promise<void> {
     const overview = await this.dependencies.getOverview();
-    const preparation = overview.offlinePreparation;
-    const validity = overview.offlineValidity;
-    if (preparation === null || validity === null) {
+    const preparations = overview.offlinePreparations;
+    if (preparations.length === 0) {
       await this.clearPreparedPlan();
       this.publish('no-plan');
       return;
     }
-    const previews = await mapWithConcurrency(
-      preparation.workoutIds,
-      maxConcurrency,
-      (workoutId) => this.dependencies.getPreview(workoutId),
-    );
     const installationId = await this.dependencies.getInstallationId();
     const lease = await this.dependencies.registerLease(installationId);
-    if (lease.planId !== preparation.plan.id)
-      throw new Error('Offline lease does not match the prepared plan.');
-    const { media, payload } = this.buildPayload(
-      overview,
-      preparation.plan,
-      previews,
-      { ...lease, installationId },
-    );
-    this.assertGeneration(generation);
-    const revision = Math.max(Date.now(), (current?.revision ?? -1) + 1);
-    await this.dependencies.plugin.putPreparedPlan({
-      ...(current === undefined
-        ? {}
-        : {
-            expectedPlanId: current.planId,
-            expectedRevision: current.revision,
-          }),
-      expiresAt: validity.expiresAt,
-      payload,
-      payloadVersion,
-      planId: preparation.plan.id,
-      revision,
-      validatedAt: validity.validatedAt,
-    });
-    this.assertGeneration(generation);
-    await this.removeStaleFiles(current, media);
-    this.publish(media.length === 0 ? 'ready' : 'data-ready-media-in-progress');
-    const results = await mapWithConcurrency(media, maxConcurrency, (job) =>
-      this.downloadIfNeeded(job, preparation.plan.id, revision, generation),
-    );
+    const activeIds = new Set(preparations.map((item) => item.plan.id));
+    for (const stale of current.filter((item) => !activeIds.has(item.planId)))
+      await this.clearPreparedPlan(stale);
+
+    const results: boolean[] = [];
+    for (const preparation of preparations) {
+      const selectedOverview = await this.dependencies.getOverview(
+        preparation.plan.catalogEntryId,
+      );
+      const previews = await mapWithConcurrency(
+        preparation.workoutIds,
+        maxConcurrency,
+        (workoutId) =>
+          this.dependencies.getPreview(
+            workoutId,
+            preparation.plan.catalogEntryId,
+          ),
+      );
+      const previous = current.find(
+        (item) => item.planId === preparation.plan.id,
+      );
+      const { media, payload } = this.buildPayload(
+        selectedOverview,
+        preparation.plan,
+        previews,
+        { ...lease, installationId, planId: preparation.plan.id },
+      );
+      this.assertGeneration(generation);
+      const revision = Math.max(Date.now(), (previous?.revision ?? -1) + 1);
+      await this.dependencies.plugin.putPreparedPlan({
+        ...(previous === undefined
+          ? {}
+          : {
+              expectedPlanId: previous.planId,
+              expectedRevision: previous.revision,
+            }),
+        expiresAt: preparation.validity.expiresAt,
+        payload,
+        payloadVersion,
+        planId: preparation.plan.id,
+        revision,
+        validatedAt: preparation.validity.validatedAt,
+      });
+      await this.removeStaleFiles(previous, media);
+      if (media.length > 0) this.publish('data-ready-media-in-progress');
+      results.push(
+        ...(await mapWithConcurrency(media, maxConcurrency, (job) =>
+          this.downloadIfNeeded(job, preparation.plan.id, revision, generation),
+        )),
+      );
+    }
     this.assertGeneration(generation);
     this.publish(results.every(Boolean) ? 'ready' : 'ready-media-incomplete');
   }
 
   private buildPayload(
     overview: TrainingOverview,
-    plan: NonNullable<TrainingOverview['offlinePreparation']>['plan'],
+    plan: TrainingOfflinePreparation['plan'],
     previews: readonly TrainingWorkoutPreview[],
-    lease: OfflineTrainingLeaseResponse['data'] & { installationId: string },
+    lease: OfflineTrainingLeaseResponse['data'] & {
+      installationId: string;
+      planId: string;
+    },
   ): { media: MediaJob[]; payload: PreparedPlanPayload } {
     const media: MediaJob[] = [];
     const workouts = previews.map((preview) => ({
       exercises: preview.exercises.map((exercise): PreparedExercise => {
         if (exercise.type !== 'image') return exercise;
         if (exercise.image === null) return { ...exercise, image: null };
-        const fileId = `display-${exercise.image.offlineMediaId}`;
+        const fileId = `display-${plan.id}-${exercise.image.offlineMediaId}`;
         media.push({ fileId, url: exercise.image.displayUrl });
         return { ...exercise, image: { fileId } };
       }),
@@ -313,6 +349,8 @@ export class OfflinePreparationCoordinator {
     media: readonly MediaJob[],
   ): Promise<void> {
     if (previous === undefined) return;
+    const state = await this.dependencies.plugin.getState();
+    if (state.sessionAvailable || state.pendingSnapshotCount > 0) return;
     const retained = new Set(media.map((job) => job.fileId));
     for (const fileId of fileIdsFrom(previous.payload)) {
       if (retained.has(fileId)) continue;
@@ -340,17 +378,26 @@ export class OfflinePreparationCoordinator {
       : 'ready-media-incomplete';
   }
 
-  private async clearPreparedPlan(): Promise<void> {
-    const current = (await this.dependencies.plugin.getPreparedPlan())
-      .aggregate;
-    if (current === undefined) return;
-    for (const fileId of fileIdsFrom(current.payload)) {
-      const file = (await this.dependencies.plugin.getFile({ fileId })).file;
-      if (file !== undefined)
-        await this.dependencies.plugin.removeFile({
-          expectedRevision: file.revision,
-          fileId,
-        });
+  private async clearPreparedPlan(
+    selected?: OfflineStoredAggregate,
+  ): Promise<void> {
+    if (selected === undefined) {
+      const plans = (await this.dependencies.plugin.listPreparedPlans())
+        .aggregates;
+      for (const plan of plans) await this.clearPreparedPlan(plan);
+      return;
+    }
+    const current = selected;
+    const state = await this.dependencies.plugin.getState();
+    if (!state.sessionAvailable && state.pendingSnapshotCount === 0) {
+      for (const fileId of fileIdsFrom(current.payload)) {
+        const file = (await this.dependencies.plugin.getFile({ fileId })).file;
+        if (file !== undefined)
+          await this.dependencies.plugin.removeFile({
+            expectedRevision: file.revision,
+            fileId,
+          });
+      }
     }
     await this.dependencies.plugin.removePreparedPlan({
       expectedRevision: current.revision,

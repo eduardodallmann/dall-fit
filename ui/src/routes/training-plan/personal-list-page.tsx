@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   Alert,
   Button,
+  Checkbox,
   Chip,
   Dropdown,
   Modal,
@@ -22,6 +23,7 @@ import type {
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import { useOfflinePreparation } from '~/core/platform/native/offline-preparation-context';
+import { dashboardKeys } from '~/routes/dashboard/dashboard-queries';
 import {
   ActionsMenu,
   DeleteConfirmationDialog,
@@ -73,8 +75,6 @@ export function PersonalTrainingPlanListPage({
   const [copying, setCopying] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [libraryPage, setLibraryPage] = useState(1);
-  const [pendingActiveCatalogEntryId, setPendingActiveCatalogEntryId] =
-    useState<string>();
   const [deleteItem, setDeleteItem] =
     useState<
       Extract<PersonalTrainingPlanListItem, { itemType: 'training-plan' }>
@@ -92,10 +92,17 @@ export function PersonalTrainingPlanListPage({
     onSuccess: invalidateCatalog,
   });
   const activateMutation = useMutation({
-    mutationFn: (catalogEntryId: string) =>
-      activatePersonalTrainingPlan(catalogEntryId, mockTrainingPlans),
+    mutationFn: ({
+      active,
+      catalogEntryId,
+    }: {
+      active: boolean;
+      catalogEntryId: string;
+    }) =>
+      activatePersonalTrainingPlan(catalogEntryId, active, mockTrainingPlans),
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: trainingKeys.all });
+      await queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
       await offlinePreparation?.replaceActivePlan();
       await invalidateCatalog();
     },
@@ -110,7 +117,7 @@ export function PersonalTrainingPlanListPage({
     onSuccess: async (_, item) => {
       if (item.active)
         queryClient.removeQueries({ queryKey: trainingKeys.all });
-      if (item.active) await offlinePreparation?.clearActivePlan();
+      if (item.active) await offlinePreparation?.replaceActivePlan();
       await invalidateCatalog();
     },
   });
@@ -138,18 +145,7 @@ export function PersonalTrainingPlanListPage({
     onSuccess: invalidateCatalog,
   });
   const rows = query.data?.data ?? [];
-  const selectedCatalogEntryId =
-    pendingActiveCatalogEntryId ??
-    (activateMutation.isPending
-      ? activateMutation.variables
-      : rows.find(
-          (
-            item,
-          ): item is Extract<
-            PersonalTrainingPlanListItem,
-            { itemType: 'training-plan' }
-          > => item.itemType === 'training-plan' && item.active,
-        )?.catalogEntryId);
+  const activeLimitReached = (query.data?.activeCount ?? 0) >= 5;
   const pageCount = Math.max(
     1,
     Math.ceil((query.data?.total ?? 0) / (query.data?.pageSize ?? 20)),
@@ -289,11 +285,7 @@ export function PersonalTrainingPlanListPage({
                     </Table.Row>
                   ) : (
                     <Table.Row
-                      className={
-                        selectedCatalogEntryId === item.catalogEntryId
-                          ? styles.activeRow()
-                          : undefined
-                      }
+                      className={item.active ? styles.activeRow() : undefined}
                       id={item.catalogEntryId}
                     >
                       <Table.Cell>
@@ -312,27 +304,31 @@ export function PersonalTrainingPlanListPage({
                           : 'Modelo disponibilizado'}
                       </Table.Cell>
                       <Table.Cell>
-                        <input
+                        <Checkbox
                           aria-label={`Usar ${item.name}`}
-                          checked={
-                            selectedCatalogEntryId === item.catalogEntryId
+                          isDisabled={
+                            activateMutation.isPending ||
+                            (!item.active && activeLimitReached)
                           }
-                          className={styles.activeRadio()}
-                          disabled={
-                            selectedCatalogEntryId === item.catalogEntryId ||
-                            activateMutation.isPending
-                          }
-                          name="active-training-plan"
-                          onChange={() => {
-                            setPendingActiveCatalogEntryId(item.catalogEntryId);
-                            void activateMutation
-                              .mutateAsync(item.catalogEntryId)
-                              .finally(() =>
-                                setPendingActiveCatalogEntryId(undefined),
-                              );
+                          isSelected={item.active}
+                          onChange={(active) => {
+                            void activateMutation.mutateAsync({
+                              active,
+                              catalogEntryId: item.catalogEntryId,
+                            });
                           }}
-                          type="radio"
-                        />
+                        >
+                          <Checkbox.Content>
+                            <Checkbox.Control
+                              className={styles.activeCheckbox()}
+                            >
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                            <span className={styles.srOnly()}>
+                              Usar {item.name}
+                            </span>
+                          </Checkbox.Content>
+                        </Checkbox>
                       </Table.Cell>
                       <Table.Cell>
                         {new Intl.DateTimeFormat('pt-BR').format(
@@ -401,6 +397,12 @@ export function PersonalTrainingPlanListPage({
           </Pagination>
         ) : null}
       </section>
+      {activeLimitReached ? (
+        <p aria-live="polite" className={styles.description()}>
+          Você pode manter até 5 planos em uso. Desmarque um plano para
+          selecionar outro.
+        </p>
+      ) : null}
       {creating ? (
         <TrainingPlanFormModal
           hideLegend

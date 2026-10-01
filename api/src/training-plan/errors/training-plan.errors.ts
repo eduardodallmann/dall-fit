@@ -129,6 +129,17 @@ export const createGlobalReferenceReadOnlyException = () =>
     'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
     'Global training plan reference is read-only.',
   );
+export const createActiveTrainingPlanLimitException = () => {
+  const result = new HttpException(
+    {
+      code: 'ACTIVE_TRAINING_PLAN_LIMIT_REACHED',
+      details: { limit: 5 },
+      message: 'Active training plan limit reached.',
+    },
+    HttpStatus.CONFLICT,
+  );
+  return result;
+};
 export const createCloneJobDuplicateException = () =>
   domainException(
     HttpStatus.CONFLICT,

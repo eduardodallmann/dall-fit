@@ -41,7 +41,8 @@ interface PlainCatalogEntry {
 }
 
 interface PlainActiveSelection {
-  catalogEntryId: Types.ObjectId;
+  catalogEntryId?: Types.ObjectId;
+  catalogEntryIds: Types.ObjectId[];
   personId: Types.ObjectId;
 }
 
@@ -139,6 +140,7 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
     this.logger.log('MongoPersonalTrainingPlanRepository -> list -> params:', {
       params: { page, pageSize, personId },
     });
+    await this.normalizeActiveSelection(personId);
     const [entries, jobs, active] = await Promise.all([
       this.catalogModel
         .find({ personId })
@@ -185,7 +187,9 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
         if (plan === undefined) return [];
         return [
           {
-            active: active?.catalogEntryId.equals(entry._id) ?? false,
+            active:
+              active?.catalogEntryIds.some((id) => id.equals(entry._id)) ??
+              false,
             catalogEntryId: entry._id.toString(),
             createdAt: plan.createdAt.toISOString(),
             description: plan.description,
@@ -209,6 +213,7 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
     });
     const offset = (page - 1) * pageSize;
     const result = {
+      activeCount: active?.catalogEntryIds.length ?? 0,
       data: items.slice(offset, offset + pageSize),
       total: items.length,
     };
@@ -407,26 +412,93 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
     return result;
   }
 
-  async setActive(personId: string, catalogEntryId: string): Promise<void> {
+  async setActive(
+    personId: string,
+    catalogEntryId: string,
+  ): Promise<readonly string[] | null> {
     this.logger.log(
       'MongoPersonalTrainingPlanRepository -> setActive -> params:',
       {
         params: { catalogEntryId, personId },
       },
     );
-    await this.activeModel
+    await this.normalizeActiveSelection(personId);
+    const entryId = new Types.ObjectId(catalogEntryId);
+    let document = await this.activeModel
       .findOneAndUpdate(
-        { personId },
-        { $set: { catalogEntryId } },
-        { runValidators: true, upsert: true },
+        {
+          personId,
+          $or: [
+            { catalogEntryIds: entryId },
+            { 'catalogEntryIds.4': { $exists: false } },
+          ],
+        },
+        { $addToSet: { catalogEntryIds: entryId } },
+        { new: true, runValidators: true },
       )
+      .lean<PlainActiveSelection>()
       .exec();
+    if (document === null) {
+      try {
+        const created = await this.activeModel.create({
+          catalogEntryIds: [entryId],
+          personId,
+        });
+        document = created.toObject();
+      } catch (error) {
+        if (!this.isDuplicateKey(error)) throw error;
+        document = await this.activeModel
+          .findOneAndUpdate(
+            {
+              personId,
+              $or: [
+                { catalogEntryIds: entryId },
+                { 'catalogEntryIds.4': { $exists: false } },
+              ],
+            },
+            { $addToSet: { catalogEntryIds: entryId } },
+            { new: true, runValidators: true },
+          )
+          .lean<PlainActiveSelection>()
+          .exec();
+      }
+    }
+    const result =
+      document === null
+        ? null
+        : document.catalogEntryIds.map((id) => id.toString());
     this.logger.log(
-      'MongoPersonalTrainingPlanRepository -> setActive -> completed:',
+      'MongoPersonalTrainingPlanRepository -> setActive -> return:',
       {
-        data: { catalogEntryId, personId },
+        data: { activeCount: result?.length ?? 5, personId },
       },
     );
+    return result;
+  }
+
+  async setInactive(
+    personId: string,
+    catalogEntryId: string,
+  ): Promise<readonly string[]> {
+    this.logger.log(
+      'MongoPersonalTrainingPlanRepository -> setInactive -> params:',
+      { params: { catalogEntryId, personId } },
+    );
+    await this.normalizeActiveSelection(personId);
+    const document = await this.activeModel
+      .findOneAndUpdate(
+        { personId },
+        { $pull: { catalogEntryIds: new Types.ObjectId(catalogEntryId) } },
+        { new: true },
+      )
+      .lean<PlainActiveSelection>()
+      .exec();
+    const result = document?.catalogEntryIds.map((id) => id.toString()) ?? [];
+    this.logger.log(
+      'MongoPersonalTrainingPlanRepository -> setInactive -> return:',
+      { data: { activeCount: result.length, personId } },
+    );
+    return result;
   }
 
   async clearActiveIfEntry(
@@ -437,26 +509,33 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
       'MongoPersonalTrainingPlanRepository -> clearActiveIfEntry -> params:',
       { params: { catalogEntryId, personId } },
     );
-    await this.activeModel.deleteOne({ catalogEntryId, personId }).exec();
+    await this.normalizeActiveSelection(personId);
+    await this.activeModel
+      .updateOne(
+        { personId },
+        { $pull: { catalogEntryIds: new Types.ObjectId(catalogEntryId) } },
+      )
+      .exec();
     this.logger.log(
       'MongoPersonalTrainingPlanRepository -> clearActiveIfEntry -> completed:',
       { data: { catalogEntryId, personId } },
     );
   }
 
-  async getActiveCatalogEntryId(personId: string): Promise<string | null> {
+  async getActiveCatalogEntryIds(personId: string): Promise<readonly string[]> {
     this.logger.log(
-      'MongoPersonalTrainingPlanRepository -> getActiveCatalogEntryId -> params:',
+      'MongoPersonalTrainingPlanRepository -> getActiveCatalogEntryIds -> params:',
       { params: { personId } },
     );
+    await this.normalizeActiveSelection(personId);
     const document = await this.activeModel
       .findOne({ personId })
       .lean<PlainActiveSelection>()
       .exec();
-    const result = document?.catalogEntryId.toString() ?? null;
+    const result = document?.catalogEntryIds.map((id) => id.toString()) ?? [];
     this.logger.log(
-      'MongoPersonalTrainingPlanRepository -> getActiveCatalogEntryId -> return:',
-      { data: { active: result !== null, personId } },
+      'MongoPersonalTrainingPlanRepository -> getActiveCatalogEntryIds -> return:',
+      { data: { activeCount: result.length, personId } },
     );
     return result;
   }
@@ -707,12 +786,22 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
       .exec();
     const entryIds = linked.map((entry) => entry._id);
     const actives = await this.activeModel
-      .find({ catalogEntryId: { $in: entryIds } })
-      .select({ catalogEntryId: 1 })
+      .find({
+        $or: [
+          { catalogEntryIds: { $in: entryIds } },
+          { catalogEntryId: { $in: entryIds } },
+        ],
+      })
+      .select({ catalogEntryId: 1, catalogEntryIds: 1 })
       .lean<PlainActiveSelection[]>()
       .exec();
     const activeIds = new Set(
-      actives.map((item) => item.catalogEntryId.toString()),
+      actives.flatMap((item) => [
+        ...(item.catalogEntryIds ?? []).map((id) => id.toString()),
+        ...(item.catalogEntryId === undefined
+          ? []
+          : [item.catalogEntryId.toString()]),
+      ]),
     );
     const mutable = new Map<string, GlobalTrainingPlanUsage>();
     for (const id of globalTrainingPlanIds)
@@ -747,13 +836,39 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
       .exec();
     const ids = entries.map((entry) => entry._id);
     await Promise.all([
-      this.activeModel.deleteMany({ catalogEntryId: { $in: ids } }).exec(),
+      this.activeModel
+        .updateMany({}, { $pull: { catalogEntryIds: { $in: ids } } })
+        .exec(),
+      this.activeModel
+        .updateMany(
+          { catalogEntryId: { $in: ids } },
+          { $unset: { catalogEntryId: 1 } },
+        )
+        .exec(),
       this.catalogModel.deleteMany({ _id: { $in: ids } }).exec(),
     ]);
     this.logger.log(
       'MongoPersonalTrainingPlanRepository -> cleanupGlobalReferences -> completed:',
       { data: { globalTrainingPlanId, removedCount: ids.length } },
     );
+  }
+
+  private async normalizeActiveSelection(personId: string): Promise<void> {
+    const legacy = await this.activeModel
+      .findOne({ catalogEntryId: { $exists: true }, personId })
+      .select({ catalogEntryId: 1 })
+      .lean<PlainActiveSelection>()
+      .exec();
+    if (legacy?.catalogEntryId === undefined) return;
+    await this.activeModel
+      .updateOne(
+        { catalogEntryId: legacy.catalogEntryId, personId },
+        {
+          $addToSet: { catalogEntryIds: legacy.catalogEntryId },
+          $unset: { catalogEntryId: 1 },
+        },
+      )
+      .exec();
   }
 
   private mapCatalogEntry(document: PlainCatalogEntry): PersonalCatalogEntry {

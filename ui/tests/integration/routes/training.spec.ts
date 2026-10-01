@@ -24,6 +24,24 @@ test.describe('Fluxo Treinar', () => {
     ).toBeVisible();
   });
 
+  test('FIT-106 — escolhe temporariamente entre vários planos ativos', async ({
+    page,
+  }) => {
+    await page.goto('/training?mockAuth=person&mockTraining=multiple-active');
+
+    await expect(
+      page.getByRole('heading', { name: 'Escolha um plano' }),
+    ).toBeVisible();
+    const selectedPlan = page.getByRole('link', { name: /Plano ABC 1/ });
+    await selectedPlan.click();
+    await expect(page).toHaveURL(/catalogEntryId=64b000000000000000000011/);
+    await expect(
+      page.getByRole('heading', { name: 'Plano ABC 1' }),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Escolher outro plano' }).click();
+    await expect(page).not.toHaveURL(/catalogEntryId=/);
+  });
+
   test('inicia, conclui série sem carga e finaliza treino incompleto', async ({
     page,
   }) => {

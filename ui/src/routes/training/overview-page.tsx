@@ -35,8 +35,12 @@ import {
 const styles = trainingStyles();
 
 export function TrainingOverviewPage({
+  catalogEntryId,
   mockTraining,
-}: Readonly<{ mockTraining: MockTrainingScenario }>) {
+}: Readonly<{
+  catalogEntryId?: string;
+  mockTraining: MockTrainingScenario;
+}>) {
   const nativeRepository = useNativeTrainingRepository();
   const httpRepository = useMemo(
     () => createHttpTrainingRepository(mockTraining),
@@ -44,7 +48,7 @@ export function TrainingOverviewPage({
   );
   const repository = nativeRepository ?? httpRepository;
   const query = useQuery(
-    trainingOverviewQueryOptions(repository, mockTraining),
+    trainingOverviewQueryOptions(repository, mockTraining, catalogEntryId),
   );
   const refetch = query.refetch;
   const offlinePreparation = useOfflinePreparation();
@@ -58,6 +62,7 @@ export function TrainingOverviewPage({
     return (
       <NativeTrainingOverview
         mockTraining={mockTraining}
+        catalogEntryId={catalogEntryId}
         offlinePreparation={offlinePreparation}
         offlineSync={offlineSync}
         query={query}
@@ -65,17 +70,25 @@ export function TrainingOverviewPage({
       />
     );
 
-  return <OnlineTrainingOverview mockTraining={mockTraining} query={query} />;
+  return (
+    <OnlineTrainingOverview
+      catalogEntryId={catalogEntryId}
+      mockTraining={mockTraining}
+      query={query}
+    />
+  );
 }
 
 function NativeTrainingOverview({
   mockTraining,
+  catalogEntryId,
   offlinePreparation,
   offlineSync,
   query,
   repository,
 }: Readonly<{
   mockTraining: MockTrainingScenario;
+  catalogEntryId?: string;
   offlinePreparation: NonNullable<ReturnType<typeof useOfflinePreparation>>;
   offlineSync: ReturnType<typeof useOfflineSync>;
   query: UseQueryResult<TrainingOverview, Error>;
@@ -114,6 +127,7 @@ function NativeTrainingOverview({
     <>
       <OnlineTrainingOverview
         completion={syncSnapshot.completion}
+        catalogEntryId={catalogEntryId}
         mockTraining={mockTraining}
         query={query}
       />
@@ -190,11 +204,13 @@ function NativeTrainingOverview({
 }
 
 function OnlineTrainingOverview({
+  catalogEntryId,
   completion,
   mockTraining,
   query,
 }: Readonly<{
   completion?: OfflineCompletionPresentation;
+  catalogEntryId?: string;
   mockTraining: MockTrainingScenario;
   query: UseQueryResult<TrainingOverview, Error>;
 }>) {
@@ -230,7 +246,7 @@ function OnlineTrainingOverview({
     );
   }
 
-  if (query.data.plan === null) {
+  if (query.data.plan === null && query.data.availablePlans.length === 0) {
     return (
       <main className={styles.page()}>
         <section className={styles.empty()}>
@@ -252,6 +268,46 @@ function OnlineTrainingOverview({
     );
   }
 
+  if (query.data.plan === null) {
+    return (
+      <main className={styles.page()}>
+        <header className={styles.header()}>
+          <h1 className={styles.title()}>Escolha um plano</h1>
+          <p className={styles.subtitle()}>
+            Selecione qual dos seus planos em uso deseja treinar agora.
+          </p>
+        </header>
+        <ol aria-label="Planos em uso" className={styles.cardList()}>
+          {query.data.availablePlans.map((plan) => (
+            <li key={plan.catalogEntryId}>
+              <Link
+                className={styles.cardLink()}
+                search={{
+                  ...trainingMockSearch(mockTraining),
+                  catalogEntryId: plan.catalogEntryId,
+                }}
+                to="/training"
+              >
+                <Card className={styles.card()}>
+                  <Card.Content>
+                    <h2 className={styles.cardTitle()}>{plan.name}</h2>
+                    <p className={styles.exerciseMeta()}>
+                      {plan.source === 'owned'
+                        ? 'Plano próprio'
+                        : 'Modelo disponibilizado'}{' '}
+                      · {plan.workoutCount}{' '}
+                      {plan.workoutCount === 1 ? 'treino' : 'treinos'}
+                    </p>
+                  </Card.Content>
+                </Card>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.page()}>
       {completion === undefined ? null : (
@@ -261,6 +317,15 @@ function OnlineTrainingOverview({
         <h1 className={styles.title()}>{query.data.plan.name}</h1>
         <p className={styles.subtitle()}>Selecione o treino</p>
       </header>
+      {query.data.availablePlans.length > 1 ? (
+        <Link
+          className={styles.backLink()}
+          search={trainingMockSearch(mockTraining)}
+          to="/training"
+        >
+          Escolher outro plano
+        </Link>
+      ) : null}
       {query.data.workouts.length === 0 ? (
         <section className={styles.empty()}>
           <Dumbbell aria-hidden="true" className={styles.icon()} />
@@ -279,7 +344,10 @@ function OnlineTrainingOverview({
                   trackTrainingAction('training', 'select_workout')
                 }
                 params={{ workoutId: workout.id }}
-                search={trainingMockSearch(mockTraining)}
+                search={{
+                  ...trainingMockSearch(mockTraining),
+                  ...(catalogEntryId === undefined ? {} : { catalogEntryId }),
+                }}
                 to="/training/workout/$workoutId"
               >
                 <WorkoutCard workout={workout} />

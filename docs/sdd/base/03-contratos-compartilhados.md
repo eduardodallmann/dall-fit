@@ -131,7 +131,9 @@ esteja sendo iniciado isoladamente.
 O catálogo pessoal usa a união discriminada `PersonalTrainingPlanListItem`:
 
 - `itemType: training-plan` identifica uma entrada `owned` ou
-  `global-reference`, inclui `catalogEntryId` e o radio `active`;
+  `global-reference`, inclui `catalogEntryId` e o checkbox booleano `active`; a
+  coleção informa `activeCount` para aplicar o limite global de cinco mesmo com
+  paginação;
 - `itemType: clone-job` identifica somente uma operação ainda visível, com
   estado, geração e progresso de imagens; não é um plano navegável;
 - resumos e detalhes globais incluem `GlobalTrainingPlanUsage`, com pessoas
@@ -145,11 +147,11 @@ request; o Workflow os lê no MongoDB.
 
 ## Execução de treino
 
-- `TrainingOverview` combina a apresentação vigente com cards de workout, um
-  indicador opcional `current | in-progress`, `offlineValidity` emitido pelo
-  servidor e `offlinePreparation` com o plano ativo e seus IDs de workout. A
-  projeção separada impede que uma sessão em andamento faça o Android preparar um
-  plano que deixou de ser a seleção canônica; sem ativo, ambas são `null`.
+- `TrainingOverview` publica `availablePlans`, o plano temporariamente escolhido,
+  cards de workout e uma coleção `offlinePreparations`, com validade e IDs de
+  workout independentes por plano ativo. Com vários ativos e sem
+  `catalogEntryId`, `plan` é nulo e os workouts ficam vazios; uma sessão em
+  andamento continua soberana pelo snapshot mesmo após desativação.
 - `TrainingWorkoutPreview` publica os cinco tipos de exercício e acrescenta
   `lastLoadsKg` aos exercícios de séries. Cada posição é inteiro de 0 a 9999 ou
   `null`; ausência de carga é um valor válido, não um erro. Imagem também publica
@@ -166,9 +168,9 @@ request; o Workflow os lê no MongoDB.
 - `DashboardResponse` envolve `Dashboard`, que publica `generatedAt`, próxima ação,
   sete dias da semana civil, totais dos últimos 30 dias, oito semanas de tendência
   e até cinco conclusões recentes da pessoa autenticada.
-- `DashboardNextAction` é discriminada em `select-plan`, `start-workout` e
-  `resume-workout`; somente início inclui `catalogEntryId`, enquanto início e
-  retomada incluem IDs e nomes do workout/plano necessários à apresentação.
+- `DashboardNextAction` é discriminada em `select-plan`,
+  `choose-training-plan`, `start-workout` e `resume-workout`; vários ativos não
+  elegem um deles e produzem `choose-training-plan`.
 - `AdminDashboardResponse` envolve somente agregados de pessoas, treino e planos,
   oito buckets com pessoas ativas distintas e até cinco modelos globais com
   contagens. Não existe entidade ou ID de pessoa nessa estrutura.
@@ -193,10 +195,9 @@ request; o Workflow os lê no MongoDB.
   envia `X-App-Version-Code` e `X-Sync-Contract-Version`; esses headers negociam
   compatibilidade e não substituem autenticação, lease ou validação do snapshot.
 - `RegisterOfflineTrainingLeaseRequest` contém somente o UUID v4 da instalação.
-  `OfflineTrainingLeaseResponse` publica plano, fence, vencimento e o estado
-  `created | unchanged | plan-rebound | taken-over`; pessoa e instalação não
-  retornam. O contrato é compartilhado porque a preparação Android registra o
-  lease antes de tornar o plano apto a novas sessões offline.
+  `OfflineTrainingLeaseResponse` publica fence, vencimento e o estado `created |
+  unchanged | taken-over`; a concessão pertence à pessoa e instalação, não a um
+  plano singular. Pessoa e instalação não retornam.
 - `OfflineTrainingSnapshotResult` diferencia aceite, duplicata, conclusão,
   cancelamento e resolução local/servidor; identifica o estado do snapshot e
   devolve os metadados server-side aplicáveis. Conclusão inclui o mesmo

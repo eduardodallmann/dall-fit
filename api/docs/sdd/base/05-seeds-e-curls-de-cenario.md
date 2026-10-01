@@ -76,7 +76,6 @@ Identificadores vigentes incluem:
   token fictício com permissão restrita em
   `/tmp/dall-fit-native-session-token.txt`;
 - `offline-training-lease:create`, `offline-training-lease:unchanged`,
-  `offline-training-lease:plan-rebound`,
   `offline-training-lease:takeover-required`, `offline-training-lease:takeover`,
   `offline-training-lease:no-active-plan` e
   `offline-training-lease:invalid-body`, que criam pessoa, sessão Bearer e o estado

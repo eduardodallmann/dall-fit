@@ -30,7 +30,7 @@ const INGEST_SCRIPT = `
 local leaseRaw = redis.call('GET', KEYS[1])
 if not leaseRaw then return {'lease-expired', '', '', '', '', '', '', '', ''} end
 local lease = cjson.decode(leaseRaw)
-if lease.personId ~= ARGV[1] or lease.planId ~= ARGV[2] or lease.installationId ~= ARGV[3] or lease.leaseId ~= ARGV[4] then
+if lease.personId ~= ARGV[1] or lease.installationId ~= ARGV[3] or lease.leaseId ~= ARGV[4] then
   return {'lease-revoked', '', '', '', '', '', '', '', ''}
 end
 

@@ -27,12 +27,13 @@ export class RegisterOfflineTrainingLeaseCommand {
       'RegisterOfflineTrainingLeaseCommand -> execute -> params:',
       { params: { operation: 'register' } },
     );
-    const active = await this.personalPlans.getActiveExecutionPlan(personId);
+    const activePlans =
+      await this.personalPlans.getActiveExecutionPlans(personId);
     this.logger.log(
       'RegisterOfflineTrainingLeaseCommand -> execute -> personalPlans return:',
-      { data: { active: active !== null } },
+      { data: { activeCount: activePlans.length } },
     );
-    if (active === null) {
+    if (activePlans.length === 0) {
       this.logger.warn(
         'RegisterOfflineTrainingLeaseCommand -> execute -> activePlanMissing error:',
         { data: { code: 'ACTIVE_TRAINING_PLAN_NOT_FOUND' } },
@@ -40,11 +41,7 @@ export class RegisterOfflineTrainingLeaseCommand {
       throw activeTrainingPlanNotFoundException();
     }
     try {
-      const data = await this.leases.register(
-        personId,
-        active.plan.id,
-        installationId,
-      );
+      const data = await this.leases.register(personId, installationId);
       this.logger.log(
         'RegisterOfflineTrainingLeaseCommand -> execute -> leases return:',
         { data: { state: data.state } },

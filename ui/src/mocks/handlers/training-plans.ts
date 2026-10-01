@@ -33,7 +33,7 @@ import {
 } from '~/mocks/mock-response';
 
 interface ScenarioState {
-  activeCatalogEntryId: string | null;
+  activeCatalogEntryIds: string[];
   detail: GlobalTrainingPlanDetails;
   plans: TrainingPlanSummary[];
   workout: TrainingPlanWorkoutDetails;
@@ -73,8 +73,19 @@ function getScenario(request: Request): string {
 function getState(scenario: string): ScenarioState {
   const existing = scenarioStates.get(scenario);
   if (existing !== undefined) return existing;
+  let activeCatalogEntryIds: string[] = [];
+  if (scenario === 'multiple-active')
+    activeCatalogEntryIds = [
+      '74b000000000000000000001',
+      '74b000000000000000000002',
+    ];
+  if (scenario === 'active-limit')
+    activeCatalogEntryIds = Array.from(
+      { length: 5 },
+      (_, index) => `74b0000000000000000000${index + 1}`,
+    );
   const result: ScenarioState = {
-    activeCatalogEntryId: null,
+    activeCatalogEntryIds,
     detail: {
       ...trainingPlanDetailFixture,
       workouts: [...trainingPlanDetailFixture.workouts],
@@ -144,7 +155,7 @@ function getState(scenario: string): ScenarioState {
 registerMockRealtimeReplication(({ scenario, state }) => {
   if (scenario === undefined || state === undefined) return;
   scenarioStates.set(scenario, {
-    activeCatalogEntryId: null,
+    activeCatalogEntryIds: [],
     cloneJobs: [],
     ...structuredClone(state),
     detail: {
@@ -779,20 +790,33 @@ export const trainingPlanHandlers = [
       state.detail,
       '74b000000000000000000001',
       'owned',
-      state.activeCatalogEntryId,
+      state.activeCatalogEntryIds,
     );
     const reference = toPersonalPlanItem(
       trainingPlanFixtures[1] ?? state.detail,
       '74b000000000000000000002',
       'global-reference',
-      state.activeCatalogEntryId,
+      state.activeCatalogEntryIds,
     );
     let items: PersonalTrainingPlanListItem[] =
       scenario === 'empty' ? [] : [owned, reference, ...state.cloneJobs];
+    if (scenario === 'active-limit')
+      items = [
+        ...Array.from({ length: 6 }, (_, index) =>
+          toPersonalPlanItem(
+            trainingPlanFixtures[index] ?? state.detail,
+            `74b0000000000000000000${index + 1}`,
+            index === 1 ? 'global-reference' : 'owned',
+            state.activeCatalogEntryIds,
+          ),
+        ),
+        ...state.cloneJobs,
+      ];
     if (scenario === 'personal-reference') items = [reference];
     const pageSize = 20;
     return HttpResponse.json(
       {
+        activeCount: state.activeCatalogEntryIds.length,
         data: items.slice((page - 1) * pageSize, page * pageSize),
         page,
         pageSize,
@@ -868,7 +892,7 @@ export const trainingPlanHandlers = [
       state.detail,
       '74b000000000000000000099',
       'owned',
-      state.activeCatalogEntryId,
+      state.activeCatalogEntryIds,
     );
     return HttpResponse.json({ data }, createMockResponseInit({ status: 201 }));
   }),
@@ -888,17 +912,32 @@ export const trainingPlanHandlers = [
       plan,
       '74b000000000000000000002',
       'global-reference',
-      state.activeCatalogEntryId,
+      state.activeCatalogEntryIds,
     );
     return HttpResponse.json({ data }, createMockResponseInit({ status: 201 }));
   }),
   http.put('*/training-plans/active', async ({ request }) => {
     const state = getState(getScenario(request));
-    const input = (await request.json()) as { catalogEntryId: string };
-    state.activeCatalogEntryId = input.catalogEntryId;
+    const input = (await request.json()) as {
+      active: boolean;
+      catalogEntryId: string;
+    };
+    if (
+      input.active &&
+      !state.activeCatalogEntryIds.includes(input.catalogEntryId) &&
+      state.activeCatalogEntryIds.length >= 5
+    )
+      return apiError(
+        'ACTIVE_TRAINING_PLAN_LIMIT_REACHED',
+        'Active training plan limit reached.',
+        409,
+      );
+    state.activeCatalogEntryIds = input.active
+      ? [...new Set([...state.activeCatalogEntryIds, input.catalogEntryId])]
+      : state.activeCatalogEntryIds.filter((id) => id !== input.catalogEntryId);
     activateTrainingPlanScenario();
     return HttpResponse.json(
-      { data: { activeCatalogEntryId: input.catalogEntryId } },
+      { data: { activeCatalogEntryIds: state.activeCatalogEntryIds } },
       createMockResponseInit(),
     );
   }),
@@ -910,7 +949,9 @@ export const trainingPlanHandlers = [
         : 'owned';
     const data = {
       ...state.detail,
-      active: state.activeCatalogEntryId === params.catalogEntryId,
+      active: state.activeCatalogEntryIds.includes(
+        String(params.catalogEntryId),
+      ),
       catalogEntryId: String(params.catalogEntryId),
       source,
     };
@@ -1158,11 +1199,11 @@ function toPersonalPlanItem(
   plan: TrainingPlanSummary,
   catalogEntryId: string,
   source: 'global-reference' | 'owned',
-  activeCatalogEntryId: string | null,
+  activeCatalogEntryIds: readonly string[],
 ): Extract<PersonalTrainingPlanListItem, { itemType: 'training-plan' }> {
   return {
     ...plan,
-    active: activeCatalogEntryId === catalogEntryId,
+    active: activeCatalogEntryIds.includes(catalogEntryId),
     catalogEntryId,
     itemType: 'training-plan',
     source,

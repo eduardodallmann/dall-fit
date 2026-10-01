@@ -11,7 +11,6 @@ export interface OfflineTrainingLease {
   expiresAt: string;
   installationId: string;
   leaseId: string;
-  planId: string;
   personId: string;
 }
 
@@ -20,6 +19,5 @@ export type OfflineTrainingLeasePublic = OfflineTrainingLeaseResponse['data'];
 export interface OfflineTrainingLeaseIdentity {
   installationId: string;
   leaseId: string;
-  planId: string;
   personId: string;
 }

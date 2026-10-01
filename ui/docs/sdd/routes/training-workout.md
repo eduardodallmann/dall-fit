@@ -16,7 +16,9 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 
 ## Entradas e pré-condições
 
-`workoutId` identifica um item do plano ativo. No Web, a rota combina prévia e
+`workoutId` identifica um item do plano escolhido. Antes da sessão, quando há
+vários ativos, `catalogEntryId` identifica sem ambiguidade o catálogo e é preservado
+no link de retorno. No Web, a rota combina prévia e
 sessão HTTP; depois do início, o Redis permanece canônico por até 24 horas. No
 Android, prévia, sessão e lease vêm do motor nativo e sobrevivem a refresh,
 background, recriação do WebView e morte do processo. Existe no máximo uma sessão

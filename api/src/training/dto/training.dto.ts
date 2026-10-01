@@ -7,6 +7,7 @@ import {
   IsInt,
   IsMongoId,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Max,
   MaxLength,
@@ -17,6 +18,12 @@ import {
 export class TrainingWorkoutParamsDto {
   @IsMongoId()
   workoutId!: string;
+}
+
+export class TrainingPlanChoiceQueryDto {
+  @IsMongoId()
+  @IsOptional()
+  catalogEntryId?: string;
 }
 
 export class TrainingExerciseParamsDto {

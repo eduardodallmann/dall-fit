@@ -16,11 +16,17 @@ const plan = {
   workoutCount: 1,
 };
 const overview: TrainingOverview = {
-  offlinePreparation: { plan, workoutIds: ['workout-a'] },
-  offlineValidity: {
-    expiresAt: '2030-01-08T00:00:00.000Z',
-    validatedAt: '2030-01-01T00:00:00.000Z',
-  },
+  availablePlans: [plan],
+  offlinePreparations: [
+    {
+      plan,
+      validity: {
+        expiresAt: '2030-01-08T00:00:00.000Z',
+        validatedAt: '2030-01-01T00:00:00.000Z',
+      },
+      workoutIds: ['workout-a'],
+    },
+  ],
   plan,
   workouts: [
     {
@@ -68,6 +74,7 @@ function createHarness(
         planId: plan.id,
       },
       overview,
+      plan,
       previews: [preparedPreview],
     },
     payloadVersion: 2,
@@ -121,6 +128,7 @@ function createHarness(
     getActiveSession: () => Promise.resolve({ aggregate: active }),
     getMonotonicTime: () => Promise.resolve({ elapsedRealtime: 1_000 }),
     getPreparedPlan: () => Promise.resolve({ aggregate: prepared }),
+    listPreparedPlans: () => Promise.resolve({ aggregates: [prepared] }),
     getReadyFileUrl: () =>
       Promise.resolve({ url: 'content://com.dallfit.app.fileprovider/media' }),
   } as unknown as OfflineStoragePlugin;

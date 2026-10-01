@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsMongoId,
@@ -65,6 +66,9 @@ export class CreateGlobalTrainingPlanReferenceDto {
 }
 
 export class ActivatePersonalTrainingPlanDto {
+  @IsBoolean()
+  active!: boolean;
+
   @IsMongoId()
   catalogEntryId!: string;
 }

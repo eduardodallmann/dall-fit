@@ -46,3 +46,6 @@ substituída permanece no histórico e aponta para a sucessora.
   reset irrecuperável.
 - [`ADR-0017`](ADR-0017-assinatura-release-android-play-store.md): chave própria no
   Play App Signing, upload key separada, AAB em CI protegido e promoção manual.
+- [`ADR-0018`](ADR-0018-multiplos-planos-ativos-e-lease-por-instalacao.md): até
+  cinco planos ativos e preparados, escolha temporária e lease offline por pessoa
+  e instalação, substituindo o vínculo singular da ADR-0015.

@@ -10,10 +10,13 @@ function createService({
   last = null,
   session = null,
 }: { active?: unknown; last?: unknown; session?: unknown } = {}) {
+  let activePlans: unknown[] = [];
+  if (Array.isArray(active)) activePlans = active;
+  else if (active !== null) activePlans = [active];
   const findLastForPlan = vi.fn().mockResolvedValue(last);
   const service = new TrainingDashboardContextService(
     {
-      getActiveExecutionPlan: vi.fn().mockResolvedValue(active),
+      getActiveExecutionPlans: vi.fn().mockResolvedValue(activePlans),
     } as unknown as PersonalTrainingPlanService,
     { findLastForPlan } as unknown as WorkoutExecutionRepository,
     {
@@ -29,6 +32,17 @@ describe('TrainingDashboardContextService', () => {
 
     await expect(service.resolve('person-a')).resolves.toEqual({
       nextAction: { type: 'select-plan' },
+      workoutCount: null,
+    });
+  });
+
+  it('asks the training route to choose when several plans are active', async () => {
+    const { service } = createService({
+      active: [{ plan: { workouts: [] } }, { plan: { workouts: [] } }],
+    });
+
+    await expect(service.resolve('person-a')).resolves.toEqual({
+      nextAction: { type: 'choose-training-plan' },
       workoutCount: null,
     });
   });

@@ -16,7 +16,6 @@ import type { TrainingClockService } from '~/training/services/training-clock.se
 
 describe('OfflineTrainingLeaseService', () => {
   const personId = 'person-sensitive';
-  const planId = 'plan-sensitive';
   const installationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const now = new Date('2026-09-13T12:00:00.000Z');
   const expiresAt = '2026-09-20T12:00:00.000Z';
@@ -25,7 +24,6 @@ describe('OfflineTrainingLeaseService', () => {
     installationId,
     leaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     personId,
-    planId,
   };
   const evalMock = vi.fn();
   const client = { eval: evalMock } as unknown as Redis;
@@ -52,19 +50,17 @@ describe('OfflineTrainingLeaseService', () => {
   it.each([
     ['created', false],
     ['unchanged', false],
-    ['plan-rebound', false],
     ['taken-over', true],
   ] as const)('returns the atomic %s transition', async (state, takeover) => {
     evalMock.mockResolvedValueOnce([state, JSON.stringify(lease)]);
 
     const result = takeover
-      ? await service.takeover(personId, planId, installationId)
-      : await service.register(personId, planId, installationId);
+      ? await service.takeover(personId, installationId)
+      : await service.register(personId, installationId);
 
     expect(result).toEqual({
       expiresAt,
       leaseId: lease.leaseId,
-      planId,
       state,
     });
     expect(evalMock).toHaveBeenCalledWith(
@@ -72,7 +68,6 @@ describe('OfflineTrainingLeaseService', () => {
       1,
       'namespace:offline-training-lease:secret',
       installationId,
-      planId,
       String(Date.parse(expiresAt)),
       expect.any(String),
       takeover ? '1' : '0',
@@ -83,7 +78,7 @@ describe('OfflineTrainingLeaseService', () => {
     evalMock.mockResolvedValueOnce(['takeover-required', '']);
 
     await expect(
-      service.register(personId, planId, installationId),
+      service.register(personId, installationId),
     ).rejects.toBeInstanceOf(OfflineTrainingLeaseTakeoverRequiredError);
   });
 
@@ -118,7 +113,6 @@ describe('OfflineTrainingLeaseService', () => {
       1,
       expect.any(String),
       personId,
-      planId,
       installationId,
       lease.leaseId,
       JSON.stringify(renewed),
@@ -146,7 +140,7 @@ describe('OfflineTrainingLeaseService', () => {
       evalMock.mockRejectedValueOnce(error);
 
       await expect(
-        service.register(personId, planId, installationId),
+        service.register(personId, installationId),
       ).rejects.toBeInstanceOf(OfflineTrainingLeaseUnavailableError);
     },
   );
@@ -160,12 +154,11 @@ describe('OfflineTrainingLeaseService', () => {
       });
     evalMock.mockResolvedValueOnce(['created', JSON.stringify(lease)]);
 
-    await service.register(personId, planId, installationId);
+    await service.register(personId, installationId);
     const serializedLogs = JSON.stringify(logs);
     logSpy.mockRestore();
 
     expect(serializedLogs).not.toContain(personId);
-    expect(serializedLogs).not.toContain(planId);
     expect(serializedLogs).not.toContain(installationId);
     expect(serializedLogs).not.toContain(lease.leaseId);
     expect(serializedLogs).not.toContain('namespace:offline-training-lease');
@@ -175,7 +168,7 @@ describe('OfflineTrainingLeaseService', () => {
     evalMock.mockResolvedValueOnce(['created']);
 
     await expect(
-      service.register(personId, planId, installationId),
+      service.register(personId, installationId),
     ).rejects.toBeInstanceOf(OfflineTrainingLeaseUnavailableError);
   });
 });

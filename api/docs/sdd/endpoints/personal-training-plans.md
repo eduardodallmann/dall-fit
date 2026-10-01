@@ -22,7 +22,7 @@ o source pela entrada persistida; não existe capability ou flag confiada ao bod
 | `GET /training-plans/library?page=1`     | globais com resumo e bloqueio local de clone    |
 | `POST /training-plans`                   | plano próprio v0 + entrada, sem ativar          |
 | `POST /training-plans/global-references` | vínculo único ao global                         |
-| `PUT /training-plans/active`             | substitui atomicamente o único radio ativo      |
+| `PUT /training-plans/active`             | define o estado de uma entrada; máximo de cinco |
 | `GET /training-plans/:catalogEntryId`    | detalhe resolvido, source e versão              |
 | `PATCH /training-plans/:catalogEntryId`  | atualiza somente plano próprio                  |
 | `DELETE /training-plans/:catalogEntryId` | exclui próprio ou desvincula referência         |
@@ -37,7 +37,7 @@ GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`. IDs fora do catálogo da sessão são
 indistinguíveis e retornam `TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND`.
 
 DELETE de item próprio exige versão; DELETE de referência não exige, pois remove
-somente o vínculo. Ambos limpam a seleção ativa sem escolher fallback. Repetir uma
+somente o vínculo. Ambos removem a entrada do conjunto ativo sem escolher fallback. Repetir uma
 referência retorna `409 GLOBAL_TRAINING_PLAN_REFERENCE_DUPLICATE`. Ativação nunca
 aceita job, item de outra pessoa ou referência cujo global foi excluído.
 
@@ -50,7 +50,10 @@ execuções já finalizadas.
 
 `training_plan_catalog_entries` possui unicidade por pessoa/plano próprio e por
 pessoa/global. `training_plan_active_selections` possui índice único por pessoa e
-zero ou um documento. A lista combina catálogo válido e jobs visíveis, ordena por
+um array de até cinco `catalogEntryIds` únicos. O repository migra preguiçosamente
+o campo singular legado e usa `$addToSet` condicionado ao quinto índice para
+impedir seis seleções sob concorrência. A lista devolve `activeCount` além do
+booleano de cada linha. A lista combina catálogo válido e jobs visíveis, ordena por
 criação e pagina 20; globais excluídos são removidos pela limpeza administrativa.
 Leituras de referência consultam sempre a árvore global atual.
 
@@ -58,7 +61,9 @@ Criação própria compensa a árvore se falhar ao criar catálogo. Exclusão pr
 remove a árvore e suas imagens; desvincular preserva o global. Erros estáveis
 adicionais: `TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND`,
 `GLOBAL_TRAINING_PLAN_REFERENCE_DUPLICATE` e
-`GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`.
+`GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`. Uma sexta ativação retorna `409
+ACTIVE_TRAINING_PLAN_LIMIT_REACHED` com `details.limit=5`; desativação é
+idempotente e pode deixar o conjunto vazio.
 
 A confirmação do assistente reutiliza esta modelagem por
 `AssistantTrainingPlanMaterializationService`: reserva `trainingPlanId` e
@@ -96,11 +101,11 @@ curl --request POST http://localhost:4000/auth/test-login \
 && curl --include --request PUT http://localhost:4000/training-plans/active \
   --header 'content-type: application/json' --header 'origin: http://localhost:3000' \
   --header "x-csrf-token: ${CSRF_TOKEN}" --cookie /tmp/dall-fit-fit58.txt \
-  --data '{"catalogEntryId":"74b000000000000000000001"}'
+  --data '{"active":true,"catalogEntryId":"74b000000000000000000001"}'
 ```
 
-A lista contém o próprio e a referência na mesma coleção; a resposta final aponta
-somente para `...001`. Nenhum item seria ativado só pela criação.
+A lista contém o próprio e a referência na mesma coleção; a resposta final contém
+o array canônico de IDs ativos. Nenhum item é ativado só pela criação.
 
 ### Cenário 2 — referência viva e somente leitura
 

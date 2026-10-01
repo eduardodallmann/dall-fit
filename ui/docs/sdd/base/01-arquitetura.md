@@ -70,18 +70,22 @@ offline Google Analytics. Rotas `/api` e `/auth`, SSE, signed URLs e recursos
 remotos não entram no cache e nunca recebem resposta privada do service worker.
 
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
-`files/offline/` e do lock justo que serializa mutações no processo. O schema v4
-mantém metadados do motor, uma conta local, no máximo um plano preparado e uma
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v5
+mantém metadados do motor, uma conta local, até cinco planos preparados e uma
 sessão ativa, snapshots por execução, estado operacional de sincronização e
 metadados de arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON
 opacos com `payloadVersion` e revisão; apenas IDs, timestamps, sequência monotônica
 local e estado necessários ficam normalizados. A bridge não expõe SQL, path absoluto
-ou bytes. A migration v2→v3 acrescenta uma projeção singleton da conclusão mais
+ou bytes. O schema v5 substitui o singleton de plano preparado por até cinco
+linhas com `plan_id` como chave, preservando a linha v4 durante a migration; conta
+e sessão continuam singulares. A migration v2→v3 acrescenta uma projeção singleton da conclusão mais
 recente, separada do snapshot de domínio e vinculada à identidade e sequência da
 fila para promoção canônica sem regressão.
 A migration v3→v4 acrescenta a cada snapshot o `producer_version_code` e o
 `sync_contract_version`; linhas legadas recebem 1 sem alterar JSON, revisão,
-sequência, ação ou conclusão provisória. Bancos v1 e v2 atravessam todas as
+sequência, ação ou conclusão provisória. A migration v4→v5 recria
+`prepared_plan` como coleção e copia o registro anterior sem alterar payload,
+revisão ou validade. Bancos v1 e v2 atravessam todas as
 migrations intermediárias na mesma ordem.
 
 `OfflineSyncEngine` é um singleton nativo associado ao mesmo provider. Um executor
@@ -148,14 +152,15 @@ Eventos `stateChanged` são best-effort; `getState` sempre fornece revisão e
 contadores canônicos, inclusive a geração/categoria técnica de recuperação.
 
 `OfflinePreparationCoordinator` existe somente na composição Android. Ao entrar
-em Treinar, ele lê validade e metadados canônicos, compõe `GET /training` e até
-quatro previews simultâneos pelo Axios autenticado, registra o lease e grava o
-payload v2 sem URLs e
+em Treinar, ele lê validade e metadados canônicos, reconcilia até cinco planos
+ativos, compõe `GET /training` por escolha e até quatro previews simultâneos pelo
+Axios autenticado, registra um lease da instalação e grava cada payload v2 sem URLs e
 libera a rota antes das mídias. Até quatro downloads Java recebem a signed URL
 `display` apenas durante a chamada, exigem HTTPS/WebP/2xx, no máximo três redirects
 HTTPS, corpo completo não vazio de até 10 MiB e concluem pelo rename do motor.
-Geração e revisão impedem callbacks atrasados de publicar dados depois de troca ou
-remoção. Web/PWA não instancia esse coordenador.
+Geração e revisão impedem callbacks atrasados de publicar dados depois de mudança
+do conjunto. Réplicas desativadas são removidas sem apagar mídia enquanto sessão
+ou snapshot pendente puder referenciá-la. Web/PWA não instancia esse coordenador.
 
 O payload preparado v2 acrescenta a projeção de overview, previews sanitizados e
 o lease registrado por `PUT /training/offline-lease`; UUID e fence permanecem no

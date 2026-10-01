@@ -554,7 +554,7 @@ describe('Global training plans (e2e)', () => {
     });
     expect(savedStretch?.instructions).toContain('10–20 s');
     await authenticatedMutation(agent, agent.put('/training-plans/active'))
-      .send({ catalogEntryId: confirmationData.catalogEntryId })
+      .send({ active: true, catalogEntryId: confirmationData.catalogEntryId })
       .expect(200);
     const execution = await authenticatedMutation(
       agent,
@@ -1501,8 +1501,19 @@ describe('Global training plans (e2e)', () => {
     expect(readOnly.status).toBe(403);
 
     await authenticatedMutation(person, person.put('/training-plans/active'))
-      .send({ catalogEntryId: referenceEntryId })
+      .send({ active: true, catalogEntryId: ownedEntryId })
       .expect(200);
+    const activeResponse = await authenticatedMutation(
+      person,
+      person.put('/training-plans/active'),
+    )
+      .send({ active: true, catalogEntryId: referenceEntryId })
+      .expect(200);
+    expect(activeResponse.body).toMatchObject({
+      data: { activeCatalogEntryIds: [ownedEntryId, referenceEntryId] },
+    });
+    const activeList = await person.get('/training-plans?page=1').expect(200);
+    expect(activeList.body).toMatchObject({ activeCount: 2 });
     const adminList = await admin
       .get('/global/training-plans?page=1')
       .expect(200);
@@ -1520,7 +1531,83 @@ describe('Global training plans (e2e)', () => {
     ).expect(204);
     const afterDelete = await person.get('/training-plans?page=1').expect(200);
     expect(afterDelete.body).toMatchObject({ total: 1 });
-    await expect(activeModel.countDocuments()).resolves.toBe(0);
+    const selection = await activeModel.findOne().lean().exec();
+    expect(selection?.catalogEntryIds.map((id) => id.toString())).toEqual([
+      ownedEntryId,
+    ]);
+  });
+
+  it('rejects a sixth active plan without changing the confirmed five', async () => {
+    const person = await login(false);
+    const catalogEntryIds: string[] = [];
+    for (let index = 1; index <= 6; index += 1) {
+      const created = await authenticatedMutation(
+        person,
+        person.post('/training-plans'),
+      ).send({
+        description: 'Plano para validar o limite de seleções ativas.',
+        name: `Plano ${index}`,
+      });
+      expect(created.status).toBe(201);
+      catalogEntryIds.push(
+        (created.body as { data: { catalogEntryId: string } }).data
+          .catalogEntryId,
+      );
+    }
+    for (const catalogEntryId of catalogEntryIds.slice(0, 5))
+      await authenticatedMutation(person, person.put('/training-plans/active'))
+        .send({ active: true, catalogEntryId })
+        .expect(200);
+
+    const rejected = await authenticatedMutation(
+      person,
+      person.put('/training-plans/active'),
+    ).send({ active: true, catalogEntryId: catalogEntryIds[5] });
+    expect(rejected.status).toBe(409);
+    expect(rejected.body).toMatchObject({
+      code: 'ACTIVE_TRAINING_PLAN_LIMIT_REACHED',
+      details: { limit: 5 },
+    });
+    const list = await person.get('/training-plans?page=1').expect(200);
+    expect(list.body).toMatchObject({ activeCount: 5 });
+  });
+
+  it('migrates a legacy singular active selection without losing the plan', async () => {
+    const person = await login(false);
+    const created = await authenticatedMutation(
+      person,
+      person.post('/training-plans'),
+    ).send({
+      description: 'Plano preservado durante a migração da seleção ativa.',
+      name: 'Plano legado',
+    });
+    expect(created.status).toBe(201);
+    const catalogEntryId = (
+      created.body as { data: { catalogEntryId: string } }
+    ).data.catalogEntryId;
+    const catalogEntry = await catalogModel
+      .findById(catalogEntryId)
+      .lean()
+      .exec();
+    expect(catalogEntry).not.toBeNull();
+    if (catalogEntry === null) return;
+    await activeModel.collection.insertOne({
+      catalogEntryId: new Types.ObjectId(catalogEntryId),
+      personId: catalogEntry.personId,
+    });
+
+    const list = await person.get('/training-plans?page=1').expect(200);
+    expect(list.body).toMatchObject({
+      activeCount: 1,
+      data: [expect.objectContaining({ active: true, catalogEntryId })],
+    });
+    const migrated = await activeModel.collection.findOne({
+      personId: catalogEntry.personId,
+    });
+    expect(migrated?.catalogEntryId).toBeUndefined();
+    expect(migrated?.catalogEntryIds).toEqual([
+      new Types.ObjectId(catalogEntryId),
+    ]);
   });
 
   it('creates a workout in an owned personal plan through its catalog entry', async () => {
@@ -1684,25 +1771,28 @@ describe('Global training plans (e2e)', () => {
       trainingPlanId: null,
     });
     await activeModel.create({
-      catalogEntryId: catalogEntry._id,
+      catalogEntryIds: [catalogEntry._id],
       personId: persistedPerson?._id,
     });
 
     const overview = await person.get('/training').expect(200);
     expect(overview.body).toMatchObject({
       data: {
-        offlinePreparation: {
-          plan: { id: plan.id },
-          workoutIds: [workoutId.toString()],
-        },
+        offlinePreparations: [
+          {
+            plan: { id: plan.id },
+            workoutIds: [workoutId.toString()],
+          },
+        ],
         plan: { id: plan.id, source: 'global-reference' },
         workouts: [{ id: workoutId.toString(), indicator: 'current' }],
       },
     });
     const overviewData = (overview.body as TrainingOverviewResponse).data;
-    const offlineValidity = overviewData.offlineValidity;
-    expect(offlineValidity).not.toBeNull();
-    if (offlineValidity === null) throw new Error('Expected offline validity.');
+    const offlineValidity = overviewData.offlinePreparations[0]?.validity;
+    expect(offlineValidity).toBeDefined();
+    if (offlineValidity === undefined)
+      throw new Error('Expected offline validity.');
     const validatedAt = Date.parse(offlineValidity.validatedAt);
     const expiresAt = Date.parse(offlineValidity.expiresAt);
     expect(expiresAt - validatedAt).toBe(7 * 24 * 60 * 60 * 1000);

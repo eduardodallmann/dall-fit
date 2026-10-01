@@ -54,6 +54,8 @@ export type MockTrainingPlansScenario =
   | 'loading'
   | 'not-found'
   | 'personal-mixed'
+  | 'multiple-active'
+  | 'active-limit'
   | 'personal-reference'
   | 'clone-running'
   | 'clone-failed'

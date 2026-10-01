@@ -80,11 +80,13 @@ type SessionAction =
   | { exerciseId: string; type: 'complete-exercise' | 'restart-exercise' };
 
 interface TrainingWorkoutPageProps {
+  catalogEntryId?: string;
   mockTraining: MockTrainingScenario;
   workoutId: string;
 }
 
 export function TrainingWorkoutPage({
+  catalogEntryId,
   mockTraining,
   workoutId,
 }: Readonly<TrainingWorkoutPageProps>) {
@@ -97,7 +99,12 @@ export function TrainingWorkoutPage({
   );
   const repository = nativeRepository ?? httpRepository;
   const previewQuery = useQuery(
-    trainingPreviewQueryOptions(workoutId, repository, mockTraining),
+    trainingPreviewQueryOptions(
+      workoutId,
+      repository,
+      mockTraining,
+      catalogEntryId,
+    ),
   );
   const sessionOptions = trainingSessionQueryOptions(repository, mockTraining);
   const sessionQuery = useQuery(sessionOptions);
@@ -111,7 +118,7 @@ export function TrainingWorkoutPage({
     sessionQuery.isError &&
     trainingErrorCode(sessionQuery.error) === 'WORKOUT_SESSION_EXPIRED';
   const startMutation = useMutation({
-    mutationFn: () => repository.startSession(workoutId),
+    mutationFn: () => repository.startSession(workoutId, catalogEntryId),
     onSuccess: (data) => {
       queryClient.setQueryData(sessionOptions.queryKey, data);
       trackTrainingAction('training_workout', 'start_workout', 'success');
@@ -124,7 +131,7 @@ export function TrainingWorkoutPage({
   const discardMutation = useMutation({
     mutationFn: async () => {
       await repository.abandonSession();
-      return repository.startSession(workoutId);
+      return repository.startSession(workoutId, catalogEntryId);
     },
     onSuccess: (data) => {
       queryClient.setQueryData(sessionOptions.queryKey, data);
@@ -186,7 +193,10 @@ export function TrainingWorkoutPage({
       <main className={styles.page()}>
         <Link
           className={styles.backLink()}
-          search={trainingMockSearch(mockTraining)}
+          search={{
+            ...trainingMockSearch(mockTraining),
+            ...(catalogEntryId === undefined ? {} : { catalogEntryId }),
+          }}
           to="/training"
         >
           Voltar para treinos
@@ -258,7 +268,10 @@ export function TrainingWorkoutPage({
     <main className={styles.page()}>
       <Link
         className={styles.backLink()}
-        search={trainingMockSearch(mockTraining)}
+        search={{
+          ...trainingMockSearch(mockTraining),
+          ...(catalogEntryId === undefined ? {} : { catalogEntryId }),
+        }}
         to="/training"
       >
         Voltar para treinos

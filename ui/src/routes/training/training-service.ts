@@ -21,6 +21,7 @@ import { apiClient } from '~/core/http/api-client';
 
 export type MockTrainingScenario =
   | 'active-plan'
+  | 'multiple-active'
   | 'duration-running'
   | 'exercise-completed'
   | 'load-pending'
@@ -35,6 +36,7 @@ export type MockTrainingScenario =
   | 'youtube-long-running';
 
 export function trainingMockSearch(scenario: MockTrainingScenario): {
+  catalogEntryId?: string;
   mockTraining?: MockTrainingScenario;
 } {
   return import.meta.env.DEV && import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
@@ -67,23 +69,25 @@ function mutationConfig(scenario: MockTrainingScenario, version?: number) {
 
 export async function getTrainingOverview(
   scenario: MockTrainingScenario,
+  catalogEntryId?: string,
   signal?: AbortSignal,
 ): Promise<TrainingOverview> {
-  const response = await apiClient.get<TrainingOverviewResponse>(
-    '/training',
-    config(scenario, signal),
-  );
+  const response = await apiClient.get<TrainingOverviewResponse>('/training', {
+    ...config(scenario, signal),
+    params: { catalogEntryId },
+  });
   return response.data.data;
 }
 
 export async function getTrainingWorkoutPreview(
   workoutId: string,
   scenario: MockTrainingScenario,
+  catalogEntryId?: string,
   signal?: AbortSignal,
 ): Promise<TrainingWorkoutPreview> {
   const response = await apiClient.get<TrainingWorkoutPreviewResponse>(
     `/training/workouts/${workoutId}`,
-    config(scenario, signal),
+    { ...config(scenario, signal), params: { catalogEntryId } },
   );
   return response.data.data;
 }
@@ -91,11 +95,12 @@ export async function getTrainingWorkoutPreview(
 export async function startTrainingSession(
   workoutId: string,
   scenario: MockTrainingScenario,
+  catalogEntryId?: string,
 ): Promise<TrainingSession> {
   const response = await apiClient.post<TrainingSessionResponse>(
     `/training/workouts/${workoutId}/session`,
     {},
-    mutationConfig(scenario),
+    { ...mutationConfig(scenario), params: { catalogEntryId } },
   );
   return response.data.data;
 }

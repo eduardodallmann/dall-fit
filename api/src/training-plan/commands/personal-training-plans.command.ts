@@ -85,11 +85,18 @@ export class PersonalTrainingPlansCommand {
     return result;
   }
 
-  async activate(personId: string, catalogEntryId: string) {
-    this.logParams('activate', { catalogEntryId, personId });
-    await this.personalService.activate(personId, catalogEntryId);
-    const result = { data: { activeCatalogEntryId: catalogEntryId } };
-    this.logReturn('activate', { catalogEntryId, personId });
+  async activate(personId: string, catalogEntryId: string, active: boolean) {
+    this.logParams('activate', { active, catalogEntryId, personId });
+    const activeCatalogEntryIds = await this.personalService.setActiveState(
+      personId,
+      catalogEntryId,
+      active,
+    );
+    const result = { data: { activeCatalogEntryIds } };
+    this.logReturn('activate', {
+      activeCount: activeCatalogEntryIds.length,
+      personId,
+    });
     return result;
   }
 

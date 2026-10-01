@@ -193,11 +193,33 @@ export class MongoDashboardReadRepository extends DashboardReadRepository {
           },
         })
         .exec(),
-      this.activeSelections.distinct('personId').then((ids) => ids.length),
+      this.activeSelections
+        .distinct('personId', {
+          $or: [
+            { 'catalogEntryIds.0': { $exists: true } },
+            { catalogEntryId: { $exists: true } },
+          ],
+        })
+        .then((ids) => ids.length),
       this.plans.countDocuments({ ownerPersonId: null }).exec(),
       this.catalog.countDocuments({ kind: 'owned' }).exec(),
       this.catalog.countDocuments({ kind: 'global-reference' }).exec(),
-      this.activeSelections.countDocuments().exec(),
+      this.activeSelections
+        .aggregate<{ count: number }>([
+          {
+            $project: {
+              count: {
+                $cond: [
+                  { $isArray: '$catalogEntryIds' },
+                  { $size: '$catalogEntryIds' },
+                  { $cond: [{ $ne: ['$catalogEntryId', null] }, 1, 0] },
+                ],
+              },
+            },
+          },
+          { $group: { _id: null, count: { $sum: '$count' } } },
+        ])
+        .then((rows) => rows[0]?.count ?? 0),
       this.readTopGlobalPlans(),
     ]);
     this.logger.log(
@@ -324,9 +346,25 @@ export class MongoDashboardReadRepository extends DashboardReadRepository {
         {
           $lookup: {
             as: 'activeSelections',
-            foreignField: 'catalogEntryId',
             from: 'training_plan_active_selections',
-            localField: '_id',
+            let: { entryId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      {
+                        $in: [
+                          '$$entryId',
+                          { $ifNull: ['$catalogEntryIds', []] },
+                        ],
+                      },
+                      { $eq: ['$catalogEntryId', '$$entryId'] },
+                    ],
+                  },
+                },
+              },
+            ],
           },
         },
         {

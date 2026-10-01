@@ -40,12 +40,21 @@ export abstract class PersonalTrainingPlanRepository {
     personId: string,
     catalogEntryId: string,
   ): Promise<PersonalCatalogEntry | null>;
-  abstract setActive(personId: string, catalogEntryId: string): Promise<void>;
+  abstract setActive(
+    personId: string,
+    catalogEntryId: string,
+  ): Promise<readonly string[] | null>;
+  abstract setInactive(
+    personId: string,
+    catalogEntryId: string,
+  ): Promise<readonly string[]>;
   abstract clearActiveIfEntry(
     personId: string,
     catalogEntryId: string,
   ): Promise<void>;
-  abstract getActiveCatalogEntryId(personId: string): Promise<string | null>;
+  abstract getActiveCatalogEntryIds(
+    personId: string,
+  ): Promise<readonly string[]>;
   abstract getGlobalSnapshot(
     globalTrainingPlanId: string,
   ): Promise<TrainingPlanCloneSnapshotDraft | null>;

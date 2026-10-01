@@ -105,23 +105,21 @@ inicia uma conversa nova. Sessões ainda continuáveis permanecem retomáveis ao
 fechar normalmente, e “Desistir” continua sendo a exclusão explícita em qualquer
 estado.
 
-A tabela possui Nome, Origem, Em uso, Atualização e Ações. O radio não é a primeira
-coluna, possui um único `name`, fica desabilitado no item ativo e nunca desmarca ao
-ser clicado. Pode não haver nenhum ativo. A seleção aplica imediatamente um realce
-discreto e persistente às células da linha ativa; falha restaura o destaque
-confirmado anterior. Plano próprio oferece editar/excluir; referência oferece
+A tabela possui Nome, Origem, Em uso, Atualização e Ações. Cada entrada usa o
+Checkbox composto do HeroUI e pode ser marcada ou desmarcada independentemente.
+Pode haver de zero a cinco ativos. Ao alcançar cinco, somente os desmarcados ficam
+desabilitados e o texto acessível orienta desmarcar um plano para selecionar outro.
+A seleção aplica realce discreto às linhas ativas; falha restaura o conjunto
+confirmado. Plano próprio oferece editar/excluir; referência oferece
 navegação e “Excluir”, que visualmente remove o item mas envia desvinculação sem
 versão.
-Marcar qualquer entrada como ativa remove as queries do domínio `/training` antes
-de invalidar o catálogo; assim, uma visita anterior sem plano não pode reaparecer
-do cache ao navegar novamente para Treinar.
+Alternar qualquer entrada remove as queries do domínio `/training` e invalida
+catálogo e dashboard; assim, respostas anteriores não reaparecem ao navegar.
 Excluir a entrada ativa remove imediatamente as queries de `/training`; a próxima
 visita refaz a leitura e não exibe por um instante o plano excluído.
-No Android, o sucesso da troca também limpa plano/mídias preparados antes de
-compor imediatamente a nova seleção, mesmo fora de Treinar. Falha de preparação
-não desfaz a seleção nem restaura o snapshot anterior. Excluir ou desvincular a
-entrada ativa limpa o preparado; editar conteúdo aguarda a próxima entrada em
-Treinar. Sessão ativa e snapshots de execução permanecem independentes.
+No Android, o sucesso reconcilia a coleção preparada mesmo fora de Treinar. Falha
+de preparação não desfaz o conjunto confirmado. Excluir ou desvincular remove
+somente a réplica desativada; sessão ativa e snapshots permanecem independentes.
 
 Job aparece como linha não navegável “Clonando”, com estado/progresso. Em
 `failed|start-failed` oferece retry; enquanto não terminal oferece cancelar. A
@@ -161,7 +159,7 @@ valor local alterado não bloqueiam por si só.
 
 ## Acessibilidade
 
-Tabela possui headers semânticos, nome como row header, radio rotulado pelo plano,
+Tabela possui headers semânticos, nome como row header, checkbox rotulado pelo plano,
 menus/dropdown operáveis por teclado e ações de clone com labels específicos. A
 linha inteira não é usada como controle de seleção.
 No workout somente leitura, a ordem usa `ol`, cada mídia possui botão nomeado pelo
@@ -173,7 +171,7 @@ interação que atrase a leitura.
 ## Cenários funcionais e cobertura
 
 1. `?mockAuth=person&mockTrainingPlans=personal-mixed`: próprio e referência na
-   mesma tabela; troca do radio mantém somente um ativo.
+   mesma tabela; checkboxes independentes permitem ambos ativos.
 2. `?mockAuth=admin&mockTrainingPlans=personal-mixed`: admin também vê “Meus
    planos”, mantendo “Modelos de treino” separado no menu.
 3. `?mockAuth=person&mockTrainingPlans=clone-running`: ações mutuamente bloqueadas

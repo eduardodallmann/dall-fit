@@ -109,8 +109,9 @@ export interface UpdateTrainingPlanRequest {
 export type GlobalTrainingPlanCollectionResponse =
   CollectionResponse<GlobalTrainingPlanSummary>;
 
-export type PersonalTrainingPlanCollectionResponse =
-  CollectionResponse<PersonalTrainingPlanListItem>;
+export interface PersonalTrainingPlanCollectionResponse extends CollectionResponse<PersonalTrainingPlanListItem> {
+  activeCount: number;
+}
 
 export type GlobalTrainingPlanLibraryResponse =
   CollectionResponse<GlobalTrainingPlanLibraryItem>;
@@ -132,11 +133,12 @@ export type CreateGlobalTrainingPlanReferenceResponse =
   ApiResponse<PersonalTrainingPlanListItem>;
 
 export interface ActivatePersonalTrainingPlanRequest {
+  active: boolean;
   catalogEntryId: string;
 }
 
 export type ActivatePersonalTrainingPlanResponse = ApiResponse<{
-  activeCatalogEntryId: string;
+  activeCatalogEntryIds: readonly string[];
 }>;
 
 export interface CreateTrainingPlanCloneJobRequest {
@@ -215,13 +217,11 @@ export interface RegisterOfflineTrainingLeaseRequest {
   installationId: string;
 }
 
-export type OfflineTrainingLeaseState =
-  'created' | 'plan-rebound' | 'taken-over' | 'unchanged';
+export type OfflineTrainingLeaseState = 'created' | 'taken-over' | 'unchanged';
 
 export type OfflineTrainingLeaseResponse = ApiResponse<{
   expiresAt: string;
   leaseId: string;
-  planId: string;
   state: OfflineTrainingLeaseState;
 }>;
 

@@ -38,7 +38,9 @@ A região pessoal é um `section` nomeado pelo `h1` `Visão geral`, seguido da f
 neutra `Seu treino em um só lugar.`. Ela contém, nesta ordem:
 
 1. Card `Próximo treino`, com nomes de plano/workout quando aplicável e uma única
-   ação dominante: `Escolher um plano`, `Começar treino` ou `Retomar treino`.
+   ação dominante: escolher um plano, escolher entre planos em uso, começar treino
+   ou retomar treino. Com vários ativos, `Escolher treino` navega a `/training`
+   sem eleger um plano.
 2. Card `Esta semana`, com sete dias de segunda a domingo, marca textual e visual
    das conclusões, `X treinos concluídos` e `X de Y treinos` quando existe plano.
 3. `Últimos 30 dias`, com cards de conclusões, duração em horas/minutos e percentual

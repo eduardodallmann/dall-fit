@@ -148,7 +148,7 @@ describe('Dashboard (e2e)', () => {
       personId,
       trainingPlanId: null,
     });
-    await active.create({ catalogEntryId: entry._id, personId });
+    await active.create({ catalogEntryIds: [entry._id], personId });
     return { entry, plan, workoutId };
   }
 

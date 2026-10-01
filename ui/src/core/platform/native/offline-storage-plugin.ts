@@ -148,7 +148,9 @@ export interface OfflineStoragePlugin {
     completion?: OfflineCompletionPresentation;
   }>;
   getNextSyncAction(): Promise<{ action?: OfflineSyncAction }>;
-  getPreparedPlan(): Promise<{ aggregate?: OfflineStoredAggregate }>;
+  getPreparedPlan(options: {
+    planId: string;
+  }): Promise<{ aggregate?: OfflineStoredAggregate }>;
   getSnapshot(options: {
     executionId: string;
   }): Promise<{ aggregate?: OfflineStoredAggregate }>;
@@ -157,6 +159,7 @@ export interface OfflineStoragePlugin {
   hasPendingChanges(): Promise<{ value: boolean }>;
   initialize(): Promise<OfflineStorageState>;
   listSnapshots(): Promise<{ aggregates: OfflineStoredAggregate[] }>;
+  listPreparedPlans(): Promise<{ aggregates: OfflineStoredAggregate[] }>;
   putActiveSession(options: {
     payload: Readonly<Record<string, unknown>>;
     payloadVersion: number;

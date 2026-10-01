@@ -76,7 +76,6 @@ const offlineLeaseScenarios = [
   'offline-training-lease:create',
   'offline-training-lease:invalid-body',
   'offline-training-lease:no-active-plan',
-  'offline-training-lease:plan-rebound',
   'offline-training-lease:takeover',
   'offline-training-lease:takeover-required',
   'offline-training-lease:unchanged',
@@ -341,7 +340,6 @@ async function seedOfflineLeaseRedis(
       scenario === 'offline-training-lease:unchanged' ||
       scenario === 'offline-training-lease:takeover' ||
       scenario === 'offline-training-lease:takeover-required' ||
-      scenario === 'offline-training-lease:plan-rebound' ||
       (scenario.startsWith('offline-training-snapshot:') &&
         scenario !== 'offline-training-snapshot:expired')
     ) {
@@ -356,7 +354,6 @@ async function seedOfflineLeaseRedis(
               : 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           personId: offlineLeasePersonId,
-          planId: '64b000000000000000000002',
         }),
         'PXAT',
         expiresAt,
@@ -650,7 +647,7 @@ async function main(): Promise<void> {
               trainingPlanId: null,
             });
             await activeModel.create({
-              catalogEntryId: entry._id,
+              catalogEntryIds: [entry._id],
               personId: person._id,
             });
             await workoutExecutionModel.create({
@@ -738,7 +735,7 @@ async function main(): Promise<void> {
         ]);
         if (scenario === 'personal-training-plans:reference')
           await activeModel.create({
-            catalogEntryId: referenceEntryId,
+            catalogEntryIds: [referenceEntryId],
             personId,
           });
         if (
@@ -747,10 +744,7 @@ async function main(): Promise<void> {
           scenario !== 'offline-training-lease:no-active-plan'
         )
           await activeModel.create({
-            catalogEntryId:
-              scenario === 'offline-training-lease:plan-rebound'
-                ? referenceEntryId
-                : ownedEntryId,
+            catalogEntryIds: [ownedEntryId],
             personId,
           });
         if (scenario?.startsWith('offline-training-snapshot:')) {

@@ -121,6 +121,7 @@ export type {
   TrainingPlanWorkoutDetails,
   TrainingExerciseExecution,
   TrainingExercisePreview,
+  TrainingOfflinePreparation,
   TrainingOverview,
   TrainingPlanExecutionSummary,
   TrainingPlanSource,

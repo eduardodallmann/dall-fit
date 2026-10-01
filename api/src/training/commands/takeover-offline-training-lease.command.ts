@@ -27,12 +27,13 @@ export class TakeoverOfflineTrainingLeaseCommand {
       'TakeoverOfflineTrainingLeaseCommand -> execute -> params:',
       { params: { operation: 'takeover' } },
     );
-    const active = await this.personalPlans.getActiveExecutionPlan(personId);
+    const activePlans =
+      await this.personalPlans.getActiveExecutionPlans(personId);
     this.logger.log(
       'TakeoverOfflineTrainingLeaseCommand -> execute -> personalPlans return:',
-      { data: { active: active !== null } },
+      { data: { activeCount: activePlans.length } },
     );
-    if (active === null) {
+    if (activePlans.length === 0) {
       this.logger.warn(
         'TakeoverOfflineTrainingLeaseCommand -> execute -> activePlanMissing error:',
         { data: { code: 'ACTIVE_TRAINING_PLAN_NOT_FOUND' } },
@@ -40,11 +41,7 @@ export class TakeoverOfflineTrainingLeaseCommand {
       throw activeTrainingPlanNotFoundException();
     }
     try {
-      const data = await this.leases.takeover(
-        personId,
-        active.plan.id,
-        installationId,
-      );
+      const data = await this.leases.takeover(personId, installationId);
       this.logger.log(
         'TakeoverOfflineTrainingLeaseCommand -> execute -> leases return:',
         { data: { state: data.state } },

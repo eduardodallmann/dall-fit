@@ -334,8 +334,10 @@ ter janelas independentes.
 
 `OfflineTrainingLeaseService`, no módulo de treino, usa o mesmo singleton e uma
 chave `offline-training-lease` por pessoa. Ele não recebe DTO HTTP nem persiste no
-MongoDB. Os endpoints são exclusivos de sessão Bearer nativa; commands resolvem o
-plano ativo antes de chamar o service. Falha do Redis vira indisponibilidade
+MongoDB. Os endpoints são exclusivos de sessão Bearer nativa; commands exigem ao
+menos um plano ativo antes de chamar o service. A concessão cerca pessoa e
+instalação, não um plano singular, e pode validar snapshots de todos os planos
+preparados. Falha do Redis vira indisponibilidade
 específica, sem autorização otimista ou lease local por instância.
 
 O mesmo módulo recebe snapshots Android v1 em uma chave

@@ -23,18 +23,16 @@ import { TrainingClockService } from '~/training/services/training-clock.service
 const ACQUIRE_SCRIPT = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then
-  redis.call('SET', KEYS[1], ARGV[4], 'PXAT', ARGV[3])
-  return {'created', ARGV[4]}
+  redis.call('SET', KEYS[1], ARGV[3], 'PXAT', ARGV[2])
+  return {'created', ARGV[3]}
 end
 local current = cjson.decode(raw)
 if current.installationId == ARGV[1] then
-  if current.planId == ARGV[2] then return {'unchanged', raw} end
-  redis.call('SET', KEYS[1], ARGV[4], 'PXAT', ARGV[3])
-  return {'plan-rebound', ARGV[4]}
+  return {'unchanged', raw}
 end
-if ARGV[5] == '1' then
-  redis.call('SET', KEYS[1], ARGV[4], 'PXAT', ARGV[3])
-  return {'taken-over', ARGV[4]}
+if ARGV[4] == '1' then
+  redis.call('SET', KEYS[1], ARGV[3], 'PXAT', ARGV[2])
+  return {'taken-over', ARGV[3]}
 end
 return {'takeover-required', ''}
 `;
@@ -43,7 +41,7 @@ const VALIDATE_SCRIPT = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then return {0, ''} end
 local current = cjson.decode(raw)
-if current.personId ~= ARGV[1] or current.planId ~= ARGV[2] or current.installationId ~= ARGV[3] or current.leaseId ~= ARGV[4] then
+if current.personId ~= ARGV[1] or current.installationId ~= ARGV[2] or current.leaseId ~= ARGV[3] then
   return {-1, ''}
 end
 return {1, raw}
@@ -53,11 +51,11 @@ const RENEW_SCRIPT = `
 local raw = redis.call('GET', KEYS[1])
 if not raw then return {0, ''} end
 local current = cjson.decode(raw)
-if current.personId ~= ARGV[1] or current.planId ~= ARGV[2] or current.installationId ~= ARGV[3] or current.leaseId ~= ARGV[4] then
+if current.personId ~= ARGV[1] or current.installationId ~= ARGV[2] or current.leaseId ~= ARGV[3] then
   return {-1, ''}
 end
-redis.call('SET', KEYS[1], ARGV[5], 'PXAT', ARGV[6])
-return {1, ARGV[5]}
+redis.call('SET', KEYS[1], ARGV[4], 'PXAT', ARGV[5])
+return {1, ARGV[4]}
 `;
 
 @Injectable()
@@ -72,13 +70,12 @@ export class OfflineTrainingLeaseService {
 
   async register(
     personId: string,
-    planId: string,
     installationId: string,
   ): Promise<OfflineTrainingLeasePublic> {
     this.logger.log('OfflineTrainingLeaseService -> register -> params:', {
       params: { operation: 'register' },
     });
-    const result = await this.acquire(personId, planId, installationId, false);
+    const result = await this.acquire(personId, installationId, false);
     this.logger.log(
       'OfflineTrainingLeaseService -> register -> acquire return:',
       {
@@ -93,13 +90,12 @@ export class OfflineTrainingLeaseService {
 
   async takeover(
     personId: string,
-    planId: string,
     installationId: string,
   ): Promise<OfflineTrainingLeasePublic> {
     this.logger.log('OfflineTrainingLeaseService -> takeover -> params:', {
       params: { operation: 'takeover' },
     });
-    const result = await this.acquire(personId, planId, installationId, true);
+    const result = await this.acquire(personId, installationId, true);
     this.logger.log(
       'OfflineTrainingLeaseService -> takeover -> acquire return:',
       {
@@ -126,7 +122,6 @@ export class OfflineTrainingLeaseService {
           1,
           key,
           identity.personId,
-          identity.planId,
           identity.installationId,
           identity.leaseId,
         ),
@@ -171,7 +166,6 @@ export class OfflineTrainingLeaseService {
           1,
           key,
           identity.personId,
-          identity.planId,
           identity.installationId,
           identity.leaseId,
           JSON.stringify(renewed),
@@ -198,7 +192,6 @@ export class OfflineTrainingLeaseService {
 
   private async acquire(
     personId: string,
-    planId: string,
     installationId: string,
     takeover: boolean,
   ): Promise<OfflineTrainingLeasePublic> {
@@ -212,7 +205,6 @@ export class OfflineTrainingLeaseService {
       installationId,
       leaseId: randomUUID(),
       personId,
-      planId,
     };
     const key = this.keys.create('offline-training-lease', personId);
     try {
@@ -222,7 +214,6 @@ export class OfflineTrainingLeaseService {
           1,
           key,
           installationId,
-          planId,
           String(expiresAtMs),
           JSON.stringify(candidate),
           takeover ? '1' : '0',
@@ -243,7 +234,6 @@ export class OfflineTrainingLeaseService {
       const result = {
         expiresAt: lease.expiresAt,
         leaseId: lease.leaseId,
-        planId: lease.planId,
         state,
       };
       this.logger.log('OfflineTrainingLeaseService -> acquire -> return:', {
@@ -288,12 +278,10 @@ export class OfflineTrainingLeaseService {
       !('installationId' in parsed) ||
       !('leaseId' in parsed) ||
       !('personId' in parsed) ||
-      !('planId' in parsed) ||
       typeof parsed.expiresAt !== 'string' ||
       typeof parsed.installationId !== 'string' ||
       typeof parsed.leaseId !== 'string' ||
-      typeof parsed.personId !== 'string' ||
-      typeof parsed.planId !== 'string'
+      typeof parsed.personId !== 'string'
     ) {
       throw new Error('Invalid offline lease payload.');
     }
@@ -310,12 +298,9 @@ export class OfflineTrainingLeaseService {
     this.logger.log('OfflineTrainingLeaseService -> isPublicState -> params:', {
       params: { valueType: typeof value },
     });
-    const result = [
-      'created',
-      'plan-rebound',
-      'taken-over',
-      'unchanged',
-    ].includes(String(value));
+    const result = ['created', 'taken-over', 'unchanged'].includes(
+      String(value),
+    );
     this.logger.log('OfflineTrainingLeaseService -> isPublicState -> return:', {
       data: { valid: result },
     });

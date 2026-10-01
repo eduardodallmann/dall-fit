@@ -22,9 +22,9 @@ HTTP compartilhados em `@dall-fit/types`.
 
 | Método e path                                   | Entrada                           | Sucesso e resultado                   |
 | ----------------------------------------------- | --------------------------------- | ------------------------------------- |
-| `GET /training`                                 | sem body                          | `200 TrainingOverviewResponse`        |
-| `GET /training/workouts/:workoutId`             | MongoID                           | `200 TrainingWorkoutPreviewResponse`  |
-| `POST /training/workouts/:workoutId/session`    | `{}`                              | `201 TrainingSessionResponse`         |
+| `GET /training`                                 | query `catalogEntryId?`           | `200 TrainingOverviewResponse`        |
+| `GET /training/workouts/:workoutId`             | MongoID + query `catalogEntryId?` | `200 TrainingWorkoutPreviewResponse`  |
+| `POST /training/workouts/:workoutId/session`    | query `catalogEntryId?` + `{}`    | `201 TrainingSessionResponse`         |
 | `GET /training/session`                         | sem body                          | `200 TrainingSessionResponse`         |
 | `DELETE /training/session`                      | sem body                          | `204`                                 |
 | `PUT .../series/:seriesNumber/load`             | `{ loadKg }`                      | `200 TrainingSessionResponse`         |
@@ -54,14 +54,14 @@ abandono e finalização têm 30 por minuto. A configuração está em
 
 ### Listagem e prévia
 
-`overview` consulta a sessão Redis e a seleção ativa. Se existir sessão, usa seu snapshot para não
+`overview` consulta a sessão Redis e o conjunto ativo. Se existir sessão, usa seu snapshot para não
 misturar edições posteriores e marca seu workout como `in-progress`. Sem sessão,
-resolve a seleção ativa, busca a última execução do plano e marca o workout
-seguinte ciclicamente como `current`. Ausência de seleção retorna plano nulo e lista
-vazia. Independentemente da apresentação, `offlinePreparation` identifica o plano
-ativo canônico e seus workouts; `offlineValidity` usa o relógio da API e expira
-exatamente sete dias depois. Ambos são nulos sem seleção ativa. A prévia exige
-workout pertencente ao plano ativo, lê os perfis da pessoa e hidrata signed URLs
+resolve zero, um ou vários ativos. Zero retorna vazio; um preserva a grade atual;
+vários sem `catalogEntryId` retornam somente `availablePlans`; uma escolha ativa
+válida retorna sua grade sem persistir preferência. `offlinePreparations` contém
+uma projeção com validade de sete dias para cada ativo. A prévia e o início recebem
+o mesmo `catalogEntryId` quando a seleção seria ambígua, exigem que o workout
+pertença a esse plano, leem os perfis da pessoa e hidratam signed URLs
 somente na resposta; nenhuma URL temporária é persistida. Imagens da prévia incluem
 `offlineMediaId`, SHA-256 estável derivado internamente da chave do asset display,
 sem revelar essa chave nem autorizar acesso.
@@ -116,6 +116,8 @@ proprietária.
 | Caminho                               | Gatilho                                          | Resultado                                                        | Efeitos            |
 | ------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- | ------------------ |
 | sem plano ativo                       | overview ou prévia                               | overview vazio ou `404 TRAINING_PLAN_ACTIVE_SELECTION_NOT_FOUND` | nenhum             |
+| vários sem escolha                    | overview                                         | resumos ativos e workouts vazios                                 | nenhum             |
+| escolha ausente/inativa/alheia        | overview, prévia ou início                       | `404 TRAINING_PLAN_ACTIVE_SELECTION_NOT_FOUND`                    | nenhum             |
 | workout alheio                        | ID não pertence ao ativo                         | `404 TRAINING_WORKOUT_NOT_FOUND`                                 | nenhum             |
 | sessão concorrente                    | iniciar com chave existente                      | `409 WORKOUT_SESSION_ALREADY_ACTIVE`                             | preserva existente |
 | sessão ausente                        | leitura ou mutation                              | `404 WORKOUT_SESSION_NOT_FOUND`                                  | nenhum             |

@@ -8,7 +8,8 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 
 ## Objetivo funcional
 
-- Problema resolvido: escolher um workout do plano em uso ou retomar a sessão.
+- Problema resolvido: escolher entre planos em uso, escolher um workout ou retomar
+  a sessão.
 - Ator: pessoa autenticada, inclusive administradora.
 - Resultado esperado: abrir a prévia/execução correta sem editar o plano.
 - Fluxo relacionado: [execução de treino](../../../../docs/sdd/flows/execucao-de-treino.md).
@@ -16,9 +17,9 @@ sendo verificadas; nenhum draft ou operação anterior é recuperado.
 ## Entradas e pré-condições
 
 O item `Treinar` do menu navega para a rota. `mockAuth` e `mockTraining` existem
-somente nos cenários locais. No Web, o backend deriva a pessoa, a seleção ativa e
+somente nos cenários locais. No Web, o backend deriva a pessoa, o conjunto ativo e
 uma eventual sessão Redis; query ou body não escolhem owner. No Android, o
-repository nativo deriva esses dados do plano e da sessão vinculados à conta no
+repository nativo deriva esses dados da coleção de planos e da sessão vinculados à conta no
 SQLite.
 
 Web/PWA não oferece execução offline. Sem conexão, o guard global preserva
@@ -35,7 +36,7 @@ depois que o terminal local voltar a este path.
 
 ## Elementos, estados e ações
 
-Com plano ativo, a tela mostra nome do plano, instrução `Selecione o treino` e uma
+Com exatamente um plano ativo, a tela mostra nome do plano, instrução `Selecione o treino` e uma
 lista de cards navegáveis. Cada card contém thumbnail/fallback, nome, áreas
 distintas e, quando aplicável, `Atual` ou `Em andamento`. O primeiro workout é
 atual sem histórico; depois, o atual é o seguinte ao último concluído de forma
@@ -45,13 +46,16 @@ A grade possui uma coluna em `390px` e `900px` e no máximo duas em `1440px`. O
 play de vídeo fica centralizado sobre a thumbnail. Os chips usam tokens semânticos
 com contraste legível nos temas claro e escuro; nomes podem ocupar duas linhas.
 
-Sem plano, mostra `Nenhum plano em uso`, explicação e `Ir para Meus planos`. Plano
+Com dois a cinco ativos e sem `catalogEntryId`, mostra `Escolha um plano` e cards
+reais com nome, origem e quantidade de workouts. A escolha permanece na mesma rota
+como search param validado, não é persistida e oferece `Escolher outro plano`.
+Links de workout propagam o parâmetro. Sem plano, mostra `Nenhum plano em uso`, explicação e `Ir para Meus planos`. Plano
 sem workouts possui empty state próprio. Loading usa skeletons. Falha mostra Alert
 e retry explícito. A navegação do card conserva o seletor MSW somente quando os
 mocks locais estão habilitados; uma build de produção nunca propaga
 `mockTraining` para a URL.
 
-No Android com storage nativo, a entrada dispara a preparação do plano ativo. Sem
+No Android com storage nativo, a entrada reconcilia todos os planos ativos. Sem
 snapshot essencial válido, o conteúdo da rota mostra um gate acessível nos estados
 `preparing-data`, `expired` ou `failed`; falha oferece retry e link real para Meus
 planos, sem bloquear o shell. Depois do commit essencial, mídia pendente ou
@@ -97,9 +101,9 @@ notificação genérica cujo toque abre o app e provoca nova leitura do SQLite.
   central; Android usa `NativeTrainingRepository` e não alterna para HTTP por
   ação.
 - O coordenador Android consulta os mesmos endpoints, com concorrência máxima de
-  quatro, e persiste somente o payload de domínio e `fileId` da mídia display.
+  quatro, e persiste até cinco payloads independentes e `fileId` da mídia display.
 - Sucesso utiliza `TrainingOverview`; erro não promove cache anterior a sucesso.
-- Ativar um plano em `/training-plan` remove todas as queries `trainingKeys` antes
+- Alternar um plano em `/training-plan` remove todas as queries `trainingKeys` antes
   de invalidar o catálogo; a próxima navegação sempre lê a seleção canônica, mesmo
   que esta rota tenha armazenado anteriormente o estado sem plano.
 
@@ -107,7 +111,7 @@ notificação genérica cujo toque abre o app e provoca nova leitura do SQLite.
 
 Cards são links reais na lista ordenada `Treinos do plano`. Indicadores não são a
 única identificação do card. Ação vazia navega para `/training-plan`; workout
-navega para `/training/workout/:workoutId`. O voltar do navegador retorna ao shell
+navega para `/training/workout/:workoutId` preservando `catalogEntryId`. O voltar do navegador retorna ao shell
 sem persistência local de sessão.
 
 ## Analytics
@@ -133,6 +137,14 @@ SDK e não são reproduzidos ao reconectar.
 - Given: seleção ativa ausente.
 - When: a rota abre.
 - Then: a pessoa recebe orientação para Meus planos.
+
+### Cenário 3 — vários planos ativos
+
+- Link para testar: `http://localhost:3000/training?mockAuth=person&mockTraining=multiple-active`
+- Given: existem dois planos em uso e nenhuma sessão.
+- When: a rota abre e a pessoa escolhe um card.
+- Then: a URL recebe `catalogEntryId`, somente os workouts escolhidos aparecem e
+  `Escolher outro plano` remove a escolha.
 
 ### Cenário 3 — ativação após estado vazio
 

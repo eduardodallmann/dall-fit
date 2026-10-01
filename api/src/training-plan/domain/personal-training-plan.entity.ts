@@ -32,6 +32,7 @@ export interface PersonalTrainingExecutionPlan {
 }
 
 export interface PersonalTrainingPlanPage {
+  activeCount: number;
   data: readonly PersonalTrainingPlanListItem[];
   total: number;
 }

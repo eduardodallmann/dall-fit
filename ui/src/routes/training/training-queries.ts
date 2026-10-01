@@ -10,12 +10,29 @@ export const trainingKeys = {
   overview: (
     source: TrainingRepository['source'],
     scenario: MockTrainingScenario,
-  ) => [...trainingKeys.all, source, 'overview', scenario] as const,
+    catalogEntryId?: string,
+  ) =>
+    [
+      ...trainingKeys.all,
+      source,
+      'overview',
+      scenario,
+      catalogEntryId,
+    ] as const,
   preview: (
     source: TrainingRepository['source'],
     workoutId: string,
     scenario: MockTrainingScenario,
-  ) => [...trainingKeys.all, source, 'preview', workoutId, scenario] as const,
+    catalogEntryId?: string,
+  ) =>
+    [
+      ...trainingKeys.all,
+      source,
+      'preview',
+      workoutId,
+      scenario,
+      catalogEntryId,
+    ] as const,
   session: (
     source: TrainingRepository['source'],
     scenario: MockTrainingScenario,
@@ -25,10 +42,15 @@ export const trainingKeys = {
 export function trainingOverviewQueryOptions(
   repository: TrainingRepository,
   scenario: MockTrainingScenario,
+  catalogEntryId?: string,
 ) {
   return queryOptions({
-    queryKey: trainingKeys.overview(repository.source, scenario),
-    queryFn: ({ signal }) => repository.getOverview(signal),
+    queryKey: trainingKeys.overview(
+      repository.source,
+      scenario,
+      catalogEntryId,
+    ),
+    queryFn: ({ signal }) => repository.getOverview(catalogEntryId, signal),
   });
 }
 
@@ -36,10 +58,17 @@ export function trainingPreviewQueryOptions(
   workoutId: string,
   repository: TrainingRepository,
   scenario: MockTrainingScenario,
+  catalogEntryId?: string,
 ) {
   return queryOptions({
-    queryKey: trainingKeys.preview(repository.source, workoutId, scenario),
-    queryFn: ({ signal }) => repository.getPreview(workoutId, signal),
+    queryKey: trainingKeys.preview(
+      repository.source,
+      workoutId,
+      scenario,
+      catalogEntryId,
+    ),
+    queryFn: ({ signal }) =>
+      repository.getPreview(workoutId, catalogEntryId, signal),
   });
 }
 

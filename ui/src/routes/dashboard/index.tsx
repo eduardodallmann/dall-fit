@@ -128,10 +128,7 @@ function NextActionCard({ data }: Readonly<{ data: Dashboard }>) {
   const navigate = useNavigate();
   const action = data.nextAction;
   const label = actionLabel(action.type);
-  const description =
-    action.type === 'select-plan'
-      ? 'Escolha um plano para preparar seu próximo treino.'
-      : `${action.planName} · ${action.workoutName}`;
+  const description = actionDescription(action);
   const destination = actionDestination(action.type);
 
   return (
@@ -152,12 +149,18 @@ function NextActionCard({ data }: Readonly<{ data: Dashboard }>) {
               navigationKind: 'dashboard_action',
               surface: 'dashboard',
             });
-            void (action.type === 'select-plan'
-              ? navigate({ to: '/training-plan' })
-              : navigate({
-                  params: { workoutId: action.workoutId },
-                  to: '/training/workout/$workoutId',
-                }));
+            if (action.type === 'select-plan') {
+              void navigate({ to: '/training-plan' });
+              return;
+            }
+            if (action.type === 'choose-training-plan') {
+              void navigate({ to: '/training' });
+              return;
+            }
+            void navigate({
+              params: { workoutId: action.workoutId },
+              to: '/training/workout/$workoutId',
+            });
           }}
           variant="primary"
         >
@@ -170,12 +173,22 @@ function NextActionCard({ data }: Readonly<{ data: Dashboard }>) {
 
 function actionLabel(type: Dashboard['nextAction']['type']): string {
   if (type === 'select-plan') return 'Escolher um plano';
+  if (type === 'choose-training-plan') return 'Escolher treino';
   if (type === 'start-workout') return 'Começar treino';
   return 'Retomar treino';
 }
 
+function actionDescription(action: Dashboard['nextAction']): string {
+  if (action.type === 'select-plan')
+    return 'Escolha um plano para preparar seu próximo treino.';
+  if (action.type === 'choose-training-plan')
+    return 'Escolha qual dos seus planos em uso deseja treinar agora.';
+  return `${action.planName} · ${action.workoutName}`;
+}
+
 function actionDestination(type: Dashboard['nextAction']['type']) {
   if (type === 'select-plan') return 'training_plans' as const;
+  if (type === 'choose-training-plan') return 'training_start' as const;
   if (type === 'start-workout') return 'training_start' as const;
   return 'training_resume' as const;
 }

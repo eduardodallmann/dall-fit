@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 final class OfflineStorageDatabase extends SQLiteOpenHelper {
     static final String DATABASE_NAME = "dall-fit-offline.db";
-    static final int SCHEMA_VERSION = 4;
+    static final int SCHEMA_VERSION = 5;
 
     OfflineStorageDatabase(Context context) {
         this(context, DATABASE_NAME);
@@ -32,7 +32,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         if (oldVersion == 1 && newVersion >= 2) migrateFromOneToTwo(database);
         if (oldVersion <= 2 && newVersion >= 3) migrateFromTwoToThree(database);
         if (oldVersion <= 3 && newVersion >= 4) migrateFromThreeToFour(database);
-        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 4) throw missingMigration();
+        if (oldVersion <= 4 && newVersion >= 5) migrateFromFourToFive(database);
+        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 5) throw missingMigration();
     }
 
     @Override
@@ -64,9 +65,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         );
         database.execSQL(
             "CREATE TABLE prepared_plan (" +
-            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
             "account_id INTEGER NOT NULL DEFAULT 1 REFERENCES account_state(id) ON DELETE CASCADE," +
-            "plan_id TEXT NOT NULL CHECK (length(plan_id) > 0)," +
+            "plan_id TEXT PRIMARY KEY CHECK (length(plan_id) > 0)," +
             "payload_version INTEGER NOT NULL CHECK (payload_version > 0)," +
             "revision INTEGER NOT NULL CHECK (revision >= 0)," +
             "payload_json TEXT NOT NULL," +
@@ -195,6 +195,28 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "ALTER TABLE snapshots ADD COLUMN sync_contract_version INTEGER NOT NULL DEFAULT 1 " +
             "CHECK (sync_contract_version > 0)"
         );
+    }
+
+    private static void migrateFromFourToFive(SQLiteDatabase database) {
+        database.execSQL("ALTER TABLE prepared_plan RENAME TO prepared_plan_v4");
+        database.execSQL(
+            "CREATE TABLE prepared_plan (" +
+            "account_id INTEGER NOT NULL DEFAULT 1 REFERENCES account_state(id) ON DELETE CASCADE," +
+            "plan_id TEXT PRIMARY KEY CHECK (length(plan_id) > 0)," +
+            "payload_version INTEGER NOT NULL CHECK (payload_version > 0)," +
+            "revision INTEGER NOT NULL CHECK (revision >= 0)," +
+            "payload_json TEXT NOT NULL," +
+            "validated_at TEXT NOT NULL," +
+            "expires_at TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
+        database.execSQL(
+            "INSERT INTO prepared_plan " +
+            "(account_id, plan_id, payload_version, revision, payload_json, validated_at, expires_at, updated_at) " +
+            "SELECT account_id, plan_id, payload_version, revision, payload_json, validated_at, expires_at, updated_at " +
+            "FROM prepared_plan_v4"
+        );
+        database.execSQL("DROP TABLE prepared_plan_v4");
     }
 
     private static void createLatestCompletionTable(SQLiteDatabase database) {

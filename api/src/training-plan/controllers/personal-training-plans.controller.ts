@@ -139,10 +139,15 @@ export class PersonalTrainingPlansController {
     @Body() input: ActivatePersonalTrainingPlanDto,
   ): Promise<ActivatePersonalTrainingPlanResponse> {
     this.logParams('activate', {
+      active: input.active,
       catalogEntryId: input.catalogEntryId,
       personId: person.id,
     });
-    const result = await this.command.activate(person.id, input.catalogEntryId);
+    const result = await this.command.activate(
+      person.id,
+      input.catalogEntryId,
+      input.active,
+    );
     return result;
   }
 

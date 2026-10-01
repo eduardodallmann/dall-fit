@@ -91,11 +91,14 @@ export function createTrainingOverviewFixture(
   inProgress = false,
 ): TrainingOverview {
   return {
-    offlinePreparation: {
-      plan: trainingPlanExecutionFixture,
-      workoutIds: [...mockTrainingIds.workouts],
-    },
-    offlineValidity,
+    availablePlans: [trainingPlanExecutionFixture],
+    offlinePreparations: [
+      {
+        plan: trainingPlanExecutionFixture,
+        validity: offlineValidity,
+        workoutIds: [...mockTrainingIds.workouts],
+      },
+    ],
     plan: trainingPlanExecutionFixture,
     workouts: [
       {
@@ -121,6 +124,61 @@ export function createTrainingOverviewFixture(
       },
     ],
   };
+}
+
+export function createMultipleTrainingOverviewFixture(
+  catalogEntryId?: string,
+): TrainingOverview {
+  const first = createTrainingOverviewFixture();
+  const second: TrainingPlanExecutionSummary = {
+    catalogEntryId: '64b000000000000000000012',
+    id: '64b000000000000000000002',
+    name: 'Mobilidade e cardio',
+    source: 'global-reference',
+    workoutCount: 2,
+  };
+  const availablePlans = [trainingPlanExecutionFixture, second];
+  const selected = availablePlans.find(
+    (plan) => plan.catalogEntryId === catalogEntryId,
+  );
+  return {
+    availablePlans,
+    offlinePreparations: availablePlans.map((plan) => ({
+      plan,
+      validity: offlineValidity,
+      workoutIds:
+        plan.catalogEntryId === trainingPlanExecutionFixture.catalogEntryId
+          ? [...mockTrainingIds.workouts]
+          : ['64b000000000000000000104', '64b000000000000000000105'],
+    })),
+    plan: selected ?? null,
+    workouts: selectedWorkouts(selected, first.workouts),
+  };
+}
+
+function selectedWorkouts(
+  selected: TrainingPlanExecutionSummary | undefined,
+  firstWorkouts: TrainingOverview['workouts'],
+): TrainingOverview['workouts'] {
+  if (selected === undefined) return [];
+  if (selected.catalogEntryId === trainingPlanExecutionFixture.catalogEntryId)
+    return firstWorkouts;
+  return [
+    {
+      bodyAreas: ['cardio'],
+      id: '64b000000000000000000104',
+      indicator: 'current',
+      media: null,
+      name: 'Cardio leve',
+    },
+    {
+      bodyAreas: ['mobility'],
+      id: '64b000000000000000000105',
+      indicator: null,
+      media: null,
+      name: 'Mobilidade',
+    },
+  ];
 }
 
 export function createTrainingSessionFixture(

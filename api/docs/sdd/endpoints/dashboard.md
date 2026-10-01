@@ -58,7 +58,9 @@ recentes em ISO 8601.
 O read model administrativo executa agregações limitadas e previsíveis sobre
 pessoas, execuções, catálogo, seleções e modelos globais. `topGlobalPlans` agrupa
 referências por modelo, conta pessoas vinculadas e ativas, ordena por ativos,
-vinculados, nome e ID e limita cinco. Os índices de pessoa por criação, execução
+vinculados, nome e ID e limita cinco. `activePlanCount` deduplica pessoas com ao
+menos uma seleção, enquanto `activeSelectionCount` soma as entradas dos arrays.
+Os índices de pessoa por criação, execução
 por status/data, catálogo por tipo/modelo/pessoa e seleção por entrada sustentam
 essas leituras.
 
@@ -69,11 +71,13 @@ essas leituras.
 1. sessão existente prevalece e produz `resume-workout` com o plano e workout do
    snapshot, mesmo se a seleção atual mudou;
 2. sem sessão e sem plano executável, produz `select-plan`;
-3. com plano, consulta a última execução e escolhe ciclicamente o workout seguinte,
+3. com vários ativos, produz `choose-training-plan` e encaminha a `/training` sem
+   escolher um ID;
+4. com um plano, consulta a última execução e escolhe ciclicamente o workout seguinte,
    ou o primeiro sem histórico, produzindo `start-workout` e `catalogEntryId`.
 
 `currentWeek.workoutCount` usa o total do snapshot quando há sessão, o total do
-plano ativo sem sessão ou `null` sem plano.
+plano ativo sem sessão ou `null` sem plano ou com vários ativos.
 
 ## Formato das respostas
 

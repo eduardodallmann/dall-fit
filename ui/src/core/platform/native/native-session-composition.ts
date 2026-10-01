@@ -41,9 +41,10 @@ export async function createNativeComposition(): Promise<NativeComposition> {
   await appCompatibility.initialize();
   const offlinePreparation = new OfflinePreparationCoordinator({
     getInstallationId: () => coordinator.getInstallationId(),
-    getOverview: () => getTrainingOverview('active-plan'),
-    getPreview: (workoutId) =>
-      getTrainingWorkoutPreview(workoutId, 'active-plan'),
+    getOverview: (catalogEntryId) =>
+      getTrainingOverview('active-plan', catalogEntryId),
+    getPreview: (workoutId, catalogEntryId) =>
+      getTrainingWorkoutPreview(workoutId, 'active-plan', catalogEntryId),
     plugin: offlineStoragePlugin,
     registerLease: registerOfflineTrainingLease,
     takeoverLease: takeoverOfflineTrainingLease,

@@ -34,9 +34,13 @@ export interface TrainingRepository {
     executionId: string,
     signal?: AbortSignal,
   ): Promise<WorkoutExecutionSummary>;
-  getOverview(signal?: AbortSignal): Promise<TrainingOverview>;
+  getOverview(
+    catalogEntryId?: string,
+    signal?: AbortSignal,
+  ): Promise<TrainingOverview>;
   getPreview(
     workoutId: string,
+    catalogEntryId?: string,
     signal?: AbortSignal,
   ): Promise<TrainingWorkoutPreview>;
   getSession(signal?: AbortSignal): Promise<TrainingSession>;
@@ -54,7 +58,10 @@ export interface TrainingRepository {
     loadKg: number | null,
     version: number,
   ): Promise<TrainingSession>;
-  startSession(workoutId: string): Promise<TrainingSession>;
+  startSession(
+    workoutId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingSession>;
   startTimer(
     exerciseId: string,
     kind: 'duration' | 'pause',

@@ -15,9 +15,12 @@ export class TrainingCommand {
 
   constructor(private readonly service: TrainingService) {}
 
-  async overview(personId: string): Promise<TrainingOverviewResponse> {
+  async overview(
+    personId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingOverviewResponse> {
     this.logParams('overview', { personId });
-    const data = await this.service.overview(personId);
+    const data = await this.service.overview(personId, catalogEntryId);
     const result = { data };
     this.logReturn('overview', {
       personId,
@@ -29,9 +32,14 @@ export class TrainingCommand {
   async preview(
     personId: string,
     workoutId: string,
+    catalogEntryId?: string,
   ): Promise<TrainingWorkoutPreviewResponse> {
     this.logParams('preview', { personId, workoutId });
-    const data = await this.service.preview(personId, workoutId);
+    const data = await this.service.preview(
+      personId,
+      workoutId,
+      catalogEntryId,
+    );
     const result = { data };
     this.logReturn('preview', {
       exerciseCount: data.exercises.length,
@@ -44,9 +52,10 @@ export class TrainingCommand {
   async start(
     personId: string,
     workoutId: string,
+    catalogEntryId?: string,
   ): Promise<TrainingSessionResponse> {
     this.logParams('start', { personId, workoutId });
-    const data = await this.service.start(personId, workoutId);
+    const data = await this.service.start(personId, workoutId, catalogEntryId);
     const result = { data };
     this.logReturn('start', { personId, version: data.version, workoutId });
     return result;

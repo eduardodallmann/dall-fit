@@ -28,6 +28,7 @@ import type {
   VersionedResult,
 } from '~/training-plan/domain/training-plan.entity';
 import {
+  createActiveTrainingPlanLimitException,
   createCatalogEntryNotFoundException,
   createCloneJobDuplicateException,
   createCloneJobNotFoundException,
@@ -75,6 +76,7 @@ export class PersonalTrainingPlanService {
       TRAINING_PLAN_PAGE_SIZE,
     );
     const result = {
+      activeCount: pageResult.activeCount,
       data: pageResult.data,
       page,
       pageSize: TRAINING_PLAN_PAGE_SIZE,
@@ -159,29 +161,35 @@ export class PersonalTrainingPlanService {
     return result;
   }
 
-  async activate(personId: string, catalogEntryId: string): Promise<void> {
-    this.logger.log('PersonalTrainingPlanService -> activate -> params:', {
-      params: { catalogEntryId, personId },
-    });
-    const previousCatalogEntryId =
-      await this.repository.getActiveCatalogEntryId(personId);
-    const previous =
-      previousCatalogEntryId === null ||
-      previousCatalogEntryId === catalogEntryId
-        ? null
-        : await this.resolveEntry(personId, previousCatalogEntryId);
-    const next = await this.resolveEntry(personId, catalogEntryId);
-    await this.repository.setActive(personId, catalogEntryId);
-    if (previous?.source === 'global-reference')
+  async setActiveState(
+    personId: string,
+    catalogEntryId: string,
+    active: boolean,
+  ): Promise<readonly string[]> {
+    this.logger.log(
+      'PersonalTrainingPlanService -> setActiveState -> params:',
+      {
+        params: { active, catalogEntryId, personId },
+      },
+    );
+    const resolved = await this.resolveEntry(personId, catalogEntryId);
+    const activeCatalogEntryIds = active
+      ? await this.repository.setActive(personId, catalogEntryId)
+      : await this.repository.setInactive(personId, catalogEntryId);
+    if (activeCatalogEntryIds === null)
+      throw createActiveTrainingPlanLimitException();
+    if (resolved.source === 'global-reference')
       await this.publishGlobalUsageChanged(
-        previous.plan.id,
-        previous.plan.version,
+        resolved.plan.id,
+        resolved.plan.version,
       );
-    if (next.source === 'global-reference')
-      await this.publishGlobalUsageChanged(next.plan.id, next.plan.version);
-    this.logger.log('PersonalTrainingPlanService -> activate -> completed:', {
-      data: { catalogEntryId, personId },
-    });
+    this.logger.log(
+      'PersonalTrainingPlanService -> setActiveState -> return:',
+      {
+        data: { activeCount: activeCatalogEntryIds.length, personId },
+      },
+    );
+    return activeCatalogEntryIds;
   }
 
   async getDetails(
@@ -192,9 +200,9 @@ export class PersonalTrainingPlanService {
       params: { catalogEntryId, personId },
     });
     const resolved = await this.resolveEntry(personId, catalogEntryId);
-    const active =
-      (await this.repository.getActiveCatalogEntryId(personId)) ===
-      catalogEntryId;
+    const active = (
+      await this.repository.getActiveCatalogEntryIds(personId)
+    ).includes(catalogEntryId);
     const result = {
       active,
       catalogEntryId,
@@ -234,9 +242,9 @@ export class PersonalTrainingPlanService {
       expectedVersion,
       changes,
     );
-    const active =
-      (await this.repository.getActiveCatalogEntryId(personId)) ===
-      catalogEntryId;
+    const active = (
+      await this.repository.getActiveCatalogEntryIds(personId)
+    ).includes(catalogEntryId);
     const result = {
       data: this.toPlanItem(
         resolved.entry,
@@ -319,41 +327,37 @@ export class PersonalTrainingPlanService {
     return result;
   }
 
-  async getActiveExecutionPlan(
+  async getActiveExecutionPlans(
     personId: string,
-  ): Promise<PersonalTrainingExecutionPlan | null> {
+  ): Promise<readonly PersonalTrainingExecutionPlan[]> {
     this.logger.log(
-      'PersonalTrainingPlanService -> getActiveExecutionPlan -> params:',
+      'PersonalTrainingPlanService -> getActiveExecutionPlans -> params:',
       { params: { personId } },
     );
-    const catalogEntryId =
-      await this.repository.getActiveCatalogEntryId(personId);
+    const catalogEntryIds =
+      await this.repository.getActiveCatalogEntryIds(personId);
     this.logger.log(
-      'PersonalTrainingPlanService -> getActiveExecutionPlan -> repository return:',
-      { data: { active: catalogEntryId !== null, personId } },
+      'PersonalTrainingPlanService -> getActiveExecutionPlans -> repository return:',
+      { data: { activeCount: catalogEntryIds.length, personId } },
     );
-    if (catalogEntryId === null) {
-      const result = null;
-      this.logger.log(
-        'PersonalTrainingPlanService -> getActiveExecutionPlan -> return:',
-        { data: { active: false, personId } },
-      );
-      return result;
-    }
-    const resolved = await this.resolveEntry(personId, catalogEntryId);
-    const plan = await this.trainingPlanService.getExecutionTree(
-      resolved.plan.id,
-      resolved.ownerPersonId,
+    const result = await Promise.all(
+      catalogEntryIds.map(async (catalogEntryId) => {
+        const resolved = await this.resolveEntry(personId, catalogEntryId);
+        const plan = await this.trainingPlanService.getExecutionTree(
+          resolved.plan.id,
+          resolved.ownerPersonId,
+        );
+        return {
+          catalogEntryId,
+          ownerPersonId: resolved.ownerPersonId,
+          plan,
+          source: resolved.source,
+        };
+      }),
     );
-    const result = {
-      catalogEntryId,
-      ownerPersonId: resolved.ownerPersonId,
-      plan,
-      source: resolved.source,
-    };
     this.logger.log(
-      'PersonalTrainingPlanService -> getActiveExecutionPlan -> return:',
-      { data: { active: true, personId, trainingPlanId: plan.id } },
+      'PersonalTrainingPlanService -> getActiveExecutionPlans -> return:',
+      { data: { activeCount: result.length, personId } },
     );
     return result;
   }

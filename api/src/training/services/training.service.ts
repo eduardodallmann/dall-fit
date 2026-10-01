@@ -74,17 +74,20 @@ export class TrainingService {
     private readonly clock: TrainingClockService,
   ) {}
 
-  async overview(personId: string): Promise<TrainingOverview> {
+  async overview(
+    personId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingOverview> {
     this.logger.log('TrainingService -> overview -> params:', {
       params: { personId },
     });
-    const [session, active] = await Promise.all([
+    const [session, activePlans] = await Promise.all([
       this.sessions.get(personId),
-      this.personalPlans.getActiveExecutionPlan(personId),
+      this.personalPlans.getActiveExecutionPlans(personId),
     ]);
     this.logger.log('TrainingService -> overview -> dependencies return:', {
       data: {
-        activePlanFound: active !== null,
+        activePlanCount: activePlans.length,
         sessionFound: session !== null,
       },
     });
@@ -92,22 +95,20 @@ export class TrainingService {
     this.logger.log('TrainingService -> overview -> clock return:', {
       data: { resolved: true },
     });
-    const offlineValidity =
-      active === null
-        ? null
-        : {
-            expiresAt: new Date(
-              validatedAt.getTime() + OFFLINE_PLAN_TTL_MS,
-            ).toISOString(),
-            validatedAt: validatedAt.toISOString(),
-          };
-    const offlinePreparation =
-      active === null
-        ? null
-        : {
-            plan: this.planSummary(active),
-            workoutIds: active.plan.workouts.map((workout) => workout.id),
-          };
+    const validity = {
+      expiresAt: new Date(
+        validatedAt.getTime() + OFFLINE_PLAN_TTL_MS,
+      ).toISOString(),
+      validatedAt: validatedAt.toISOString(),
+    };
+    const availablePlans = activePlans.map((active) =>
+      this.planSummary(active),
+    );
+    const offlinePreparations = activePlans.map((active) => ({
+      plan: this.planSummary(active),
+      validity,
+      workoutIds: active.plan.workouts.map((workout) => workout.id),
+    }));
     if (session !== null) {
       const workouts = await Promise.all(
         session.planWorkouts.map(async (workout) => ({
@@ -117,8 +118,8 @@ export class TrainingService {
         })),
       );
       const result = {
-        offlinePreparation,
-        offlineValidity,
+        availablePlans,
+        offlinePreparations,
         plan: session.plan,
         workouts,
       };
@@ -127,15 +128,37 @@ export class TrainingService {
       });
       return result;
     }
-    if (active === null) {
+    if (activePlans.length === 0) {
       const result = {
-        offlinePreparation: null,
-        offlineValidity: null,
+        availablePlans,
+        offlinePreparations,
         plan: null,
         workouts: [],
       };
       this.logger.log('TrainingService -> overview -> return:', {
         data: { personId, source: 'empty', workoutCount: 0 },
+      });
+      return result;
+    }
+    let active: PersonalTrainingExecutionPlan | undefined;
+    if (catalogEntryId === undefined) {
+      if (activePlans.length === 1) active = activePlans[0];
+    } else {
+      active = activePlans.find(
+        (item) => item.catalogEntryId === catalogEntryId,
+      );
+    }
+    if (active === undefined) {
+      if (catalogEntryId !== undefined)
+        throw createActiveTrainingPlanNotFoundException();
+      const result = {
+        availablePlans,
+        offlinePreparations,
+        plan: null,
+        workouts: [],
+      };
+      this.logger.log('TrainingService -> overview -> return:', {
+        data: { personId, source: 'multiple-active-plans', workoutCount: 0 },
       });
       return result;
     }
@@ -155,8 +178,8 @@ export class TrainingService {
       })),
     );
     const result = {
-      offlinePreparation,
-      offlineValidity,
+      availablePlans,
+      offlinePreparations,
       plan: this.planSummary(active),
       workouts,
     };
@@ -169,11 +192,12 @@ export class TrainingService {
   async preview(
     personId: string,
     workoutId: string,
+    catalogEntryId?: string,
   ): Promise<TrainingWorkoutPreview> {
     this.logger.log('TrainingService -> preview -> params:', {
       params: { personId, workoutId },
     });
-    const active = await this.requireActivePlan(personId);
+    const active = await this.requireActivePlan(personId, catalogEntryId);
     const workout = this.requireWorkout(active, workoutId);
     const setExerciseIds = workout.exercises
       .filter(isSetExercise)
@@ -236,13 +260,17 @@ export class TrainingService {
     return result;
   }
 
-  async start(personId: string, workoutId: string): Promise<TrainingSession> {
+  async start(
+    personId: string,
+    workoutId: string,
+    catalogEntryId?: string,
+  ): Promise<TrainingSession> {
     this.logger.log('TrainingService -> start -> params:', {
       params: { personId, workoutId },
     });
     if ((await this.sessions.get(personId)) !== null)
       throw createWorkoutSessionAlreadyActiveException();
-    const active = await this.requireActivePlan(personId);
+    const active = await this.requireActivePlan(personId, catalogEntryId);
     const workout = this.requireWorkout(active, workoutId);
     const profiles = await this.loadProfiles.findForExercises(
       personId,
@@ -739,9 +767,19 @@ export class TrainingService {
 
   private async requireActivePlan(
     personId: string,
+    catalogEntryId?: string,
   ): Promise<PersonalTrainingExecutionPlan> {
-    const result = await this.personalPlans.getActiveExecutionPlan(personId);
-    if (result === null) throw createActiveTrainingPlanNotFoundException();
+    const activePlans =
+      await this.personalPlans.getActiveExecutionPlans(personId);
+    let result: PersonalTrainingExecutionPlan | undefined;
+    if (catalogEntryId === undefined) {
+      if (activePlans.length === 1) result = activePlans[0];
+    } else {
+      result = activePlans.find(
+        (item) => item.catalogEntryId === catalogEntryId,
+      );
+    }
+    if (result === undefined) throw createActiveTrainingPlanNotFoundException();
     return result;
   }
 

@@ -4,7 +4,7 @@
 
 ## Objetivo funcional
 
-- Ator: pessoa autenticada com um plano de treino ativo.
+- Ator: pessoa autenticada com ao menos um plano ativo ou sessão retomável.
 - Problema resolvido: selecionar, executar, retomar e finalizar um workout com
   acompanhamento por série, carga opcional e timers.
 - Resultado esperado: progresso efêmero retomável e resumo durável após a
@@ -50,7 +50,8 @@ por pessoa.
    a rede, a mesma rota é remontada contra as autoridades online. No Android,
    entrar na listagem valida o snapshot local pela janela de sete dias
    emitida pela API e já pode renderizar overview e previews locais enquanto
-   atualiza online. A preparação registra silenciosamente o lease da instalação,
+   atualiza online. A preparação reconcilia todos os planos ativos e registra
+   silenciosamente o lease da instalação,
    persiste o fence com o payload v2 e confirma o snapshot essencial antes dos
    downloads display; mídia incompleta nunca bloqueia. Em instalação sem sessão ou
    snapshot local, takeover explícito pode transferir o editor; dados de lease
@@ -63,16 +64,19 @@ por pessoa.
    em foreground ou pelo WorkManager, preservando revisões concorrentes e terminais
    distintos na ordem local.
 3. A dashboard oferece a mesma decisão de entrada: sem seleção orienta escolher
-   plano, com seleção aponta o workout seguinte e com sessão aponta retomada usando
-   o snapshot. Atividades recentes abrem diretamente o resumo durável. A listagem
-   resolve o plano ativo e marca como atual o workout seguinte ao último
+   plano, com um ativo aponta o workout seguinte, com vários envia à escolha em
+   `/training` e com sessão aponta retomada usando o snapshot. Atividades recentes
+   abrem diretamente o resumo durável. A listagem resolve o plano escolhido e
+   marca como atual o workout seguinte ao último
    concluído; uma sessão Redis existente prevalece e é marcada em andamento. Ao
    ativar um plano na gestão pessoal, a UI remove o cache deste domínio para que
    uma resposta anterior sem plano não sobreviva à próxima navegação.
 4. A prévia resolve mídia e sugere as últimas cargas duráveis, inclusive `null`.
    Antes de iniciar, a pessoa pode retornar à seleção por um link próprio; ele não
    aparece durante a sessão.
-5. No Web, iniciar cria o snapshot Redis exclusivo com TTL absoluto de 24 horas.
+5. Com vários ativos, a escolha usa `catalogEntryId` apenas na URL e é propagada à
+   prévia e ao início, sem preferência persistente. No Web, iniciar cria o snapshot
+   Redis exclusivo com TTL absoluto de 24 horas.
    No Android, iniciar valida plano/lease locais, captura a árvore preparada e grava
    sessão + snapshot `in-progress` em uma transação SQLite. Se outro workout já
    estiver ativo, a pessoa continua ou confirma o descarte terminal antes do novo.
@@ -107,12 +111,12 @@ por pessoa.
 
 | Dado                     | Origem      | Consumidores                           | Persistência                       | Observações                                      |
 | ------------------------ | ----------- | -------------------------------------- | ---------------------------------- | ------------------------------------------------ |
-| plano/workout/exercícios | plano ativo | API e três rotas                       | MongoDB + snapshot Redis           | snapshot isola a execução de edições posteriores |
+| plano/workout/exercícios | conjunto ativo + escolha temporária | API e três rotas       | MongoDB + snapshot Redis           | snapshot isola a execução de edições posteriores |
 | versão da sessão         | Redis       | UI e API                               | snapshot Redis                     | começa em zero e avança por CAS                  |
 | cargas por série         | UI/API      | execução e próxima prévia              | Redis; perfil MongoDB ao finalizar | inteiro ou `null`                                |
 | timers                   | API         | overlay da UI                          | timestamps no Redis                | nenhum interval é persistido                     |
 | resumo de execução       | API         | conclusão e seleção do próximo workout | MongoDB                            | idempotente por pessoa/sessão                    |
-| lease de edição offline  | API         | preparação e repository Android        | Redis + vínculo no plano SQLite    | plano/instalação no valor; `leaseId` cerca a concessão |
+| lease de edição offline  | API         | preparação e repository Android        | Redis por pessoa/instalação        | `leaseId` cerca snapshots dos planos preparados |
 | snapshot offline corrente | Android/API | sincronizador Android nativo              | SQLite local + Redis corrente      | foreground imediato; WorkManager best-effort; revisão monotônica; conflito exige escolha explícita |
 | terminal offline         | API         | retries e histórico                    | recibo MongoDB único por execução  | conclusão ou cancelamento imutável                |
 

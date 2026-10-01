@@ -6,6 +6,7 @@ import type {
 } from '@dall-fit/types';
 
 import {
+  createMultipleTrainingOverviewFixture,
   createTrainingOverviewFixture,
   createTrainingPreviewFixture,
   createTrainingSessionFixture,
@@ -139,7 +140,6 @@ export const trainingHandlers = [
           data: {
             expiresAt: '2030-01-08T00:00:00.000Z',
             leaseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-            planId: '64b000000000000000000001',
             state: 'taken-over',
           },
         },
@@ -165,7 +165,6 @@ export const trainingHandlers = [
         data: {
           expiresAt: '2030-01-08T00:00:00.000Z',
           leaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          planId: '64b000000000000000000001',
           state: 'created',
         },
       },
@@ -178,15 +177,21 @@ export const trainingHandlers = [
     if (name === 'no-active-plan' && !trainingPlanActivated)
       return HttpResponse.json({
         data: {
-          offlinePreparation: null,
-          offlineValidity: null,
+          availablePlans: [],
+          offlinePreparations: [],
           plan: null,
           workouts: [],
         },
       });
     const state = stateFor(name);
     return HttpResponse.json({
-      data: createTrainingOverviewFixture(state.session !== null),
+      data:
+        name === 'multiple-active'
+          ? createMultipleTrainingOverviewFixture(
+              new URL(request.url).searchParams.get('catalogEntryId') ??
+                undefined,
+            )
+          : createTrainingOverviewFixture(state.session !== null),
     });
   }),
 

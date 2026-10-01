@@ -290,12 +290,13 @@ export interface TrainingOfflineValidity {
 
 export interface TrainingOfflinePreparation {
   plan: TrainingPlanExecutionSummary;
+  validity: TrainingOfflineValidity;
   workoutIds: readonly EntityId[];
 }
 
 export interface TrainingOverview {
-  offlinePreparation: TrainingOfflinePreparation | null;
-  offlineValidity: TrainingOfflineValidity | null;
+  availablePlans: readonly TrainingPlanExecutionSummary[];
+  offlinePreparations: readonly TrainingOfflinePreparation[];
   plan: TrainingPlanExecutionSummary | null;
   workouts: readonly TrainingWorkoutCard[];
 }
@@ -476,6 +477,7 @@ export interface WorkoutExecutionSummary extends Entity {
 
 export type DashboardNextAction =
   | { type: 'select-plan' }
+  | { type: 'choose-training-plan' }
   | {
       catalogEntryId: EntityId;
       planName: string;

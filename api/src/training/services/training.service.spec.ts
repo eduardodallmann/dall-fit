@@ -17,9 +17,12 @@ function createService(
     loadProfiles?: Partial<TrainingLoadProfileService>;
   } = {},
 ) {
+  let activePlans: unknown[] = [];
+  if (Array.isArray(active)) activePlans = active;
+  else if (active !== null) activePlans = [active];
   return new TrainingService(
     {
-      getActiveExecutionPlan: vi.fn().mockResolvedValue(active),
+      getActiveExecutionPlans: vi.fn().mockResolvedValue(activePlans),
     } as unknown as PersonalTrainingPlanService,
     dependencies.images as ExerciseImageService,
     dependencies.loadProfiles as TrainingLoadProfileService,
@@ -36,8 +39,8 @@ describe('TrainingService offline overview', () => {
     const result = await createService(null).overview('person-a');
 
     expect(result).toEqual({
-      offlinePreparation: null,
-      offlineValidity: null,
+      availablePlans: [],
+      offlinePreparations: [],
       plan: null,
       workouts: [],
     });
@@ -60,13 +63,44 @@ describe('TrainingService offline overview', () => {
       source: 'owned',
     }).overview('person-a');
 
-    expect(result.offlineValidity).toEqual({
+    expect(result.offlinePreparations).toHaveLength(1);
+    expect(result.offlinePreparations[0]?.plan.id).toBe('plan-a');
+    expect(result.offlinePreparations[0]?.validity).toEqual({
       expiresAt: '2026-09-20T12:00:00.000Z',
       validatedAt: now.toISOString(),
     });
-    expect(result.offlinePreparation).toMatchObject({
-      plan: { id: 'plan-a' },
-      workoutIds: [],
+    expect(result.offlinePreparations[0]?.workoutIds).toEqual([]);
+  });
+
+  it('requires a temporary catalog choice when several plans are active', async () => {
+    const createActive = (catalogEntryId: string, planId: string) => ({
+      catalogEntryId,
+      ownerPersonId: 'person-a',
+      plan: {
+        createdAt: now.toISOString(),
+        description: '',
+        id: planId,
+        name: planId,
+        ownerPersonId: 'person-a',
+        updatedAt: now.toISOString(),
+        version: 1,
+        workouts: [],
+      },
+      source: 'owned' as const,
+    });
+    const service = createService([
+      createActive('catalog-a', 'plan-a'),
+      createActive('catalog-b', 'plan-b'),
+    ]);
+
+    const chooser = await service.overview('person-a');
+    expect(chooser.availablePlans).toHaveLength(2);
+    expect(chooser.plan).toBeNull();
+    expect(chooser.workouts).toEqual([]);
+    await expect(
+      service.overview('person-a', 'catalog-b'),
+    ).resolves.toMatchObject({
+      plan: { catalogEntryId: 'catalog-b', id: 'plan-b' },
     });
   });
 

@@ -234,7 +234,19 @@ public final class OfflineStoragePlugin extends Plugin {
 
     @PluginMethod
     public void getPreparedPlan(PluginCall call) {
-        resolveAggregate(call, service::getPreparedPlan);
+        resolveAggregate(call, () -> service.getPreparedPlan(requiredString(call, "planId")));
+    }
+
+    @PluginMethod
+    public void listPreparedPlans(PluginCall call) {
+        resolve(call, () -> {
+            List<StoredAggregate> plans = service.listPreparedPlans();
+            JSArray array = new JSArray();
+            for (StoredAggregate plan : plans) array.put(aggregateToJson(plan));
+            JSObject result = new JSObject();
+            result.put("aggregates", array);
+            return result;
+        });
     }
 
     @PluginMethod

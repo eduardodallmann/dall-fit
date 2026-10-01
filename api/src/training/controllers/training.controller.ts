@@ -10,6 +10,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -42,6 +43,7 @@ import {
   StartTrainingTimerDto,
   TrainingExerciseParamsDto,
   TrainingLoadDto,
+  TrainingPlanChoiceQueryDto,
   TrainingSeriesParamsDto,
   TrainingWorkoutParamsDto,
   WorkoutExecutionParamsDto,
@@ -58,9 +60,10 @@ export class TrainingController {
   @Header('Cache-Control', 'private, no-store')
   async overview(
     @CurrentPerson() person: PersonEntity,
+    @Query() query: TrainingPlanChoiceQueryDto,
   ): Promise<TrainingOverviewResponse> {
     this.logParams('overview', { personId: person.id });
-    const result = await this.command.overview(person.id);
+    const result = await this.command.overview(person.id, query.catalogEntryId);
     this.logReturn('overview', { workoutCount: result.data.workouts.length });
     return result;
   }
@@ -70,12 +73,17 @@ export class TrainingController {
   async preview(
     @CurrentPerson() person: PersonEntity,
     @Param() params: TrainingWorkoutParamsDto,
+    @Query() query: TrainingPlanChoiceQueryDto,
   ): Promise<TrainingWorkoutPreviewResponse> {
     this.logParams('preview', {
       personId: person.id,
       workoutId: params.workoutId,
     });
-    const result = await this.command.preview(person.id, params.workoutId);
+    const result = await this.command.preview(
+      person.id,
+      params.workoutId,
+      query.catalogEntryId,
+    );
     this.logReturn('preview', { exerciseCount: result.data.exercises.length });
     return result;
   }
@@ -86,6 +94,7 @@ export class TrainingController {
   async start(
     @CurrentPerson() person: PersonEntity,
     @Param() params: TrainingWorkoutParamsDto,
+    @Query() query: TrainingPlanChoiceQueryDto,
     @Body() _body: EmptyTrainingDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<TrainingSessionResponse> {
@@ -93,7 +102,11 @@ export class TrainingController {
       personId: person.id,
       workoutId: params.workoutId,
     });
-    const result = await this.command.start(person.id, params.workoutId);
+    const result = await this.command.start(
+      person.id,
+      params.workoutId,
+      query.catalogEntryId,
+    );
     this.setVersion(response, result.data.version);
     this.logReturn('start', { version: result.data.version });
     return result;

@@ -284,7 +284,7 @@ describe('Offline training lease (e2e)', () => {
       },
     ]);
     if (active) {
-      await activeModel.create({ catalogEntryId: firstEntryId, personId });
+      await activeModel.create({ catalogEntryIds: [firstEntryId], personId });
     }
   }
 
@@ -409,7 +409,7 @@ describe('Offline training lease (e2e)', () => {
     expect(JSON.stringify(repeated.body)).not.toContain(installationA);
   });
 
-  it('rebinds the same installation to a newly active plan with a new fence', async () => {
+  it('keeps the installation lease when the active plan collection changes', async () => {
     await seedPlans();
     const token = await nativeToken();
     const first = await request(app.getHttpServer())
@@ -419,7 +419,7 @@ describe('Offline training lease (e2e)', () => {
       .expect(200);
     await activeModel.updateOne(
       { personId },
-      { $set: { catalogEntryId: secondEntryId } },
+      { $addToSet: { catalogEntryIds: secondEntryId } },
     );
 
     const rebound = await request(app.getHttpServer())
@@ -430,17 +430,15 @@ describe('Offline training lease (e2e)', () => {
     const firstBody = first.body as LeaseResponseBody;
     const reboundBody = rebound.body as LeaseResponseBody;
 
-    expect(reboundBody.data.state).toBe('plan-rebound');
-    expect(reboundBody.data.planId).toBe(secondPlanId.toString());
-    expect(reboundBody.data.leaseId).not.toBe(firstBody.data.leaseId);
+    expect(reboundBody.data.state).toBe('unchanged');
+    expect(reboundBody.data.leaseId).toBe(firstBody.data.leaseId);
     await expect(
       leases.validate({
         installationId: installationA,
         leaseId: firstBody.data.leaseId,
         personId: personId.toString(),
-        planId: firstPlanId.toString(),
       }),
-    ).rejects.toBeInstanceOf(OfflineTrainingLeaseRevokedError);
+    ).resolves.toMatchObject({ leaseId: firstBody.data.leaseId });
   });
 
   it('requires takeover for another installation and makes takeover retry idempotent', async () => {
@@ -525,7 +523,6 @@ describe('Offline training lease (e2e)', () => {
       installationId: installationA,
       leaseId: body.data.leaseId,
       personId: personId.toString(),
-      planId: firstPlanId.toString(),
     };
     await redisClient.pexpire(leaseKey(), 10_000);
     const beforeValidation = await redisClient.pttl(leaseKey());

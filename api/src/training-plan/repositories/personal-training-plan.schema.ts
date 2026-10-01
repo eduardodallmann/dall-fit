@@ -77,8 +77,11 @@ export class PersonalTrainingPlanActiveDocument {
   @Prop({ required: true, type: MongooseSchema.Types.ObjectId, unique: true })
   personId!: Types.ObjectId;
 
-  @Prop({ required: true, type: MongooseSchema.Types.ObjectId })
-  catalogEntryId!: Types.ObjectId;
+  @Prop({ default: undefined, type: MongooseSchema.Types.ObjectId })
+  catalogEntryId?: Types.ObjectId;
+
+  @Prop({ default: [], type: [MongooseSchema.Types.ObjectId] })
+  catalogEntryIds!: Types.ObjectId[];
 
   createdAt!: Date;
   updatedAt!: Date;
@@ -87,7 +90,7 @@ export class PersonalTrainingPlanActiveDocument {
 export const PersonalTrainingPlanActiveSchema = SchemaFactory.createForClass(
   PersonalTrainingPlanActiveDocument,
 );
-PersonalTrainingPlanActiveSchema.index({ catalogEntryId: 1 });
+PersonalTrainingPlanActiveSchema.index({ catalogEntryIds: 1 });
 
 @Schema({
   collection: 'training_plan_clone_jobs',
