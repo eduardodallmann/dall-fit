@@ -31,20 +31,20 @@
     "typecheck": "pnpm -C packages/types build && pnpm -C api typecheck && pnpm -C workflow typecheck && pnpm -C ui typecheck"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^9.39.5",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9.39.4",
+    "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-prettier": "^5.5.7",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "eslint-plugin-sonarjs": "^4.2.0",
-    "globals": "^17.7.0",
-    "prettier": "^3.9.6",
-    "sonarqube-scanner": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "sonarqube-scanner": "^5.0.2",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.65.0"
+    "typescript-eslint": "^8.72.0"
   }
 }

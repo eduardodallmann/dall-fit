@@ -32,8 +32,8 @@ em adapters atrás de contratos exclusivos do cliente.
 ## Decisão
 
 Adotar a alternativa C com Capacitor 8. O projeto `ui/android/` é código-fonte
-versionado, usa o identificador `com.dallfit.app`, mínimo API 29 e preserva as
-demais versões do template oficial adotado. O caminho de produção sempre gera o
+versionado, usa o identificador `com.dallfit.app`, mínimo API 29 e mantém versões
+compatíveis com o template oficial e os plugins adotados. O caminho de produção sempre gera o
 bundle Vite local antes de sincronizá-lo; não existe `server.url`, JavaScript
 remoto ou live update no default de produção.
 

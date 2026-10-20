@@ -42,8 +42,8 @@ O cliente HTTP, services, hooks e componentes usados em produção permanecem re
 somente a resposta da fronteira de rede é interceptada.
 
 A única exceção técnica é a navegação top-level de
-`GET /api/auth/google`: service workers não interceptam essa navegação como uma
-request Axios. O Vite, já controlado pelo `webServer` do Playwright e somente com
+`GET /api/auth/google`: o handler MSW delega explicitamente essa navegação na mesma
+origem ao middleware Vite. O Vite, já controlado pelo `webServer` do Playwright e somente com
 mocks habilitados, responde `302 /dash` em sucesso ou
 `302 /?authError=oauth_failed` no cenário de erro recuperável. Os cookies fictícios
 de sessão/resultado seguem

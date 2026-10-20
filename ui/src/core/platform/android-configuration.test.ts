@@ -40,17 +40,17 @@ describe('Android workspace configuration', () => {
   it('keeps Capacitor packages aligned and Android at API 29', () => {
     const uiPackage = parsePackage(uiPackageSource);
 
-    expect(uiPackage.dependencies?.['@capacitor/android']).toBe('8.5.2');
-    expect(uiPackage.dependencies?.['@capacitor/core']).toBe('8.5.2');
+    expect(uiPackage.dependencies?.['@capacitor/android']).toBe('8.5.3');
+    expect(uiPackage.dependencies?.['@capacitor/core']).toBe('8.5.3');
     expect(
       uiPackage.dependencies?.['@capawesome/capacitor-google-sign-in'],
     ).toBe('0.1.4');
     expect(
       uiPackage.dependencies?.['@aparajita/capacitor-secure-storage'],
-    ).toBe('8.0.0');
-    expect(uiPackage.devDependencies?.['@capacitor/cli']).toBe('8.5.2');
+    ).toBe('8.0.1');
+    expect(uiPackage.devDependencies?.['@capacitor/cli']).toBe('8.5.3');
     expect(androidVariables).toMatch(/minSdkVersion\s*=\s*29/);
-    expect(androidVariables).toMatch(/compileSdkVersion\s*=\s*36/);
+    expect(androidVariables).toMatch(/compileSdkVersion\s*=\s*37/);
     expect(androidVariables).toMatch(/targetSdkVersion\s*=\s*36/);
   });
 
@@ -196,7 +196,7 @@ describe('Android workspace configuration', () => {
   });
 
   it('configures persistent best-effort sync without a foreground service', () => {
-    expect(androidVariables).toMatch(/androidxWorkVersion\s*=\s*'2\.11\.2'/);
+    expect(androidVariables).toMatch(/androidxWorkVersion\s*=\s*'2\.12\.0'/);
     expect(androidAppBuild).toContain(
       'implementation "androidx.work:work-runtime:$androidxWorkVersion"',
     );

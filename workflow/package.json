@@ -18,19 +18,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vercel/blob": "2.7.0",
+    "@vercel/blob": "2.8.2",
     "consola": "3.4.2",
     "h3": "1.15.11",
-    "mongodb": "7.5.0",
-    "nitropack": "2.13.4",
-    "workflow": "4.8.4"
+    "mongodb": "7.7.0",
+    "nitropack": "2.13.5",
+    "workflow": "5.2.2"
   },
   "devDependencies": {
-    "@types/node": "26.1.1",
-    "@vitest/coverage-v8": "4.1.10",
-    "@workflow/vitest": "4.0.20",
+    "@types/node": "26.6.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "@workflow/vitest": "5.0.5",
     "typescript": "6.0.3",
-    "vite": "8.1.5",
-    "vitest": "4.1.10"
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
   }
 }

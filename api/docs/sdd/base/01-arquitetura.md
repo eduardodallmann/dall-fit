@@ -2,7 +2,7 @@
 
 ## Stack
 
-A API usa NestJS 11, TypeScript, Node.js, Mongoose para MongoDB, ioredis para
+A API usa NestJS 12, TypeScript, Node.js, Mongoose para MongoDB, ioredis para
 Redis e Terminus para probes operacionais. `@nestjs/config` carrega o ambiente e uma função baseada em Zod valida e
 tipa seus valores antes do bootstrap. O entrypoint é
 `src/main.ts`, a composição raiz está em `src/app.module.ts` e funcionalidades

@@ -1,3 +1,4 @@
+import { createMemoryHistory } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,15 +16,21 @@ vi.mock('@vercel/analytics/react', () => ({
 }));
 
 describe('App', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.stubEnv('VITE_ENABLE_API_MOCKS', 'true');
     analyticsMock.mockClear();
     queryClient.clear();
-    window.history.replaceState({}, '', '/?mockAuth=unauthenticated');
-    await router.navigate({ to: '/', search: { mockAuth: 'unauthenticated' } });
   });
 
   it('resolves the public root route inside the application providers', async () => {
+    router.update({
+      context: { queryClient },
+      history: createMemoryHistory({
+        initialEntries: ['/?mockAuth=unauthenticated'],
+      }),
+    });
+    await router.load();
+
     render(
       <AppProviders>
         <App />
@@ -55,7 +62,6 @@ describe('App', () => {
   });
 
   afterEach(() => {
-    router.cancelMatches();
     vi.unstubAllEnvs();
   });
 });

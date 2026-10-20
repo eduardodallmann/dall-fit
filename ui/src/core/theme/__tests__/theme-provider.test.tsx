@@ -4,7 +4,8 @@ import { Toast } from '@heroui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
+import { delay } from 'msw/utils/delay';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Person } from '@dall-fit/types';
@@ -218,7 +219,9 @@ describe('ThemeProvider', () => {
     );
 
     await screen.findByText('Não foi possível salvar o tema. Tente novamente.');
-    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    });
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 });

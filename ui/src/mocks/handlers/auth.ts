@@ -1,4 +1,6 @@
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
+import { delay } from 'msw/utils/delay';
+import { passthrough } from 'msw/utils/passthrough';
 
 import type { Person, Theme } from '@dall-fit/types';
 
@@ -161,6 +163,14 @@ export const authHandlers = [
     () => new HttpResponse(null, createMockResponseInit({ status: 204 })),
   ),
   http.get('*/auth/google', ({ request }) => {
+    const url = new URL(request.url);
+    if (
+      typeof location !== 'undefined' &&
+      url.origin === location.origin &&
+      url.pathname === '/api/auth/google'
+    )
+      return passthrough();
+
     const destination = new URL('/dash', request.url).toString();
     const result = new HttpResponse(
       null,

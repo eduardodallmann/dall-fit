@@ -1,4 +1,4 @@
-import { sse, type ServerSentEventMessage } from 'msw';
+import { sse, type ServerSentEventMessage } from 'msw/sse';
 
 import type {
   RealtimeResourceInvalidation,

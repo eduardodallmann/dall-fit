@@ -394,7 +394,7 @@ function assertCurrentNavigation(isCurrent: () => boolean): void {
 function normalizeAuthReturnTo(href: string): string | undefined {
   const url = parseAuthReturnUrl(href);
   if (url === undefined) return undefined;
-  const { foundRoute, matchedRoutes, routeParams } = router.getMatchedRoutes(
+  const [matchedRoutes, routeParams, foundRoute] = router.getMatchedRoutes(
     url.pathname,
   );
   if (

@@ -38,7 +38,7 @@ catálogo pessoal e executa cópias por um projeto Nitro com Vercel Workflow.
 - guardar jobs e snapshots imutáveis em `training_plan_clone_jobs`;
 - persistir o job antes de a API iniciar o Workflow por HTTPS/HMAC v1;
 - implantar `workflow/` como Related Project Vercel separado, com Nitro 2 e
-  Workflow 4 estáveis, acesso direto ao MongoDB e Blob privado por OIDC;
+  Workflow 5 estáveis, acesso direto ao MongoDB e Blob privado por OIDC;
 - copiar no máximo três imagens por decisão, duas variantes em paralelo, confirmar
   progresso por imagem e materializar plano+catálogo somente após todas as cópias;
 - usar IDs e pathnames determinísticos, lease de início, geração e updates

@@ -44,8 +44,8 @@ pnpm -C api dev:infra
 
 O projeto Android Capacitor é versionado em `ui/android/`, mas não participa de
 `pnpm dev`, `pnpm build` nem dos gates web. Para trabalhar nele, instalar Node 24,
-pnpm, Android Studio 2025.2.1 ou mais recente e os Android SDK Tools com a platform
-API 36; o JDK adequado é instalado e administrado pelo Android Studio. O produto
+pnpm, Android Studio compatível com Android Gradle Plugin 9.4 e os Android SDK Tools
+com a platform API 37; o JDK 21 pode ser administrado pelo Android Studio. O produto
 suporta dispositivos a partir da API 29.
 
 Os comandos canônicos, executados na raiz, são:
@@ -66,7 +66,7 @@ nenhum client secret ou `google-services.json` pertence ao repositório. Sessão
 UUID e dados privados são excluídos tanto de Auto Backup quanto de transferência
 entre dispositivos pelas regras versionadas do projeto Android.
 
-O Android usa `androidx.work:work-runtime` `2.11.2` para sincronização persistente
+O Android usa `androidx.work:work-runtime` `2.12.0` para sincronização persistente
 best-effort. Cada snapshot pendente agenda um unique one-time work global da fila,
 e um unique periodic work de seis horas funciona como contingência. Ambos exigem
 somente conectividade disponível, não usam modo expedited nem Foreground Service e

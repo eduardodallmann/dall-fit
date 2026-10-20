@@ -1,5 +1,6 @@
 import { createMemoryHistory } from '@tanstack/react-router';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
+import { delay } from 'msw/utils/delay';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authReturnTo } from '~/auth/auth-return-to';
@@ -27,7 +28,6 @@ beforeEach(async () => {
   await router.load();
 });
 afterEach(() => {
-  router.cancelMatches();
   queryClient.clear();
   vi.unstubAllEnvs();
 });

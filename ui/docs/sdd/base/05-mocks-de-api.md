@@ -42,6 +42,11 @@ src/mocks/
 Browser e testes consomem a mesma lista de handlers para evitar contratos
 divergentes.
 
+MSW 3 importa handlers HTTP de `msw/http`, SSE de `msw/sse` e latência de
+`msw/utils/delay`. O setup Vitest seleciona o adapter Fetch real da mesma instância
+Axios para compatibilidade com a interceptação Node no JSDOM. O navegador mantém
+a seleção padrão do Axios, exercitada pelos integrados Playwright.
+
 ## Ativação no desenvolvimento
 
 Mocks são opt-in. Quando implementados, a variável será:
@@ -110,7 +115,7 @@ desenvolvimento que não seja enviado em produção.
 ## Requests sem handler
 
 Nos testes, qualquer request não reconhecida encerra o teste com erro por meio de
-`onUnhandledRequest: 'error'`.
+`onUnhandledFrame: 'error'`.
 
 No navegador, a lista de handlers termina com uma proteção para a URL base da API.
 Uma operação sem handler explícito recebe `501` com um erro estável como
@@ -123,7 +128,7 @@ O handler de proteção sempre fica por último.
 `tests/setup.ts` deverá:
 
 1. iniciar `mockServer` antes da suíte;
-2. usar `onUnhandledRequest: 'error'`;
+2. usar `onUnhandledFrame: 'error'`;
 3. restaurar handlers sobrescritos após cada teste;
 4. limpar estados mutáveis mantidos pelos handlers após cada teste;
 5. encerrar o servidor após a suíte.
@@ -175,9 +180,10 @@ Erros do frontend são documentados na rota; contratos HTTP permanecem no SDD da
 ## Estado de adoção
 
 MSW foi adotado com autenticação. Os handlers vigentes cobrem pessoa atual, CSRF,
-logout e mutações. A navegação de documento `GET /api/auth/google`, que não passa
-pelo `fetch` interceptável do Service Worker, usa no Playwright um middleware
-exclusivo do Vite que responde redirect fictício para `/dash`. No modo mock, a
+logout e mutações. A navegação de documento `GET /api/auth/google` na mesma origem
+é repassada explicitamente pelo handler MSW ao middleware exclusivo do Vite, que
+responde redirect fictício para `/dash`. Outros requests continuam interceptados.
+No modo mock, a
 query exclusiva `mockAuth` faz o
 client enviar `x-dall-fit-mock-auth` com o cenário selecionado; o header nunca é
 enviado quando mocks estão desabilitados e não pertence ao contrato da API.

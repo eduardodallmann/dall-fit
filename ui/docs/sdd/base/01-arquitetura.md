@@ -228,8 +228,11 @@ em testes. Componentes, hooks e rotas acessam apenas `PlatformContext` e
 `ui/src`, exceto em `src/core/platform/native/`. Novas capacidades adicionam seu
 port e adapter somente quando possuírem comportamento e consumidor reais.
 
-O template Capacitor 8.5.2 conserva compile/target SDK 36, Android Gradle Plugin
-8.13.0 e Gradle Wrapper 8.14.3. Apenas `minSdkVersion` é elevado para 29. Assets
+O projeto usa Capacitor 8.5.3, compile SDK 37, target SDK 36, Android Gradle Plugin
+9.4.1 e Gradle Wrapper 9.8.2 com JDK 21. O `minSdkVersion` permanece em 29; as
+bibliotecas AndroidX são selecionadas pela compatibilidade com essa stack e os
+plugins. A stdlib Kotlin e suas variantes JDK 7/8 ficam alinhadas em 2.4.21, e a
+bridge Cordova usa 15.1.0. Assets
 web copiados, configuração gerada, caches e outputs Gradle não são versionados;
 configuração, wrapper e código nativo necessários para reproduzir o build são.
 Depois de `assembleDebug` concluir, o comando `pnpm android:build:debug` move o
@@ -654,7 +657,7 @@ o erro é anunciado pelo toast global.
 
 ## Progressive Web App
 
-O build de produção usa `vite-plugin-pwa` 1.3 com a estratégia `generateSW`. O
+O build de produção usa `vite-plugin-pwa` 2 com a estratégia `generateSW`. O
 manifest identifica a aplicação como `Dall Fit`, inicia em `/dash`, possui escopo
 raiz e usa apresentação `standalone`. `public/favicon.svg` é a fonte vetorial
 canônica do símbolo azul-claro Dall Fit (`#21B9E5`). Os demais ícones versionados

@@ -36,6 +36,7 @@ import {
 import { OfflineTrainingTerminalReceiptDocument } from '~/training/repositories/offline-training-terminal-receipt.schema';
 import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 import { OfflineTrainingLeaseService } from '~/training/services/offline-training-lease.service';
+import { TrainingClockService } from '~/training/services/training-clock.service';
 
 const googleCredential = Buffer.from(
   JSON.stringify({
@@ -530,6 +531,9 @@ describe('Offline training lease (e2e)', () => {
     const afterValidation = await redisClient.pttl(leaseKey());
     expect(afterValidation).toBeLessThanOrEqual(beforeValidation);
 
+    vi.spyOn(app.get(TrainingClockService), 'now').mockReturnValueOnce(
+      new Date(Date.now() + 1_000),
+    );
     const renewed = await leases.renewAfterAcceptedSync(identity);
     expect(renewed.expiresAt).not.toBe(body.data.expiresAt);
     expect(await redisClient.pttl(leaseKey())).toBeGreaterThan(604_790_000);

@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw/http';
 
 import { appCompatibilityHandlers } from '~/mocks/handlers/app-compatibility';
 import { authHandlers } from '~/mocks/handlers/auth';

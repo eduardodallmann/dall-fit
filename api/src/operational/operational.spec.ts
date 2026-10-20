@@ -1,4 +1,8 @@
-import type { HealthCheckResult, HealthCheckService } from '@nestjs/terminus';
+import type {
+  HealthCheckResult,
+  HealthCheckService,
+  HealthIndicatorService,
+} from '@nestjs/terminus';
 import type { Connection } from 'mongoose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -84,7 +88,7 @@ describe('MongoHealthIndicator', () => {
     command.mockResolvedValue({ ok: 1 });
     indicator = new MongoHealthIndicator(
       connection as unknown as Connection,
-      healthIndicatorService,
+      healthIndicatorService as unknown as HealthIndicatorService,
     );
   });
 
@@ -103,7 +107,7 @@ describe('MongoHealthIndicator', () => {
   it('marks MongoDB as down when the connection has no database', async () => {
     indicator = new MongoHealthIndicator(
       { db: undefined } as unknown as Connection,
-      healthIndicatorService,
+      healthIndicatorService as unknown as HealthIndicatorService,
     );
 
     await expect(indicator.check()).resolves.toEqual({
@@ -159,7 +163,7 @@ describe('RedisHealthIndicator', () => {
     redisClientService.ping.mockResolvedValue(undefined);
     indicator = new RedisHealthIndicator(
       redisClientService as unknown as RedisClientService,
-      healthIndicatorService,
+      healthIndicatorService as unknown as HealthIndicatorService,
     );
   });
 

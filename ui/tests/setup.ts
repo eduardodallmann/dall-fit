@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 
 import { authReturnTo } from '~/auth/auth-return-to';
 import { resetSessionLifecycleForTests } from '~/auth/session-lifecycle';
+import { apiClient } from '~/core/http/api-client';
 import { resetAuthScenarioStates } from '~/mocks/handlers/auth';
 import { resetDashboardScenarioStates } from '~/mocks/handlers/dashboard';
 import { resetTrainingScenarioStates } from '~/mocks/handlers/training';
@@ -14,7 +15,8 @@ import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans
 import { mockServer } from '~/mocks/server';
 
 beforeAll(() => {
-  mockServer.listen({ onUnhandledRequest: 'error' });
+  apiClient.defaults.adapter = 'fetch';
+  mockServer.listen({ onUnhandledFrame: 'error' });
 });
 
 afterEach(() => {

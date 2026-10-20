@@ -57,7 +57,7 @@ export async function bootstrap() {
       import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
     ) {
       const { mockWorker } = await import('~/mocks/browser');
-      await mockWorker.start({ onUnhandledRequest: 'bypass' });
+      await mockWorker.start({ onUnhandledFrame: 'bypass' });
     }
 
     root.render(
