@@ -1,7 +1,7 @@
 # Arquitetura do Workflow
 
 `dall-fit-workflow` é uma aplicação Node/Nitro 2 independente, empacotada com o
-preset `vercel` e integrada ao Vercel Workflow 4 por `workflow/nitro`. Em produção
+preset `vercel` e integrada ao Vercel Workflow 5 por `workflow/nitro`. Em produção
 ela é um Related Project do mesmo monorepo, com deploy e rollback próprios.
 
 O handler Nitro valida transporte, chama um command e responde. O command reserva

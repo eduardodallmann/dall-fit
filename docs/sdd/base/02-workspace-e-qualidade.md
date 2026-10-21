@@ -12,6 +12,21 @@ Dependências compartilhadas por tooling transversal, como ESLint e Prettier, fi
 na raiz. Dependências necessárias para executar ou testar uma aplicação permanecem
 no `package.json` dessa aplicação.
 
+O workspace mantém overrides restritos a consumidores e versões concretos:
+
+- `@workflow/core@5.2.2>nanoid` usa `5.1.16`, corrigindo os advisories
+  `GHSA-28wg-ghj8-5hjv` e `GHSA-xwg4-73v4-xw9w` sem promover o Nano ID para
+  outra major nem alterar o `nanoid` 3 usado pelo tooling. A compatibilidade é
+  validada pelos testes da runtime oficial e pelo build Nitro do Workflow;
+- `xcode@3.0.1>uuid` usa `11.1.1`, corrigindo `GHSA-w5hq-g745-h8pq` no tooling
+  do Capacitor. Essa linha conserva CommonJS e a API `v4()` consumida pelo parser;
+  versões a partir de 12 não suportam CommonJS. Os testes da UI verificam
+  carregamento sem `require(esm)` e geração/serialização de um projeto em memória.
+
+Esses overrides devem ser reavaliados ao atualizar os pacotes proprietários e
+removidos quando eles não exigirem mais as versões vulneráveis. Os alertas da
+auditoria não são suprimidos.
+
 ## Desenvolvimento local
 
 O comando abaixo, executado na raiz, inicia API, Workflow e UI simultaneamente:

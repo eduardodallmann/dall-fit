@@ -4,6 +4,10 @@ packages:
   - workflow
   - packages/*
 
+overrides:
+  '@workflow/core@5.2.2>nanoid': 5.1.16
+  'xcode@3.0.1>uuid': 11.1.1
+
 allowBuilds:
   '@swc/core': true
   cbor-extract: true

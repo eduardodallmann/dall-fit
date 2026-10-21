@@ -153,6 +153,12 @@ imutabilidade do snapshot. Testes de configuração verificam identidade do app,
 comprova que imports `@capacitor/*` falham fora de `core/platform/native` e são
 aceitos dentro da fronteira.
 
+O script `test` executa também os contratos de dependências do tooling em
+`tests/dependency-compatibility.test.mjs`. Eles carregam o parser Xcode do
+Capacitor sem `require(esm)` e validam geração de IDs e serialização em memória
+para proteger o override de UUID documentado no SDD do workspace. Esses testes
+não executam Xcode nem representam um build iOS.
+
 A autenticação Android acrescenta testes de inicialização/cancelamento do Google,
 envelope versionado e UUID, isolamento entre mesma conta e conta diferente, falha
 de limpeza, expiração, logout local independente da revogação remota, Bearer sem
