@@ -11,6 +11,39 @@ futuras devem ser organizadas em módulos por domínio.
 O servidor HTTP usa a porta `4000` por padrão e aceita requests da origem da UI em
 `http://localhost:3000`. Ambos os valores são configuráveis por ambiente.
 
+## Runtime e build de produção
+
+O `engines.node` de `api/package.json` exige Node.js `24.x`, alinhado ao `.nvmrc`
+usado no desenvolvimento e no CI. Na Vercel, essa declaração seleciona a major do
+runtime independentemente da versão previamente escolhida no dashboard. O projeto
+Vercel da API usa `api/` como Root Directory e a integração NestJS detecta
+`src/main.ts` sem um handler HTTP paralelo.
+
+O build Nest mantém a saída CommonJS e resolve os aliases internos. O entrypoint
+gerado é `dist/src/main.js`, também usado por `pnpm -C api start:prod` depois do
+build. Os pacotes NestJS 12 são ESM; o consumo dessa saída CommonJS depende do
+suporte `require(esm)` do Node, não de imports dinâmicos inseridos manualmente no
+código da aplicação.
+
+Runtimes Lambda podem desabilitar esse suporte mesmo no Node 24. Por isso, no
+painel do projeto da API na Vercel, em **Settings → Environment Variables**,
+configurar `NODE_OPTIONS=--experimental-require-module` para **Production** e
+**Preview**. A opção é administrada no painel, sem depender de um arquivo de
+configuração de deploy versionado. Se `NODE_OPTIONS` já contiver outras opções,
+acrescentar essa flag sem substituí-las.
+
+Essa opção precisa existir antes da inicialização do processo; defini-la somente
+no comando de build, em `process.env` no bootstrap ou no `.env` carregado pelo Nest
+é tarde demais. Alterações exigem novo deployment; não corrigem funções já
+publicadas.
+
+A configuração segue o
+[guia de migração do NestJS 12](https://docs.nestjs.com/migration-guide#nodejs-requirements),
+a [configuração de runtime da Vercel](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions)
+e o [opt-in documentado pelo Lambda](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html#nodejs-experimental-features).
+O smoke do artefato compilado pertence aos E2E descritos em
+[`03-testes-e-qualidade.md`](03-testes-e-qualidade.md).
+
 ## Tempo real transversal
 
 `RealtimeModule` oferece stream SSE autenticado e publicação genérica de

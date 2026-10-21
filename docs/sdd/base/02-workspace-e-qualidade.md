@@ -250,6 +250,10 @@ API e UI usam Vitest, mas mantêm ambientes e configurações independentes:
 - E2E do backend permanece em comando próprio e usa MongoDB e Redis efêmeros,
   iniciados sem Docker;
 - E2E do backend sempre executam de forma serial;
+- o comando E2E do backend recompila a API e valida também o bootstrap do
+  artefato CommonJS em processo Node separado, com opções de runtime da Vercel e
+  bancos efêmeros; detalhes pertencem ao
+  [SDD de qualidade da API](../../../api/docs/sdd/base/03-testes-e-qualidade.md#bootstrap-do-artefato-de-produção);
 - o Workflow possui unitários Vitest, teste de runtime com `@workflow/vitest` e
   build Nitro `vercel` que confirma a descoberta de workflows e steps;
 - no backend, não existe nível, pasta ou comando `test:integration`.

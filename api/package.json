@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "build": "nest build",
     "configure:google-oauth": "node ./scripts/configure-google-oauth.mjs",
@@ -16,7 +19,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "seed": "tsx test/seeds/cli.ts",
     "seed:assistant-globals": "tsx scripts/seed-assistant-global-training-plans.ts",
     "lint": "pnpm --dir .. exec eslint api",
@@ -27,7 +30,7 @@
     "test:coverage": "vitest run --coverage",
     "test:coverage:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=coverage/junit.xml",
     "test:debug": "vitest --inspect-brk --inspect --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "test:e2e": "pnpm build && vitest run --config ./vitest.config.e2e.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
