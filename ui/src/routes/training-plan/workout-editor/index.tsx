@@ -56,17 +56,25 @@ import {
 
 import type {
   Exercise,
+  ExerciseLibrarySelection,
   ExerciseType,
   TrainingPlanWorkoutDetails,
   UpdateExerciseRequest,
 } from '@dall-fit/types';
 
+import {
+  getActiveSessionGeneration,
+  isSessionGenerationActive,
+} from '~/auth/session-lifecycle';
 import { trackUiEvent, type AnalyticsControl } from '~/core/analytics';
 import { isExpectedCancellation } from '~/core/http/http-error';
 import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
+import { ExerciseLibrary } from '~/routes/training-plan/exercise-library';
 import {
+  copyTrainingPlanExercises,
   createTrainingPlanExercise,
   deleteTrainingPlanExercise,
+  getTrainingPlanWorkout,
   removeTrainingPlanExerciseImage,
   reorderTrainingPlanExercises,
   updateTrainingPlanExercise,
@@ -75,6 +83,7 @@ import {
   type MockTrainingPlansScenario,
   type TrainingPlanResource,
 } from '~/routes/training-plan/training-plan-service';
+import { trainingKeys } from '~/routes/training/training-queries';
 
 import {
   createEditorExercise,
@@ -150,6 +159,7 @@ const dragScreenReaderInstructions: ScreenReaderInstructions = {
 };
 
 type EditorOperation =
+  | 'exercise_copy'
   | 'workout_update'
   | 'exercise_create'
   | 'exercise_update'
@@ -219,6 +229,12 @@ export function WorkoutEditor({
     new Set(),
   );
   const [structuralPending, setStructuralPending] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryDirty, setLibraryDirty] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<string>();
+  const copyPending = useRef(false);
+  const addTriggerRef = useRef<HTMLButtonElement>(null);
+  const recoveryTriggerRef = useRef<HTMLButtonElement>(null);
   const [activeExerciseId, setActiveExerciseId] = useState<string>();
   const dragDirection = useRef(0);
   const focusAfterReorder = useRef<string | undefined>(undefined);
@@ -610,6 +626,139 @@ export function WorkoutEditor({
       .finally(() => setStructuralPending(false));
   };
 
+  const copyExercises = async (
+    selections: readonly ExerciseLibrarySelection[],
+  ) => {
+    const generation = getActiveSessionGeneration();
+    if (copyPending.current || queue.paused)
+      throw new Error('Exercise copy is unavailable.');
+    copyPending.current = true;
+    setStructuralPending(true);
+    trackStarted('exercise_copy', 'copy_exercises');
+    let confirmedVersion = data.version;
+    try {
+      const copied = await queue.enqueue(async (version) => {
+        const result = await copyTrainingPlanExercises(
+          data.trainingPlan.id,
+          data.id,
+          { selections },
+          version,
+          mockScenario,
+        );
+        confirmedVersion = result.version;
+        return result;
+      });
+      if (!isSessionGenerationActive(generation))
+        throw new DOMException('Session ended.', 'AbortError');
+      setItems((current) => [...current, ...copied.map(createEditorExercise)]);
+      synchronizeWorkoutMutation(queryClient, {
+        mockScenario,
+        resource,
+        trainingPlanId: data.trainingPlan.id,
+        workoutId: data.id,
+        version: confirmedVersion,
+        updateWorkout: (workout) => ({
+          ...workout,
+          exercises: [...workout.exercises, ...copied],
+        }),
+        updateDetail: (detail) => ({
+          ...detail,
+          workouts: detail.workouts.map((workout) =>
+            workout.id === data.id
+              ? {
+                  ...workout,
+                  exerciseCount: workout.exerciseCount + copied.length,
+                }
+              : workout,
+          ),
+        }),
+      });
+      void queryClient
+        .invalidateQueries({ queryKey: trainingKeys.all })
+        .catch(() => undefined);
+      trackCompleted('exercise_copy', 'copy_exercises', 'success');
+      trackUiEvent({
+        eventName: 'ui_overlay_closed',
+        overlay: 'exercise_library',
+        reason: 'submit',
+        control: 'copy_exercises',
+        surface: 'workout',
+      });
+      setCopyNotice(
+        `${copied.length} ${copied.length === 1 ? 'exercício copiado' : 'exercícios copiados'}.`,
+      );
+    } catch (error: unknown) {
+      if (
+        isSessionGenerationActive(generation) &&
+        !isExpectedCancellation(error)
+      )
+        trackCompleted('exercise_copy', 'copy_exercises', 'error');
+      throw error;
+    } finally {
+      copyPending.current = false;
+      if (isSessionGenerationActive(generation)) setStructuralPending(false);
+    }
+  };
+
+  const recoverCopy = async () => {
+    const generation = getActiveSessionGeneration();
+    const fresh = await getTrainingPlanWorkout(
+      data.trainingPlan.id,
+      data.id,
+      mockScenario,
+      undefined,
+      resource,
+    );
+    if (!isSessionGenerationActive(generation))
+      throw new DOMException('Session ended.', 'AbortError');
+    await queue.reset(fresh.version);
+    if (!isSessionGenerationActive(generation))
+      throw new DOMException('Session ended.', 'AbortError');
+    clearAllTimers();
+    setItems(() => fresh.exercises.map(createEditorExercise));
+    setWorkoutName(fresh.name);
+    setNameDraft(fresh.name);
+    setNameStatus('idle');
+    setEditingName(false);
+    synchronizeWorkoutMutation(queryClient, {
+      mockScenario,
+      resource,
+      trainingPlanId: data.trainingPlan.id,
+      workoutId: data.id,
+      version: fresh.version,
+      updateWorkout: () => fresh,
+      updateDetail: (detail) => ({
+        ...detail,
+        workouts: detail.workouts.map((workout) =>
+          workout.id === data.id
+            ? { ...workout, exerciseCount: fresh.exercises.length }
+            : workout,
+        ),
+      }),
+    });
+  };
+
+  const closeLibrary = () => {
+    setLibraryOpen(false);
+    setLibraryDirty(false);
+    requestAnimationFrame(() => {
+      const trigger = queue.paused
+        ? recoveryTriggerRef.current
+        : addTriggerRef.current;
+      trigger?.focus();
+    });
+  };
+
+  const openLibrary = () => {
+    setLibraryOpen(true);
+    trackUiEvent({
+      eventName: 'ui_overlay_opened',
+      overlay: 'exercise_library',
+      control: 'copy_exercises',
+      surface: 'workout',
+    });
+  };
+
   const deleteExercise = (exerciseId: string) => {
     if (structuralPending || queue.paused) return;
     const index = itemsRef.current.findIndex(
@@ -923,6 +1072,7 @@ export function WorkoutEditor({
   };
 
   const hasUnsavedWork =
+    libraryDirty ||
     structuralPending ||
     queue.isPending ||
     nameStatus !== 'idle' ||
@@ -1037,6 +1187,20 @@ export function WorkoutEditor({
       <header className={styles.exerciseHeader()}>
         <h2 className={styles.sectionTitle()}>Exercícios</h2>
       </header>
+      {resource === 'personal' && queue.paused && !libraryOpen ? (
+        <Button
+          onPress={openLibrary}
+          ref={recoveryTriggerRef}
+          variant="secondary"
+        >
+          Revisar treino antes de continuar
+        </Button>
+      ) : null}
+      {copyNotice === undefined ? null : (
+        <p className={styles.status()} role="status">
+          {copyNotice}
+        </p>
+      )}
       <DndContext
         accessibility={{
           announcements: dragAnnouncements,
@@ -1098,6 +1262,7 @@ export function WorkoutEditor({
         <Separator className={styles.addSeparator()} />
         <Dropdown>
           <Dropdown.Trigger
+            ref={addTriggerRef}
             className={styles.addTrigger()}
             isDisabled={structureDisabled || items.length >= 50}
           >
@@ -1108,8 +1273,25 @@ export function WorkoutEditor({
           <Dropdown.Popover placement="bottom">
             <Dropdown.Menu
               aria-label="Tipo do exercício"
-              items={exerciseTypes}
-              onAction={(key) => addExercise(key as ExerciseType)}
+              items={
+                resource === 'personal'
+                  ? [
+                      ...exerciseTypes,
+                      {
+                        description:
+                          'Escolha exercícios dos modelos disponíveis.',
+                        icon: ListPlus,
+                        id: 'copy',
+                        label: 'Copiar exercícios',
+                      },
+                    ]
+                  : exerciseTypes
+              }
+              onAction={(key) => {
+                if (key === 'copy') {
+                  openLibrary();
+                } else addExercise(key as ExerciseType);
+              }}
             >
               {(item) => {
                 const Icon = item.icon;
@@ -1128,6 +1310,17 @@ export function WorkoutEditor({
         </Dropdown>
         <Separator className={styles.addSeparator()} />
       </div>
+      {libraryOpen ? (
+        <ExerciseLibrary
+          capacity={Math.max(0, 50 - items.length)}
+          mockScenario={mockScenario}
+          onClose={closeLibrary}
+          onCopy={copyExercises}
+          onRecover={recoverCopy}
+          onUnsavedChange={setLibraryDirty}
+          paused={queue.paused}
+        />
+      ) : null}
       {queue.isPending ? (
         <span aria-live="polite" className={styles.srOnly()}>
           Alterações sendo salvas em ordem…

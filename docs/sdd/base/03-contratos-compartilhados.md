@@ -128,6 +128,17 @@ esteja sendo iniciado isoladamente.
 
 ## Planos pessoais e clonagem
 
+`ExerciseLibraryQuery` combina página, busca por nome e área opcional. A coleção
+`ExerciseLibraryResponse` contém até 20 `ExerciseLibraryItem`, cada um com grupo,
+referência de plano/workout/exercício global, versão da origem e `Exercise`
+hidratado. A identidade do grupo é independente de mídia e URL assinada.
+`CopyExercisesRequest` contém somente seleções ordenadas, sem conteúdo ou owner;
+`CopyExercisesResponse` devolve o array criado. O header transporta a versão do
+destino, enquanto cada seleção transporta a versão da origem. API e UI validam
+limite com base no conjunto inteiro, incluindo itens ocultos pelos filtros.
+Contratos e cenários proprietários estão no
+[endpoint de biblioteca](../../../api/docs/sdd/endpoints/exercise-library.md).
+
 O catálogo pessoal usa a união discriminada `PersonalTrainingPlanListItem`:
 
 - `itemType: training-plan` identifica uma entrada `owned` ou

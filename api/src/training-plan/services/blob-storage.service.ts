@@ -7,6 +7,7 @@ import {
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
   BlobUnknownError,
+  copy,
   del,
   head,
   issueSignedToken,
@@ -26,7 +27,8 @@ export type BlobFailureCategory =
   | 'store_suspended'
   | 'unknown';
 
-export type BlobOperation = 'delete' | 'head' | 'list' | 'sign' | 'upload';
+export type BlobOperation =
+  'copy' | 'delete' | 'head' | 'list' | 'sign' | 'upload';
 
 export class BlobStorageOperationError extends Error {
   constructor(
@@ -50,6 +52,48 @@ export interface StoredBlobMetadata {
 @Injectable()
 export class BlobStorageService {
   private readonly logger = new Logger(BlobStorageService.name);
+
+  async copyVariant(
+    source: string,
+    destination: string,
+    signal: AbortSignal,
+    etag?: string,
+  ): Promise<StoredBlob> {
+    this.logger.log('BlobStorageService -> copyVariant -> params:', {
+      params: { variants: 1 },
+    });
+    try {
+      const abortSignal = AbortSignal.any([
+        signal,
+        AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+      ]);
+      const metadata =
+        etag === undefined ? await head(source, { abortSignal }) : { etag };
+      this.logger.log('BlobStorageService -> copyVariant -> metadata return:', {
+        data: { present: true },
+      });
+      const copied = await copy(source, destination, {
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: false,
+        contentType: 'image/webp',
+        cacheControlMaxAge: 31_536_000,
+        ifMatch: metadata.etag,
+        abortSignal,
+      });
+      this.logger.log('BlobStorageService -> copyVariant -> copy return:', {
+        data: { copied: true },
+      });
+      const result = { key: copied.pathname, etag: copied.etag };
+      this.logger.log('BlobStorageService -> copyVariant -> return:', {
+        data: { copied: true },
+      });
+      return result;
+    } catch (error: unknown) {
+      const failure = this.toOperationError('copy', error);
+      throw failure;
+    }
+  }
 
   async upload(pathname: string, content: Buffer): Promise<StoredBlob> {
     this.logger.log('BlobStorageService -> upload -> params:', {
@@ -102,13 +146,20 @@ export class BlobStorageService {
   async createSignedReadUrl(
     pathname: string,
     validUntil: number,
+    signal?: AbortSignal,
   ): Promise<string> {
     this.logger.log('BlobStorageService -> createSignedReadUrl -> params:', {
       params: { operation: 'get', pathnamePresent: pathname.length > 0 },
     });
     try {
       const signedToken = await issueSignedToken({
-        abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+        abortSignal:
+          signal === undefined
+            ? AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS)
+            : AbortSignal.any([
+                signal,
+                AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+              ]),
         operations: ['get'],
         pathname,
         validUntil,

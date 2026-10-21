@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw/http';
 import { delay } from 'msw/utils/delay';
 
 import type {
+  CopyExercisesRequest,
   CreateExerciseRequest,
   CreateTrainingPlanRequest,
   Exercise,
@@ -15,6 +16,7 @@ import type {
   UpdateTrainingPlanRequest,
 } from '@dall-fit/types';
 
+import { exerciseLibraryFixtures } from '~/mocks/fixtures/exercise-library';
 import {
   largeTrainingPlanFixtures,
   trainingPlanCollectionFixture,
@@ -34,6 +36,8 @@ import {
 } from '~/mocks/mock-response';
 
 interface ScenarioState {
+  copyAttempts: number;
+  libraryReadCount: number;
   activeCatalogEntryIds: string[];
   detail: GlobalTrainingPlanDetails;
   plans: TrainingPlanSummary[];
@@ -46,7 +50,7 @@ interface ScenarioState {
 const privateBlobOrigin =
   'https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com';
 
-function signedExerciseImage(status: 'expired' | 'fresh') {
+function signedExerciseImage(status: 'expired' | 'fresh', assetId?: string) {
   const expiresAt =
     status === 'expired'
       ? '2020-01-01T00:00:00.000Z'
@@ -56,9 +60,9 @@ function signedExerciseImage(status: 'expired' | 'fresh') {
     `&vercel-blob-signature=fake-${status}` +
     `&mock-status=${status}`;
   const result = {
-    displayUrl: `${privateBlobOrigin}/exercise-images/display.webp?${query}`,
+    displayUrl: `${privateBlobOrigin}/exercise-images/${assetId === undefined ? '' : `${assetId}-`}display.webp?${query}`,
     signedUrlExpiresAt: expiresAt,
-    thumbnailUrl: `${privateBlobOrigin}/exercise-images/thumbnail.webp?${query}`,
+    thumbnailUrl: `${privateBlobOrigin}/exercise-images/${assetId === undefined ? '' : `${assetId}-`}thumbnail.webp?${query}`,
   };
   return result;
 }
@@ -86,6 +90,8 @@ function getState(scenario: string): ScenarioState {
       (_, index) => `74b0000000000000000000${index + 1}`,
     );
   const result: ScenarioState = {
+    copyAttempts: 0,
+    libraryReadCount: 0,
     activeCatalogEntryIds,
     detail: {
       ...trainingPlanDetailFixture,
@@ -112,6 +118,39 @@ function getState(scenario: string): ScenarioState {
           : workout,
       ),
     };
+  }
+  if (scenario.startsWith('exercise-library')) {
+    result.workout = {
+      ...result.workout,
+      id: '74b000000000000000000101',
+      exercises: [],
+    };
+    result.detail = {
+      ...result.detail,
+      workouts: [
+        { id: result.workout.id, name: result.workout.name, exerciseCount: 0 },
+      ],
+    };
+    if (scenario === 'exercise-library-limit') {
+      result.workout = {
+        ...result.workout,
+        exercises: Array.from({ length: 48 }, (_, index) => ({
+          id: `74b000000000000000000${String(200 + index).padStart(3, '0')}`,
+          type: 'pause' as const,
+          restSeconds: 60,
+        })),
+      };
+      result.detail = {
+        ...result.detail,
+        workouts: [
+          {
+            id: result.workout.id,
+            name: result.workout.name,
+            exerciseCount: 48,
+          },
+        ],
+      };
+    }
   }
   if (scenario === 'clone-running' || scenario === 'clone-failed') {
     const now = new Date().toISOString();
@@ -156,6 +195,8 @@ function getState(scenario: string): ScenarioState {
 registerMockRealtimeReplication(({ scenario, state }) => {
   if (scenario === undefined || state === undefined) return;
   scenarioStates.set(scenario, {
+    copyAttempts: 0,
+    libraryReadCount: 0,
     activeCatalogEntryIds: [],
     cloneJobs: [],
     ...structuredClone(state),
@@ -313,6 +354,158 @@ function defaultExercise(
 }
 
 export const trainingPlanHandlers = [
+  http.get('*/training-plans/exercise-library', async ({ request }) => {
+    const scenario = getScenario(request);
+    const state = getState(scenario);
+    state.libraryReadCount += 1;
+    await delay(100);
+    if (scenario === 'exercise-library-error' && state.libraryReadCount <= 2)
+      return apiError('SERVICE_UNAVAILABLE', 'Library unavailable.', 503);
+    const url = new URL(request.url);
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const normalize = (value: string) =>
+      value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+    const search = normalize(url.searchParams.get('search') ?? '');
+    const area = url.searchParams.get('bodyArea');
+    const fixtures =
+      scenario === 'exercise-library-empty'
+        ? []
+        : exerciseLibraryFixtures(
+            scenario === 'exercise-library-stale' && state.copyAttempts > 0
+              ? 1
+              : 0,
+          );
+    const filtered = fixtures
+      .filter(
+        ({ exercise }) =>
+          normalize(
+            exercise.type === 'pause' ? 'Pausa' : exercise.name,
+          ).includes(search) &&
+          (area === null ||
+            ('bodyArea' in exercise && exercise.bodyArea === area)),
+      )
+      .map((item) =>
+        scenario === 'exercise-library-media' && item.exercise.type === 'image'
+          ? {
+              ...item,
+              exercise: {
+                ...item.exercise,
+                image: signedExerciseImage('fresh'),
+              },
+            }
+          : item,
+      );
+    return HttpResponse.json(
+      {
+        data: filtered.slice((page - 1) * 20, page * 20),
+        page,
+        pageSize: 20,
+        total: filtered.length,
+      },
+      createMockResponseInit({
+        headers: { 'Cache-Control': 'private, no-store' },
+      }),
+    );
+  }),
+  http.post(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/copy',
+    async ({ params, request }) => {
+      const scenario = getScenario(request);
+      const state = getState(scenario);
+      if (params.catalogEntryId === '74b000000000000000000002')
+        return apiError(
+          'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+          'Read only.',
+          403,
+        );
+      if (params.catalogEntryId !== '74b000000000000000000001')
+        return apiError(
+          'TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND',
+          'Not found.',
+          404,
+        );
+      const invalid = validateMutation(request, state, scenario);
+      if (invalid !== null) return invalid;
+      const input = (await request.json()) as CopyExercisesRequest;
+      const selections = input.selections;
+      if (
+        !Array.isArray(input.selections) ||
+        selections.length === 0 ||
+        selections.length > 50 ||
+        new Set(selections.map((item) => item.groupId)).size !==
+          selections.length
+      )
+        return apiError('VALIDATION_ERROR', 'Invalid selection.', 400);
+      state.copyAttempts += 1;
+      await delay(300);
+      if (
+        scenario === 'exercise-library-copy-error' &&
+        state.copyAttempts === 1
+      )
+        return apiError('EXERCISE_IMAGE_COPY_FAILED', 'Copy unavailable.', 503);
+      if (
+        scenario === 'exercise-library-conflict' &&
+        state.copyAttempts === 1
+      ) {
+        increment(state, request, false);
+        return apiError(
+          'TRAINING_PLAN_VERSION_CONFLICT',
+          'Version conflict.',
+          412,
+        );
+      }
+      if (scenario === 'exercise-library-stale' && state.copyAttempts === 1)
+        return HttpResponse.json(
+          {
+            ...createMockApiError(
+              'EXERCISE_LIBRARY_SELECTION_STALE',
+              'Selection changed.',
+            ),
+            details: {
+              staleGroupIds: selections.map((item) => item.groupId),
+            },
+          },
+          createMockResponseInit({ status: 409 }),
+        );
+      if (state.workout.exercises.length + selections.length > 50)
+        return apiError('EXERCISE_LIMIT_REACHED', 'Exercise limit.', 409);
+      const fixtures = exerciseLibraryFixtures(
+        scenario === 'exercise-library-stale' ? 1 : 0,
+      );
+      const sources = selections.map((selection) =>
+        fixtures.find(
+          (item) =>
+            item.groupId === selection.groupId &&
+            item.version === selection.version &&
+            item.exerciseId === selection.exerciseId &&
+            item.trainingPlanId === selection.trainingPlanId &&
+            item.workoutId === selection.workoutId,
+        ),
+      );
+      if (sources.some((item) => item === undefined))
+        return apiError(
+          'EXERCISE_LIBRARY_SELECTION_STALE',
+          'Selection changed.',
+          409,
+        );
+      const copied = sources.map((source) => {
+        const id = `74b000000000000000000${String(500 + state.nextExerciseNumber++).padStart(3, '0')}`;
+        const exercise = source!.exercise;
+        return exercise.type === 'image' &&
+          scenario === 'exercise-library-media'
+          ? { ...exercise, id, image: signedExerciseImage('fresh', id) }
+          : { ...exercise, id };
+      });
+      const version = increment(state, request, false);
+      state.workout = {
+        ...state.workout,
+        exercises: [...state.workout.exercises, ...copied],
+        version,
+      };
+      synchronizeExerciseCount(state);
+      return HttpResponse.json({ data: copied }, responseInit(version, 201));
+    },
+  ),
   http.get(`${privateBlobOrigin}/exercise-images/:variant`, ({ request }) => {
     const status = new URL(request.url).searchParams.get('mock-status');
     if (status === 'expired') return new HttpResponse(null, { status: 403 });

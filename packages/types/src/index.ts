@@ -1,4 +1,10 @@
 export type {
+  CopyExercisesRequest,
+  CopyExercisesResponse,
+  ExerciseLibraryItem,
+  ExerciseLibraryQuery,
+  ExerciseLibraryResponse,
+  ExerciseLibrarySelection,
   AndroidAppCompatibility,
   AndroidAppCompatibilityResponse,
   ApiError,

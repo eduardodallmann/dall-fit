@@ -39,7 +39,10 @@ import {
   WorkoutExecutionSchema,
 } from '~/training/repositories/workout-execution.schema';
 
+import { exerciseLibrarySeeds, seedExerciseLibrary } from './exercise-library';
+
 const trainingPlanScenarios = [
+  ...exerciseLibrarySeeds,
   'training-plans:create',
   'training-plans:create-workout',
   'training-plans:delete',
@@ -519,7 +522,13 @@ async function main(): Promise<void> {
       WorkoutExecutionSchema,
     );
 
-    if (!(await seedAuthenticationScenario(personModel, scenario))) {
+    if (scenario?.startsWith('exercise-library:')) {
+      await seedExerciseLibrary(
+        { personModel, trainingPlanModel, catalogModel },
+        scenario,
+        seedSession,
+      );
+    } else if (!(await seedAuthenticationScenario(personModel, scenario))) {
       await personModel
         .findOneAndUpdate(
           { googleSubject: 'google-admin-001' },

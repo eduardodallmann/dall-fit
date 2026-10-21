@@ -274,6 +274,18 @@ automáticas (tentativa inicial e único retry transitório) e aceitam a repeti�
 explícita seguinte, permitindo validar erro, Analytics e recuperação reais. O
 estado de tentativas é limpo pelo setup global entre testes.
 
+## Biblioteca de exercícios
+
+Os seletores `exercise-library`, `exercise-library-body-area`,
+`exercise-library-grouped`, `exercise-library-media`, `exercise-library-limit`,
+`exercise-library-stale`, `exercise-library-copy-error`,
+`exercise-library-conflict`, `exercise-library-empty` e `exercise-library-error`
+reutilizam o grupo de planos. A biblioteca entrega representantes tipados, filtro
+por área e nome e páginas de 20; o POST preserva ordem, valida versão/capacidade e
+atualiza o mesmo estado do workout. A origem obsoleta e a falha de cópia são
+recuperáveis, sem handler paralelo no Playwright. A matriz de UI está descrita na
+[rota pessoal](../routes/training-plan-workout.md).
+
 ## Sessão fictícia através da navegação OAuth
 
 Para jornadas que atravessam documentos, o cookie exclusivamente fictício

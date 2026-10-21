@@ -15,6 +15,7 @@ import type {
   UploadedImageFile,
 } from '~/training-plan/domain/training-plan.entity';
 import {
+  createExerciseImageCopyFailedException,
   createImageTooLargeException,
   createImageUploadFailedException,
   createImageUrlSigningFailedException,
@@ -31,6 +32,83 @@ export const SIGNED_IMAGE_URL_TTL_MS = 15 * 60 * 1000;
 export class ExerciseImageService {
   private readonly logger = new Logger(ExerciseImageService.name);
   constructor(private readonly blobStorageService: BlobStorageService) {}
+
+  async copyExercises(
+    exercises: readonly StoredExercise[],
+    signal: AbortSignal,
+  ): Promise<readonly StoredExercise[]> {
+    this.logger.log('ExerciseImageService -> copyExercises -> params:', {
+      params: { count: exercises.length },
+    });
+    const result = [...exercises];
+    const destinations: string[] = [];
+    let nextIndex = 0;
+    let failed = false;
+    const workers = Array.from(
+      { length: Math.min(4, exercises.length) },
+      async () => {
+        while (nextIndex < exercises.length && !failed) {
+          const index = nextIndex++;
+          const exercise = exercises[index];
+          if (exercise?.type !== 'image' || exercise.image === null) continue;
+          const source = exercise.image;
+          const prefix = `exercise-images/${randomBytes(12).toString('hex')}`;
+          const thumbnailKey = `${prefix}/thumbnail.webp`;
+          const displayKey = `${prefix}/display.webp`;
+          destinations.push(thumbnailKey, displayKey);
+          const variants = await Promise.allSettled([
+            this.blobStorageService.copyVariant(
+              source.thumbnail.key,
+              thumbnailKey,
+              signal,
+              source.thumbnail.etag,
+            ),
+            this.blobStorageService.copyVariant(
+              source.display.key,
+              displayKey,
+              signal,
+              source.display.etag,
+            ),
+          ]);
+          const [thumbnail, display] = variants;
+          if (
+            thumbnail?.status !== 'fulfilled' ||
+            display?.status !== 'fulfilled'
+          ) {
+            failed = true;
+            throw createExerciseImageCopyFailedException();
+          }
+          result[index] = {
+            ...exercise,
+            image: {
+              thumbnail: { ...source.thumbnail, ...thumbnail.value },
+              display: { ...source.display, ...display.value },
+            },
+          };
+        }
+      },
+    );
+    const settled = await Promise.allSettled(workers);
+    this.logger.log(
+      'ExerciseImageService -> copyExercises -> workers completed:',
+      { data: { count: exercises.length, failed } },
+    );
+    if (
+      signal.aborted ||
+      settled.some((worker) => worker.status === 'rejected')
+    ) {
+      this.logger.warn(
+        'ExerciseImageService -> copyExercises -> compensation branch:',
+        { data: { variants: destinations.length } },
+      );
+      await this.deleteKeysSafely(destinations);
+      throw createExerciseImageCopyFailedException();
+    }
+    this.logger.log('ExerciseImageService -> copyExercises -> return:', {
+      data: { count: result.length },
+    });
+    return result;
+  }
 
   async processAndUpload(
     file: UploadedImageFile,
@@ -131,20 +209,23 @@ export class ExerciseImageService {
   async createSignedImage(
     image: StoredExerciseImage,
     validUntil = Date.now() + SIGNED_IMAGE_URL_TTL_MS,
+    signal?: AbortSignal,
   ): Promise<ExerciseImage> {
     this.logger.log('ExerciseImageService -> createSignedImage -> params:', {
       params: { variants: 2 },
     });
     try {
+      const sign = (key: string) =>
+        signal === undefined
+          ? this.blobStorageService.createSignedReadUrl(key, validUntil)
+          : this.blobStorageService.createSignedReadUrl(
+              key,
+              validUntil,
+              signal,
+            );
       const [thumbnailUrl, displayUrl] = await Promise.all([
-        this.blobStorageService.createSignedReadUrl(
-          image.thumbnail.key,
-          validUntil,
-        ),
-        this.blobStorageService.createSignedReadUrl(
-          image.display.key,
-          validUntil,
-        ),
+        sign(image.thumbnail.key),
+        sign(image.display.key),
       ]);
       this.logger.log(
         'ExerciseImageService -> createSignedImage -> blobStorageService return:',

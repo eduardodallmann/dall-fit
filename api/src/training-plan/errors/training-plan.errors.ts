@@ -111,6 +111,27 @@ export const createImageUrlSigningFailedException = () =>
     'IMAGE_URL_SIGNING_FAILED',
     'Image URL signing failed.',
   );
+export const createExerciseLibraryStaleException = (staleGroupIds: string[]) =>
+  new HttpException(
+    {
+      code: 'EXERCISE_LIBRARY_SELECTION_STALE',
+      message: 'Selected exercises changed. Reload the library.',
+      details: { staleGroupIds },
+    },
+    HttpStatus.CONFLICT,
+  );
+export const createExerciseImageCopyFailedException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'EXERCISE_IMAGE_COPY_FAILED',
+    'Exercise image copy failed.',
+  );
+export const createExerciseCopyUncertainException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'EXERCISE_COPY_RESULT_UNCERTAIN',
+    'Reload the workout before another copy.',
+  );
 export const createCatalogEntryNotFoundException = () =>
   domainException(
     HttpStatus.NOT_FOUND,

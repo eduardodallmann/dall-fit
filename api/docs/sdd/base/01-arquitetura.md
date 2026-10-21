@@ -108,6 +108,25 @@ snapshot e destinos já confirmados de jobs de clone não terminais.
 os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
 usa `syncIndexes()`.
 
+## Biblioteca de exercícios e cópia limitada
+
+`ExerciseLibraryController` e `ExerciseLibraryCommand` expõem leitura agrupada e
+cópia em lote autenticadas pela fronteira pessoal do módulo de planos.
+`ExerciseLibraryService` resolve representantes; `ExerciseCopyService` valida o
+destino e recebe o array preparado para um append CAS único. O adapter
+`MongoExerciseLibraryRepository` mantém a projeção e o filtro atômico de owner,
+versão, quantidade e BSON resultante. Não há coleção adicional de exercícios nem
+acesso de controller/command a repositories.
+
+O command usa o service pessoal para resolver ownership e o service de imagens
+para copiar variantes privadas com ETag e assinar antes do commit. Preparação usa
+orçamento de 45 s, até quatro imagens/oito variantes e compensação somente quando
+é conhecido que não houve commit. Resultado incerto preserva assets e exige
+leitura canônica. A reconciliação operacional só remove órfãos com ao menos 24 h,
+protegendo uploads/cópias ainda anteriores ao CAS. A clonagem durável de árvores
+no Workflow continua separada. Contratos, branches e seeds estão no
+[endpoint proprietário](../endpoints/exercise-library.md).
+
 ## Read model de dashboard
 
 `DashboardModule` expõe as leituras autenticada e administrativa sem transformar

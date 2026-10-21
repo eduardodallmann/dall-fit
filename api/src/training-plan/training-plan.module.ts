@@ -10,6 +10,7 @@ import { CreateTrainingPlanWorkoutCommand } from '~/training-plan/commands/creat
 import { DeleteGlobalTrainingPlanCommand } from '~/training-plan/commands/delete-global-training-plan.command';
 import { DeleteTrainingPlanExerciseCommand } from '~/training-plan/commands/delete-training-plan-exercise.command';
 import { DeleteTrainingPlanWorkoutCommand } from '~/training-plan/commands/delete-training-plan-workout.command';
+import { ExerciseLibraryCommand } from '~/training-plan/commands/exercise-library.command';
 import { GetGlobalTrainingPlanCommand } from '~/training-plan/commands/get-global-training-plan.command';
 import { GetTrainingPlanWorkoutCommand } from '~/training-plan/commands/get-training-plan-workout.command';
 import { ListGlobalTrainingPlansCommand } from '~/training-plan/commands/list-global-training-plans.command';
@@ -20,11 +21,14 @@ import { UpdateGlobalTrainingPlanCommand } from '~/training-plan/commands/update
 import { UpdateTrainingPlanExerciseCommand } from '~/training-plan/commands/update-training-plan-exercise.command';
 import { UpdateTrainingPlanWorkoutCommand } from '~/training-plan/commands/update-training-plan-workout.command';
 import { UploadTrainingPlanExerciseImageCommand } from '~/training-plan/commands/upload-training-plan-exercise-image.command';
+import { ExerciseLibraryController } from '~/training-plan/controllers/exercise-library.controller';
 import { GlobalTrainingPlansController } from '~/training-plan/controllers/global-training-plans.controller';
 import {
   PersonalTrainingPlansController,
   TrainingPlanCloneJobsController,
 } from '~/training-plan/controllers/personal-training-plans.controller';
+import { ExerciseLibraryRepository } from '~/training-plan/repositories/exercise-library.repository';
+import { MongoExerciseLibraryRepository } from '~/training-plan/repositories/mongo-exercise-library.repository';
 import { MongoPersonalTrainingPlanRepository } from '~/training-plan/repositories/mongo-personal-training-plan.repository';
 import { MongoTrainingPlanRepository } from '~/training-plan/repositories/mongo-training-plan.repository';
 import { PersonalTrainingPlanRepository } from '~/training-plan/repositories/personal-training-plan.repository';
@@ -43,7 +47,9 @@ import {
 } from '~/training-plan/repositories/training-plan.schema';
 import { AssistantTrainingPlanMaterializationService } from '~/training-plan/services/assistant-training-plan-materialization.service';
 import { BlobStorageService } from '~/training-plan/services/blob-storage.service';
+import { ExerciseCopyService } from '~/training-plan/services/exercise-copy.service';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
+import { ExerciseLibraryService } from '~/training-plan/services/exercise-library.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
@@ -79,11 +85,20 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
     ]),
   ],
   controllers: [
+    ExerciseLibraryController,
     GlobalTrainingPlansController,
     PersonalTrainingPlansController,
     TrainingPlanCloneJobsController,
   ],
   providers: [
+    ExerciseLibraryCommand,
+    ExerciseCopyService,
+    ExerciseLibraryService,
+    MongoExerciseLibraryRepository,
+    {
+      provide: ExerciseLibraryRepository,
+      useExisting: MongoExerciseLibraryRepository,
+    },
     CreateGlobalTrainingPlanCommand,
     CreateTrainingPlanExerciseCommand,
     CreateTrainingPlanWorkoutCommand,

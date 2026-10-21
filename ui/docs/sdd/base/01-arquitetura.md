@@ -566,6 +566,16 @@ componente ao fechar interrompe o vídeo. Os modais de mídia removem a animaç�
 saída para que conteúdo e overlay desapareçam juntos, sem um estado intermediário
 de redimensionamento.
 
+### Biblioteca de exercícios no editor pessoal
+
+O editor pessoal também compõe `exercise-library/`: queries de biblioteca ficam
+na família `trainingPlanKeys.libraries`, incluem área/busca/página e encaminham
+cancelamento. A seleção não pertence ao cache da página e sobrevive aos filtros.
+O lote usa a mesma FIFO, timeout Axios específico de 60 s e resultado confirmado.
+`503 EXERCISE_COPY_RESULT_UNCERTAIN` é tratado como gravação ambígua, junto de rede
+e timeout, e exige leitura canônica antes de outra mutation do aggregate. O fluxo
+completo pertence à [rota pessoal](../routes/training-plan-workout.md).
+
 ### Analytics e privacidade
 
 `src/core/analytics/index.ts` é a única fronteira de eventos customizados. Ela usa
@@ -616,6 +626,12 @@ quando o valor mudou desde o término anterior, sempre como estado enumerado.
 Os overlays enumerados incluem `exercise_image_preview` e
 `exercise_video_preview`; seus controles são `image_preview` e `video_preview` e
 nunca enviam ID, nome, URL ou metadado da mídia.
+
+O overlay `exercise_library` usa o controle `copy_exercises`. A operação enumerada
+`exercise_copy` emite início e um terminal. `trackExerciseLibraryAction` publica
+`exercise_library` somente com `action` em `search | filter | select | deselect |
+page | retry`. O evento não inclui termos, área escolhida, contagem, IDs, nomes ou
+conteúdo. Abertura/fechamento usam os eventos de overlay existentes.
 
 O catálogo do workout inclui nome, tipo/adicionar, campo, handle/drop, exclusão,
 upload/substituição/remoção, conflito e retry. Operações de workout/exercício/mídia

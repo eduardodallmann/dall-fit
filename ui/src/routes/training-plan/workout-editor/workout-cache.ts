@@ -3,6 +3,7 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import type {
   Exercise,
   GlobalTrainingPlanCollectionResponse,
+  PersonalTrainingPlanCollectionResponse,
   TrainingPlanDetails,
   TrainingPlanWorkoutDetails,
 } from '@dall-fit/types';
@@ -66,19 +67,32 @@ export function synchronizeWorkoutMutation(
       return { ...synchronized, version };
     },
   );
-  queryClient.setQueriesData<GlobalTrainingPlanCollectionResponse>(
+  queryClient.setQueriesData<
+    | GlobalTrainingPlanCollectionResponse
+    | PersonalTrainingPlanCollectionResponse
+  >(
     {
       predicate: (query) => listMatchesScenario(query.queryKey, mockScenario),
     },
-    (current) =>
-      current === undefined
-        ? current
-        : {
-            ...current,
-            data: current.data.map((plan) =>
-              plan.id === trainingPlanId ? { ...plan, version } : plan,
-            ),
-          },
+    (current) => {
+      if (current === undefined) return current;
+      if ('activeCount' in current)
+        return {
+          ...current,
+          data: current.data.map((plan) =>
+            plan.itemType === 'training-plan' &&
+            plan.catalogEntryId === trainingPlanId
+              ? { ...plan, version }
+              : plan,
+          ),
+        };
+      return {
+        ...current,
+        data: current.data.map((plan) =>
+          plan.id === trainingPlanId ? { ...plan, version } : plan,
+        ),
+      };
+    },
   );
 }
 

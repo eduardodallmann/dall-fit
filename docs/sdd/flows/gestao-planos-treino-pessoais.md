@@ -30,6 +30,8 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 |     7 | Navegar/editar  | detalhe e workout | `/training-plans/:catalogEntryId/**`      |
 |     8 | Alternar uso    | lista             | `PUT /training-plans/active`              |
 |     9 | Pedir ajuda     | modal da lista    | `/training-plan-assistant/session/**`     |
+|    10 | Buscar exercícios | modal do workout próprio | `GET /training-plans/exercise-library` |
+|    11 | Copiar conjunto | mesmo workout | `POST /training-plans/:catalogEntryId/workouts/:workoutId/exercises/copy` |
 
 ## Sequência e decisões
 
@@ -86,6 +88,16 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
     títulos inline de plano e treino pela mesma mutation dos botões.
 13. Biblioteca sem resultados mostra `Nenhum modelo disponível`, orienta tentar
     mais tarde e omite as ações de uso e clone.
+14. No workout próprio, `Adicionar exercício` → `Copiar exercícios` abre a
+    biblioteca de exercícios globais, agrupados por nome. Busca e área filtram os
+    representantes mais recentes; paginação e filtros preservam seleção e ordem,
+    mantendo visível o total, inclusive itens ocultos.
+15. Confirmar acrescenta o conjunto inteiro na FIFO do destino com um único CAS,
+    IDs novos e mídia independente. Não cria referências, planos ou jobs e não
+    altera os planos ativos. Origem obsoleta exige nova seleção dos grupos
+    afetados; conflito ou resultado incerto exige releitura antes de outra cópia.
+    Detalhes de interação pertencem à rota pessoal e os de mídia/atomicidade ao
+    [endpoint da biblioteca](../../../api/docs/sdd/endpoints/exercise-library.md).
 
 ## Dados compartilhados
 
@@ -166,6 +178,8 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 - API E2E: `api/test/training-plan.e2e-spec.ts`.
 - Workflow: specs de services e `workflow-spike.workflow.spec.ts`.
 - Playwright: `ui/tests/integration/routes/personal-training-plan.spec.ts`.
+- Biblioteca de exercícios: E2E de planos, unitários dos services/command e
+  `ui/tests/integration/routes/exercise-library.spec.ts`.
 - MSW: `ui/src/mocks/handlers/training-plans.ts`.
 - Assistente API: `api/test/training-plan.e2e-spec.ts` e
   `api/docs/sdd/endpoints/training-plan-assistant.md`.

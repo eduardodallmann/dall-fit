@@ -1,5 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
+import type { ExerciseLibraryQuery } from '@dall-fit/types';
+
 import {
   getPersonalTrainingPlan,
   listGlobalTrainingPlanLibrary,
@@ -9,6 +11,7 @@ import { getTrainingPlanAssistantSession } from '~/routes/training-plan/training
 import {
   getGlobalTrainingPlan,
   getTrainingPlanWorkout,
+  listExerciseLibrary,
   listGlobalTrainingPlans,
   type MockTrainingPlansScenario,
 } from '~/routes/training-plan/training-plan-service';
@@ -134,5 +137,16 @@ export function trainingPlanLibraryQueryOptions(
     queryKey: trainingPlanKeys.library(page, scenario),
     queryFn: ({ signal }) =>
       listGlobalTrainingPlanLibrary(page, scenario, signal),
+  });
+}
+
+export function exerciseLibraryQueryOptions(
+  query: ExerciseLibraryQuery,
+  scenario: MockTrainingPlansScenario,
+) {
+  return queryOptions({
+    queryKey: [...trainingPlanKeys.libraries(), 'exercises', scenario, query],
+    queryFn: ({ signal }) => listExerciseLibrary(query, scenario, signal),
+    staleTime: 0,
   });
 }

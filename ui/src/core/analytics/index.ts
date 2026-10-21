@@ -18,6 +18,7 @@ export type AnalyticsSurface =
   | 'workout';
 
 export type AnalyticsControl =
+  | 'copy_exercises'
   | 'add_exercise'
   | 'breadcrumb_home'
   | 'breadcrumb_plan'
@@ -124,6 +125,7 @@ type UiAnalyticsEvent =
         | 'delete_confirmation'
         | 'exercise_image_preview'
         | 'exercise_video_preview'
+        | 'exercise_library'
         | 'plan_form';
     })
   | (CommonEvent & {
@@ -133,6 +135,7 @@ type UiAnalyticsEvent =
         | 'delete_confirmation'
         | 'exercise_image_preview'
         | 'exercise_video_preview'
+        | 'exercise_library'
         | 'plan_form';
       reason:
         | 'backdrop'
@@ -166,6 +169,7 @@ type UiAnalyticsEvent =
       operation:
         | 'google_login'
         | 'exercise_create'
+        | 'exercise_copy'
         | 'exercise_delete'
         | 'exercise_image_remove'
         | 'exercise_image_replace'
@@ -189,6 +193,7 @@ type UiAnalyticsEvent =
       operation:
         | 'google_login'
         | 'exercise_create'
+        | 'exercise_copy'
         | 'exercise_delete'
         | 'exercise_image_remove'
         | 'exercise_image_replace'
@@ -460,4 +465,15 @@ export function allowOnlineAnalyticsEvent(
   event: BeforeSendEvent,
 ): BeforeSendEvent | null {
   return isBrowserOnline() ? event : null;
+}
+
+export function trackExerciseLibraryAction(
+  action: 'search' | 'filter' | 'select' | 'deselect' | 'page' | 'retry',
+): void {
+  if (!isBrowserOnline()) return;
+  try {
+    track('exercise_library', { action });
+  } catch {
+    // Optional telemetry contains only a fixed action, never exercise data.
+  }
 }

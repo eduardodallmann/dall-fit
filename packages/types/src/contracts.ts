@@ -1,5 +1,6 @@
 import type {
   AdminDashboard,
+  BodyArea,
   Dashboard,
   Exercise,
   ExerciseImage,
@@ -185,6 +186,32 @@ export interface CreateExerciseRequest {
 }
 
 export type CreateExerciseResponse = ApiResponse<Exercise>;
+
+export interface ExerciseLibraryQuery {
+  page: number;
+  search?: string;
+  bodyArea?: BodyArea;
+}
+
+export interface ExerciseLibrarySelection {
+  groupId: string;
+  trainingPlanId: string;
+  workoutId: string;
+  exerciseId: string;
+  version: number;
+}
+
+export interface ExerciseLibraryItem extends ExerciseLibrarySelection {
+  exercise: Exercise;
+}
+
+export type ExerciseLibraryResponse = CollectionResponse<ExerciseLibraryItem>;
+
+export interface CopyExercisesRequest {
+  selections: readonly ExerciseLibrarySelection[];
+}
+
+export type CopyExercisesResponse = ApiResponse<readonly Exercise[]>;
 
 export type UpdateExerciseRequest = Partial<
   Pick<

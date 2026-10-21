@@ -9,6 +9,13 @@ export interface ClassifiedHttpFailure {
   status?: number;
 }
 
+export class AmbiguousMutationError extends Error {
+  constructor(cause: unknown) {
+    super('The mutation result must be read before another write.', { cause });
+    this.name = 'AmbiguousMutationError';
+  }
+}
+
 const retryableStatuses = new Set([408, 500, 502, 503, 504]);
 
 export function getApiErrorCode(error: unknown): string | undefined {
@@ -40,8 +47,14 @@ export function isExpectedCancellation(error: unknown): boolean {
 }
 
 export function isAmbiguousMutationFailure(error: unknown): boolean {
-  const kind = classifyHttpFailure(error).kind;
-  return kind === 'network' || kind === 'timeout';
+  if (error instanceof AmbiguousMutationError) return true;
+  const failure = classifyHttpFailure(error);
+  return (
+    failure.kind === 'network' ||
+    failure.kind === 'timeout' ||
+    (failure.status === 503 &&
+      failure.code === 'EXERCISE_COPY_RESULT_UNCERTAIN')
+  );
 }
 
 export function shouldRetryQuery(

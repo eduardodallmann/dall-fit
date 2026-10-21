@@ -2,6 +2,7 @@ import axios from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import {
+  AmbiguousMutationError,
   classifyHttpFailure,
   isAmbiguousMutationFailure,
   shouldRetryQuery,
@@ -71,6 +72,16 @@ describe('HTTP failure policy', () => {
       ),
     ).toBe(true);
     expect(isAmbiguousMutationFailure(responseError(503))).toBe(false);
+    expect(
+      isAmbiguousMutationFailure(
+        responseError(503, 'EXERCISE_COPY_RESULT_UNCERTAIN'),
+      ),
+    ).toBe(true);
+    expect(
+      isAmbiguousMutationFailure(
+        new AmbiguousMutationError(new Error('Missing version after success')),
+      ),
+    ).toBe(true);
     expect(isAmbiguousMutationFailure(new axios.CanceledError())).toBe(false);
   });
 });

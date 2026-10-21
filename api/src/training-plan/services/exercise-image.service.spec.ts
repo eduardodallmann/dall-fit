@@ -5,6 +5,50 @@ import type { BlobStorageService } from '~/training-plan/services/blob-storage.s
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 
 describe('ExerciseImageService', () => {
+  it('waits for late variants before compensating a failed copy batch', async () => {
+    let finishThumbnail:
+      ((value: { key: string; etag: string }) => void) | undefined;
+    const thumbnail = new Promise<{ key: string; etag: string }>((resolve) => {
+      finishThumbnail = resolve;
+    });
+    const copyVariant = vi
+      .fn()
+      .mockReturnValueOnce(thumbnail)
+      .mockRejectedValueOnce(new Error('display failed'));
+    const deletion = vi.fn().mockResolvedValue(undefined);
+    const service = new ExerciseImageService({
+      copyVariant,
+      delete: deletion,
+    } as unknown as BlobStorageService);
+    const copying = service.copyExercises(
+      [
+        {
+          id: 'new-exercise',
+          type: 'image',
+          name: 'Supino',
+          bodyArea: 'chest',
+          sets: 3,
+          repetitions: 12,
+          restSeconds: 60,
+          image: {
+            thumbnail: { key: 'old/thumb', width: 160, height: 160 },
+            display: { key: 'old/display', width: 800, height: 800 },
+          },
+        },
+      ],
+      new AbortController().signal,
+    );
+    await vi.waitFor(() => expect(copyVariant).toHaveBeenCalledTimes(2));
+    expect(deletion).not.toHaveBeenCalled();
+    finishThumbnail?.({ key: 'new/thumb', etag: 'copy-etag' });
+    await expect(copying).rejects.toMatchObject({
+      response: { code: 'EXERCISE_IMAGE_COPY_FAILED' },
+    });
+    expect(deletion).toHaveBeenCalledWith([
+      expect.stringMatching(/^exercise-images\/[^/]+\/thumbnail.webp$/),
+      expect.stringMatching(/^exercise-images\/[^/]+\/display.webp$/),
+    ]);
+  });
   async function imageBuffer(): Promise<Buffer> {
     const result = await sharp({
       create: { width: 320, height: 640, channels: 3, background: '#336699' },

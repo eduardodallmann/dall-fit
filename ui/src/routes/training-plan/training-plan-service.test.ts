@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw/http';
 import { describe, expect, it, vi } from 'vitest';
 
 import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
+import { isAmbiguousMutationFailure } from '~/core/http/http-error';
 import { resetTrainingPlanScenarioStates } from '~/mocks/handlers/training-plans';
 import {
   createMockApiError,
@@ -9,6 +10,7 @@ import {
 } from '~/mocks/mock-response';
 import { mockServer } from '~/mocks/server';
 import {
+  copyTrainingPlanExercises,
   createGlobalTrainingPlan,
   createTrainingPlanExercise,
   createTrainingPlanWorkout,
@@ -29,6 +31,42 @@ const planId = '64b000000000000000000001';
 const workoutId = '64b000000000000000000101';
 
 describe('training plan service', () => {
+  it.each(['proxy', 'missing-version', 'known-media-error'])(
+    'requires reconciliation only when the copy result is uncertain: %s',
+    async (kind) => {
+      mockServer.use(
+        http.post(
+          '*/training-plans/:catalogEntryId/workouts/:workoutId/exercises/copy',
+          () => {
+            if (kind === 'proxy')
+              return new HttpResponse(
+                'Upstream failed',
+                createMockResponseInit({ status: 502 }),
+              );
+            if (kind === 'missing-version')
+              return HttpResponse.json(
+                { data: [] },
+                createMockResponseInit({ status: 201 }),
+              );
+            return HttpResponse.json(
+              createMockApiError('EXERCISE_IMAGE_COPY_FAILED', 'Copy failed'),
+              createMockResponseInit({ status: 503 }),
+            );
+          },
+        ),
+      );
+      const error: unknown = await copyTrainingPlanExercises(
+        planId,
+        workoutId,
+        { selections: [] },
+        0,
+        'success',
+      ).catch((failure: unknown) => failure);
+      expect(isAmbiguousMutationFailure(error)).toBe(
+        kind !== 'known-media-error',
+      );
+    },
+  );
   it('serializes the mock selector only when API mocks are enabled', () => {
     vi.stubEnv('VITE_ENABLE_API_MOCKS', 'false');
     expect(trainingPlanMockSearch('success')).toEqual({});

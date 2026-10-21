@@ -19,6 +19,8 @@ import {
 } from 'vitest';
 
 import type {
+  CopyExercisesResponse,
+  ExerciseLibraryResponse,
   GlobalTrainingPlanCollectionResponse,
   GlobalTrainingPlanLibraryResponse,
   TrainingOverviewResponse,
@@ -33,6 +35,7 @@ import {
   TrainingPlanAssistantSessionDocument,
 } from '~/training-plan-assistant/repositories/training-plan-assistant.schema';
 import { TrainingPlanCloneStarter } from '~/training-plan/adapters/training-plan-clone-starter';
+import { ExerciseLibraryRepository } from '~/training-plan/repositories/exercise-library.repository';
 import {
   PersonalTrainingPlanActiveDocument,
   PersonalTrainingPlanCatalogDocument,
@@ -74,6 +77,9 @@ describe('Global training plans (e2e)', () => {
   const uploadedBlobs: Array<{ content: Buffer; key: string }> = [];
   const deletedBlobKeys: string[][] = [];
   const blobStorage = {
+    copyVariant: vi.fn((source: string, destination: string) =>
+      Promise.resolve({ key: destination, etag: `copied:${source}` }),
+    ),
     createSignedReadUrl: vi.fn((pathname: string, validUntil: number) =>
       Promise.resolve(
         `https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com/${pathname}?vercel-blob-delegation=fake&vercel-blob-signature=${validUntil}`,
@@ -274,6 +280,452 @@ describe('Global training plans (e2e)', () => {
 
     return result;
   }
+
+  async function libraryDestination() {
+    const agent = await login(false);
+    const created = await authenticatedMutation(
+      agent,
+      agent.post('/training-plans'),
+    )
+      .send({ name: 'Plano pessoal', description: 'Destino da cópia.' })
+      .expect(201);
+    const entry = (
+      created.body as { data: { catalogEntryId: string; id: string } }
+    ).data;
+    const workout = await authenticatedMutation(
+      agent,
+      agent
+        .post(`/training-plans/${entry.catalogEntryId}/workouts`)
+        .set('X-Resource-Version', '0'),
+    )
+      .send({})
+      .expect(201);
+    const workoutId = (workout.body as { data: { id: string } }).data.id;
+    return {
+      agent,
+      entry,
+      workoutId,
+      path: `/training-plans/${entry.catalogEntryId}/workouts/${workoutId}`,
+    };
+  }
+
+  async function librarySource() {
+    const workoutId = new Types.ObjectId();
+    return createGlobalPlan({
+      workouts: [
+        {
+          _id: workoutId,
+          name: 'Origem',
+          exercises: [
+            {
+              _id: new Types.ObjectId(),
+              type: 'duration',
+              name: 'Elevação lateral',
+              bodyArea: 'shoulder',
+              durationMinutes: 5,
+              instructions: 'Movimento controlado.',
+              youtubeId: 'ZA8gs8XP2bs',
+            },
+            { _id: new Types.ObjectId(), type: 'pause', restSeconds: 45 },
+            {
+              _id: new Types.ObjectId(),
+              type: 'image',
+              name: 'Supino',
+              bodyArea: 'chest',
+              sets: 3,
+              repetitions: 12,
+              restSeconds: 60,
+              image: {
+                thumbnail: {
+                  key: 'exercise-images/source/thumbnail.webp',
+                  width: 160,
+                  height: 160,
+                },
+                display: {
+                  key: 'exercise-images/source/display.webp',
+                  width: 800,
+                  height: 800,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  it('FIT-107 groups by normalized name, chooses the newest plan and filters its representative before pagination', async () => {
+    const { agent } = await libraryDestination();
+    const old = await librarySource();
+    const newer = await createGlobalPlan({
+      workouts: [
+        {
+          _id: new Types.ObjectId(),
+          name: 'Outro',
+          exercises: [
+            {
+              _id: new Types.ObjectId(),
+              type: 'duration',
+              name: '  ELEVACAO   LATERAL ',
+              bodyArea: 'back',
+              durationMinutes: 10,
+            },
+          ],
+        },
+      ],
+    });
+    await trainingPlanModel.collection.updateOne(
+      { _id: old._id },
+      { $set: { updatedAt: new Date('2025-01-01') } },
+    );
+    await trainingPlanModel.collection.updateOne(
+      { _id: newer._id },
+      { $set: { updatedAt: new Date('2026-01-01') } },
+    );
+    const all = await agent.get('/training-plans/exercise-library').expect(200);
+    expect(all.headers['cache-control']).toBe('private, no-store');
+    const rows = (all.body as ExerciseLibraryResponse).data;
+    expect(rows).toHaveLength(3);
+    expect(
+      rows.find((row) => row.groupId === 'name:elevacao lateral'),
+    ).toMatchObject({
+      trainingPlanId: newer.id,
+      exercise: { bodyArea: 'back', durationMinutes: 10 },
+    });
+    const filtered = await agent
+      .get('/training-plans/exercise-library?search=elevação&bodyArea=shoulder')
+      .expect(200);
+    expect((filtered.body as ExerciseLibraryResponse).total).toBe(0);
+    const matching = await agent
+      .get('/training-plans/exercise-library?search=elevação&bodyArea=back')
+      .expect(200);
+    expect((matching.body as ExerciseLibraryResponse).total).toBe(1);
+    await agent
+      .get('/training-plans/exercise-library?bodyArea=invalid')
+      .expect(400);
+    await agent
+      .get('/training-plans/exercise-library?bodyArea=back&bodyArea=chest')
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/training-plans/exercise-library')
+      .expect(401);
+  });
+
+  it('FIT-107 copies a complete mixed batch in one CAS with independent images and optional duration fields', async () => {
+    const { agent, path } = await libraryDestination();
+    const source = await librarySource();
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = [...(library.body as ExerciseLibraryResponse).data]
+      .reverse()
+      .map(({ exercise: _exercise, ...item }) => item);
+    const copied = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(201);
+    expect(copied.headers['x-resource-version']).toBe('2');
+    const exercises = (copied.body as CopyExercisesResponse).data;
+    expect(exercises.map((item) => item.type)).toEqual([
+      'image',
+      'pause',
+      'duration',
+    ]);
+    expect(
+      exercises.every(
+        (item) =>
+          !selections.some((selection) => selection.exerciseId === item.id),
+      ),
+    ).toBe(true);
+    expect(exercises[2]).toMatchObject({
+      instructions: 'Movimento controlado.',
+      youtubeId: 'ZA8gs8XP2bs',
+    });
+    const media = exercises[0];
+    expect(media?.type === 'image' && media.image?.displayUrl).not.toContain(
+      '/source/',
+    );
+    expect(blobStorage.copyVariant).toHaveBeenCalledTimes(2);
+    await trainingPlanModel.deleteOne({ _id: source._id });
+    const read = await agent.get(path).expect(200);
+    expect(
+      (read.body as { data: { exercises: unknown[] } }).data.exercises,
+    ).toHaveLength(3);
+    await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(412);
+  });
+
+  it('FIT-107 rejects stale sources, read-only or foreign destinations and duplicate selections without writes', async () => {
+    const { agent, path } = await libraryDestination();
+    const source = await librarySource();
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = (library.body as ExerciseLibraryResponse).data.map(
+      ({ exercise: _exercise, ...item }) => item,
+    );
+    await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections: [selections[0], selections[0]] })
+      .expect(400);
+    await authenticatedMutation(agent, agent.post(`${path}/exercises/copy`))
+      .send({ selections })
+      .expect(428);
+    await authenticatedMutation(
+      agent,
+      agent
+        .post(
+          `${path.replace(/training-plans\/[^/]+/, 'training-plans/74b000000000000000000099')}/exercises/copy`,
+        )
+        .set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(404);
+    const reference = await authenticatedMutation(
+      agent,
+      agent.post('/training-plans/global-references'),
+    )
+      .send({ globalTrainingPlanId: source.id })
+      .expect(201);
+    const referenceId = (reference.body as { data: { catalogEntryId: string } })
+      .data.catalogEntryId;
+    await authenticatedMutation(
+      agent,
+      agent
+        .post(
+          `/training-plans/${referenceId}/workouts/${new Types.ObjectId().toString()}/exercises/copy`,
+        )
+        .set('X-Resource-Version', '0'),
+    )
+      .send({ selections })
+      .expect(403);
+    await trainingPlanModel.updateOne(
+      { _id: source._id },
+      { $inc: { version: 1 } },
+    );
+    const stale = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(409);
+    expect(stale.body).toMatchObject({
+      code: 'EXERCISE_LIBRARY_SELECTION_STALE',
+    });
+    expect(blobStorage.copyVariant).not.toHaveBeenCalled();
+  });
+
+  it('FIT-107 compensates all copied variants on a partial media failure and preserves the destination', async () => {
+    const { agent, path } = await libraryDestination();
+    await librarySource();
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = (library.body as ExerciseLibraryResponse).data.map(
+      ({ exercise: _exercise, ...item }) => item,
+    );
+    blobStorage.copyVariant.mockRejectedValueOnce(new Error('Copy failed'));
+    const failed = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(503);
+    expect(failed.body).toMatchObject({ code: 'EXERCISE_IMAGE_COPY_FAILED' });
+    expect(deletedBlobKeys.flat()).toHaveLength(2);
+    const read = await agent.get(path).expect(200);
+    expect(read.headers['x-resource-version']).toBe('1');
+    expect(
+      (read.body as { data: { exercises: unknown[] } }).data.exercises,
+    ).toHaveLength(0);
+  });
+
+  it('FIT-107 retains copied assets when a database response is lost after a successful commit', async () => {
+    const { agent, path } = await libraryDestination();
+    await librarySource();
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = (library.body as ExerciseLibraryResponse).data.map(
+      ({ exercise: _exercise, ...item }) => item,
+    );
+    const repository = app.get(ExerciseLibraryRepository);
+    const append = repository.append.bind(repository);
+    const spy = vi
+      .spyOn(repository, 'append')
+      .mockImplementationOnce(async (...args) => {
+        await append(...args);
+        throw new Error('Lost response');
+      });
+    try {
+      const failed = await authenticatedMutation(
+        agent,
+        agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+      )
+        .send({ selections })
+        .expect(503);
+      expect(failed.body).toMatchObject({
+        code: 'EXERCISE_COPY_RESULT_UNCERTAIN',
+      });
+      expect(deletedBlobKeys).toHaveLength(0);
+      const read = await agent.get(path).expect(200);
+      expect(read.headers['x-resource-version']).toBe('2');
+      expect(
+        (read.body as { data: { exercises: unknown[] } }).data.exercises,
+      ).toHaveLength(3);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('FIT-107 paginates filtered groups and isolates personal exercises', async () => {
+    const { agent, entry, workoutId } = await libraryDestination();
+    await trainingPlanModel.updateOne(
+      { _id: entry.id, 'workouts._id': workoutId },
+      {
+        $push: {
+          'workouts.$.exercises': {
+            _id: new Types.ObjectId(),
+            type: 'duration',
+            name: 'Privado',
+            bodyArea: 'back',
+            durationMinutes: 3,
+          },
+        },
+      },
+    );
+    await createGlobalPlan({
+      workouts: [
+        {
+          _id: new Types.ObjectId(),
+          name: 'Origem',
+          exercises: Array.from({ length: 25 }, (_, index) => ({
+            _id: new Types.ObjectId(),
+            type: 'duration',
+            name: `Elevação ${String(index).padStart(2, '0')}`,
+            bodyArea: 'back',
+            durationMinutes: 5,
+          })),
+        },
+      ],
+    });
+    const first = await agent
+      .get('/training-plans/exercise-library?bodyArea=back&page=1')
+      .expect(200);
+    const second = await agent
+      .get('/training-plans/exercise-library?bodyArea=back&page=2')
+      .expect(200);
+    const firstPage = first.body as ExerciseLibraryResponse;
+    const secondPage = second.body as ExerciseLibraryResponse;
+    expect(firstPage.total).toBe(25);
+    expect(firstPage.data).toHaveLength(20);
+    expect(secondPage.data).toHaveLength(5);
+    expect(
+      new Set(
+        [...firstPage.data, ...secondPage.data].map((item) => item.groupId),
+      ).size,
+    ).toBe(25);
+    await authenticatedMutation(
+      agent,
+      agent
+        .post(
+          `/training-plans/${entry.catalogEntryId}/workouts/${workoutId}/exercises/copy`,
+        )
+        .set('X-Resource-Version', '1'),
+    )
+      .send({ selections: [null] })
+      .expect(400);
+  });
+
+  it('FIT-107 enforces capacity under simultaneous requests with one winning CAS', async () => {
+    const { agent, entry, workoutId, path } = await libraryDestination();
+    await librarySource();
+    await trainingPlanModel.updateOne(
+      { _id: entry.id, 'workouts._id': workoutId },
+      {
+        $set: {
+          'workouts.$.exercises': Array.from({ length: 48 }, () => ({
+            _id: new Types.ObjectId(),
+            type: 'pause',
+            restSeconds: 60,
+          })),
+        },
+      },
+    );
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = (library.body as ExerciseLibraryResponse).data
+      .filter((item) => item.exercise.type !== 'image')
+      .map(({ exercise: _exercise, ...item }) => item);
+    const send = () =>
+      authenticatedMutation(
+        agent,
+        agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+      ).send({ selections });
+    const responses = await Promise.all([send(), send()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 412,
+    ]);
+    const current = await agent.get(path).expect(200);
+    expect(
+      (current.body as { data: { exercises: unknown[] } }).data.exercises,
+    ).toHaveLength(50);
+    await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '2'),
+    )
+      .send({ selections })
+      .expect(409);
+  });
+
+  it('FIT-107 rejects the BSON candidate before appending any part of the batch', async () => {
+    const { agent, entry, path } = await libraryDestination();
+    await librarySource();
+    const [before] = await trainingPlanModel.aggregate<{ bytes: number }>([
+      { $match: { _id: new Types.ObjectId(entry.id) } },
+      { $project: { bytes: { $bsonSize: '$$ROOT' } } },
+    ]);
+    if (before === undefined) throw new Error('Missing destination.');
+    await trainingPlanModel.collection.updateOne(
+      { _id: new Types.ObjectId(entry.id) },
+      {
+        $set: {
+          description: 'x'.repeat(
+            12 * 1024 * 1024 - before.bytes - 100 + 'Destino da cópia.'.length,
+          ),
+        },
+      },
+    );
+    const library = await agent
+      .get('/training-plans/exercise-library')
+      .expect(200);
+    const selections = (library.body as ExerciseLibraryResponse).data
+      .filter((item) => item.exercise.type !== 'image')
+      .map(({ exercise: _exercise, ...item }) => item);
+    const result = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/exercises/copy`).set('X-Resource-Version', '1'),
+    )
+      .send({ selections })
+      .expect(409);
+    expect(result.body).toMatchObject({
+      code: 'TRAINING_PLAN_SIZE_LIMIT_REACHED',
+    });
+    const current = await agent.get(path).expect(200);
+    expect(
+      (current.body as { data: { exercises: unknown[] } }).data.exercises,
+    ).toHaveLength(0);
+    expect(current.headers['x-resource-version']).toBe('1');
+  });
 
   async function advanceAssistantToNeutralScreening(
     agent: ReturnType<typeof request.agent>,

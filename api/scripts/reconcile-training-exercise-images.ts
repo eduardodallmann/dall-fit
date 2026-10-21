@@ -5,6 +5,8 @@ import process from 'node:process';
 import { del, list } from '@vercel/blob';
 import { connect, disconnect } from 'mongoose';
 
+import { reclaimableImageKeys } from '~/training-plan/domain/image-reconciliation';
+
 const prefix = 'exercise-images/';
 
 interface CloneJobImageReference {
@@ -81,14 +83,14 @@ async function main(): Promise<void> {
       ...planReferences.flatMap((entry) => entry.keys),
       ...cloneReferences,
     ]);
-    const stored: string[] = [];
+    const stored: { pathname: string; uploadedAt: Date }[] = [];
     let cursor: string | undefined;
     do {
       const page = await list({ cursor, prefix });
-      stored.push(...page.blobs.map((blob) => blob.pathname));
+      stored.push(...page.blobs);
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor !== undefined);
-    const orphaned = stored.filter((key) => !referenced.has(key));
+    const orphaned = reclaimableImageKeys(stored, referenced);
     if (execute && orphaned.length > 0) await del(orphaned);
     process.stdout.write(
       `Image reconciliation ${execute ? 'executed' : 'dry-run'}: stored=${stored.length}, referenced=${referenced.size}, orphaned=${orphaned.length}.\n`,

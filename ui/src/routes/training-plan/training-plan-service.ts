@@ -1,4 +1,6 @@
 import type {
+  CopyExercisesRequest,
+  CopyExercisesResponse,
   CreateExerciseRequest,
   CreateExerciseResponse,
   CreateTrainingPlanRequest,
@@ -6,6 +8,8 @@ import type {
   CreateTrainingPlanWorkoutResponse,
   Exercise,
   ExerciseImage,
+  ExerciseLibraryQuery,
+  ExerciseLibraryResponse,
   GlobalTrainingPlanCollectionResponse,
   GlobalTrainingPlanDetails,
   GlobalTrainingPlanDetailsResponse,
@@ -24,8 +28,22 @@ import type {
 } from '@dall-fit/types';
 
 import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
+import {
+  AmbiguousMutationError,
+  classifyHttpFailure,
+} from '~/core/http/http-error';
 
 export type MockTrainingPlansScenario =
+  | 'exercise-library'
+  | 'exercise-library-body-area'
+  | 'exercise-library-grouped'
+  | 'exercise-library-media'
+  | 'exercise-library-limit'
+  | 'exercise-library-stale'
+  | 'exercise-library-copy-error'
+  | 'exercise-library-conflict'
+  | 'exercise-library-empty'
+  | 'exercise-library-error'
   | 'assistant-abandon'
   | 'assistant-blocked'
   | 'assistant-clarifying'
@@ -126,6 +144,57 @@ function mutationConfig(
 function responseVersion(headers: Record<string, unknown>): number {
   const result = parseResourceVersion(headers['x-resource-version']);
   return result;
+}
+
+export async function listExerciseLibrary(
+  query: ExerciseLibraryQuery,
+  mockScenario: MockTrainingPlansScenario,
+  signal?: AbortSignal,
+): Promise<ExerciseLibraryResponse> {
+  const response = await apiClient.get<ExerciseLibraryResponse>(
+    '/training-plans/exercise-library',
+    {
+      ...requestConfig(mockScenario, signal),
+      params: query,
+    },
+  );
+  return response.data;
+}
+
+export async function copyTrainingPlanExercises(
+  catalogEntryId: string,
+  workoutId: string,
+  input: CopyExercisesRequest,
+  version: number,
+  mockScenario: MockTrainingPlansScenario,
+): Promise<VersionedMutationResult<readonly Exercise[]>> {
+  try {
+    const response = await apiClient.post<CopyExercisesResponse>(
+      `/training-plans/${catalogEntryId}/workouts/${workoutId}/exercises/copy`,
+      input,
+      {
+        ...mutationConfig(mockScenario, version),
+        timeout: 60_000,
+      },
+    );
+    return {
+      data: response.data.data,
+      version: responseVersion(response.headers),
+    };
+  } catch (error: unknown) {
+    const failure = classifyHttpFailure(error);
+    const knownBeforeCommit =
+      failure.code === 'EXERCISE_IMAGE_COPY_FAILED' ||
+      failure.code === 'IMAGE_URL_SIGNING_FAILED';
+    if (
+      failure.kind === 'unknown' ||
+      (failure.kind === 'http' &&
+        (failure.status ?? 0) >= 500 &&
+        !knownBeforeCommit)
+    )
+      throw new AmbiguousMutationError(error);
+    throw error;
+  }
 }
 
 function requestConfig(

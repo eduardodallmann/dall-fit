@@ -16,6 +16,7 @@ import {
 } from '~/training-plan/services/blob-storage.service';
 
 const {
+  copyBlobMock,
   deleteBlobMock,
   headBlobMock,
   issueSignedTokenMock,
@@ -23,6 +24,7 @@ const {
   presignUrlMock,
   putBlobMock,
 } = vi.hoisted(() => ({
+  copyBlobMock: vi.fn(),
   deleteBlobMock: vi.fn(),
   headBlobMock: vi.fn(),
   issueSignedTokenMock: vi.fn(),
@@ -32,6 +34,7 @@ const {
 }));
 
 vi.mock('@vercel/blob', () => ({
+  copy: copyBlobMock,
   BlobAccessError: class extends Error {},
   BlobRequestAbortedError: class extends Error {},
   BlobServiceNotAvailable: class extends Error {},
@@ -51,12 +54,42 @@ describe('BlobStorageService', () => {
   const service = new BlobStorageService();
 
   beforeEach(() => {
+    copyBlobMock.mockReset();
     deleteBlobMock.mockReset();
     headBlobMock.mockReset();
     issueSignedTokenMock.mockReset();
     listBlobMock.mockReset();
     presignUrlMock.mockReset();
     putBlobMock.mockReset();
+  });
+
+  it('copies the exact private source with an ETag and an independent destination', async () => {
+    headBlobMock.mockResolvedValue({ etag: 'source-etag' });
+    copyBlobMock.mockResolvedValue({
+      pathname: 'exercise-images/new/display.webp',
+      etag: 'new-etag',
+    });
+    const copied = await service.copyVariant(
+      'exercise-images/old/display.webp',
+      'exercise-images/new/display.webp',
+      new AbortController().signal,
+    );
+    expect(copied).toEqual({
+      key: 'exercise-images/new/display.webp',
+      etag: 'new-etag',
+    });
+    expect(copyBlobMock).toHaveBeenCalledWith(
+      'exercise-images/old/display.webp',
+      'exercise-images/new/display.webp',
+      expect.objectContaining({
+        ifMatch: 'source-etag',
+        access: 'private',
+        allowOverwrite: false,
+        addRandomSuffix: false,
+        contentType: 'image/webp',
+      }),
+    );
+    expect(copyBlobMock.mock.calls[0]?.[2]).not.toHaveProperty('token');
   });
 
   it('uploads privately through OIDC without passing a permanent token', async () => {

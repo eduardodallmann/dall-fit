@@ -69,6 +69,12 @@ pnpm -C api seed -- <endpoint-slug>:<scenario-slug>
 
 Identificadores vigentes incluem:
 
+- `exercise-library:ready`, `exercise-library:limit`, `exercise-library:size`,
+  `exercise-library:stale`, `exercise-library:read-only`,
+  `exercise-library:not-found` e `exercise-library:image-failure`; preparam IDs
+  FIT107 isolados, body em `/tmp/dall-fit-exercise-copy.json` e sessão Bearer local
+  em `/tmp/dall-fit-exercise-library-token.txt`, com permissões restritas;
+
 - `auth:person-new`, `auth:person-existing` e `auth:person-admin`;
 - `auth:person-legacy`, `auth:person-theme-light` e
   `auth:person-theme-dark`;

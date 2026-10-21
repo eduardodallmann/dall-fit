@@ -517,6 +517,16 @@ function parseTrainingPlanSearch(
     ? search.mockAuth
     : undefined;
   const scenarios: readonly MockTrainingPlansScenario[] = [
+    'exercise-library',
+    'exercise-library-body-area',
+    'exercise-library-grouped',
+    'exercise-library-media',
+    'exercise-library-limit',
+    'exercise-library-stale',
+    'exercise-library-copy-error',
+    'exercise-library-conflict',
+    'exercise-library-empty',
+    'exercise-library-error',
     'assistant-abandon',
     'assistant-blocked',
     'assistant-clarifying',

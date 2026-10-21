@@ -20,6 +20,8 @@ o source pela entrada persistida; não existe capability ou flag confiada ao bod
 | ---------------------------------------- | ----------------------------------------------- |
 | `GET /training-plans?page=1`             | página unificada de planos e jobs não terminais |
 | `GET /training-plans/library?page=1`     | globais com resumo e bloqueio local de clone    |
+| `GET /training-plans/exercise-library`   | exercícios globais agrupados, busca e área      |
+| `POST .../workouts/:workoutId/exercises/copy` | cópia independente de um lote com CAS       |
 | `POST /training-plans`                   | plano próprio v0 + entrada, sem ativar          |
 | `POST /training-plans/global-references` | vínculo único ao global                         |
 | `PUT /training-plans/active`             | define o estado de uma entrada; máximo de cinco |
@@ -35,6 +37,12 @@ descritos em [`global-training-plans.md`](global-training-plans.md). A diferenç
 ownership pessoal; uma referência aceita GET, mas qualquer mutação retorna `403
 GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY`. IDs fora do catálogo da sessão são
 indistinguíveis e retornam `TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND`.
+
+A [biblioteca de exercícios](exercise-library.md) possui controller/command
+próprios dentro do mesmo módulo. A leitura não exige administração; a cópia exige
+destino próprio, preserva a ordem da seleção e grava o conjunto inteiro com uma
+única versão. A documentação proprietária descreve agrupamento, filtros, mídia,
+compensação, resultado incerto e seus cenários reproduzíveis.
 
 DELETE de item próprio exige versão; DELETE de referência não exige, pois remove
 somente o vínculo. Ambos removem a entrada do conjunto ativo sem escolher fallback. Repetir uma
