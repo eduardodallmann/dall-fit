@@ -172,3 +172,15 @@ Vitest cobre formato, service/query, ações, métricas, tendência, acessibilid
 presença administrativa e falhas isoladas. Playwright cobre os cenários mockados,
 navegação, retry, invalidação, viewports e ausência de request administrativa para
 pessoa comum.
+
+## Substituição por leitura e aceite
+
+Pessoa/CSRF são seguidos da verificação jurídica antes de montar queries de métricas.
+Sem aceite, a região principal apresenta [Termos de uso](terms.md), não o dashboard.
+Menu mantém identidade, tema e saída sem links de negócio/instalação. Sem publicação,
+admin recebe `Configurar primeiro termo`; demais pessoas veem indisponibilidade e
+retry. Falha/loading nunca expõem negócio. Depois do aceite, o dashboard conserva
+sua composição e o menu acrescenta os acessos jurídicos dentro do mesmo grupo.
+Os screenshots existentes orientam somente composição/breakpoint, não o texto ou
+quantidade de links. Cenários: `http://localhost:3000/dash?mockTerms=required` e
+`http://localhost:3000/dash?mockAuth=admin&mockTerms=not-configured`.

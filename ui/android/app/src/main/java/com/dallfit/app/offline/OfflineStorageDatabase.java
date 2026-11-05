@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 final class OfflineStorageDatabase extends SQLiteOpenHelper {
     static final String DATABASE_NAME = "dall-fit-offline.db";
-    static final int SCHEMA_VERSION = 5;
+    static final int SCHEMA_VERSION = 6;
 
     OfflineStorageDatabase(Context context) {
         this(context, DATABASE_NAME);
@@ -33,7 +33,8 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         if (oldVersion <= 2 && newVersion >= 3) migrateFromTwoToThree(database);
         if (oldVersion <= 3 && newVersion >= 4) migrateFromThreeToFour(database);
         if (oldVersion <= 4 && newVersion >= 5) migrateFromFourToFive(database);
-        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 5) throw missingMigration();
+        if (oldVersion <= 5 && newVersion >= 6) createTermsAccessTable(database);
+        if (newVersion != SCHEMA_VERSION || oldVersion < 1 || oldVersion > 6) throw missingMigration();
     }
 
     @Override
@@ -123,6 +124,7 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
             "updated_at TEXT NOT NULL)"
         );
         createLatestCompletionTable(database);
+        createTermsAccessTable(database);
         database.execSQL(
             "CREATE INDEX snapshots_pending_order ON snapshots(updated_at, execution_id)"
         );
@@ -131,6 +133,17 @@ final class OfflineStorageDatabase extends SQLiteOpenHelper {
         );
         database.execSQL(
             "CREATE INDEX offline_files_plan ON offline_files(plan_id, status)"
+        );
+    }
+
+    private static void createTermsAccessTable(SQLiteDatabase database) {
+        database.execSQL(
+            "CREATE TABLE terms_access (" +
+            "account_id INTEGER PRIMARY KEY REFERENCES account_state(id) ON DELETE CASCADE," +
+            "access_json TEXT NULL," +
+            "required_reference_json TEXT NULL," +
+            "required_number INTEGER NOT NULL DEFAULT 0 CHECK (required_number >= 0)," +
+            "blocked INTEGER NOT NULL DEFAULT 0)"
         );
     }
 

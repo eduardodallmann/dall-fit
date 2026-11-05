@@ -3,6 +3,7 @@ import { track, type BeforeSendEvent } from '@vercel/analytics';
 import { isBrowserOnline } from '~/core/connectivity';
 
 export type AnalyticsSurface =
+  | 'terms'
   | 'application_menu'
   | 'authenticated_shell'
   | 'dashboard'
@@ -18,6 +19,7 @@ export type AnalyticsSurface =
   | 'workout';
 
 export type AnalyticsControl =
+  | 'terms_action'
   | 'copy_exercises'
   | 'add_exercise'
   | 'breadcrumb_home'
@@ -86,7 +88,25 @@ export type TrainingAnalyticsAction =
 
 type UiAnalyticsEvent =
   | (CommonEvent & {
+      eventName: 'ui_terms_action';
+      action:
+        | 'accept'
+        | 'copy'
+        | 'retry'
+        | 'create'
+        | 'save'
+        | 'preview'
+        | 'publish'
+        | 'delete'
+        | 'read'
+        | 'page'
+        | 'declare'
+        | 'cancel';
+    })
+  | (CommonEvent & {
       destination:
+        | 'terms'
+        | 'admin_terms'
         | 'dash'
         | 'training_completion'
         | 'training_plans'
@@ -149,13 +169,27 @@ type UiAnalyticsEvent =
     })
   | (CommonEvent & {
       eventName: 'ui_field_focused';
-      field: 'description' | 'name';
-      form: 'training_plan';
+      field:
+        | 'description'
+        | 'name'
+        | 'title'
+        | 'operatorName'
+        | 'operatorEmail'
+        | 'changeSummary'
+        | 'bodyHtml';
+      form: 'training_plan' | 'terms_editor';
     })
   | (CommonEvent & {
       eventName: 'ui_field_completed';
-      field: 'description' | 'name';
-      form: 'training_plan';
+      field:
+        | 'description'
+        | 'name'
+        | 'title'
+        | 'operatorName'
+        | 'operatorEmail'
+        | 'changeSummary'
+        | 'bodyHtml';
+      form: 'training_plan' | 'terms_editor';
       state: 'empty' | 'invalid' | 'valid';
     })
   | (CommonEvent & {
@@ -167,6 +201,14 @@ type UiAnalyticsEvent =
       channel?: 'native' | 'web';
       eventName: 'ui_operation_started';
       operation:
+        | 'terms_accept'
+        | 'terms_copy'
+        | 'terms_create'
+        | 'terms_save'
+        | 'terms_preview'
+        | 'terms_publish'
+        | 'terms_delete'
+        | 'terms_retry'
         | 'google_login'
         | 'exercise_create'
         | 'exercise_copy'
@@ -191,6 +233,14 @@ type UiAnalyticsEvent =
       channel?: 'native' | 'web';
       eventName: 'ui_operation_completed';
       operation:
+        | 'terms_accept'
+        | 'terms_copy'
+        | 'terms_create'
+        | 'terms_save'
+        | 'terms_preview'
+        | 'terms_publish'
+        | 'terms_delete'
+        | 'terms_retry'
         | 'google_login'
         | 'exercise_create'
         | 'exercise_copy'
@@ -243,7 +293,12 @@ export type SystemFailureCategory =
   'bootstrap' | 'pwa_registration' | 'pwa_update' | 'render';
 
 export function normalizeAnalyticsRoute(pathname: string): string | undefined {
-  if (pathname === '/' || pathname === '/dash') {
+  if (
+    pathname === '/' ||
+    pathname === '/dash' ||
+    pathname === '/terms' ||
+    pathname === '/admin/terms'
+  ) {
     return pathname;
   }
 
@@ -320,6 +375,8 @@ function buildProperties(event: UiAnalyticsEvent): AnalyticsProperties {
         destination: event.destination,
         navigation_kind: event.navigationKind,
       });
+    case 'ui_terms_action':
+      return compactProperties({ ...common, action: event.action });
     case 'ui_button_pressed':
       return compactProperties({ ...common, action: event.action });
     case 'ui_menu_opened':

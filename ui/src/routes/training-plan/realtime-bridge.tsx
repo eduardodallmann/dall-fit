@@ -17,6 +17,7 @@ export function TrainingPlanRealtimeBridge() {
     };
     const unsubscribeReady = realtimeClient.onReady(reconcile);
     const unsubscribeInvalidation = realtimeClient.onInvalidation((event) => {
+      if (event.resource !== 'global-training-plan') return;
       const paused = coordinator.notifyExternalChange(event);
       void queryClient.invalidateQueries({
         queryKey: trainingPlanKeys.lists(),
@@ -33,11 +34,9 @@ export function TrainingPlanRealtimeBridge() {
         });
       }
     });
-    realtimeClient.start();
     return () => {
       unsubscribeInvalidation();
       unsubscribeReady();
-      realtimeClient.stop();
     };
   }, [queryClient]);
 

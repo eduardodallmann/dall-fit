@@ -48,3 +48,10 @@ Alterações Markdown exclusivas dispensam validação automatizada. Demais muda
 devem aprovar `pnpm lint`, `pnpm test`, `pnpm test:coverage:ci` e `pnpm build`.
 Depois da adoção do Playwright, mudanças em cenários integrados aprovam também
 `pnpm test:integration`.
+
+## Leitura e gestão de termos
+
+[/terms](routes/terms.md) possui leitura, declarações e próprios recibos; a mesma
+superfície substitui negócio pendente. [/admin/terms](routes/admin-terms.md) possui
+o editor, prévia e publicação. `core/terms` coordena a situação da geração e o
+comprovante nativo sem aceitar no cadastro.

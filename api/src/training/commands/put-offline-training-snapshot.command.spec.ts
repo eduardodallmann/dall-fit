@@ -53,6 +53,7 @@ describe('PutOfflineTrainingSnapshotCommand', () => {
     });
     terminals.replay.mockResolvedValue(null);
     command = new PutOfflineTrainingSnapshotCommand(
+      { require: vi.fn().mockResolvedValue(undefined) } as never,
       compatibility as never,
       content as unknown as OfflineTrainingSnapshotContentService,
       locks as unknown as OfflineTrainingSnapshotLockService,

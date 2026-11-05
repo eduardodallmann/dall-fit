@@ -153,3 +153,18 @@ export type {
   YoutubeShortExercise,
 } from './entities.js';
 export { BODY_AREAS } from './entities.js';
+export type {
+  AcceptTermsRequest,
+  AcceptedTerms,
+  CreateTermsRequest,
+  CurrentTerms,
+  PublishTermsRequest,
+  TermsAcceptance,
+  TermsAccess,
+  TermsDocument,
+  TermsFields,
+  TermsPublication,
+  TermsReference,
+  TermsSummary,
+  TermsList,
+} from './terms.js';

@@ -209,3 +209,11 @@ ações enumeradas `assistant_open|message|retry|abandon|preview|adjust|confirm`
 | `assets/training-plan/mobile-390-assistant-collecting-modal.png` | `390x844` | `assistant-collecting` | composição vertical da coleta no mobile |
 | `assets/training-plan/desktop-1440-assistant-preview-modal.png` | `1440x900` | `assistant-preview` | prévia rolável, ajuste e ações no desktop |
 | `assets/training-plan/mobile-390-assistant-preview-modal.png` | `390x844` | `assistant-preview` | prévia e rodapé fixo no mobile |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

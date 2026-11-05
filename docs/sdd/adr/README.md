@@ -49,3 +49,5 @@ substituída permanece no histórico e aponta para a sucessora.
 - [`ADR-0018`](ADR-0018-multiplos-planos-ativos-e-lease-por-instalacao.md): até
   cinco planos ativos e preparados, escolha temporária e lease offline por pessoa
   e instalação, substituindo o vínculo singular da ADR-0015.
+
+- [`ADR-0019`](ADR-0019-termos-versionados-e-bloqueio-de-acesso.md): documento imutável, recibo por pessoa/versão, bloqueio HTTP/UI e comprovante Android por conta.

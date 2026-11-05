@@ -24,6 +24,10 @@ import { PersonDocument } from '~/person/repositories/person.schema';
 import { RateLimitService } from '~/redis/rate-limit.service';
 import { RedisClientService } from '~/redis/redis-client.service';
 import {
+  TERMS_ACCEPTANCE_MODEL,
+  type StoredAcceptance,
+} from '~/terms/repositories/terms.schema';
+import {
   PersonalTrainingPlanActiveDocument,
   PersonalTrainingPlanCatalogDocument,
 } from '~/training-plan/repositories/personal-training-plan.schema';
@@ -37,6 +41,8 @@ import { OfflineTrainingTerminalReceiptDocument } from '~/training/repositories/
 import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 import { OfflineTrainingLeaseService } from '~/training/services/offline-training-lease.service';
 import { TrainingClockService } from '~/training/services/training-clock.service';
+
+import { resetTermsFixture, seedAcceptedTerms } from './helpers/terms-fixture';
 
 const googleCredential = Buffer.from(
   JSON.stringify({
@@ -155,6 +161,7 @@ describe('Offline training lease (e2e)', () => {
   });
 
   beforeEach(async () => {
+    await resetTermsFixture(app);
     vi.restoreAllMocks();
     configService.set('ANDROID_MIN_VERSION_CODE', 1);
     await Promise.all([
@@ -173,6 +180,7 @@ describe('Offline training lease (e2e)', () => {
       name: 'Offline Runner',
       photoUrl: null,
     });
+    await seedAcceptedTerms(app, personId.toString());
   });
 
   it('publishes the public Android compatibility policy without caching', async () => {
@@ -379,6 +387,49 @@ describe('Offline training lease (e2e)', () => {
       .expect(200);
     return response.body as LeaseResponseBody;
   }
+
+  it('rejects a snapshot for pending terms before lease renewal, locks or execution writes', async () => {
+    configService.set('ANDROID_MIN_VERSION_CODE', 2);
+    await seedPlans();
+    const token = await nativeToken();
+    const lease = await registeredLease(token);
+    const before = await redisClient.get(leaseKey());
+    const keysBefore = (await redisClient.keys('*')).sort();
+    await app
+      .get<Model<StoredAcceptance>>(getModelToken(TERMS_ACCEPTANCE_MODEL))
+      .deleteMany({});
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-App-Version-Code', '1')
+      .set('X-Sync-Contract-Version', '1')
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(409)
+      .expect(({ body }) => {
+        expect(body as unknown).toMatchObject({ code: 'APP_UPDATE_REQUIRED' });
+      });
+    await request(app.getHttpServer())
+      .put('/training/offline-snapshot')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-App-Version-Code', '2')
+      .set('X-Sync-Contract-Version', '1')
+      .send(snapshotRequest(lease.data.leaseId))
+      .expect(403)
+      .expect(({ body }) => {
+        expect(body as unknown).toMatchObject({
+          code: 'TERMS_ACCEPTANCE_REQUIRED',
+        });
+      });
+    expect(await redisClient.get(leaseKey())).toBe(before);
+    expect(await redisClient.exists(snapshotKey())).toBe(0);
+    expect(
+      (await redisClient.keys('*')).filter(
+        (key) => !keysBefore.includes(key) && !key.includes(':rate:'),
+      ),
+    ).toEqual([]);
+    expect(await receiptModel.countDocuments()).toBe(0);
+    expect(await executionModel.countDocuments()).toBe(0);
+  });
 
   it('creates once and preserves the fence, expiry and PTTL on repeated registration', async () => {
     await seedPlans();

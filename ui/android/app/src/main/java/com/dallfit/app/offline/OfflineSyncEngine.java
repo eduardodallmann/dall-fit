@@ -195,7 +195,8 @@ public final class OfflineSyncEngine {
                 apiBaseUrl == null ||
                 authenticationRequired ||
                 globalProtocolFailure ||
-                updateRequired
+                updateRequired ||
+                storage.hasKnownTermsRequirement()
             ) {
                 emitState();
                 return;
@@ -269,7 +270,7 @@ public final class OfflineSyncEngine {
             synchronized (this) {
                 running = false;
                 recoverBeforeRepeat = expectedGeneration != generation;
-                repeat = runAgain && accessToken != null && apiBaseUrl != null && !authenticationRequired && !globalProtocolFailure && !updateRequired;
+                repeat = runAgain && accessToken != null && apiBaseUrl != null && !authenticationRequired && !globalProtocolFailure && !updateRequired && !storage.hasKnownTermsRequirement();
                 runAgain = false;
             }
             emitState();
@@ -426,6 +427,10 @@ public final class OfflineSyncEngine {
                 clearCycleAttempt(claim);
                 if (notifier != null) notifier.notifyActionRequired();
                 return false;
+            case TERMS_REQUIRED:
+                storage.pauseSyncForTerms(claim, result.getDetailsJson(), updatedAt);
+                clearCycleAttempt(claim);
+                return false;
             case UPDATE_REQUIRED:
                 compatibility.recordUpdateRequired(result.getDetailsJson());
                 storage.markSyncActionRequired(
@@ -497,7 +502,7 @@ public final class OfflineSyncEngine {
     }
 
     private synchronized boolean isCurrent(long expectedGeneration) {
-        return expectedGeneration == generation && !authenticationRequired && !globalProtocolFailure && !updateRequired;
+        return expectedGeneration == generation && !authenticationRequired && !globalProtocolFailure && !updateRequired && !storage.hasKnownTermsRequirement();
     }
 
     private String now() {

@@ -150,3 +150,13 @@ Retorna `404 ACTIVE_TRAINING_PLAN_NOT_FOUND` antes de acessar Redis.
 - renovação por leitura ou repetição;
 - histórico ou tombstone de lease no MongoDB;
 - escolha de plano persistida no lease.
+
+## Aceite de termos como precondição
+
+Depois dos guards de sessão/permissão/CSRF/quota e antes dos pipes/controllers de
+negócio, a política exige recibo da publicação vigente. Pendência responde
+`403 TERMS_ACCEPTANCE_REQUIRED`; ausência de publicação, `503 TERMS_NOT_CONFIGURED`;
+consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no domínio
+deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
+dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
+sem transformá-los em efeito do login.

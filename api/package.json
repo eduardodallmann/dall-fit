@@ -12,6 +12,7 @@
     "build": "nest build",
     "configure:google-oauth": "node ./scripts/configure-google-oauth.mjs",
     "indexes:apply": "tsx ./scripts/apply-indexes.ts",
+    "terms:prepare-initial": "tsx ./scripts/prepare-initial-terms.ts",
     "images:reconcile": "tsx ./scripts/reconcile-training-exercise-images.ts",
     "dev": "concurrently --kill-others --no-color --names infra,api \"pnpm dev:infra\" \"pnpm start:dev\"",
     "dev:infra": "node ./scripts/dev-infra.mjs",
@@ -55,6 +56,7 @@
     "mongoose": "^9.11.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sanitize-html": "2.18.1",
     "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
@@ -67,6 +69,7 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.3.0",
     "@types/node": "^26.6.5",
+    "@types/sanitize-html": "2.16.2",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.5",
     "concurrently": "^10.0.6",

@@ -84,6 +84,33 @@ describe('analytics boundary', () => {
     expect(JSON.stringify(trackMock.mock.calls)).not.toContain('mockAuth');
   });
 
+  it('projects legal field metadata without the term, public contact or domain identifiers', () => {
+    window.history.replaceState({}, '', '/admin/terms?mockTerms=admin');
+    expect(normalizeAnalyticsRoute('/terms')).toBe('/terms');
+    trackUiEvent({
+      control: 'terms_action',
+      surface: 'terms',
+      eventName: 'ui_field_completed',
+      form: 'terms_editor',
+      field: 'bodyHtml',
+      state: 'valid',
+      value: '<p>private draft</p>',
+      operatorEmail: 'operator@example.test',
+      termsVersionId: 'private-id',
+    } as Parameters<typeof trackUiEvent>[0]);
+    expect(trackMock).toHaveBeenCalledWith('ui_field_completed', {
+      control: 'terms_action',
+      surface: 'terms',
+      route: '/admin/terms',
+      form: 'terms_editor',
+      field: 'bodyHtml',
+      state: 'valid',
+    });
+    expect(JSON.stringify(trackMock.mock.calls)).not.toMatch(
+      /private|operator@example|mockTerms/,
+    );
+  });
+
   it('discards an identical event repeated in the same interaction cycle', () => {
     const event = {
       control: 'retry' as const,

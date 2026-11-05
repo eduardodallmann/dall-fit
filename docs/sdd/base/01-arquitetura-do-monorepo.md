@@ -129,3 +129,13 @@ Um novo projeto deve:
 4. receber um escopo explícito no ESLint da raiz;
 5. ser adicionado aos scripts agregadores;
 6. criar seu SDD local quando tiver arquitetura ou comportamento próprios.
+
+## Acesso jurídico entre canais
+
+Autenticação e aceite contratual são decisões independentes. Documento publicado e
+recibo único por pessoa/versão vivem no MongoDB, com política HTTP transversal e
+uma barreira visual compartilhada. Android conserva comprovante e requisito mínimo
+por conta no motor existente; offline não presume conhecimento de publicações
+novas. A coordenação está no [fluxo de termos](../flows/aceite-de-termos.md) e na
+[ADR-0019](../adr/ADR-0019-termos-versionados-e-bloqueio-de-acesso.md); contratos
+HTTP/UI pertencem aos respectivos projetos.

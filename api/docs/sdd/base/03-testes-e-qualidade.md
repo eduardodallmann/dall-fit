@@ -132,3 +132,13 @@ específicos. Seguir `06-logging-e-rastreabilidade.md`.
 
 O ciclo de vida dos bancos, isolamento e fixtures segue
 `04-mocks-e-bancos-de-teste.md`.
+
+## Aceite e fixtures de negócio
+
+E2E de negócio preparam explicitamente documento e recibos sintéticos, separados do
+login. E2E de autenticação continuam sem aceite implícito. `terms.e2e-spec.ts`
+verifica constraints, CSRF, bootstrap, imutabilidade, replay/concorrência e canais;
+o E2E de snapshot verifica recusa antes de efeitos e prioridade da compatibilidade.
+Unitários substituem o port de termos e cobrem falha fechada, corrida, preview,
+CAS, sanitização, escaping e hash. Dados públicos reais da minuta ficam somente na
+fonte operacional e nunca em fixtures sintéticas.

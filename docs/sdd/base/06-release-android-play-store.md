@@ -16,7 +16,7 @@ para 100% da produção. Não há rollout percentual nem feature flag de offline
   pelo Android, Play Store e política de compatibilidade;
 - `versionName` é apresentação e precisa ser revisado em toda release;
 - ambos vivem em `ui/android/app/build.gradle`;
-- a primeira release deste processo usa `versionCode 2` e `versionName 1.0`, salvo
+- a build corrente usa `versionCode 3` e `versionName 1.1`, salvo
   se a Play Console já tiver consumido o código 2;
 - código já aceito pela Play Console nunca é reutilizado para bytes diferentes;
 - release corretiva incrementa `versionCode`; downgrade não é rollback suportado.
@@ -181,3 +181,13 @@ consulta de compatibilidade e um sync controlado. A política mínima só é ele
 depois que a build correspondente estiver disponível e validada. Incidente posterior
 usa release corretiva crescente; troca de chave, downgrade do SQLite ou redução do
 mínimo não substituem a correção.
+
+## Compatibilidade da barreira de termos
+
+A build corrente compreende `terms-required` e migra SQLite para schema 6 sem
+fabricar aceites ou remover treinos. Distribuir e validar essa build antes de
+qualquer elevação do mínimo público. Não alterar `ANDROID_MIN_VERSION_CODE`
+automaticamente no build ou na publicação do termo. O smoke inclui aceite inicial,
+modo avião com prova confirmada, nova publicação, Worker pausado com fila preservada
+e retomada depois do aceite online. O proprietário revisa/publica a minuta inicial
+pela [gestão de termos](../../../api/docs/sdd/endpoints/admin-terms.md).

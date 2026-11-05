@@ -113,6 +113,36 @@ public final class OfflineStoragePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getTermsAccess(PluginCall call) {
+        resolve(call, () -> {
+            JSObject result = new JSObject();
+            String json = service.getTermsAccessJson(requiredString(call, "personId"));
+            if (json != null) result.put("access", new JSObject(json));
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void recordTermsAccess(PluginCall call) {
+        resolve(call, () -> {
+            service.recordTermsAccess(requiredString(call, "personId"), requiredObject(call, "access").toString());
+            JSObject result = new JSObject();
+            String json = service.getTermsAccessJson(requiredString(call, "personId"));
+            if (json != null) result.put("access", new JSObject(json));
+            syncEngine.triggerCurrentCredentials();
+            return result;
+        });
+    }
+
+    @PluginMethod
+    public void noteTermsRequired(PluginCall call) {
+        resolve(call, () -> {
+            service.noteTermsRequired(requiredObject(call, "reference").toString(), requiredString(call, "personId"));
+            return new JSObject();
+        });
+    }
+
+    @PluginMethod
     public void getSyncState(PluginCall call) {
         resolve(call, () -> syncStateToJson(syncEngine.getState()));
     }
@@ -217,6 +247,7 @@ public final class OfflineStoragePlugin extends Plugin {
     public void downloadFile(PluginCall call) {
         execute(() ->
             resolve(call, () -> {
+                service.requireTermsAccepted();
                 OfflineFileMetadata file = mediaDownloader.download(
                     requiredString(call, "url"),
                     requiredString(call, "fileId"),
@@ -252,6 +283,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void putPreparedPlan(PluginCall call) {
         resolve(call, () -> {
+            service.requireTermsAccepted();
             service.putPreparedPlan(
                 requiredString(call, "planId"),
                 requiredInteger(call, "payloadVersion"),
@@ -285,6 +317,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void putActiveSession(PluginCall call) {
         resolve(call, () -> {
+            service.requireTermsAccepted();
             service.putActiveSession(
                 requiredString(call, "sessionId"),
                 requiredString(call, "planId"),
@@ -300,6 +333,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void commitTrainingSession(PluginCall call) {
         execute(() -> resolve(call, () -> {
+            service.requireTermsAccepted();
             service.commitTrainingSession(
                 requiredString(call, "sessionId"),
                 requiredString(call, "executionId"),
@@ -316,6 +350,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void commitTrainingTerminal(PluginCall call) {
         execute(() -> resolve(call, () -> {
+            service.requireTermsAccepted();
             service.commitTrainingTerminal(
                 requiredString(call, "sessionId"),
                 requiredLong(call, "expectedSessionRevision"),
@@ -435,6 +470,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void putSnapshot(PluginCall call) {
         resolve(call, () -> {
+            service.requireTermsAccepted();
             service.putSnapshot(
                 requiredString(call, "executionId"),
                 requiredString(call, "planId"),
@@ -461,6 +497,7 @@ public final class OfflineStoragePlugin extends Plugin {
     @PluginMethod
     public void registerTemporaryFile(PluginCall call) {
         resolve(call, () -> {
+            service.requireTermsAccepted();
             OfflineFileMetadata file = service.registerTemporaryFile(
                 requiredString(call, "fileId"),
                 call.getString("planId"),

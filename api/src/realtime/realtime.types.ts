@@ -7,6 +7,7 @@ export interface InternalRealtimeEvent {
 }
 
 export interface RealtimeConnection {
+  personId: string;
   clientInstanceId: string;
   isAdmin: boolean;
 }

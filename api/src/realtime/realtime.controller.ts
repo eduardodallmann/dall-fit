@@ -15,9 +15,11 @@ import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import type { PersonEntity } from '~/person/domain/person.entity';
 import { RealtimeStreamService } from '~/realtime/realtime-stream.service';
 import { RealtimeEventsQueryDto } from '~/realtime/realtime.dto';
+import { TermsExempt } from '~/terms/terms-policy';
 
 @Authenticated()
 @Controller('realtime')
+@TermsExempt()
 export class RealtimeController {
   private readonly logger = new Logger(RealtimeController.name);
 
@@ -39,6 +41,7 @@ export class RealtimeController {
       params: { isAdmin: person.isAdmin === true },
     });
     const result = this.realtimeStream.stream({
+      personId: person.id,
       clientInstanceId: query.clientInstanceId,
       isAdmin: person.isAdmin === true,
     });

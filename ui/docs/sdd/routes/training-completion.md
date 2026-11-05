@@ -74,3 +74,11 @@ altera share, clipboard, toast ou navegação.
 | --- | ---: | --- | --- |
 | `assets/training-completion/desktop-1440-training-completion.png` | `1440x900` | `sdd-workout-complete` | resumo, semana, métricas e ações no desktop |
 | `assets/training-completion/mobile-390-training-completion.png` | `390x844` | `sdd-workout-complete` | resumo e semana reorganizados no mobile |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

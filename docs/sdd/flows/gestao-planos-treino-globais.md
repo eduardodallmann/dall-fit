@@ -198,3 +198,12 @@ edições administrativas existentes.
   sem API real nem `page.route`.
 - Não há regressão visual porque as pastas de assets das rotas não contêm
   screenshots.
+
+## Precondição de aceite vigente
+
+Esta jornada exige o [aceite de termos](aceite-de-termos.md). O bloqueio antecede
+consultas/mutations de negócio. Uma publicação descoberta durante uso oculta a
+atividade e pausa novos efeitos, preservando estado confirmado e recuperável;
+ação HTTP recusada não é repetida automaticamente depois do aceite. Android
+preserva treino offline com comprovante confirmado até conhecer requisito novo e
+pausa a fila compartilhada, sem tratar pendência como revogação de sessão.

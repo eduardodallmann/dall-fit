@@ -108,6 +108,15 @@ public final class OfflineSyncHttpTransport implements OfflineSyncTransport {
                 "authentication-required"
             );
         }
+        if (status == HttpURLConnection.HTTP_FORBIDDEN && "TERMS_ACCEPTANCE_REQUIRED".equals(code)) {
+            JSONObject details = response == null ? null : response.optJSONObject("details");
+            try {
+                JSONObject reference = TermsAccessValidator.reference(details);
+                return OfflineSyncTransportResult.termsRequired(reference.toString());
+            } catch (JSONException error) {
+                return OfflineSyncTransportResult.of(OfflineSyncTransportResult.Kind.GLOBAL_BLOCKED, "invalid-terms-response");
+            }
+        }
         if (status == HttpURLConnection.HTTP_CONFLICT && "APP_UPDATE_REQUIRED".equals(code)) {
             JSONObject details = response == null ? null : response.optJSONObject("details");
             if (!validUpdateDetails(details)) return OfflineSyncTransportResult.of(

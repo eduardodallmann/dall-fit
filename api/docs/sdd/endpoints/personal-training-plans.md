@@ -184,3 +184,13 @@ E2E em `api/test/training-plan.e2e-spec.ts` cobre pessoa comum, ownership,
 catálogo misto, referência read-only, seleção, criação, desvinculação e criação de
 workout próprio pelo `catalogEntryId`.
 Unitários dos services usam repositories e starter substituídos por mocks.
+
+## Aceite de termos como precondição
+
+Depois dos guards de sessão/permissão/CSRF/quota e antes dos pipes/controllers de
+negócio, a política exige recibo da publicação vigente. Pendência responde
+`403 TERMS_ACCEPTANCE_REQUIRED`; ausência de publicação, `503 TERMS_NOT_CONFIGURED`;
+consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no domínio
+deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
+dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
+sem transformá-los em efeito do login.

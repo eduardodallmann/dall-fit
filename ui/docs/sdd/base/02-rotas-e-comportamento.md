@@ -142,3 +142,16 @@ Antes de alterar o layout, verificar se existe ao menos uma imagem em
 
 A inexistência de imagens não altera os requisitos de documentação funcional,
 testes, acessibilidade ou quality gates.
+
+## Barreira jurídica do layout privado
+
+Todas as rotas de negócio exigem aceite vigente além da sessão. O guard conserva
+a intenção e encaminha entrada pendente a `/dash`, antes de carregar negócio.
+`/terms` é acessível com sessão sem aceite; `/admin/terms` admite somente admin e
+bootstrap enquanto não há publicação. Descoberta durante uso conserva a URL e o
+estado recuperável oculto. Voltar, preload ou URL direta não produzem aceite.
+
+A raiz lê o destino pendente sem consumi-lo. Somente o guard liberado consome a
+intenção e retoma a rota validada; sem ela, `/dash`. `TermsBoundary` não invalida
+navegação durante encerramento de geração, preservando o destino de uma nova
+navegação bloqueada por expiração. Detalhes em [terms.md](../routes/terms.md).

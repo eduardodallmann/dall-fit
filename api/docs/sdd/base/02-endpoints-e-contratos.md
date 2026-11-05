@@ -189,3 +189,17 @@ cURL completo que aciona aquele caminho. Seed ausente é declarado como
 
 Exemplos de request e response, quando úteis, devem ser mínimos, sanitizados e
 secundários à explicação humana.
+
+## Precondição jurídica
+
+Fronteiras de negócio autenticadas verificam a maior publicação no primary e o
+recibo próprio. Falta de concordância responde `403 TERMS_ACCEPTANCE_REQUIRED`,
+com somente ID/número/hash em `details`; sem publicação, `503 TERMS_NOT_CONFIGURED`;
+falha necessária, `503 TERMS_UNAVAILABLE`. Isso não é `401`, CSRF ou perda de lease.
+Auth/tema/saída, termos, compatibilidade/probes e stream mínimo de termos têm
+exceções estritas descritas em [terms.md](../endpoints/terms.md). Snapshot verifica
+compatibilidade antes do aceite e antes de locks/escritas.
+
+Os contratos de termos usam `private, no-store`, schemas estritos e canal da sessão.
+Revisão técnica de draft usa o header de recurso existente; número jurídico é
+atribuído somente na publicação. Não incluir HTML ou identidade em erros/eventos.

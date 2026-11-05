@@ -185,3 +185,12 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
   `api/docs/sdd/endpoints/training-plan-assistant.md`.
 - Assistente UI/MSW: `ui/src/mocks/handlers/training-plan-assistant.ts` e os
   cenários Playwright da rota pessoal.
+
+## Precondição de aceite vigente
+
+Esta jornada exige o [aceite de termos](aceite-de-termos.md). O bloqueio antecede
+consultas/mutations de negócio. Uma publicação descoberta durante uso oculta a
+atividade e pausa novos efeitos, preservando estado confirmado e recuperável;
+ação HTTP recusada não é repetida automaticamente depois do aceite. Android
+preserva treino offline com comprovante confirmado até conhecer requisito novo e
+pausa a fila compartilhada, sem tratar pendência como revogação de sessão.

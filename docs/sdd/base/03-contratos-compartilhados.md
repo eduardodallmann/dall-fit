@@ -238,3 +238,18 @@ request; o Workflow os lê no MongoDB.
 - `TrainingPlanAssistantConfirmationResponse` devolve somente
   `catalogEntryId` e `trainingPlanId`. A entrada nasce `owned`, inativa e não
   contém referência a provider, prompt ou resposta de saúde.
+
+## Termos versionados
+
+[`packages/types/src/terms.ts`](../../../packages/types/src/terms.ts), exportado pelo
+index público, define `TermsFields`, `TermsDocument`, `TermsSummary`, `TermsList`,
+`TermsPublication`, `TermsReference`, `TermsAcceptance`, `TermsAccess`, `CurrentTerms`,
+`AcceptedTerms` e os requests de criar/publicar/aceitar. Revisão técnica de rascunho
+e número jurídico publicado são distintos. `TermsAccess` é union discriminada
+`accepted | required | not-configured`; somente `accepted` contém recibo próprio,
+com os dois literais `true`, hash e referência correspondentes.
+
+`RealtimeResourceInvalidation` admite `resource=terms`, ID, `state=present` e número
+da publicação em `version`, sem HTML, contato ou recibo. O evento acelera refetch,
+mas não é comprovante de concordância. Detalhes de autorização, status, campos e
+limites estão nos [endpoints de termos](../../../api/docs/sdd/endpoints/terms.md).

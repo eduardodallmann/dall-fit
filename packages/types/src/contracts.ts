@@ -56,6 +56,12 @@ export interface AppUpdateRequiredDetails {
 
 export type RealtimeResourceInvalidation =
   | {
+      resource: 'terms';
+      resourceId: string;
+      state: 'present';
+      version: number;
+    }
+  | {
       resource: 'global-training-plan';
       resourceId: string;
       state: 'deleted';

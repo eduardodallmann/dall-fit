@@ -8,6 +8,8 @@ import {
 } from '@tanstack/react-router';
 import axios from 'axios';
 
+import type { Person } from '@dall-fit/types';
+
 import { configureAdminAccessHandler } from '~/auth/admin-access-lifecycle';
 import { authReturnTo, parseAuthReturnUrl } from '~/auth/auth-return-to';
 import { ensureCsrfToken, type MockAuthScenario } from '~/auth/auth-service';
@@ -28,6 +30,8 @@ import {
   ProtectedRouteError,
   ProtectedRoutePending,
 } from '~/core/components/route-status';
+import { getTermsPolicy } from '~/core/terms/policy';
+import { termsAccessQueryOptions } from '~/core/terms/queries';
 import { assertAdminAccess } from '~/routes/admin-access';
 import type { MockDashboardScenario } from '~/routes/dashboard/dashboard-service';
 import { probeRootSession } from '~/routes/root-session-probe';
@@ -37,6 +41,8 @@ import {
   HomeRouteComponent,
   HomeRoutePending,
 } from '~/routes/route-components';
+import { TermsPage } from '~/routes/terms';
+import { AdminTermsPage } from '~/routes/terms/admin';
 import { TrainingPlanDetailPage } from '~/routes/training-plan/detail-page';
 import { TrainingPlanListPage } from '~/routes/training-plan/list-page';
 import { PersonalTrainingPlanDetailPage } from '~/routes/training-plan/personal-detail-page';
@@ -57,11 +63,13 @@ interface RouterContext {
 interface HomeSearch {
   authError?: 'oauth_failed';
   mockAuth?: MockAuthScenario;
+  mockTerms?: string;
 }
 
 interface DashSearch {
   mockAuth?: MockAuthScenario;
   mockDashboard?: MockDashboardScenario;
+  mockTerms?: string;
 }
 
 interface TrainingPlanSearch extends DashSearch {
@@ -109,7 +117,7 @@ const homeRoute = createRoute({
       !abortController.signal.aborted &&
       context.navigationSequence === navigationSequence
     ) {
-      const destination = authReturnTo.consume(normalizeAuthReturnTo);
+      const destination = authReturnTo.read(normalizeAuthReturnTo);
       if (destination !== undefined)
         redirect({ href: destination, replace: true, throw: true });
       redirect({
@@ -131,6 +139,12 @@ const homeRoute = createRoute({
       ? search.mockAuth
       : undefined;
     if (mockAuth !== undefined) result.mockAuth = mockAuth;
+    if (
+      typeof search.mockTerms === 'string' &&
+      import.meta.env.DEV &&
+      import.meta.env.VITE_ENABLE_API_MOCKS === 'true'
+    )
+      result.mockTerms = search.mockTerms;
 
     return result;
   },
@@ -138,6 +152,54 @@ const homeRoute = createRoute({
   pendingComponent: HomeRoutePending,
   pendingMs: 300,
 });
+
+async function ensureTermsNavigation(
+  client: QueryClient,
+  person: Person,
+  location: { href: string; pathname: string; search: Record<string, unknown> },
+  isCurrent: () => boolean,
+): Promise<void> {
+  try {
+    await client.fetchQuery({
+      ...termsAccessQueryOptions(),
+      staleTime: 0,
+    });
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error) && error.response?.status === 401)
+      throw error;
+  }
+  assertCurrentNavigation(isCurrent);
+  const policy = getTermsPolicy();
+  const legal =
+    location.pathname === '/terms' ||
+    (location.pathname === '/admin/terms' &&
+      policy.access?.state === 'not-configured' &&
+      person.isAdmin === true);
+  if (
+    policy.blocked &&
+    !legal &&
+    location.pathname !== '/dash' &&
+    location.href !== router.state.resolvedLocation?.href
+  ) {
+    if (authReturnTo.read(normalizeAuthReturnTo) === undefined)
+      captureAuthReturnTo(location.href);
+    redirect({
+      to: '/dash',
+      replace: true,
+      search: parseTermsSearch(location.search),
+      throw: true,
+    });
+  }
+  if (
+    policy.localOnly &&
+    !policy.blocked &&
+    !legal &&
+    location.pathname !== '/training' &&
+    !location.pathname.startsWith('/training/workout/')
+  )
+    redirect({ to: '/training', replace: true, throw: true });
+  if (!policy.blocked) finishAuthenticatedNavigation(location);
+}
 
 const authenticatedRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -170,7 +232,12 @@ const authenticatedRoute = createRoute({
       );
       if (getSessionChannel() === 'web') await ensureCsrfToken(mockAuth);
       assertCurrentNavigation(isCurrent);
-      finishAuthenticatedNavigation(location);
+      await ensureTermsNavigation(
+        context.queryClient,
+        person,
+        location,
+        isCurrent,
+      );
       const result = { mockAuth, person };
 
       return result;
@@ -223,6 +290,7 @@ const dashRoute = createRoute({
       ? search.mockDashboard
       : undefined;
     const result = {
+      ...parseTermsSearch(search),
       ...(mockAuth === undefined ? {} : { mockAuth }),
       ...(mockDashboard === undefined ? {} : { mockDashboard }),
     };
@@ -328,10 +396,24 @@ const trainingCompletionRoute = createRoute({
   component: TrainingCompletionRouteComponent,
 });
 
+const termsRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: '/terms',
+  validateSearch: parseTermsSearch,
+  component: TermsPage,
+});
+const adminTermsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/admin/terms',
+  validateSearch: parseTermsSearch,
+  component: AdminTermsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   homeRoute,
   authenticatedRoute.addChildren([
     dashRoute,
+    termsRoute,
     personalTrainingPlanListRoute,
     personalTrainingPlanDetailRoute,
     personalTrainingPlanWorkoutRoute,
@@ -339,6 +421,7 @@ const routeTree = rootRoute.addChildren([
     trainingWorkoutRoute,
     trainingCompletionRoute,
     adminRoute.addChildren([
+      adminTermsRoute,
       trainingPlanListRoute,
       trainingPlanDetailRoute,
       trainingPlanWorkoutRoute,
@@ -751,4 +834,16 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
+}
+
+function parseTermsSearch(search: Record<string, unknown>) {
+  const base: DashSearch & { mockTerms?: string } = {};
+  if (isMockAuthScenario(search.mockAuth)) base.mockAuth = search.mockAuth;
+  if (
+    import.meta.env.DEV &&
+    import.meta.env.VITE_ENABLE_API_MOCKS === 'true' &&
+    typeof search.mockTerms === 'string'
+  )
+    base.mockTerms = search.mockTerms;
+  return base;
 }

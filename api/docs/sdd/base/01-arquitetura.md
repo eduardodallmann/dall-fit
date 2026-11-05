@@ -104,7 +104,7 @@ Essa reconciliação preserva tanto referências materializadas quanto origens d
 snapshot e destinos já confirmados de jobs de clone não terminais.
 `autoIndex` é `true` somente em `local|test`. Preview/produção usam `false` e
 `pnpm -C api indexes:apply -- --execute` com
-`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v4`. O comando cria primeiro
+`INDEX_OPERATION_CONFIRMATION=apply-dall-fit-indexes-v5`. O comando cria primeiro
 os índices únicos/compostos conhecidos e remove somente o nome legado exato; não
 usa `syncIndexes()`.
 
@@ -605,3 +605,27 @@ O bypass de autenticação aceita somente runtime local/teste fora da Vercel e C
 flag explícita e chave aleatória de pelo menos 32 bytes comparada em tempo
 constante. Fora desse contexto o endpoint se comporta como inexistente. O script
 de configuração OAuth não habilita bypass nem grava chave conhecida.
+
+## Termos e autorização de negócio
+
+`TermsDataModule` fornece modelos, repository e services globais para evitar ciclo
+com autenticação. `TermsModule` compõe controllers/commands administrativos e de
+leitura. `TermsPolicyInterceptor`, registrado por `APP_INTERCEPTOR`, roda depois de
+todos os guards e antes dos pipes/controllers; quando há pessoa autenticada exige
+recibo canônico salvo no MongoDB, sem carregar HTML. `TermsExempt` marca somente
+fronteiras de suporte; `TermsAdministration` admite bootstrap exclusivo sem
+publicação. Snapshot trata a exigência dentro do command depois da compatibilidade.
+
+`terms_versions` guarda draft e publicação no mesmo documento, com HTML restrito,
+identificação por versão, hash UTF-8, revisão e autoria interna. Índice único
+parcial `{ publicationNumber: -1 }` para publicados coordena a numeração; há índice
+por criação/ID. `terms_acceptances` tem unique pessoa/versão e índice por pessoa,
+data e ID. Upsert preserva a primeira evidência. Os índices entram no conjunto v5
+explícito; não existe backfill de concordância nem hook de publicação no startup.
+
+`sanitize-html` 2.18.1 é dependência exclusiva da API, com tipos 2.16.2. A política
+permitida e todo caminho de concorrência são descritos na
+[administração](../endpoints/admin-terms.md). O comando `terms:prepare-initial`
+prepara a minuta idempotentemente mediante operação explícita; não publica nem
+aceita. [Leitura/aceite](../endpoints/terms.md) documenta as exceções, erros e
+projeções. SSE envia termos mesmo durante pendência e filtra negócio por recibo.

@@ -70,13 +70,13 @@ offline Google Analytics. Rotas `/api` e `/auth`, SSE, signed URLs e recursos
 remotos não entram no cache e nunca recebem resposta privada do service worker.
 
 O motor é o único proprietário do SQLite `dall-fit-offline.db`, de
-`files/offline/` e do lock justo que serializa mutações no processo. O schema v5
+`files/offline/` e do lock justo que serializa mutações no processo. O schema v6
 mantém metadados do motor, uma conta local, até cinco planos preparados e uma
 sessão ativa, snapshots por execução, estado operacional de sincronização e
 metadados de arquivos `temporary | ready`. Plano, sessão e snapshot são objetos JSON
 opacos com `payloadVersion` e revisão; apenas IDs, timestamps, sequência monotônica
 local e estado necessários ficam normalizados. A bridge não expõe SQL, path absoluto
-ou bytes. O schema v5 substitui o singleton de plano preparado por até cinco
+ou bytes. O schema vigente conserva a coleção que substitui o singleton de plano preparado por até cinco
 linhas com `plan_id` como chave, preservando a linha v4 durante a migration; conta
 e sessão continuam singulares. A migration v2→v3 acrescenta uma projeção singleton da conclusão mais
 recente, separada do snapshot de domínio e vinculada à identidade e sequência da
@@ -208,13 +208,11 @@ no resume e ao recuperar conectividade. Consultas concorrentes compartilham uma
 operação e respostas de composição encerrada são ignoradas. O maior mínimo já
 observado e a URL validada ficam em preferência privada excluída de backup; falha
 de rede sem mínimo conhecido permanece aberta somente para o uso local permitido.
-O pacote que introduz o schema v4 usa `versionCode 2`; `versionName` continua
-somente informativo e não participa da comparação.
-Com pacote obsoleto, o guard global substitui toda navegação por `main`, heading e
-ação da Play Store. Somente o path exato do workout capturado antes da detecção
-permanece montado até `completed` ou `cancelled`; preparação, takeover, nova sessão
-e todas as entradas do sincronizador permanecem bloqueados. A bridge tenta primeiro
-o intent restrito a `com.android.vending` e depois a mesma URL HTTPS no navegador.
+O pacote corrente usa `versionCode 3`, `versionName 1.1` e schema SQLite 6.
+A migration v5→v6 acrescenta `terms_access`, vinculada à conta, sem fabricar recibo
+nem alterar plano/sessão/fila. Bancos anteriores percorrem as migrations aditivas
+existentes antes dela. Elevar o mínimo público é operação posterior à distribuição
+validada, conforme o processo de release Android.
 
 Criação e migrations pertencem ao `SQLiteOpenHelper`. Falha de abertura é tentada
 novamente com outro handle; falha persistente, migration ausente ou downgrade
@@ -789,7 +787,7 @@ documento visível.
 `src/auth/auth-return-to.ts` concentra a persistência temporária da intenção de
 navegação em `sessionStorage`, sem dados de sessão. O Router valida o path contra
 sua árvore e reutiliza os validadores de search da rota para guardar apenas seus
-parâmetros aceitos. A raiz e `/dash` consomem a intenção; o handler de encerramento
+parâmetros aceitos. A raiz lê a intenção sem consumir; o guard privado só a consome após aceite vigente; o handler de encerramento
 de sessão coordena sua limpeza com a captura da entrada bloqueada. Preloads usam
 somente a pessoa já cacheada e não ativam sessão, obtêm CSRF ou alteram a intenção.
 
@@ -880,3 +878,41 @@ consumo público por meio da interoperabilidade CommonJS do Vite.
 - [TanStack Query React](https://tanstack.com/query/latest/docs/framework/react/overview)
 - [TanStack Form React](https://tanstack.com/form/latest/docs/framework/react)
 - [Axios](https://axios.rest/pages/getting-started/first-steps)
+
+## Política de termos e atividade privada
+
+`core/terms/policy.ts` mantém situação, requisito mínimo, autorização local e estado
+bloqueado dentro da geração autenticada. O guard privado aguarda `/terms/access`
+depois de pessoa/CSRF e antes de montar negócio. `TermsBoundary` observa a mesma
+query; antes do primeiro aceite não pré-renderiza filhos privados. Uma nova
+exigência oculta a árvore já usada com React `Activity`, limpando efeitos e portals
+sem perder estado recuperável. O Axios cancela novas requests de negócio e nunca
+repete mutation recusada como efeito do aceite. O SSE pertence a essa fronteira;
+o bridge de planos apenas assina os recursos de seu domínio.
+
+Web/PWA revalida por foco/reconexão, ready SSE e intervalo de cinco minutos visível.
+Android consulta canônico online e persiste somente comprovante mínimo e referência
+monotônica no motor existente, com conta esperada em cada chamada da bridge. Em
+falha transitória, prova válida permite Treinar local; sem prova ou com requisito
+posterior conhecido mantém bloqueio. `terms-required` pausa o motor foreground e
+Worker sem expirar credencial, descartar fila ou gerar notificação de conflito.
+
+O menu sem aceite conserva identidade/tema/saída e omite navegação/instalação. Depois
+do aceite, inclui `Termos de uso` e, para admin, `Gestão de termos`. Leitura,
+próprios recibos e gestão possuem [rotas proprietárias](../routes/terms.md).
+
+Analytics admite paths `/terms` e `/admin/terms`, surface `terms` e control
+`terms_action`. `ui_terms_action` só recebe ação enumerada; operações jurídicas
+emitem início/terminal. Campos do editor usam `form=terms_editor` e nomes enumerados
+`title`, `operatorName`, `operatorEmail`, `changeSummary` e `bodyHtml` no contrato tipado, com estado de validação,
+sem valores. Identificação, texto legal, hash, número, recibo, ID e resultado jurídico
+concreto são proibidos nas emissões.
+
+Referências oficiais complementares: [React Activity](https://react.dev/reference/react/Activity)
+e [sanitização server-side](https://github.com/apostrophecms/apostrophe/tree/main/packages/sanitize-html).
+As APIs usadas foram conferidas com React 19.3.1 e os tipos locais.
+
+A recusa jurídica do Worker só grava o requisito e libera o claim em uma mesma
+transação se execução, revisão e sequência ainda identificarem o item em voo.
+Resposta atrasada de uma fila removida por troca de conta não cria requisito na
+conta seguinte. O teste instrumentado de termos protege esse caminho.

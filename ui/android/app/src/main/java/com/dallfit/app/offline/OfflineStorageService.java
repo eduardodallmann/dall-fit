@@ -160,6 +160,156 @@ public final class OfflineStorageService {
         });
     }
 
+    public String getTermsAccessJson() { return getTermsAccessJson(null); }
+
+    public String getTermsAccessJson(String expectedPersonId) {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            requireTermsAccount(helper.getReadableDatabase(), expectedPersonId);
+            try (Cursor cursor = helper.getReadableDatabase().rawQuery(
+                "SELECT access_json, required_reference_json, blocked FROM terms_access WHERE account_id = 1", null
+            )) {
+                if (!cursor.moveToFirst()) return null;
+                if (cursor.getInt(2) != 0 && !cursor.isNull(1)) {
+                    JSONObject result = new JSONObject();
+                    result.put("state", "required");
+                    result.put("current", new JSONObject(cursor.getString(1)));
+                    result.put("acceptance", JSONObject.NULL);
+                    return result.toString();
+                }
+                return cursor.isNull(0) ? null : cursor.getString(0);
+            } catch (JSONException error) {
+                throw invalidInput("termsAccess");
+            }
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public boolean hasKnownTermsRequirement() {
+        mutationLock.lock();
+        try {
+            ensureOperationalLocked();
+            try (Cursor cursor = helper.getReadableDatabase().rawQuery(
+                "SELECT blocked FROM terms_access WHERE account_id = 1", null
+            )) {
+                return cursor.moveToFirst() && cursor.getInt(0) != 0;
+            }
+        } finally {
+            mutationLock.unlock();
+        }
+    }
+
+    public void requireTermsAccepted() {
+        String json = getTermsAccessJson();
+        try {
+            if (json == null || !"accepted".equals(new JSONObject(json).optString("state"))) {
+                throw new OfflineStorageException("TERMS_ACCEPTANCE_REQUIRED", "Connect to review the current terms.");
+            }
+        } catch (JSONException error) {
+            throw invalidInput("termsAccess");
+        }
+    }
+
+    public void recordTermsAccess(String expectedPersonId, String accessJson) {
+        final JSONObject access;
+        final JSONObject reference;
+        try {
+            access = TermsAccessValidator.access(accessJson);
+            reference = access.optJSONObject("current");
+        } catch (JSONException error) {
+            throw invalidInput("termsAccess");
+        }
+        mutate(database -> {
+            requireTermsAccount(database, expectedPersonId);
+            long minimum = readTermsMinimum(database);
+            long number = reference == null ? 0 : reference.optLong("publicationNumber", 0);
+            if (number < minimum) return false;
+            ContentValues values = new ContentValues();
+            values.put("account_id", 1);
+            values.put("access_json", access.toString());
+            values.put("required_number", number);
+            values.put("required_reference_json", reference == null ? null : reference.toString());
+            values.put("blocked", "required".equals(access.optString("state")) ? 1 : 0);
+            database.insertWithOnConflict("terms_access", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    public void noteTermsRequired(String referenceJson, String expectedPersonId) {
+        final JSONObject reference;
+        try {
+            reference = TermsAccessValidator.reference(new JSONObject(referenceJson));
+        } catch (JSONException error) {
+            throw invalidInput("termsReference");
+        }
+        mutate(database -> {
+            requireTermsAccount(database, expectedPersonId);
+            if (!writeTermsRequirement(database, reference)) return false;
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    public boolean pauseSyncForTerms(OfflineSyncClaim claim, String referenceJson, String updatedAt) {
+        requireIsoInstant(updatedAt, "updatedAt");
+        final JSONObject reference;
+        try {
+            reference = TermsAccessValidator.reference(new JSONObject(referenceJson));
+        } catch (JSONException error) {
+            throw invalidInput("termsReference");
+        }
+        return mutate(database -> {
+            String condition = "execution_id = ? AND snapshot_revision = ? AND queue_sequence = ? AND status = 'in_flight'";
+            String[] arguments = { claim.getExecutionId(), Long.toString(claim.getRevision()), Long.toString(claim.getQueueSequence()) };
+            try (Cursor cursor = database.query("sync_state", new String[] { "execution_id" }, condition, arguments, null, null, null)) {
+                if (!cursor.moveToFirst()) return false;
+            }
+            writeTermsRequirement(database, reference);
+            ContentValues pending = new ContentValues();
+            pending.put("status", "pending");
+            pending.put("attempt_count", 0);
+            pending.putNull("next_attempt_at");
+            pending.put("reason", "terms-required");
+            pending.putNull("action_details_json");
+            pending.put("updated_at", updatedAt);
+            database.update("sync_state", pending, condition, arguments);
+            database.execSQL("UPDATE sync_state SET revision = revision + 1 WHERE execution_id = ?", new Object[] { claim.getExecutionId() });
+            incrementStateRevision(database);
+            return true;
+        });
+    }
+
+    private static boolean writeTermsRequirement(SQLiteDatabase database, JSONObject reference) {
+        long number = reference.optLong("publicationNumber", 0);
+        if (number < readTermsMinimum(database)) return false;
+        database.execSQL("INSERT OR IGNORE INTO terms_access (account_id) VALUES (1)");
+        ContentValues values = new ContentValues();
+        values.put("required_number", number);
+        values.put("required_reference_json", reference.toString());
+        values.put("blocked", 1);
+        database.update("terms_access", values, "account_id = 1", null);
+        return true;
+    }
+
+    private static void requireTermsAccount(SQLiteDatabase database, String expectedPersonId) {
+        requireAccount(database);
+        if (expectedPersonId == null) return;
+        try (Cursor cursor = database.rawQuery("SELECT person_id FROM account_state WHERE id = 1", null)) {
+            if (!cursor.moveToFirst() || !expectedPersonId.equals(cursor.getString(0))) {
+                throw new OfflineStorageException("OFFLINE_STORAGE_ACCOUNT_MISMATCH", "Terms belong to another account.");
+            }
+        }
+    }
+
+    private static long readTermsMinimum(SQLiteDatabase database) {
+        try (Cursor cursor = database.rawQuery("SELECT required_number FROM terms_access WHERE account_id = 1", null)) {
+            return cursor.moveToFirst() ? cursor.getLong(0) : 0;
+        }
+    }
+
     public boolean hasPendingChanges() {
         mutationLock.lock();
         try {
@@ -1120,6 +1270,7 @@ public final class OfflineStorageService {
             ) > 0;
             String publicState;
             if (authenticationRequired && pendingCount > 0) publicState = "authentication-required";
+            else if (hasKnownTermsRequirement()) publicState = "terms-required";
             else if (syncing) publicState = "syncing";
             else if (updateRequired) publicState = "update-required";
             else if (actionRequired) publicState = "action-required";

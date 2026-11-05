@@ -61,3 +61,11 @@ Playwright em `personal-training-plan.spec.ts`.
 | `assets/training-plan-detail/desktop-1440-read-only.png` | `1440x900` | `personal-reference` | modelo disponibilizado em leitura no desktop |
 | `assets/training-plan-detail/mobile-390-read-only.png` | `390x844` | `personal-reference` | detalhe somente leitura no mobile |
 | `assets/training-plan-detail/desktop-1440-owned.png` | `1440x900` | `personal-mixed`, entrada própria | controles de edição e tabela do plano próprio |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

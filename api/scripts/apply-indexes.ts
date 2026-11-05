@@ -4,7 +4,7 @@ import process from 'node:process';
 
 import { connect, disconnect } from 'mongoose';
 
-const confirmation = 'apply-dall-fit-indexes-v4';
+const confirmation = 'apply-dall-fit-indexes-v5';
 const trainingPlanIndexName = 'ownerPersonId_1_createdAt_-1__id_-1';
 const legacyTrainingPlanIndexName = 'ownerPersonId_1_createdAt_-1';
 const peopleIndexName = 'googleSubject_1';
@@ -95,11 +95,23 @@ async function main(): Promise<void> {
       { name: 'trainingPlanId_1_exerciseId_1' },
     );
 
+    const terms = database.collection('terms_versions');
+    await terms.createIndex(
+      { publicationNumber: -1 },
+      { unique: true, partialFilterExpression: { state: 'published' } },
+    );
+    await terms.createIndex({ createdAt: -1, _id: -1 });
+    const acceptances = database.collection('terms_acceptances');
+    await acceptances.createIndex(
+      { personId: 1, termsVersionId: 1 },
+      { unique: true },
+    );
+    await acceptances.createIndex({ personId: 1, acceptedAt: -1, _id: -1 });
     const indexes = await trainingPlans.indexes();
     if (indexes.some((index) => index.name === legacyTrainingPlanIndexName)) {
       await trainingPlans.dropIndex(legacyTrainingPlanIndexName);
     }
-    process.stdout.write('Index set v4 applied successfully.\n');
+    process.stdout.write('Index set v5 applied successfully.\n');
   } finally {
     await disconnect();
   }

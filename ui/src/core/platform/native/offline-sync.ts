@@ -8,6 +8,7 @@ import {
   type OfflineSyncAction,
   type OfflineSyncState,
 } from '~/core/platform/native/offline-storage-plugin';
+import { readNativeTerms, requireTerms } from '~/core/terms/policy';
 
 type SyncPlugin = Pick<
   OfflineStoragePlugin,
@@ -175,6 +176,10 @@ export class OfflineSyncCoordinator {
   }
 
   private async handleState(state: OfflineSyncState): Promise<void> {
+    if (state.state === 'terms-required') {
+      const local = await readNativeTerms();
+      requireTerms(local?.current ?? undefined);
+    }
     if (state.state === 'authentication-required')
       this.authenticationRequired = true;
     await this.refresh();

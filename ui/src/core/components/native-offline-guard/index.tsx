@@ -13,15 +13,21 @@ const styles = nativeOfflineGuardStyles();
 
 export function NativeOfflineGuard({
   children,
-}: Readonly<{ children: ReactNode }>) {
+  disabled = false,
+}: Readonly<{ children: ReactNode; disabled?: boolean }>) {
   const platform = usePlatform();
   if (!platform.capabilities.nativeOfflineStorage) return children;
-  return <ActiveNativeOfflineGuard>{children}</ActiveNativeOfflineGuard>;
+  return (
+    <ActiveNativeOfflineGuard disabled={disabled}>
+      {children}
+    </ActiveNativeOfflineGuard>
+  );
 }
 
 function ActiveNativeOfflineGuard({
   children,
-}: Readonly<{ children: ReactNode }>) {
+  disabled,
+}: Readonly<{ children: ReactNode; disabled: boolean }>) {
   const preparation = useOfflinePreparation();
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,16 +46,16 @@ function ActiveNativeOfflineGuard({
     preparationSnapshot.status === 'data-ready-media-in-progress';
 
   useEffect(() => {
-    if (online || supported || preparation === null) return;
+    if (disabled || online || supported || preparation === null) return;
     void preparation.enter();
-  }, [online, preparation, supported]);
+  }, [disabled, online, preparation, supported]);
 
   useEffect(() => {
-    if (online || supported || !hasPlan) return;
+    if (disabled || online || supported || !hasPlan) return;
     void navigate({ replace: true, to: '/training' });
-  }, [hasPlan, navigate, online, supported]);
+  }, [disabled, hasPlan, navigate, online, supported]);
 
-  if (online || supported) return children;
+  if (disabled || online || supported) return children;
   if (hasPlan) return null;
 
   return (

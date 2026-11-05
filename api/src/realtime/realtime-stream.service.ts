@@ -7,13 +7,17 @@ import {
   REALTIME_HEARTBEAT_MS,
 } from '~/realtime/realtime.constants';
 import type { RealtimeConnection } from '~/realtime/realtime.types';
+import { TermsAccessService } from '~/terms/services/terms-access.service';
 
 @Injectable()
 export class RealtimeStreamService {
   private activeConnections = 0;
   private readonly logger = new Logger(RealtimeStreamService.name);
 
-  constructor(private readonly subscriber: RealtimeSubscriberService) {}
+  constructor(
+    private readonly subscriber: RealtimeSubscriberService,
+    private readonly termsAccess: TermsAccessService,
+  ) {}
 
   stream(connection: RealtimeConnection): Observable<MessageEvent> {
     this.logger.log('RealtimeStreamService -> stream -> params:', {
@@ -28,25 +32,41 @@ export class RealtimeStreamService {
       });
       observer.next({ data: {}, retry: 3_000, type: 'realtime-ready' });
       const unsubscribe = this.subscriber.subscribe((envelope) => {
-        const isGlobalTrainingPlanEvent =
-          envelope.event?.resource === 'global-training-plan';
-        if (!connection.isAdmin && !isGlobalTrainingPlanEvent) {
-          this.logger.log(
-            'RealtimeStreamService -> stream -> audienceSuppressed branch:',
-            { data: { audienceAccepted: false } },
+        void (async () => {
+          const isTermsEvent = envelope.event?.resource === 'terms';
+          if (!isTermsEvent) {
+            const access = await this.termsAccess.access(connection.personId);
+            if (access.state !== 'accepted') return;
+          }
+          const isGlobalTrainingPlanEvent =
+            envelope.event?.resource === 'global-training-plan';
+          if (
+            !connection.isAdmin &&
+            !isGlobalTrainingPlanEvent &&
+            !isTermsEvent
+          ) {
+            this.logger.log(
+              'RealtimeStreamService -> stream -> audienceSuppressed branch:',
+              { data: { audienceAccepted: false } },
+            );
+            return;
+          }
+          if (envelope.originClientInstanceId === connection.clientInstanceId) {
+            this.logger.log(
+              'RealtimeStreamService -> stream -> originSuppressed branch:',
+              { data: { originMatched: true } },
+            );
+            return;
+          }
+          observer.next({
+            data: envelope.event,
+            type: 'resource-invalidated',
+          });
+        })().catch(() => {
+          this.logger.warn(
+            'RealtimeStreamService -> stream -> termsUnavailable branch:',
+            { data: { delivered: false } },
           );
-          return;
-        }
-        if (envelope.originClientInstanceId === connection.clientInstanceId) {
-          this.logger.log(
-            'RealtimeStreamService -> stream -> originSuppressed branch:',
-            { data: { originMatched: true } },
-          );
-          return;
-        }
-        observer.next({
-          data: envelope.event,
-          type: 'resource-invalidated',
         });
       });
       const heartbeat = setInterval(() => {

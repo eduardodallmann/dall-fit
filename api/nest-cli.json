@@ -4,7 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["training-plan-assistant/data/*.json"],
+    "assets": ["training-plan-assistant/data/*.json", "terms/domain/*.json"],
     "watchAssets": true
   }
 }

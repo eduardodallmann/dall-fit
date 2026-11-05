@@ -153,3 +153,11 @@ Invalidações SSE do plano refazem detalhe e resumos para qualquer usuário
 autenticado (admin ou não-admin) quando não há edição ou confirmação local
 aberta. Com trabalho local, o coordenador pausa e conserva a recarga confirmada
 desta tela. Exclusão externa navega para a listagem depois da reconciliação.
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

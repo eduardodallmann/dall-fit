@@ -8,6 +8,7 @@ public final class OfflineSyncTransportResult {
         GLOBAL_BLOCKED,
         SUCCESS,
         TEMPORARY,
+        TERMS_REQUIRED,
         UPDATE_REQUIRED
     }
 
@@ -42,6 +43,10 @@ public final class OfflineSyncTransportResult {
 
     public static OfflineSyncTransportResult temporary(String reason, String retryAfter) {
         return new OfflineSyncTransportResult(Kind.TEMPORARY, reason, null, retryAfter);
+    }
+
+    public static OfflineSyncTransportResult termsRequired(String detailsJson) {
+        return new OfflineSyncTransportResult(Kind.TERMS_REQUIRED, "terms-required", detailsJson, null);
     }
 
     public static OfflineSyncTransportResult updateRequired(String detailsJson) {

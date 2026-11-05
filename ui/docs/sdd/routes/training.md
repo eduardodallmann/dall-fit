@@ -202,3 +202,11 @@ SDK e não são reproduzidos ao reconectar.
 | `assets/training/desktop-1440-training.png` | `1440x900` | `active-plan` | plano em uso e grade limitada a duas colunas |
 | `assets/training/mobile-390-training.png` | `390x844` | `active-plan` | cards em coluna única no mobile |
 | `assets/training/mobile-390-no-active-plan.png` | `390x844` | `no-active-plan` | empty state e ação para Meus planos |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

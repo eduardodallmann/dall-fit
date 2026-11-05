@@ -89,7 +89,7 @@ Identificadores vigentes incluem:
   cookie Web fictício em `/tmp/dall-fit-web-session-cookie.txt` para validar a
   restrição de canal;
 - `offline-training-snapshot:ready`, `offline-training-snapshot:current`,
-  `offline-training-snapshot:expired`, `offline-training-snapshot:revoked` e
+  `offline-training-snapshot:expired`, `offline-training-snapshot:revoked`, `offline-training-snapshot:terms-required` e
   `offline-training-snapshot:invalid`, que preparam pessoa, sessões, plano, lease
   e, quando aplicável, revisão corrente. O body v1 determinístico é gravado com
   permissão restrita em `/tmp/dall-fit-offline-training-snapshot.json`; os cenários
@@ -181,3 +181,18 @@ registrar a validação no resumo da mudança.
   sanitização e formato quando forem emitidos por classes;
 - seeds são bloqueados fora de ambientes local e de teste;
 - o comando nunca limpa banco ou Redis sem validar explicitamente o ambiente alvo.
+
+## Cenários jurídicos locais
+
+`terms:not-configured`, `terms:required`, `terms:accepted`, `terms:admin`,
+`terms:draft` e `terms:updated` preparam documentos/recibos sintéticos, sessão nativa
+em `/tmp/dall-fit-terms-token.txt`, cookie Web em `/tmp/dall-fit-terms-cookie.txt` e
+bodies `dall-fit-terms-{fields,acceptance,publication}.json` no mesmo diretório,
+com permissão `0600`. Exigem segredo de sessão configurado e Redis/Mongo locais;
+recusam publicações externas à fixture, sem apagar documentos jurídicos de outros
+usos. Usar banco local dedicado para esses cenários.
+
+Seeds de negócio preparam recibos somente para pessoas sintéticas de cenário; isso
+é fixture explícita, não parte do login. Seeds `auth:*` não fabricam concordância.
+O bootstrap real da minuta possui outro comando, com confirmação/dry-run, descrito
+em [admin-terms.md](../endpoints/admin-terms.md#bootstrap-operacional-da-minuta-inicial).

@@ -40,6 +40,12 @@ import {
 } from '~/training/repositories/workout-execution.schema';
 
 import { exerciseLibrarySeeds, seedExerciseLibrary } from './exercise-library';
+import {
+  seedBusinessTerms,
+  seedTermsScenario,
+  termsSeedModels,
+  termsSeeds,
+} from './terms';
 
 const trainingPlanScenarios = [
   ...exerciseLibrarySeeds,
@@ -90,6 +96,7 @@ const offlineSnapshotScenarios = [
   'offline-training-snapshot:invalid',
   'offline-training-snapshot:ready',
   'offline-training-snapshot:revoked',
+  'offline-training-snapshot:terms-required',
 ] as const;
 
 const assistantScenarios = [
@@ -126,6 +133,7 @@ function assertSeedCanRun(
     ...offlineLeaseScenarios,
     ...offlineSnapshotScenarios,
     ...trainingPlanScenarios,
+    ...termsSeeds,
   ];
   if (!knownScenarios.includes(scenario ?? '')) {
     throw new Error(`Unknown seed. Use ${knownScenarios.join(', ')}.`);
@@ -488,41 +496,47 @@ async function main(): Promise<void> {
   await connect(mongodbUri);
 
   try {
-    const personModel = model(PersonDocument.name, PersonSchema);
-    const trainingPlanModel = model(
+    const personModel = model<PersonDocument>(
+      PersonDocument.name,
+      PersonSchema,
+    );
+    const trainingPlanModel = model<TrainingPlanDocument>(
       TrainingPlanDocument.name,
       TrainingPlanSchema,
     );
-    const catalogModel = model(
+    const catalogModel = model<PersonalTrainingPlanCatalogDocument>(
       PersonalTrainingPlanCatalogDocument.name,
       PersonalTrainingPlanCatalogSchema,
     );
-    const activeModel = model(
+    const activeModel = model<PersonalTrainingPlanActiveDocument>(
       PersonalTrainingPlanActiveDocument.name,
       PersonalTrainingPlanActiveSchema,
     );
-    const cloneJobModel = model(
+    const cloneJobModel = model<TrainingPlanCloneJobDocument>(
       TrainingPlanCloneJobDocument.name,
       TrainingPlanCloneJobSchema,
     );
-    const assistantSessionModel = model(
+    const assistantSessionModel = model<TrainingPlanAssistantSessionDocument>(
       TrainingPlanAssistantSessionDocument.name,
       TrainingPlanAssistantSessionSchema,
     );
-    const offlineTerminalReceiptModel = model(
-      OfflineTrainingTerminalReceiptDocument.name,
-      OfflineTrainingTerminalReceiptSchema,
-    );
-    const trainingLoadProfileModel = model(
+    const offlineTerminalReceiptModel =
+      model<OfflineTrainingTerminalReceiptDocument>(
+        OfflineTrainingTerminalReceiptDocument.name,
+        OfflineTrainingTerminalReceiptSchema,
+      );
+    const trainingLoadProfileModel = model<TrainingLoadProfileDocument>(
       TrainingLoadProfileDocument.name,
       TrainingLoadProfileSchema,
     );
-    const workoutExecutionModel = model(
+    const workoutExecutionModel = model<WorkoutExecutionDocument>(
       WorkoutExecutionDocument.name,
       WorkoutExecutionSchema,
     );
 
-    if (scenario?.startsWith('exercise-library:')) {
+    if (scenario?.startsWith('terms:')) {
+      await seedTermsScenario(personModel, scenario, seedSession);
+    } else if (scenario?.startsWith('exercise-library:')) {
       await seedExerciseLibrary(
         { personModel, trainingPlanModel, catalogModel },
         scenario,
@@ -924,6 +938,18 @@ async function main(): Promise<void> {
           JSON.stringify(offlineSnapshotRequestFixture(revision)),
           { mode: 0o600 },
         );
+      }
+    }
+    if (
+      scenario !== undefined &&
+      !scenario.startsWith('auth:') &&
+      !scenario.startsWith('terms:')
+    ) {
+      await seedBusinessTerms(personModel);
+      if (scenario === 'offline-training-snapshot:terms-required') {
+        await termsSeedModels().receipts.deleteMany({
+          personId: offlineLeasePersonId,
+        });
       }
     }
     process.stdout.write(`Seed ${scenario} prepared.\n`);

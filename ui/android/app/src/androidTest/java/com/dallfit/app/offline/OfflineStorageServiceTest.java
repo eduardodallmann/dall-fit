@@ -491,6 +491,8 @@ public final class OfflineStorageServiceTest {
 
     @Test
     public void migratesTheVersionFourPreparedPlanIntoTheCollection() {
+        service.initialize();
+        service.bindAccount("person-a");
         service.close();
         SQLiteDatabase versionFour = context.openOrCreateDatabase(
             databaseName,
@@ -498,6 +500,7 @@ public final class OfflineStorageServiceTest {
             null
         );
         versionFour.execSQL("PRAGMA foreign_keys = OFF");
+        versionFour.execSQL("DROP TABLE terms_access");
         versionFour.execSQL("DROP TABLE prepared_plan");
         versionFour.execSQL(
             "CREATE TABLE prepared_plan (" +
@@ -909,7 +912,18 @@ public final class OfflineStorageServiceTest {
         database.execSQL(
             "CREATE TABLE account_state (id INTEGER PRIMARY KEY, person_id TEXT NOT NULL)"
         );
-        database.execSQL("CREATE TABLE prepared_plan (id INTEGER PRIMARY KEY)");
+        database.execSQL(
+            "CREATE TABLE prepared_plan (" +
+            "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+            "account_id INTEGER NOT NULL DEFAULT 1," +
+            "plan_id TEXT NOT NULL," +
+            "payload_version INTEGER NOT NULL," +
+            "revision INTEGER NOT NULL," +
+            "payload_json TEXT NOT NULL," +
+            "validated_at TEXT NOT NULL," +
+            "expires_at TEXT NOT NULL," +
+            "updated_at TEXT NOT NULL)"
+        );
         database.execSQL("CREATE TABLE active_session (id INTEGER PRIMARY KEY)");
         database.execSQL(
             "CREATE TABLE snapshots (" +

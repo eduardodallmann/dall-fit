@@ -95,7 +95,7 @@ test('reads the committed Android application identity', () => {
 
   assert.deepEqual(readAndroidVersion(source), {
     applicationId: 'com.dallfit.app',
-    versionCode: 2,
-    versionName: '1.0',
+    versionCode: 3,
+    versionName: '1.1',
   });
 });

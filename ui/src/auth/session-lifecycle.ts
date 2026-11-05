@@ -67,6 +67,12 @@ export function getActiveSessionSignal(): AbortSignal | undefined {
   return activeSession?.controller.signal;
 }
 
+export function getActiveSessionPersonId(): string | undefined {
+  return activeSession?.status === 'active'
+    ? activeSession.personId
+    : undefined;
+}
+
 export function getActiveSessionGeneration(): number | undefined {
   return activeSession?.status === 'active'
     ? activeSession.generation

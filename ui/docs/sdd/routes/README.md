@@ -22,3 +22,6 @@ Este diretório contém a documentação funcional viva das telas. Use
   detalhe e manutenção de workouts.
 - [`/global/training-plan/:trainingPlanId/workout/:workoutId`](global-training-plan-workout.md):
   editor administrativo completo.
+
+- [`/terms`](terms.md): publicação vigente, aceite explícito e próprios recibos; barreira compartilhada com `/dash`.
+- [`/admin/terms`](admin-terms.md): rascunhos, identificação por versão, prévia e publicação.

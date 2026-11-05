@@ -395,3 +395,10 @@ curl --include --request DELETE \
   `api/test/auth.e2e-spec.ts`;
 - Playwright cobre somente a jornada da UI; o consentimento Google real permanece
   manual porque exige serviço e conta externos.
+
+## Cadastro não implica concordância contratual
+
+Todas as operações de auth são isentas da política de termos para permitir entrada,
+consulta, CSRF, tema e saída. Criar pessoa, sincronizar Google ou emitir sessão não
+cria recibo, nem durante bypass local. A UI verifica [terms/access](terms.md) somente
+depois da autenticação e bloqueia negócio até confirmação explícita.

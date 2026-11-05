@@ -99,7 +99,7 @@ export class RealtimeSubscriberService
       const parsed = JSON.parse(message) as InternalRealtimeEvent;
       if (
         parsed.audience !== 'admin' ||
-        parsed.event?.resource !== 'global-training-plan' ||
+        !['global-training-plan', 'terms'].includes(parsed.event?.resource) ||
         typeof parsed.event.resourceId !== 'string' ||
         parsed.event.resourceId.length === 0 ||
         !['deleted', 'present'].includes(parsed.event.state) ||

@@ -4,6 +4,7 @@ import { appCompatibilityHandlers } from '~/mocks/handlers/app-compatibility';
 import { authHandlers } from '~/mocks/handlers/auth';
 import { dashboardHandlers } from '~/mocks/handlers/dashboard';
 import { realtimeHandlers } from '~/mocks/handlers/realtime';
+import { termsHandlers } from '~/mocks/handlers/terms';
 import { trainingHandlers } from '~/mocks/handlers/training';
 import { trainingPlanAssistantHandlers } from '~/mocks/handlers/training-plan-assistant';
 import { trainingPlanHandlers } from '~/mocks/handlers/training-plans';
@@ -15,6 +16,7 @@ import {
 const apiBaseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, '');
 
 export const handlers = [
+  ...termsHandlers,
   ...appCompatibilityHandlers,
   ...authHandlers,
   ...dashboardHandlers,

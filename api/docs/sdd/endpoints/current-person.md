@@ -361,3 +361,9 @@ curl --request PATCH \
 | configs explícita ou ausente   | `get-current-person.command.spec.ts` | `auth.e2e-spec.ts` | pessoa com tema/legado    |
 | atualização e resposta pública | command e service próprios           | `auth.e2e-spec.ts` | tema claro/escuro         |
 | idempotência e validação       | DTO pelo pipe                        | `auth.e2e-spec.ts` | body válido/inválido      |
+
+## Independência do aceite
+
+Consultar pessoa, obter CSRF e alterar tema permanecem disponíveis com aceite
+pendente. Nenhum campo de Person nem JWT é comprovante jurídico; a situação é lida
+separadamente em [GET /terms/access](terms.md). Essas operações não criam recibo.

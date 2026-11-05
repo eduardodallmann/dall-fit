@@ -210,3 +210,13 @@ O primeiro request retorna `VALIDATION_ERROR`; o segundo,
 - `training-calendar.spec.ts` cobre virada de mês/ano e horário de verão.
 - `dashboard.e2e-spec.ts` usa MongoDB e Redis efêmeros para autenticação,
   autorização, isolamento, agregações, timezone, headers e ausência de PII.
+
+## Aceite de termos como precondição
+
+Depois dos guards de sessão/permissão/CSRF/quota e antes dos pipes/controllers de
+negócio, a política exige recibo da publicação vigente. Pendência responde
+`403 TERMS_ACCEPTANCE_REQUIRED`; ausência de publicação, `503 TERMS_NOT_CONFIGURED`;
+consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no domínio
+deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
+dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
+sem transformá-los em efeito do login.

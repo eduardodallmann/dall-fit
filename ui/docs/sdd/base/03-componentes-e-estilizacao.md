@@ -444,3 +444,13 @@ afetem composição ou responsividade validam o layout conforme
 - [HeroUI Styling](https://heroui.com/en/docs/react/getting-started/styling)
 - [HeroUI Composition](https://heroui.com/en/docs/react/getting-started/composition)
 - [HeroUI LLMs.txt](https://heroui.com/en/docs/react/getting-started/llms-txt)
+
+## Documento jurídico
+
+O renderer exclusivo de termos insere somente `contentHtml` canônico sanitizado
+pela API. Não renderiza body editável nem HTML de input local. Headings, listas,
+links e destaques recebem estilos próprios por `tv` em `routes/terms/styles.ts`,
+com fonte legal mínima 16 px e quebra de palavras. Editor usa TextField/Input e
+TextArea HeroUI; declarações usam Checkbox e confirmações usam AlertDialog.
+React `Activity` na barreira preserva formulários e remove efeitos/overlays enquanto
+a atividade privada fica inacessível. Nenhuma primitive visual é recriada.

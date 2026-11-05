@@ -9,6 +9,7 @@ import {
   AndroidAppCompatibilityService,
   type AndroidSnapshotClientHeaders,
 } from '~/app-compatibility/services/android-app-compatibility.service';
+import { TermsAccessService } from '~/terms/services/terms-access.service';
 import { mapOfflineTrainingSnapshotHttpError } from '~/training/errors/offline-training-snapshot-http.errors';
 import { OfflineTrainingSnapshotContentService } from '~/training/services/offline-training-snapshot-content.service';
 import { OfflineTrainingSnapshotLockService } from '~/training/services/offline-training-snapshot-lock.service';
@@ -20,6 +21,7 @@ export class PutOfflineTrainingSnapshotCommand {
   private readonly logger = new Logger(PutOfflineTrainingSnapshotCommand.name);
 
   constructor(
+    private readonly termsAccess: TermsAccessService,
     private readonly compatibility: AndroidAppCompatibilityService,
     private readonly content: OfflineTrainingSnapshotContentService,
     private readonly locks: OfflineTrainingSnapshotLockService,
@@ -43,6 +45,11 @@ export class PutOfflineTrainingSnapshotCommand {
     });
     try {
       this.compatibility.validateSnapshotClient(clientHeaders);
+      await this.termsAccess.require(personId);
+      this.logger.log(
+        'PutOfflineTrainingSnapshotCommand -> execute -> termsAccess return:',
+        { data: { accepted: true } },
+      );
       this.logger.log(
         'PutOfflineTrainingSnapshotCommand -> execute -> compatibility return:',
         { data: { compatible: true } },

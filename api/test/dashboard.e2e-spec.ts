@@ -24,6 +24,8 @@ import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan
 import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 import { TrainingClockService } from '~/training/services/training-clock.service';
 
+import { resetTermsFixture, seedAcceptedTerms } from './helpers/terms-fixture';
+
 const googleCredential = Buffer.from(
   JSON.stringify({
     web: {
@@ -95,6 +97,7 @@ describe('Dashboard (e2e)', () => {
   });
 
   beforeEach(async () => {
+    await resetTermsFixture(app);
     await Promise.all([
       people.deleteMany({}).exec(),
       plans.deleteMany({}).exec(),
@@ -120,6 +123,7 @@ describe('Dashboard (e2e)', () => {
       name: isAdmin ? 'Admin Runner' : 'Regular Runner',
       photoUrl: null,
     });
+    await seedAcceptedTerms(app, person._id.toString());
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')

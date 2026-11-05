@@ -2,6 +2,8 @@ import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
 import type {
   OfflineTrainingSnapshotConflictDetails,
+  TermsAccess,
+  TermsReference,
   WorkoutExecutionSummary,
 } from '@dall-fit/types';
 
@@ -51,7 +53,8 @@ export interface OfflineSyncState {
     | 'idle'
     | 'pending'
     | 'syncing'
-    | 'update-required';
+    | 'update-required'
+    | 'terms-required';
 }
 
 export interface AppCompatibilityState {
@@ -87,6 +90,18 @@ export interface OfflineSyncAction {
 }
 
 export interface OfflineStoragePlugin {
+  getTermsAccess(options: {
+    personId: string;
+  }): Promise<{ access?: TermsAccess }>;
+  recordTermsAccess(options: {
+    personId: string;
+    access: TermsAccess;
+  }): Promise<{ access?: TermsAccess }>;
+  noteTermsRequired(options: {
+    reference: TermsReference;
+    personId: string;
+  }): Promise<void>;
+
   addListener(
     eventName: 'stateChanged',
     listener: (state: OfflineStorageState) => void,

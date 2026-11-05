@@ -275,3 +275,12 @@ Referências de layout no SDD são opcionais. A comparação visual só é neces
 quando a pasta `routes/assets/<route-slug>/` contiver imagens e segue
 `06-referencias-visuais-de-layout.md`. A ausência de imagens não representa falta de
 cobertura e não cria um gate visual.
+
+## Termos e Android
+
+Política jurídica tem unitários de requisito monotônico, geração/conta e prova
+local. Os integrados de termos cobrem login, retorno, publicação em outra instância,
+preservação de draft/overlay, confirmação, falha, histórico, cópia e teclado por MSW.
+`pnpm android:test` executa migrations/conta/prova e pausa/retomada da mesma fila em
+SQLite real. A build corrente é 3/1.1; a suíte de release confere essa identidade.
+Testes de contrato não criam aceites no runtime de autenticação.

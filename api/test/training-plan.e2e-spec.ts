@@ -47,6 +47,8 @@ import { YoutubeReferenceService } from '~/training-plan/services/youtube-refere
 import { TrainingLoadProfileDocument } from '~/training/repositories/training-load-profile.schema';
 import { WorkoutExecutionDocument } from '~/training/repositories/workout-execution.schema';
 
+import { resetTermsFixture, seedAcceptedTerms } from './helpers/terms-fixture';
+
 const googleCredential = Buffer.from(
   JSON.stringify({
     web: {
@@ -188,6 +190,7 @@ describe('Global training plans (e2e)', () => {
   });
 
   beforeEach(async () => {
+    await resetTermsFixture(app);
     uploadedBlobs.length = 0;
     deletedBlobKeys.length = 0;
     vi.clearAllMocks();
@@ -216,7 +219,7 @@ describe('Global training plans (e2e)', () => {
     isAdmin: boolean,
   ): Promise<ReturnType<typeof request.agent>> {
     const googleSubject = isAdmin ? 'google-admin-001' : 'google-person-001';
-    await personModel.create({
+    const person = await personModel.create({
       googleSubject,
       name: isAdmin ? 'Admin Runner' : 'Regular Runner',
       email: isAdmin
@@ -225,6 +228,7 @@ describe('Global training plans (e2e)', () => {
       photoUrl: null,
       ...(isAdmin ? { isAdmin: true } : {}),
     });
+    await seedAcceptedTerms(app, person._id.toString());
     const agent = request.agent(app.getHttpServer());
     await agent
       .post('/auth/test-login')

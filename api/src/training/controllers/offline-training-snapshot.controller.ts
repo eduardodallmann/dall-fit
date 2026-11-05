@@ -16,10 +16,12 @@ import type {
 import { NativeTrainingMutation } from '~/auth/decorators/authenticated-mutation';
 import { CurrentPerson } from '~/auth/decorators/current-person';
 import type { PersonEntity } from '~/person/domain/person.entity';
+import { TermsExempt } from '~/terms/terms-policy';
 import { PutOfflineTrainingSnapshotCommand } from '~/training/commands/put-offline-training-snapshot.command';
 import { OfflineTrainingSnapshotValidationPipe } from '~/training/dto/offline-training-snapshot.dto';
 
 @Controller('training/offline-snapshot')
+@TermsExempt()
 export class OfflineTrainingSnapshotController {
   private readonly logger = new Logger(OfflineTrainingSnapshotController.name);
 

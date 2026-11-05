@@ -388,3 +388,12 @@ somente no secure storage nativo.
 - Cenários manuais e justificativa: consentimento Google real exige serviço e conta
   externos. O lifecycle PWA real é validado por `pnpm test:pwa-update`, porque o
   Playwright com MSW Browser mantém o Workbox desabilitado.
+
+## Aceite após a entrada
+
+O probe lê o destino pendente sem consumi-lo. Autenticar cria sessão e conta, mas
+nenhum recibo jurídico. O guard privado verifica `/terms/access`: sem aceite vigente
+mantém a intenção e apresenta leitura em `/dash`, com saída/tema disponíveis.
+Somente a confirmação libera o destino. Reprodução:
+`http://localhost:3000/?mockAuth=unauthenticated&mockTerms=required`.
+Detalhes e estados pertencem à [rota de termos](terms.md).

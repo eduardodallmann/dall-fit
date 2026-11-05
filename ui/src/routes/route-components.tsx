@@ -12,12 +12,12 @@ import {
 
 import { currentPersonQueryOptions } from '~/auth/current-person-query';
 import { endSession } from '~/auth/session-lifecycle';
-import { AuthenticatedShell } from '~/core/components/authenticated-shell';
 import { usePlatform } from '~/core/platform/platform';
 import { useTheme } from '~/core/theme/theme-context';
 import { DashboardPage } from '~/routes/dashboard';
 import { HomePage } from '~/routes/home';
 import { homeStyles } from '~/routes/home/styles';
+import { TermsBoundary } from '~/routes/terms/boundary';
 import { TrainingPlanRealtimeBridge } from '~/routes/training-plan/realtime-bridge';
 
 export function AuthenticatedRouteComponent() {
@@ -51,10 +51,10 @@ export function AuthenticatedRouteComponent() {
   if (person === undefined || person.id !== routePerson.id) return null;
 
   const result = (
-    <AuthenticatedShell mockAuth={mockAuth} person={person}>
+    <TermsBoundary mockAuth={mockAuth} person={person}>
       {platform.platform === 'web' ? <TrainingPlanRealtimeBridge /> : null}
       <Outlet />
-    </AuthenticatedShell>
+    </TermsBoundary>
   );
 
   return result;

@@ -274,3 +274,11 @@ body area, tempo exato e erros de campo são proibidos.
 | `assets/training-workout/desktop-1440-timer-modal.png` | `1440x900` | `sdd-pause-running` | timer em Modal com progresso e ação |
 | `assets/training-workout/mobile-390-timer-drawer.png` | `390x844` | `sdd-pause-running` | timer em Drawer encostado ao rodapé |
 | `assets/training-workout/mobile-390-finish-incomplete-dialog.png` | `390x844` | `sdd-session-running`, finalização aberta | confirmação incompleta e ações sem corte |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.

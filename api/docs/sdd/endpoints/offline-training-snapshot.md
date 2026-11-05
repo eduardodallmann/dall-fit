@@ -284,3 +284,41 @@ pública nos detalhes. Lease, TTL, snapshot, recibo e execução permanecem inta
 - lote, patch ou merge automático;
 - múltiplas execuções correntes ou substituição sem escolha explícita;
 - upload de mídia, signed URL ou alteração do plano canônico.
+
+## Precondição jurídica antes da ingestão
+
+`TermsExempt` evita antecipar a política no interceptor deste endpoint: o command
+preserva a validação de compatibilidade primeiro e depois chama
+`TermsAccessService.require`, antes do lock, leitura/renovação do lease, snapshot,
+recibo terminal ou execução. Pendência é `403 TERMS_ACCEPTANCE_REQUIRED` com referência
+mínima; ausência de publicação/falha necessária é `503 TERMS_NOT_CONFIGURED` ou
+`TERMS_UNAVAILABLE`. O lease e a fila remota ficam intactos. O Android classifica
+especificamente essa recusa como `terms-required`, persiste exigência e pausa sem
+expirar Bearer ou apagar fila; o aceite posterior reativa o mesmo motor.
+Os [cenários de termos](terms.md) e o E2E de snapshot protegem a fronteira.
+
+### Aceite pendente não altera a ingestão
+
+**Seed**
+
+```bash
+pnpm -C api seed -- offline-training-snapshot:terms-required
+```
+
+**cURL**
+
+```bash
+curl --include --request PUT \
+  --url http://localhost:4000/training/offline-snapshot \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-native-session-token.txt)" \
+  --header 'x-app-version-code: 2' \
+  --header 'x-sync-contract-version: 1' \
+  --header 'content-type: application/json' \
+  --data @/tmp/dall-fit-offline-training-snapshot.json
+```
+
+- Given: sessão nativa, plano/lease preparados e documento publicado sem recibo vigente.
+- When: envia um snapshot compatível.
+- Then: `403 TERMS_ACCEPTANCE_REQUIRED` com referência mínima, antes de lock,
+  renovação do lease, snapshot Redis ou execução/recibo terminal MongoDB.
+- Recuperação: abrir a aplicação e aceitar online; a mesma fila pode ser retomada.

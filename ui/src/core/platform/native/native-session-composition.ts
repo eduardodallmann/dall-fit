@@ -8,6 +8,7 @@ import { OfflinePreparationCoordinator } from '~/core/platform/native/offline-pr
 import { offlineStoragePlugin } from '~/core/platform/native/offline-storage-plugin';
 import { OfflineSyncCoordinator } from '~/core/platform/native/offline-sync';
 import { SecureCredentialAdapter } from '~/core/platform/native/secure-credential-adapter';
+import { configureNativeTerms } from '~/core/terms/policy';
 import type { TrainingRepository } from '~/routes/training/training-repository';
 import {
   getTrainingOverview,
@@ -50,6 +51,16 @@ export async function createNativeComposition(): Promise<NativeComposition> {
     takeoverLease: takeoverOfflineTrainingLease,
   });
   const offlineSync = new OfflineSyncCoordinator(coordinator);
+  configureNativeTerms({
+    read: async (personId) =>
+      (await offlineStoragePlugin.getTermsAccess({ personId })).access ?? null,
+    write: async (access, personId) =>
+      (await offlineStoragePlugin.recordTermsAccess({ access, personId }))
+        .access ?? null,
+    require: (reference, personId) =>
+      offlineStoragePlugin.noteTermsRequired({ reference, personId }),
+    resume: () => offlineSync.syncNow(),
+  });
   await offlineSync.initialize();
   return {
     appCompatibility,

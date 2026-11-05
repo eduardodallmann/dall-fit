@@ -275,3 +275,11 @@ conflito de domínio, exclusão durante debounce, rollback de ordem, reordenaç�
 teclado e o `AlertDialog` que protege a saída.
 Configuração, scripts, Chromium, MSW Browser, specs de rota/flow e ignores seguem
 o contrato desta página.
+
+## Jornada de termos
+
+`tests/integration/routes/terms.spec.ts` exerce leitura em `/dash` e `/terms`,
+primeiro login, destino privado, bloqueio por publicação, preservação de rascunho,
+aceite com erro/mudança de versão, cópia e interação mobile/teclado. Publicação por
+outra instância usa os próprios endpoints MSW e revalidação por foco; não intercepta
+Axios nem acessa a API real. A reprodução manual está nas rotas de termos.

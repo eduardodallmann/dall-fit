@@ -308,3 +308,18 @@ local válida; mudar o cookie de preparação permite testar nova tentativa.
 `mockAuth` não é restaurado como parte do destino, evitando reintroduzir um seletor
 permanente de anonimato depois de autenticar. Seletores de dados das rotas continuam
 sendo usados somente com mocks habilitados.
+
+## Termos
+
+`handlers/terms.ts` e `fixtures/terms.ts` são registrados antes do sentinel. Estados
+`accepted`, `required`, `updated`, `not-configured`, `admin`, `loading`, `load-error`,
+`accept-error`, `accept-timeout`, `changed-during-acceptance`, `publication-conflict`
+e `unsafe-html` isolam cenários de leitura e administração. Padrão aceito conserva
+os cenários de negócio existentes, sem mudar o comportamento real de login.
+
+`mockTerms` só gera header/cookie auxiliar em desenvolvimento com mocks habilitados.
+O seletor sintético sobrevive à navegação OAuth top-level e o recibo de cenário a
+reload, usando cookies exclusivos de mock; resets limpam ambos. Nenhum comprovante
+real usa esses cookies ou localStorage. Documentos/recibos sintéticos têm responsáveis
+`example.test`, sem a identificação pública real da minuta. Mocks modelam HTTP,
+revisão, preview, publicação e replay; o sanitizer real é validado na API.

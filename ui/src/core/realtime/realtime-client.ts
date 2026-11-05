@@ -78,7 +78,7 @@ export class RealtimeClient {
           String(rawEvent.data),
         ) as RealtimeResourceInvalidation;
         if (
-          event.resource !== 'global-training-plan' ||
+          !['global-training-plan', 'terms'].includes(event.resource) ||
           typeof event.resourceId !== 'string' ||
           event.resourceId.length === 0 ||
           !['deleted', 'present'].includes(event.state) ||

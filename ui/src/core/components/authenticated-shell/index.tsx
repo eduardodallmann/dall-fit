@@ -30,12 +30,16 @@ const styles = authenticatedShellStyles();
 
 export interface AuthenticatedShellProps {
   children: ReactNode;
+  termsRestricted?: boolean;
+  bypassNativeOfflineGuard?: boolean;
   mockAuth?: MockAuthScenario;
   person: Person;
 }
 
 export function AuthenticatedShell({
   children,
+  termsRestricted = false,
+  bypassNativeOfflineGuard = false,
   mockAuth = 'authenticated',
   person,
 }: Readonly<AuthenticatedShellProps>) {
@@ -193,7 +197,8 @@ export function AuthenticatedShell({
           isLogoutPending={isCheckingPending || logoutMutation.isPending}
           onLogout={() => void requestLogout()}
           person={person}
-          showPwaInstall={!isNative}
+          showPwaInstall={!isNative && !termsRestricted}
+          termsRestricted={termsRestricted}
         />
       </aside>
       <div className={styles.mobileTrigger()}>
@@ -233,7 +238,8 @@ export function AuthenticatedShell({
                     onNavigate={() => closeDrawer('navigation')}
                     onLogout={() => void requestLogout()}
                     person={person}
-                    showPwaInstall={!isNative}
+                    showPwaInstall={!isNative && !termsRestricted}
+                    termsRestricted={termsRestricted}
                   />
                 </Drawer.Body>
               </Drawer.Dialog>
@@ -242,7 +248,9 @@ export function AuthenticatedShell({
         </Drawer>
       </div>
       <main className={styles.content()}>
-        <NativeOfflineGuard>{children}</NativeOfflineGuard>
+        <NativeOfflineGuard disabled={bypassNativeOfflineGuard}>
+          {children}
+        </NativeOfflineGuard>
       </main>
       <NativeLogoutDialog
         isOpen={isLogoutDialogOpen}

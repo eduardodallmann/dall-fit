@@ -59,8 +59,10 @@ import { OptionalSessionGuard } from '~/auth/guards/optional-session.guard';
 import { RateLimitGuard } from '~/auth/guards/rate-limit.guard';
 import { TestAuthBypassGuard } from '~/auth/guards/test-auth-bypass.guard';
 import type { PersonEntity } from '~/person/domain/person.entity';
+import { TermsExempt } from '~/terms/terms-policy';
 
 @Controller()
+@TermsExempt()
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
   private readonly secureCookies: boolean;

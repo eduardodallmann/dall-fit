@@ -91,7 +91,7 @@ o cadastro OAuth Android usa `com.dallfit.app` e as assinaturas autorizadas.
     redireciona a `/`. O shell mantém `GET /auth/me` observado, revalida em foco,
     reconexão e a cada cinco minutos enquanto visível, refletindo expiração, pessoa
     removida ou mudança de privilégio sem cache indefinido.
-12. Com pessoa e CSRF confirmados na chegada a `/dash`, a UI consome o destino
+12. Com pessoa, CSRF e aceite vigente confirmados na chegada a `/dash`, a UI consome o destino
     pendente válido e navega com `replace` para ele. Os guards de permissão e as
     consultas do destino continuam decidindo seu conteúdo; a pessoa fresca e o
     token CSRF são reutilizados. Sem intenção válida, permanece em `/dash`.
@@ -301,3 +301,12 @@ simulado continua retornando a `/dash`. A UI executa toda a retomada.
 
 O Playwright usa MSW Browser e valida somente a jornada do frontend. Não declarar
 que ele cobre a implementação real dos endpoints.
+
+## Aceite posterior à autenticação
+
+Criar/sincronizar conta, consentir Google e emitir sessão não criam recibo jurídico.
+Depois do bootstrap a UI consulta `/terms/access`. Sem aceite vigente, guarda a
+intenção e apresenta a barreira de leitura, mantendo saída/tema disponíveis. A raiz
+lê a intenção sem consumi-la; só o guard privado liberado retoma o destino. Uma nova
+publicação exige nova concordância sem invalidar sessão. O fluxo proprietário está
+em [aceite de termos](aceite-de-termos.md).

@@ -39,3 +39,6 @@ somente quando constituir requisito funcional excepcional.
   atômicos da única instalação editora de uma pessoa.
 - [`PUT /training/offline-snapshot`](offline-training-snapshot.md): ingestão
   idempotente e cercada da execução Android corrente.
+
+- [Termos](terms.md): situação vigente, documento integral, próprios recibos e aceite idempotente.
+- [Administração de termos](admin-terms.md): rascunho, sanitização, prévia, publicação imutável e bootstrap.

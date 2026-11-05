@@ -21,3 +21,5 @@ Quando o flow possuir jornada observável no frontend, seus cenários relevantes
 automatizados em `ui/tests/integration/flows/<flow>.spec.ts` com Playwright e MSW
 Browser. Essa suíte valida a jornada da UI; os endpoints reais participantes
 continuam cobertos pelos E2E da API.
+
+- [Publicação e aceite de termos](aceite-de-termos.md): administração, leitura posterior ao login, recibos, novo bloqueio e continuidade Android.

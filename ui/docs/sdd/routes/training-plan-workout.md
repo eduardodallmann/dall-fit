@@ -155,3 +155,11 @@ da rota pessoal cobrem ambos os modos.
 | `assets/training-plan-workout/desktop-1440-read-only.png` | `1440x900` | `personal-reference` | workout do modelo em leitura no desktop |
 | `assets/training-plan-workout/mobile-390-read-only.png` | `390x844` | `personal-reference` | cards de leitura e mídia no mobile |
 | `assets/training-plan-workout/desktop-1440-owned.png` | `1440x900` | `personal-mixed`, entrada própria | editor completo reutilizado pelo plano pessoal |
+
+## Precondição jurídica compartilhada
+
+Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
+[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
+publicação descoberta durante uso oculta a atividade com efeitos pausados e
+preserva estado recuperável; concluir o aceite não repete mutation recusada.
+Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.
