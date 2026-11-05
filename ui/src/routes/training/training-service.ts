@@ -30,6 +30,7 @@ export type MockTrainingScenario =
   | 'series-running'
   | 'session-expired'
   | 'session-running'
+  | 'timer-resolve-error'
   | 'workout-complete'
   | 'workout-incomplete'
   | 'workout-preview'

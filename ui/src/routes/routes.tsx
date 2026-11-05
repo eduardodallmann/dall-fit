@@ -504,6 +504,7 @@ function isMockDashboardScenario(
     'personal',
     'personal-error',
     'session-running',
+    'timer-resolve-error',
   ].includes(String(value));
   return result;
 }

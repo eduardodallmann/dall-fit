@@ -69,8 +69,15 @@ pode ser finalizada ou cancelada. Atividade por duração apresenta também sua
 instrução e demonstração em vídeo quando fornecidas pelo plano. Timestamps do
 servidor dirigem o contador Web. No Android, timestamp civil, duração e âncora de
 `elapsedRealtime` persistidos recompõem o contador; background não pausa, reboot
-usa fallback civil limitado e nenhum tick grava SQLite. Chegar a zero conserva o
-overlay até ação explícita, sem concluir série, exercício ou treino.
+usa fallback civil limitado e nenhum tick grava SQLite. Ao zerar, `series-rest`
+e `pause` solicitam automaticamente `finish` pela mesma fila de mutations da
+sessão. O overlay permanece aberto e bloqueado durante pending e fecha depois da
+resposta canônica ou do commit local. Descanso de série preserva carga e conclusão
+anteriores e libera a próxima série, sem concluí-la. Pausa conclui seu exercício
+e avança/foca o primeiro incompleto; se todos estiverem concluídos, abre a
+confirmação integral, sem finalizar o workout. `duration` conserva o overlay em
+`00:00` até ação manual ou substituição pela leitura canônica; o contador da UI
+não resolve esse tipo automaticamente.
 `youtube-long` conclui manualmente. Exercício concluído pode ser reiniciado sem
 apagar cargas. Mídia e timers usam Drawer encostado ao rodapé em mobile e Modal em
 desktop. YouTube Short preserva 9:16; vídeo longo preserva 16:9; títulos podem
@@ -86,6 +93,16 @@ absoluto para não ocupar espaço nem deslocar o título.
 - Conflito de versão: descarta drafts e debounces, refaz GET, substitui a sessão e
   anuncia `O treino foi atualizado em outro lugar.`; não faz merge ou retry.
 - Falha comum: mantém representação canônica, encerra pending e mostra toast.
+- Falha na resolução do timer: mantém overlay e progresso confirmado, encerra
+  pending e mostra erro persistente no diálogo; `Pular descanso` permite tentativa
+  explícita. A tentativa automática não é repetida por ticks ou rerenders.
+- Resolução manual e expiração disputam uma única operação em voo. A identidade
+  inclui sessão, tipo, alvo, série e timestamps. Troca de breakpoint não duplica a
+  operação e um novo timer pode expirar independentemente do anterior.
+- Resolução aguardando a FIFO lê a versão corrente e confere a identidade antes
+  de executar; intenção antiga não alcança timer substituto, nova sessão ou nova
+  geração de autenticação. Conflito reconcilia sem replay automático da expiração
+  contra o timer devolvido. Callbacks obsoletos não publicam cache, foco ou feedback.
 - Finalização incompleta: exige confirmação `Finalizar mesmo assim`.
 - Conclusão integral: abre confirmação com `Parabéns!` e bloqueia dismiss acidental.
 - Draft com debounce pendente bloqueia finalização. Draft inválido, debounce ou
@@ -180,13 +197,64 @@ body area, tempo exato e erros de campo são proibidos.
 - Link para testar: não se aplica; relógio monotônico e recriação exigem Android.
 - Given: existe sessão local com timer confirmado.
 - When: o app vai ao background, o WebView é recriado ou o aparelho reinicia.
-- Then: progresso e timer são recompostos sem writes por tick ou resolução
-  automática, usando monotônico no mesmo boot e fallback civil limitado no reboot.
+- Then: progresso e timer são recompostos sem writes por tick, usando monotônico
+  no mesmo boot e fallback civil limitado no reboot. Se um descanso estiver
+  vencido, a tela solicita sua resolução e fecha após commit local, sem rede;
+  falha mantém recuperação explícita. Não há execução do timer em background.
+
+### Cenário 7 — descanso entre séries fecha em 390px
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=session-running`
+- Given: execução em `390x844`, com mais de uma série incompleta no exercício.
+- When: conclui uma série intermediária e aguarda o descanso zerar.
+- Then: uma resolução `finish` confirmada fecha o Drawer, preserva carga/série e
+  libera a próxima série. O foco retorna ao cabeçalho do exercício; outro descanso
+  iniciado pela série seguinte também fecha ao vencer.
+
+### Cenário 8 — descanso entre séries fecha em 1440px
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=session-running`
+- Given: a mesma condição do cenário 7 em `1440x900`.
+- When: o descanso da série intermediária zera.
+- Then: a Modal fecha após confirmação, com a mesma preservação, foco e
+  continuidade de séries do mobile.
+
+### Cenário 9 — pausa conclui ao zerar
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=pause-running`
+- Given: pausa ativa em `390x844` ou `1440x900`.
+- When: chega a zero sem ação manual.
+- Then: o overlay fecha após resolução confirmada, a pausa fica concluída e o
+  primeiro exercício incompleto recebe foco. A conclusão final do workout continua
+  exigindo a confirmação existente.
+
+### Cenário 10 — latência, falha e recuperação explícita do descanso
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=timer-resolve-error`
+- Given: pausa ativa cuja primeira resolução falha com atraso.
+- When: chega a zero e a gravação falha.
+- Then: o diálogo permanece, indica pending durante a gravação e apresenta erro
+  persistente depois da falha. Ticks posteriores não geram novas requests;
+  `Pular descanso` confirma a segunda tentativa e fecha o overlay.
+
+### Cenário 11 — duração permanece manual e resolução obsoleta é ignorada
+
+- Link para testar: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=duration-running`
+- Given: cronômetro de duração aberto sem uma leitura canônica substituta.
+- When: chega a `00:00`.
+- Then: permanece com `Cancelar` e `Finalizar`; o contador não resolve nem conclui
+  o exercício. As duas ações continuam aguardando confirmação.
+- Cobertura adicional em Vitest: disputa manual/automática, FIFO e versão,
+  conflito, timer substituído, unmount e geração de autenticação encerrada não
+  duplicam resolução nem aplicam intenção/feedback obsoletos.
 
 ## Estrutura e cobertura
 
 - Rota: `ui/src/routes/training/workout-page.tsx`.
 - Componentes exclusivos: `media-viewer.tsx`, `timer-overlay.tsx`, `styles.ts`.
+- Coordenação de resolução de timer: `use-timer-resolution.ts`, com testes de
+  FIFO, versão, identidade, falha e lifecycle; `timer-overlay.test.tsx` cobre
+  contagem, expiração e ações manuais de duração.
 - HeroUI: `Card`, `NumberField`, `Drawer`, `Modal`, `AlertDialog`, `ProgressBar`,
   `Button`, `Chip`, `Skeleton`, toast.
 - Tipos: `TrainingWorkoutPreview`, `TrainingSession`, unions de exercício/timer.

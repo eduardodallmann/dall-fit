@@ -23,6 +23,7 @@ const apiBaseUrl = import.meta.env.VITE_API_URL.replace(/\/$/, '');
 interface TrainingState {
   completion: ReturnType<typeof createWorkoutCompletionFixture>;
   session: TrainingSession | null;
+  timerResolutionAttempts: number;
 }
 
 const states = new Map<string, TrainingState>();
@@ -53,6 +54,7 @@ function stateFor(name: string): TrainingState {
     'pause-running',
     'series-running',
     'session-running',
+    'timer-resolve-error',
     'workout-complete',
     'workout-incomplete',
     'youtube-long-running',
@@ -61,6 +63,7 @@ function stateFor(name: string): TrainingState {
     ? new Date('2026-08-01T12:00:00.000Z')
     : undefined;
   const result = {
+    timerResolutionAttempts: 0,
     completion: createWorkoutCompletionFixture(fixedNow),
     session: running
       ? createTrainingSessionFixture(fixtureScenario, fixedNow)
@@ -378,11 +381,24 @@ export const trainingHandlers = [
   http.post(
     `${apiBaseUrl}/training/session/timer/resolve`,
     async ({ request }) => {
-      const state = stateFor(scenario(request));
+      const name = scenario(request);
+      const state = stateFor(name);
       if (state.session === null)
         return error('WORKOUT_SESSION_NOT_FOUND', 'Session not found.', 404);
       const invalid = validateVersion(request, state.session);
       if (invalid !== null) return invalid;
+      state.timerResolutionAttempts += 1;
+      if (
+        name === 'timer-resolve-error' &&
+        state.timerResolutionAttempts === 1
+      ) {
+        await delay(800);
+        return error(
+          'SERVICE_UNAVAILABLE',
+          'Progress could not be saved.',
+          503,
+        );
+      }
       const body = (await request.json()) as {
         outcome: 'cancel' | 'finish' | 'skip';
       };

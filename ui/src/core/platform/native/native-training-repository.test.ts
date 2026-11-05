@@ -147,6 +147,74 @@ function createHarness(
 }
 
 describe('NativeTrainingRepository', () => {
+  it.each(['series-rest', 'pause'] as const)(
+    'confirms %s resolution only after committing session and snapshot',
+    async (kind) => {
+      const preparedPreview: TrainingWorkoutPreview =
+        kind === 'pause'
+          ? {
+              ...preview,
+              exercises: [{ id: 'pause-a', restSeconds: 30, type: 'pause' }],
+            }
+          : preview;
+      const h = createHarness(undefined, preparedPreview);
+      const started = await h.repository.startSession('workout-a');
+      const running =
+        kind === 'pause'
+          ? await h.repository.startTimer('pause-a', 'pause', started.version)
+          : await h.repository.completeSeries(
+              'exercise-a',
+              1,
+              25,
+              started.version,
+            );
+      const commit = h.commitTrainingSession.getMockImplementation()!;
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      h.commitTrainingSession.mockImplementationOnce(async (input) => {
+        await gate;
+        await commit(input);
+      });
+      const resolving = h.repository.resolveTimer('finish', running.version);
+      await vi.waitFor(() =>
+        expect(h.commitTrainingSession).toHaveBeenCalledTimes(3),
+      );
+      expect((await h.repository.getSession()).activeTimer?.kind).toBe(kind);
+      release();
+      const resolved = await resolving;
+      expect(resolved.activeTimer).toBeNull();
+      expect(resolved.version).toBe(running.version + 1);
+      expect([...h.snapshots.values()][0]?.revision).toBe(resolved.version);
+      if (kind === 'pause')
+        expect(resolved.exercises[0]?.completedAt).not.toBeNull();
+      else expect(resolved.exercises).toEqual(running.exercises);
+    },
+  );
+
+  it('preserves the native timer after a failed commit and permits explicit retry', async () => {
+    const h = createHarness();
+    const started = await h.repository.startSession('workout-a');
+    const running = await h.repository.completeSeries(
+      'exercise-a',
+      1,
+      null,
+      started.version,
+    );
+    h.commitTrainingSession.mockRejectedValueOnce(
+      new Error('SQLite unavailable'),
+    );
+    await expect(
+      h.repository.resolveTimer('finish', running.version),
+    ).rejects.toThrow('SQLite unavailable');
+    expect((await h.repository.getSession()).activeTimer).not.toBeNull();
+    expect([...h.snapshots.values()][0]?.revision).toBe(running.version);
+    const resolved = await h.repository.resolveTimer('skip', running.version);
+    expect(resolved.activeTimer).toBeNull();
+    expect(resolved.version).toBe(running.version + 1);
+  });
+
   it('projects a ready local image without persisting its content URI', async () => {
     const imagePreview = {
       ...preview,

@@ -260,9 +260,13 @@ function fixtureTimer(
   scenario: string,
   now: Date,
 ): TrainingSession['activeTimer'] {
-  if (scenario !== 'pause-running' && scenario !== 'duration-running')
+  if (
+    scenario !== 'pause-running' &&
+    scenario !== 'duration-running' &&
+    scenario !== 'timer-resolve-error'
+  )
     return null;
-  const pause = scenario === 'pause-running';
+  const pause = scenario !== 'duration-running';
   const duration = pause ? 30 : 120;
   return {
     endsAt: new Date(now.getTime() + duration * 1000).toISOString(),

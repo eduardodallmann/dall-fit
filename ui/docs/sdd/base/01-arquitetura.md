@@ -179,8 +179,23 @@ Os comandos nativos de treino gravam sessão e snapshot da mesma revisão em uma
 execução pendente é coalescida sem perder sua sequência, e terminais de execuções
 anteriores permanecem na fila. Timers guardam timestamp civil, duração e âncora de
 `SystemClock.elapsedRealtime()`; a apresentação usa monotônico no mesmo boot e
-fallback civil limitado depois de reboot. O contador não grava por tick nem resolve
-o domínio automaticamente ao chegar a zero.
+fallback civil limitado depois de reboot. O contador não grava por tick.
+Enquanto a tela de execução estiver montada, descansos `series-rest` e `pause`
+vencidos solicitam `finish` pelo mesmo repository e pela FIFO da sessão. O overlay
+fecha somente após confirmação HTTP no Web ou commit local no Android; pausa
+conclui seu exercício e descanso de série preserva as séries já confirmadas.
+`duration` mantém resolução manual pelo contador da UI. A leitura canônica Web
+continua podendo resolver timers vencidos no servidor.
+
+`useTimerResolution` coordena uma resolução em voo por timer, identifica sessão,
+alvo e início, lê a versão na cabeça da FIFO e ignora intenção obsoleta ou geração
+de autenticação encerrada. Falha conserva o overlay, apresenta erro persistente e
+permite tentativa manual sem loop por tick. Reconciliação de conflito não repete
+a expiração contra o timer canônico retornado. Retomar um descanso vencido aplica
+essa regra na tela. Ao voltar à visibilidade no Android, o repository recompõe a
+âncora do relógio nativo; a leitura só substitui a sessão se identidade, revisão e
+geração ainda forem válidas, sem regredir gravação posterior. Nenhum Worker ou
+scheduler executa timers.
 
 O shell Android observa conectividade como hint. Fora de `/training` e
 `/training/workout/:workoutId`, perda de rede substitui a navegação por Treinar se

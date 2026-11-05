@@ -84,7 +84,13 @@ por pessoa.
    revisão e confirma sessão + envelope coalescido localmente antes do feedback.
    Carga é inteira entre 0 e 9999 ou vazia;
    concluir série aceita ambos atomicamente. Descansos e exercícios temporizados
-   usam timestamps do servidor. Salvar carga e concluir compartilham uma fila FIFO
+   usam timestamps do servidor no Web e o relógio recomposto nativo no Android.
+   Ao zerar, descansos entre séries e pausas solicitam resolução `finish` pela
+   mesma autoridade da plataforma. O overlay fecha após confirmação; a série
+   anterior é preservada e a pausa conclui seu exercício, com avanço e foco do
+   próximo incompleto. O cronômetro de duração mantém ações manuais pelo contador
+   da UI; a leitura canônica Web conserva sua resolução de timers vencidos.
+   Salvar carga, concluir e resolver timers compartilham uma fila FIFO
    por sessão, lendo a versão somente ao chegar à cabeça. Um PUT de carga pendente
    não bloqueia campos incompletos nem ações de conclusão; a ação usa o draft mais
    novo e respostas antigas não o sobrescrevem.
@@ -126,11 +132,16 @@ por pessoa.
 - Interrupção ou retomada: reabrir a rota dentro de 24 horas lê o mesmo snapshot.
 - Interrupção Android: refresh, background ou recriação lê a sessão SQLite e exige
   continuar ou descartar; timer usa monotônico no mesmo boot e fallback civil
-  limitado após reboot, sem resolução automática ao chegar a zero.
+  limitado após reboot. Ao retomar a tela, um descanso ainda ativo e vencido é
+  resolvido uma vez, após commit local; não há execução do timer por Worker.
 - Interrupção Web/PWA: a perda da conexão desmonta shell e jornada, preserva a URL
   e deixa somente a superfície global; reconexão remonta a etapa vigente sem
   converter esse canal em execução offline.
 - Erro recuperável: falha de mutation mantém a sessão canônica e permite nova ação.
+- Falha na resolução de descanso: overlay permanece em zero com erro persistente
+  e `Pular descanso` permite recuperação explícita, sem retry por tick. Pending,
+  ação manual e expiração compartilham proteção contra duplicidade. Intenções
+  obsoletas não alcançam outro timer e conflito não faz replay da expiração.
 - Conflito: draft local é descartado, GET canônico prevalece e a UI avisa.
 - Indisponibilidade: falha de Redis impede leitura/mutação; falha na consolidação
   preserva a sessão para repetição idempotente.
@@ -216,6 +227,10 @@ por pessoa.
 - Playwright: `ui/tests/integration/routes/training.spec.ts` valida listagem,
   início, carga vazia, concorrência com PUT atrasado, responsividade, mídia,
   finalização parcial e confirmação de descarte contra MSW.
+- Timers: Playwright cobre fechamento de descansos entre séries e pausas em
+  `390x844` e `1440x900`, séries sucessivas e recuperação de falha. Vitest cobre
+  contador manual de duração, FIFO, versão, intenção obsoleta, teardown e commit
+  nativo de resolução antes do feedback.
 - Conectividade Web/PWA: Vitest valida a fonte e o guard, Playwright valida perda e
   retomada após bootstrap e `pnpm test:pwa-update` audita app shell, Cache Storage e
   início offline real.

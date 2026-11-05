@@ -254,7 +254,11 @@ conforme `ExerciseImage`.
 O seletor `mockTraining` cobre visão geral, prévia, sessão, timer e conclusão do
 fluxo Treinar. A visão geral inclui validade offline determinística e a projeção do
 plano ativo; previews de imagem podem fornecer signed URLs fictícias e
-`offlineMediaId` sem acionar a bridge no navegador. Os cenários
+`offlineMediaId` sem acionar a bridge no navegador. O cenário
+`timer-resolve-error` começa com pausa ativa, atrasa a primeira resolução em
+`800ms` e responde `503 SERVICE_UNAVAILABLE` sem alterar a sessão; a tentativa
+explícita seguinte confirma a resolução com a versão vigente. O contador de
+tentativas pertence ao seletor e é reiniciado entre testes. Os cenários
 `sdd-session-running`, `sdd-pause-running` e
 `sdd-workout-complete` reutilizam respectivamente os estados funcionais homônimos
 sem o prefixo, mas fixam o relógio da fixture em `2026-08-01T12:00:00.000Z`. Eles

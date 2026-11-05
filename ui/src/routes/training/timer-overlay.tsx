@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
+  Alert,
   Button,
   Drawer,
   Modal,
@@ -16,13 +17,18 @@ import { trainingStyles } from '~/routes/training/styles';
 const styles = trainingStyles();
 
 interface TrainingTimerOverlayProps {
+  error: boolean;
   isPending: boolean;
-  onResolve: (outcome: 'cancel' | 'finish' | 'skip') => void;
+  onResolve: (
+    outcome: 'cancel' | 'finish' | 'skip',
+    automatic?: boolean,
+  ) => void;
   serverNow: string;
   timer: TrainingTimer;
 }
 
 export function TrainingTimerOverlay({
+  error,
   isPending,
   onResolve,
   serverNow,
@@ -32,7 +38,6 @@ export function TrainingTimerOverlay({
     defaultValue: true,
   });
   const state = useOverlayState({ defaultOpen: true });
-  const resolvedRef = useRef(false);
   const [currentTime, setCurrentTime] = useState(new Date(serverNow).getTime());
   const start = new Date(timer.startedAt).getTime();
   const end = new Date(timer.endsAt).getTime();
@@ -53,13 +58,17 @@ export function TrainingTimerOverlay({
     return () => window.clearInterval(interval);
   }, [serverNow]);
 
+  useEffect(() => {
+    if (timer.kind !== 'duration' && remainingMs === 0 && !isPending)
+      onResolve('finish', true);
+  }, [isPending, onResolve, remainingMs, timer.kind]);
+
   const resolve = (outcome: 'cancel' | 'finish' | 'skip') => {
-    if (resolvedRef.current || isPending) return;
-    resolvedRef.current = true;
+    if (isPending) return;
     onResolve(outcome);
   };
   const handleOpenChange = (open: boolean) => {
-    if (open || resolvedRef.current) return;
+    if (open) return;
     if (timer.kind === 'duration') resolve('cancel');
     else resolve('skip');
   };
@@ -80,6 +89,16 @@ export function TrainingTimerOverlay({
           <ProgressBar.Fill />
         </ProgressBar.Track>
       </ProgressBar>
+      {error ? (
+        <Alert status="danger">
+          <Alert.Title>
+            Não foi possível encerrar o {title.toLocaleLowerCase('pt-BR')}.
+          </Alert.Title>
+          <Alert.Description>
+            Tente novamente pela ação abaixo.
+          </Alert.Description>
+        </Alert>
+      ) : null}
       <div className={styles.overlayActions()}>
         {timer.kind === 'duration' ? (
           <>
@@ -100,6 +119,7 @@ export function TrainingTimerOverlay({
           </>
         ) : (
           <Button
+            isDisabled={isPending}
             isPending={isPending}
             onPress={() => resolve('skip')}
             variant="primary"
@@ -115,7 +135,7 @@ export function TrainingTimerOverlay({
     return (
       <Modal state={{ ...state, setOpen: handleOpenChange }}>
         <Modal.Backdrop
-          isDismissable={timer.kind === 'series-rest'}
+          isDismissable={!isPending && timer.kind === 'series-rest'}
           isKeyboardDismissDisabled={timer.kind !== 'series-rest'}
         >
           <Modal.Container size="sm">
@@ -128,7 +148,9 @@ export function TrainingTimerOverlay({
 
   return (
     <Drawer state={{ ...state, setOpen: handleOpenChange }}>
-      <Drawer.Backdrop isDismissable={timer.kind === 'series-rest'}>
+      <Drawer.Backdrop
+        isDismissable={!isPending && timer.kind === 'series-rest'}
+      >
         <Drawer.Content className={styles.drawerContent()} placement="bottom">
           <Drawer.Dialog aria-label={title} className={styles.drawerDialog()}>
             <Drawer.Handle className={styles.drawerHandle()} />

@@ -20,8 +20,12 @@ import type {
   TrainingSession,
 } from '@dall-fit/types';
 
+import {
+  getActiveSessionGeneration,
+  isSessionGenerationActive,
+} from '~/auth/session-lifecycle';
 import { trackTrainingAction } from '~/core/analytics';
-import { getApiErrorCode } from '~/core/http/http-error';
+import { classifyHttpFailure, getApiErrorCode } from '~/core/http/http-error';
 import { NativeTrainingRepositoryError } from '~/core/platform/native/native-training-repository';
 import { useReloadBlocker } from '~/core/reload-safety/reload-safety-context';
 import { dashboardKeys } from '~/routes/dashboard/dashboard-queries';
@@ -47,6 +51,7 @@ import {
   trainingMockSearch,
   type MockTrainingScenario,
 } from '~/routes/training/training-service';
+import { useTimerResolution } from '~/routes/training/use-timer-resolution';
 
 const styles = trainingStyles();
 
@@ -72,10 +77,6 @@ type SessionAction =
       exerciseId: string;
       kind: 'duration' | 'pause';
       type: 'start-timer';
-    }
-  | {
-      outcome: 'cancel' | 'finish' | 'skip';
-      type: 'resolve-timer';
     }
   | { exerciseId: string; type: 'complete-exercise' | 'restart-exercise' };
 
@@ -180,6 +181,7 @@ export function TrainingWorkoutPage({
   if (session !== undefined && session.workout.id === workoutId) {
     return (
       <ActiveWorkout
+        key={session.id}
         mockTraining={mockTraining}
         repository={repository}
         session={session}
@@ -354,6 +356,18 @@ function ActiveWorkout({
   const debounceTimers = useRef(new Map<string, number>());
   const [hasPendingDraft, setHasPendingDraft] = useState(false);
 
+  const focusExercise = (exerciseId: string) => {
+    const generation = getActiveSessionGeneration();
+    window.requestAnimationFrame(() => {
+      if (
+        isSessionGenerationActive(generation) &&
+        queryClient.getQueryData<TrainingSession>(sessionQueryKey)?.id ===
+          session.id
+      )
+        document.getElementById(`training-exercise-${exerciseId}`)?.focus();
+    });
+  };
+
   const executeSessionAction = async (action: SessionAction) => {
     const current = queryClient.getQueryData<TrainingSession>(sessionQueryKey);
     const version = current?.version ?? session.version;
@@ -380,8 +394,6 @@ function ActiveWorkout({
         );
       case 'start-timer':
         return repository.startTimer(action.exerciseId, action.kind, version);
-      case 'resolve-timer':
-        return repository.resolveTimer(action.outcome, version);
       case 'complete-exercise':
         return repository.completeExercise(action.exerciseId, version);
       case 'restart-exercise':
@@ -397,19 +409,19 @@ function ActiveWorkout({
       trainingActionName(action),
       'success',
     );
+    applySession(data);
+  };
+  const applySession = (data: TrainingSession, exerciseId = expandedId) => {
     queryClient.setQueryData(sessionQueryKey, data);
     const completed = data.exercises.find(
-      (exercise) => exercise.id === expandedId,
+      (exercise) => exercise.id === exerciseId,
     )?.completedAt;
     if (completed !== null && completed !== undefined) {
       const next = data.exercises.find(
         (exercise) => exercise.completedAt === null,
       );
       setExpandedId(next?.id ?? null);
-      if (next !== undefined)
-        window.requestAnimationFrame(() =>
-          document.getElementById(`training-exercise-${next.id}`)?.focus(),
-        );
+      if (next !== undefined) focusExercise(next.id);
     }
     if (data.exercises.every((exercise) => exercise.completedAt !== null))
       setFinishOpen(true);
@@ -420,16 +432,35 @@ function ActiveWorkout({
       trainingActionName(action),
       'error',
     );
-    if (trainingErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT') {
-      const canonical = await queryClient.fetchQuery({
-        ...trainingSessionQueryOptions(repository, mockTraining),
-        staleTime: 0,
-      });
-      setDrafts(sessionDrafts(canonical));
-      clearDebounces(debounceTimers.current);
-      setHasPendingDraft(false);
-      toast.warning('O treino foi atualizado em outro lugar.');
-      return;
+    await recoverSessionError(error);
+  };
+  const recoverSessionError = async (error: unknown) => {
+    const generation = getActiveSessionGeneration();
+    if (
+      trainingErrorCode(error) === 'WORKOUT_SESSION_VERSION_CONFLICT' &&
+      (error instanceof NativeTrainingRepositoryError ||
+        classifyHttpFailure(error).status === 409)
+    ) {
+      try {
+        const canonical = await queryClient.fetchQuery({
+          ...trainingSessionQueryOptions(repository, mockTraining),
+          staleTime: 0,
+        });
+        if (
+          !isSessionGenerationActive(generation) ||
+          canonical.id !== session.id
+        )
+          return;
+        setDrafts(sessionDrafts(canonical));
+        clearDebounces(debounceTimers.current);
+        setHasPendingDraft(false);
+        toast.warning('O treino foi atualizado em outro lugar.');
+        return;
+      } catch {
+        if (!isSessionGenerationActive(generation)) return;
+        toast.danger('Não foi possível atualizar o treino. Tente novamente.');
+        return;
+      }
     }
     toast.danger('Não foi possível salvar o progresso.');
   };
@@ -446,6 +477,21 @@ function ActiveWorkout({
     scope: { id: session.id },
     onError: handleSessionError,
     onSuccess: handleSessionSuccess,
+  });
+  const timerResolution = useTimerResolution({
+    onError: recoverSessionError,
+    onSuccess: (data) => {
+      const exerciseId = session.activeTimer?.exerciseId;
+      applySession(data, exerciseId);
+      if (
+        session.activeTimer?.kind === 'series-rest' &&
+        exerciseId !== undefined
+      )
+        focusExercise(exerciseId);
+    },
+    repository,
+    session,
+    sessionQueryKey,
   });
   const completeMutation = useMutation({
     mutationFn: (confirmIncomplete: boolean) =>
@@ -499,6 +545,7 @@ function ActiveWorkout({
     hasPendingDraft ||
       loadMutation.isPending ||
       actionMutation.isPending ||
+      timerResolution.isPending ||
       completeMutation.isPending,
   );
 
@@ -607,10 +654,10 @@ function ActiveWorkout({
       </Button>
       {session.activeTimer === null ? null : (
         <TrainingTimerOverlay
-          isPending={actionMutation.isPending}
-          onResolve={(outcome) =>
-            actionMutation.mutate({ outcome, type: 'resolve-timer' })
-          }
+          key={timerResolution.timerKey}
+          error={timerResolution.error}
+          isPending={actionMutation.isPending || timerResolution.isPending}
+          onResolve={timerResolution.resolve}
           serverNow={session.serverNow}
           timer={session.activeTimer}
         />
@@ -1067,7 +1114,6 @@ function trainingActionName(
 ):
   | 'complete_exercise'
   | 'complete_series'
-  | 'resolve_timer'
   | 'restart_exercise'
   | 'save_load'
   | 'start_timer' {
@@ -1077,8 +1123,6 @@ function trainingActionName(
       return 'complete_series';
     case 'start-timer':
       return 'start_timer';
-    case 'resolve-timer':
-      return 'resolve_timer';
     case 'restart-exercise':
       return 'restart_exercise';
     case 'complete-exercise':

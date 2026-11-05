@@ -2,6 +2,119 @@ import { expect, test } from '@playwright/test';
 
 const workoutId = '64b000000000000000000101';
 
+test.describe('FIT-108 — fechamento automático de descanso', () => {
+  for (const width of [390, 1440]) {
+    test(`Cenário ${width === 390 ? 7 : 8} — descanso entre séries fecha em ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ height: width === 390 ? 844 : 900, width });
+      await page.clock.install();
+      const outcomes: string[] = [];
+      page.on('request', (request) => {
+        if (request.url().endsWith('/training/session/timer/resolve'))
+          outcomes.push(request.postData() ?? '');
+      });
+      await page.goto(
+        `/training/workout/${workoutId}?mockAuth=person&mockTraining=session-running`,
+      );
+      await page
+        .getByRole('button', { name: 'Finalizar série 1', exact: true })
+        .click();
+      const overlay = page.getByRole('dialog', {
+        name: 'Descanso',
+        exact: true,
+      });
+      await expect(overlay).toBeVisible();
+      await page.clock.fastForward(61_000);
+      await expect(overlay).toHaveCount(0);
+      await expect(
+        page.getByRole('textbox', { name: 'Carga da série 1', exact: true }),
+      ).toHaveValue('15');
+      await expect(
+        page.getByRole('textbox', { name: 'Carga da série 1', exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole('button', { name: 'Finalizar série 2', exact: true }),
+      ).toBeEnabled();
+      await expect(
+        page.getByRole('button', { name: /1 Supino reto/ }),
+      ).toBeFocused();
+      expect(outcomes).toEqual(['{"outcome":"finish"}']);
+
+      await page
+        .getByRole('button', { name: 'Finalizar série 2', exact: true })
+        .click();
+      await expect(overlay).toBeVisible();
+      await page.clock.fastForward(61_000);
+      await expect(overlay).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Finalizar série 3', exact: true }),
+      ).toBeEnabled();
+      expect(outcomes).toEqual([
+        '{"outcome":"finish"}',
+        '{"outcome":"finish"}',
+      ]);
+    });
+
+    test(`Cenário 9 — pausa conclui ao zerar em ${width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ height: width === 390 ? 844 : 900, width });
+      await page.clock.install();
+      await page.goto(
+        `/training/workout/${workoutId}?mockAuth=person&mockTraining=pause-running`,
+      );
+      const overlay = page.getByRole('dialog', {
+        name: 'Descanso',
+        exact: true,
+      });
+      await expect(overlay).toBeVisible();
+      await page.clock.fastForward(31_000);
+      await expect(overlay).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: /1 Supino reto/ }),
+      ).toBeFocused();
+      await page.getByRole('button', { name: /Pausa 30 s/ }).click();
+      await expect(
+        page.getByRole('button', { name: 'Reiniciar exercício' }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Iniciar descanso' }),
+      ).toHaveCount(0);
+      await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    });
+  }
+
+  test('Cenário 10 — latência, falha e recuperação explícita do descanso', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ height: 844, width: 390 });
+    await page.clock.install();
+    const outcomes: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('/training/session/timer/resolve'))
+        outcomes.push(request.postData() ?? '');
+    });
+    await page.goto(
+      `/training/workout/${workoutId}?mockAuth=person&mockTraining=timer-resolve-error`,
+    );
+    const overlay = page.getByRole('dialog', { name: 'Descanso', exact: true });
+    const skip = overlay.getByRole('button', { name: 'Pular descanso' });
+    await expect(overlay).toBeVisible();
+    await page.clock.fastForward(31_000);
+    await expect(skip).toBeDisabled();
+    await expect(
+      overlay.getByText('Não foi possível encerrar o descanso.'),
+    ).toBeVisible();
+    await expect(skip).toBeEnabled();
+    await page.clock.fastForward(10_000);
+    expect(outcomes).toEqual(['{"outcome":"finish"}']);
+    await skip.click();
+    await expect(overlay).toHaveCount(0);
+    expect(outcomes).toEqual(['{"outcome":"finish"}', '{"outcome":"skip"}']);
+  });
+});
+
 test.describe('Fluxo Treinar', () => {
   test('mostra o plano ativo, o treino atual e o estado sem plano', async ({
     page,
