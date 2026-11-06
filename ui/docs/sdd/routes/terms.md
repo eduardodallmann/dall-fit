@@ -18,8 +18,10 @@ Sem publicação, só admin recebe a ação `Configurar primeiro termo` na barre
 `TermsBoundary` observa a situação por TanStack Query antes de montar negócio.
 Entrada privada pendente vai para `/dash`, conservando destino validado na mesma
 intenção temporária de autenticação. `/terms` permanece disponível. Enquanto o
-bloqueio existe, o menu mantém identidade, tema e saída, sem links de navegação ou
-instalação. Discordar não cria recibo; a pessoa pode sair.
+bloqueio existe, o menu comum mantém identidade, tema e saída, sem navegação ou
+instalação. O menu administrativo conserva Modelos de treino, Gestão de termos e
+Termos de uso, independentemente de publicação/aceite; as funções pessoais continuam
+bloqueadas inclusive para o administrador. Discordar não cria recibo; a pessoa pode sair.
 
 ## Elementos e conteúdo
 
@@ -144,12 +146,12 @@ Falha da coleta não interrompe uso, leitura nem confirmação.
 - When: marca as duas declarações e confirma.
 - Then: chega aos planos somente após confirmação; reload conserva o recibo no cenário.
 
-### Cenário 4 — Nova publicação bloqueia contas existentes e preserva o rascunho aberto
+### Cenário 4 — Nova publicação preserva administração e restringe o uso pessoal
 
 - Link para testar: `http://localhost:3000/global/training-plan?mockAuth=admin&mockTerms=admin`.
 - Given: versão 1 aceita e formulário de plano aberto.
 - When: outra instância publica versão 2 e o foco revalida a situação.
-- Then: modal/negócio ficam ocultos, lê e aceita a versão 2 e recupera o rascunho.
+- Then: o rascunho administrativo continua visível e íntegro, os links pessoais ficam indisponíveis; a leitura da versão 2 e o aceite liberam o uso pessoal.
 
 ### Cenário 9 — Versão muda durante a leitura ou confirmação
 
@@ -194,3 +196,12 @@ projeção e omissão de propriedades arbitrárias. Android é validado pelos te
 instrumentados de storage/sync, sem atribuir essa cobertura ao Playwright.
 
 Referências visuais: não se aplica — não há imagens para o slug `terms`.
+
+### Administração acessível com pendência ou falha de consulta
+
+- Links para testar: `http://localhost:3000/admin/terms?mockAuth=admin&mockTerms=required`
+  e `http://localhost:3000/admin/terms?mockAuth=admin&mockTerms=load-error`.
+- Given: administrador sem aceite ou consulta jurídica indisponível.
+- When: navega entre Gestão de termos e Modelos de treino pelo menu.
+- Then: ambas as áreas permanecem acessíveis; Home, Meus planos e Treinar não
+  aparecem até aceitar. Pessoa comum não recebe esses links nem acesso por URL.

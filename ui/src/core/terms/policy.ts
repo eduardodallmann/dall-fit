@@ -165,10 +165,7 @@ export function isTermsTransportBlocked(url: string | undefined): boolean {
     )
   )
     return false;
-  if (
-    /^\/?admin\/terms(?:\/|$)/.test(path) &&
-    snapshot.access?.state === 'not-configured'
-  )
+  if (/^\/?(?:admin(?:\/|$)|global\/training-plans(?:\/|$))/.test(path))
     return false;
   // Only a running authenticated generation participates in the legal gate.
   return getActiveSessionGeneration() !== undefined;

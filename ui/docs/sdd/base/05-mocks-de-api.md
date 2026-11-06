@@ -323,3 +323,8 @@ reload, usando cookies exclusivos de mock; resets limpam ambos. Nenhum comprovan
 real usa esses cookies ou localStorage. Documentos/recibos sintéticos têm responsáveis
 `example.test`, sem a identificação pública real da minuta. Mocks modelam HTTP,
 revisão, preview, publicação e replay; o sanitizer real é validado na API.
+
+Os cenários de termos `not-configured`, `required` e `load-error` também exercitam
+administração sem aceite com `mockAuth=admin`. Os handlers administrativos respondem
+normalmente; a falha da consulta jurídica não deve impedir esses requests. Login,
+publicação e navegação administrativa continuam sem fabricar recibos de concordância.

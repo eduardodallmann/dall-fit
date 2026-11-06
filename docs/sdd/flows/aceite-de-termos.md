@@ -8,9 +8,10 @@ Documento, recibo e bloqueio têm o mesmo significado na Web/PWA e no Android.
 
 ## Entrada e pré-condições
 
-Sessão autenticada não implica concordância. Nenhuma versão publicada fecha negócio
-até a configuração; só administrador entra na gestão inicial. Uma publicação nova
-exige novo recibo de toda a base, sem expirar sessões nem alterar recibos antigos.
+Sessão autenticada não implica concordância. Sem versão publicada, o uso pessoal
+fica fechado até a configuração. A administração permanece acessível ao administrador
+verificado, sem depender de publicação ou aceite. Uma publicação nova exige novo
+recibo para uso pessoal de toda a base, sem expirar sessões ou alterar recibos antigos.
 
 ## Rotas e endpoints participantes
 
@@ -32,8 +33,10 @@ exige novo recibo de toda a base, sem expirar sessões nem alterar recibos antig
 3. Um evento mínimo de termos avisa sessões conectadas. Consultas de reconciliação
    e bloqueio HTTP mantêm a autoridade mesmo se o aviso best-effort se perder.
 4. A pessoa autenticada sem recibo vigente recebe leitura em `/dash`; menu conserva
-   identidade, tema e saída. URL direta não monta negócio. Tela já aberta fica
-   oculta com efeitos pausados e estado recuperável preservado.
+   identidade, tema e saída. Administradores conservam os links de Modelos de treino,
+   Gestão de termos e leitura dos termos. URLs pessoais não montam negócio; telas
+   pessoais já abertas ficam ocultas com efeitos pausados e estado recuperável.
+   Telas administrativas continuam acessíveis e não são ocultadas pela pendência.
 5. Após duas declarações e confirmação, o servidor grava primeiro recibo por
    pessoa/versão com data/canal verificados e relê a situação. Repetição conserva a
    evidência original. Uma corrida nunca aceita a publicação nova implicitamente.

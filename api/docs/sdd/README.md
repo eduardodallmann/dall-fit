@@ -65,5 +65,5 @@ Mudanças de endpoint, wiring, MongoDB ou Redis aprovam também
 ## Acesso por termos
 
 [Leitura/aceite](endpoints/terms.md) e [administração](endpoints/admin-terms.md)
-pertencem a `TermsModule`. Endpoints de negócio exigem recibo da vigente depois dos
-guards habituais; sessão válida, isoladamente, não autoriza negócio.
+pertencem a `TermsModule`. Operações pessoais exigem recibo da vigente depois dos guards habituais. Operações
+`AdminOnly` permanecem acessíveis ao administrador autenticado sem aceite.

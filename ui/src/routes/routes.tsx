@@ -170,11 +170,12 @@ async function ensureTermsNavigation(
   }
   assertCurrentNavigation(isCurrent);
   const policy = getTermsPolicy();
-  const legal =
-    location.pathname === '/terms' ||
-    (location.pathname === '/admin/terms' &&
-      policy.access?.state === 'not-configured' &&
-      person.isAdmin === true);
+  const administrative =
+    person.isAdmin === true &&
+    router
+      .getMatchedRoutes(location.pathname)[0]
+      .some((route) => route.options.staticData?.termsAdministration === true);
+  const legal = location.pathname === '/terms' || administrative;
   if (
     policy.blocked &&
     !legal &&
@@ -268,6 +269,7 @@ const authenticatedRoute = createRoute({
 export const adminRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
   id: '_admin',
+  staticData: { termsAdministration: true },
   beforeLoad: ({ context }) => {
     assertAdminAccess(context.person);
     const result = {};
@@ -831,6 +833,9 @@ function TrainingCompletionRouteComponent() {
 }
 
 declare module '@tanstack/react-router' {
+  interface StaticDataRouteOption {
+    termsAdministration?: boolean;
+  }
   interface Register {
     router: typeof router;
   }

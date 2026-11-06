@@ -884,9 +884,12 @@ consumo público por meio da interoperabilidade CommonJS do Vite.
 `core/terms/policy.ts` mantém situação, requisito mínimo, autorização local e estado
 bloqueado dentro da geração autenticada. O guard privado aguarda `/terms/access`
 depois de pessoa/CSRF e antes de montar negócio. `TermsBoundary` observa a mesma
-query; antes do primeiro aceite não pré-renderiza filhos privados. Uma nova
-exigência oculta a árvore já usada com React `Activity`, limpando efeitos e portals
-sem perder estado recuperável. O Axios cancela novas requests de negócio e nunca
+query; antes do primeiro aceite não pré-renderiza funções pessoais. A branch admin
+possui `staticData.termsAdministration`, reconhecida pelo guard e por `TermsBoundary`
+somente para `Person.isAdmin=true`, usando a [metadata estática oficial do Router](https://tanstack.com/router/latest/docs/framework/react/guide/static-route-data)
+validada com a versão instalada 1.170.45. Ela permanece montada sem aceite, inclusive
+quando a consulta jurídica falha. Uma nova exigência pessoal oculta a árvore já usada com React `Activity`, limpando efeitos e portals
+sem perder estado recuperável. O Axios cancela novas requests pessoais e nunca
 repete mutation recusada como efeito do aceite. O SSE pertence a essa fronteira;
 o bridge de planos apenas assina os recursos de seu domínio.
 
@@ -897,8 +900,12 @@ falha transitória, prova válida permite Treinar local; sem prova ou com requis
 posterior conhecido mantém bloqueio. `terms-required` pausa o motor foreground e
 Worker sem expirar credencial, descartar fila ou gerar notificação de conflito.
 
-O menu sem aceite conserva identidade/tema/saída e omite navegação/instalação. Depois
-do aceite, inclui `Termos de uso` e, para admin, `Gestão de termos`. Leitura,
+Sem aceite, o menu comum conserva identidade/tema/saída e omite navegação/instalação.
+Para administradores, mantém `Modelos de treino`, `Gestão de termos` e `Termos de uso`,
+sem expor Home, Meus planos ou Treinar. Os endpoints `/admin/*` e
+`/global/training-plans/*` passam pela barreira local de transporte; a autorização
+administrativa continua sendo responsabilidade dos guards da API. Depois do aceite,
+o menu pessoal completo retorna. Leitura,
 próprios recibos e gestão possuem [rotas proprietárias](../routes/terms.md).
 
 Analytics admite paths `/terms` e `/admin/terms`, surface `terms` e control

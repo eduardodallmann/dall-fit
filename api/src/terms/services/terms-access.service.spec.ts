@@ -47,9 +47,8 @@ describe('TermsAccessService', () => {
     });
     expect(repository.record).not.toHaveBeenCalled();
   });
-  it('allows only initial administration while no publication exists', async () => {
+  it('closes personal access while no publication exists', async () => {
     repository.currentReference.mockResolvedValue(null);
-    await expect(service.require('admin', true)).resolves.toBeUndefined();
     await expect(service.require('person')).rejects.toMatchObject({
       response: { code: 'TERMS_NOT_CONFIGURED' },
     });

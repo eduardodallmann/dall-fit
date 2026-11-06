@@ -192,7 +192,7 @@ secundários à explicação humana.
 
 ## Precondição jurídica
 
-Fronteiras de negócio autenticadas verificam a maior publicação no primary e o
+Fronteiras pessoais autenticadas verificam a maior publicação no primary e o
 recibo próprio. Falta de concordância responde `403 TERMS_ACCEPTANCE_REQUIRED`,
 com somente ID/número/hash em `details`; sem publicação, `503 TERMS_NOT_CONFIGURED`;
 falha necessária, `503 TERMS_UNAVAILABLE`. Isso não é `401`, CSRF ou perda de lease.
@@ -203,3 +203,8 @@ compatibilidade antes do aceite e antes de locks/escritas.
 Os contratos de termos usam `private, no-store`, schemas estritos e canal da sessão.
 Revisão técnica de draft usa o header de recurso existente; número jurídico é
 atribuído somente na publicação. Não incluir HTML ou identidade em erros/eventos.
+
+Operações protegidas por `AdminOnly` dispensam a verificação jurídica após o guard
+confirmar o administrador. A exceção pertence à operação administrativa, não à
+conta inteira: administradores ainda precisam aceitar para usar treino, catálogo
+pessoal e dashboard pessoal. Papel, CSRF, quota e concorrência continuam exigidos.

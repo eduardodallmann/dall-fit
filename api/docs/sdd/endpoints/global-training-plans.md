@@ -353,12 +353,11 @@ serial usa Nest, MongoDB e Redis efêmeros e valida transporte, ownership, schem
 confirmação explícita. Reconciliação: `pnpm -C api images:reconcile`, dry-run por
 padrão.
 
-## Aceite de termos como precondição
+## Administração independente do aceite
 
-Depois dos guards de sessão/permissão/CSRF/quota e antes dos pipes/controllers de
-negócio, a política exige recibo da publicação vigente. Pendência responde
-`403 TERMS_ACCEPTANCE_REQUIRED`; ausência de publicação, `503 TERMS_NOT_CONFIGURED`;
-consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no domínio
-deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
-dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
-sem transformá-los em efeito do login.
+Estas operações são `AdminOnly`: sessão e papel verificados continuam obrigatórios,
+assim como CSRF/quota nas mutations, mas não dependem de publicação ou recibo de
+termos. A metadata do decorator é reconhecida pelo interceptor depois dos guards.
+O administrador pode listar/criar/editar modelos sem aceitar; nenhuma operação
+cria recibo ou autoriza suas funções pessoais. Pessoa comum recebe
+`403 ADMIN_ACCESS_REQUIRED`. Os [cenários de termos](admin-terms.md) cobrem a exceção.

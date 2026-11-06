@@ -199,11 +199,10 @@ edições administrativas existentes.
 - Não há regressão visual porque as pastas de assets das rotas não contêm
   screenshots.
 
-## Precondição de aceite vigente
+## Administração independente do aceite
 
-Esta jornada exige o [aceite de termos](aceite-de-termos.md). O bloqueio antecede
-consultas/mutations de negócio. Uma publicação descoberta durante uso oculta a
-atividade e pausa novos efeitos, preservando estado confirmado e recuperável;
-ação HTTP recusada não é repetida automaticamente depois do aceite. Android
-preserva treino offline com comprovante confirmado até conhecer requisito novo e
-pausa a fila compartilhada, sem tratar pendência como revogação de sessão.
+Administradores autenticados podem listar e manter modelos globais sem aceite
+vigente ou publicação. Menu, branch administrativa e endpoints `AdminOnly` usam a
+mesma exceção, mantendo autorização de papel, CSRF e quota. Publicação nova não
+interrompe rascunhos administrativos. Treino, catálogo e dashboard pessoais do
+mesmo administrador continuam sujeitos ao [aceite de termos](aceite-de-termos.md).

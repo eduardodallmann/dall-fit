@@ -9,10 +9,11 @@ aceite de todas as pessoas, inclusive do autor. A
 
 ## Entradas e pré-condições
 
-Sessão e `Person.isAdmin=true`. Aceite vigente é necessário; a única exceção é
-configurar o primeiro documento quando a situação é `not-configured`. Pessoa comum
-é redirecionada por guard administrativo. O menu restrito não ganha links; a ação
-inicial `Configurar primeiro termo` fica na região principal da barreira.
+Sessão e `Person.isAdmin=true`. Aceite vigente não é precondição desta branch
+administrativa, mesmo sem publicação ou com falha da consulta jurídica. Pessoa
+comum continua redirecionada pelos guards. Sem aceite, o menu administrativo oferece
+Gestão de termos, Modelos de treino e leitura dos termos; a ação inicial
+`Configurar primeiro termo` também fica na região principal da barreira pessoal.
 
 `mockAuth=admin` e `mockTerms=admin|not-configured|publication-conflict|unsafe-html`
 são seletores locais MSW, sem efeito em produção. Seleção de documento e página são
@@ -41,9 +42,10 @@ de que ainda não está publicada. Aviso informa a remoção de conteúdo não p
 2. Salvar com a revisão técnica recebida; manter draft até o sucesso confirmado.
 3. Pedir prévia da revisão salva. Conferir HTML canônico e identificação.
 4. Acionar publicar e confirmar AlertDialog que explica imutabilidade e novo aceite
-   para todos, inclusive administradores.
-5. Enviar revisão, hash da prévia e ID vigente observado; após commit, a própria
-   aplicação entra na barreira jurídica. Confirmar os termos libera administração.
+   para uso pessoal de todos, inclusive administradores.
+5. Enviar revisão, hash da prévia e ID vigente observado; após commit, o documento
+   fica somente leitura e a administração permanece acessível. O uso pessoal do
+   autor depende de aceite explícito, sem criação automática de recibo.
 
 ## Caminhos alternativos
 
@@ -75,8 +77,7 @@ Sair segue a política global de encerramento, sem transformar edição em aceit
 Loading de lista/detalhe é anunciado; vazio mostra `Nenhum termo criado` com criação
 permitida. Sucesso distingue rascunho e publicação. Erro de lista/criação/detalhe
 oferece retry; erro de mutation preserva draft. Pending desabilita campos,
-confirmações duplicadas e dismiss. Sem admin ou sem aceite vigente, os guards
-substituem esta superfície conforme seus contratos; não há bypass de URL.
+confirmações duplicadas e dismiss. Sem admin, os guards substituem esta superfície conforme seus contratos; não há bypass de URL.
 
 ## Integrações
 
@@ -90,8 +91,8 @@ atrasadas de criação, recarga e publicação só afetam a geração corrente.
 
 Entrada pelo menu `Gestão de termos` quando liberado ou pela ação inicial de
 configuração. `Voltar às versões` fecha detalhe após respeitar dirty/pending.
-Navegação do browser também passa pelo blocker. Após publicação, ler/aceitar na
-barreira mantém a sessão e permite voltar à administração.
+Navegação do browser também passa pelo blocker. Após publicação, a administração
+continua disponível e a leitura/aceite por `Termos de uso` libera as funções pessoais.
 
 ## Acessibilidade e interação
 
@@ -119,7 +120,7 @@ jurídico, payload ou erro arbitrário. Falha da coleta é absorvida.
 - Link para testar: `http://localhost:3000/admin/terms?mockAuth=admin&mockTerms=not-configured`.
 - Given: nenhuma publicação e admin autenticado.
 - When: cria, edita responsável/contato, salva, visualiza e confirma publicação.
-- Then: uma versão imutável e bloqueio do próprio autor até aceite explícito.
+- Then: uma versão imutável, administração ainda acessível para criar outra versão e uso pessoal bloqueado até aceite explícito.
 
 ### Cenário 7 — Responsável e contato pertencem à versão
 

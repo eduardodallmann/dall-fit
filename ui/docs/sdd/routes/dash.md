@@ -177,7 +177,8 @@ pessoa comum.
 
 Pessoa/CSRF são seguidos da verificação jurídica antes de montar queries de métricas.
 Sem aceite, a região principal apresenta [Termos de uso](terms.md), não o dashboard.
-Menu mantém identidade, tema e saída sem links de negócio/instalação. Sem publicação,
+O menu comum mantém identidade, tema e saída sem links pessoais/instalação. Para
+administradores, mantém Modelos de treino, Gestão de termos e Termos de uso. Sem publicação,
 admin recebe `Configurar primeiro termo`; demais pessoas veem indisponibilidade e
 retry. Falha/loading nunca expõem negócio. Depois do aceite, o dashboard conserva
 sua composição e o menu acrescenta os acessos jurídicos dentro do mesmo grupo.

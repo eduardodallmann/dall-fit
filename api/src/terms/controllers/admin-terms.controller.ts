@@ -36,11 +36,9 @@ import {
   termsPage,
   termsRevision,
 } from '~/terms/dto/terms.dto';
-import { TermsAdministration } from '~/terms/terms-policy';
 
 @Controller('admin/terms')
 @AdminOnly()
-@TermsAdministration()
 export class AdminTermsController {
   private readonly logger = new Logger(AdminTermsController.name);
   constructor(private readonly command: TermsCommand) {}

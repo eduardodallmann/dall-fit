@@ -62,7 +62,8 @@ export function AdminTermsPage() {
       <h1 className={styles.title()}>Gestão de termos</h1>
       <p className={styles.text()}>
         Crie um rascunho, confira a prévia e publique uma nova versão. Cada
-        publicação exige novo aceite de todas as pessoas.
+        publicação exige novo aceite para usar as funções pessoais; a
+        administração continua acessível.
       </p>
       <Button
         isPending={create.isPending}

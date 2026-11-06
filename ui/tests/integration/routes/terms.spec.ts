@@ -51,7 +51,7 @@ test.describe('Termos de uso', () => {
       page.getByRole('link', { name: 'Termos de uso' }),
     ).toBeVisible();
   });
-  test('Cenário 4 — Nova publicação bloqueia contas existentes e preserva o rascunho aberto', async ({
+  test('Cenário 4 — Nova publicação preserva administração e restringe o uso pessoal', async ({
     page,
   }) => {
     await page.goto('/global/training-plan?mockAuth=admin&mockTerms=admin');
@@ -89,14 +89,23 @@ test.describe('Termos de uso', () => {
       window.dispatchEvent(new Event('visibilitychange')),
     );
     await expect(
-      page.getByRole('heading', { name: 'Termos de uso', exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole('textbox', { name: /^Nome/ })).toBeHidden();
-    await expect(page.getByText(/Versão 2 · Publicado/)).toBeVisible();
-    await declareAndAccept(page);
+      page.getByRole('link', { name: 'Meus planos', exact: true }),
+    ).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: /^Nome/ })).toHaveValue(
       'Rascunho preservado',
     );
+    await expect(
+      page.getByRole('link', { name: 'Gestão de termos', exact: true }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await page
+      .getByRole('link', { name: 'Termos de uso', exact: true })
+      .click();
+    await expect(page.getByText(/Versão 2 · Publicado/)).toBeVisible();
+    await declareAndAccept(page);
+    await expect(
+      page.getByRole('link', { name: 'Meus planos', exact: true }),
+    ).toBeVisible();
   });
   test('Cenário 10 — Falha de aceite e resultado ambíguo', async ({ page }) => {
     await page.goto('/dash?mockTerms=accept-error');
@@ -130,7 +139,16 @@ test.describe('Termos de uso', () => {
     ).toBeVisible();
   });
   test('Cenário 6 — Administração da primeira versão', async ({ page }) => {
-    await page.goto('/admin/terms?mockAuth=admin&mockTerms=not-configured');
+    await page.goto('/dash?mockAuth=admin&mockTerms=not-configured');
+    await expect(
+      page.getByRole('link', { name: 'Modelos de treino', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Home', exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole('link', { name: 'Gestão de termos', exact: true })
+      .click();
     await page.getByRole('button', { name: 'Criar versão' }).click();
     await page
       .getByRole('textbox', { name: /^Responsável/ })
@@ -146,17 +164,61 @@ test.describe('Termos de uso', () => {
     );
     await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: 'Termos de uso', exact: true }),
+      page.getByRole('heading', { name: 'Versão publicada', exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText(/Responsável: Responsável da nova versão/),
+      page.getByRole('link', { name: 'Gestão de termos', exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Home', exact: true }),
     ).toHaveCount(0);
+    await page
+      .getByRole('button', { name: 'Voltar às versões', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Criar versão' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Editar rascunho', exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('link', { name: 'Termos de uso', exact: true })
+      .click();
+    await expect(
+      page.getByText(/Responsável: Responsável da nova versão/),
+    ).toBeVisible();
     await declareAndAccept(page);
     await expect(
-      page.getByRole('heading', { name: 'Gestão de termos' }),
+      page.getByRole('link', { name: 'Home', exact: true }),
+    ).toBeVisible();
+  });
+  test('Administração segue acessível com termos pendentes ou falha de consulta', async ({
+    page,
+  }) => {
+    await page.goto('/global/training-plan?mockAuth=admin&mockTerms=required');
+    await expect(
+      page.getByRole('heading', { name: 'Planos de treino', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Meus planos', exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole('link', { name: 'Gestão de termos', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Gestão de termos', exact: true }),
+    ).toBeVisible();
+    await page.goto('/admin/terms?mockAuth=admin&mockTerms=load-error');
+    await expect(
+      page.getByRole('heading', { name: 'Gestão de termos', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Criar versão', exact: true }),
+    ).toBeEnabled();
+    await page.goto('/admin/terms?mockAuth=authenticated&mockTerms=required');
+    await expect(
+      page.getByRole('link', { name: 'Gestão de termos', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Termos de uso', exact: true }),
     ).toBeVisible();
   });
   test('Cenário 13 — Consulta, cópia e discordância', async ({ page }) => {

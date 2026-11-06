@@ -16,6 +16,7 @@ export const termsSeeds = [
   'terms:required',
   'terms:accepted',
   'terms:admin',
+  'terms:admin-required',
   'terms:draft',
   'terms:updated',
 ] as const;
@@ -66,6 +67,7 @@ export async function seedTermsScenario(
   });
   const admin =
     scenario === 'terms:admin' ||
+    scenario === 'terms:admin-required' ||
     scenario === 'terms:draft' ||
     scenario === 'terms:not-configured';
   await people.updateOne(

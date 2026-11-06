@@ -7,7 +7,7 @@ import {
 } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useRouter } from '@tanstack/react-router';
+import { useLocation, useMatches, useRouter } from '@tanstack/react-router';
 
 import type { Person } from '@dall-fit/types';
 
@@ -41,11 +41,12 @@ export function TermsBoundary({
   const platform = usePlatform();
   const mounted = policy.hasAccepted;
   const previousBlocked = useRef(policy.blocked);
-  const legalRoute =
-    location.pathname === '/terms' ||
-    (location.pathname === '/admin/terms' &&
-      person.isAdmin === true &&
-      policy.access?.state === 'not-configured');
+  const administrative =
+    useMatches({
+      select: (matches) =>
+        matches.some((match) => match.staticData.termsAdministration === true),
+    }) && person.isAdmin === true;
+  const legalRoute = location.pathname === '/terms' || administrative;
 
   useEffect(() => {
     if (previousBlocked.current !== policy.blocked) {

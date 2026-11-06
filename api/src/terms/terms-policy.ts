@@ -9,13 +9,13 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Observable } from 'rxjs';
 
+import { ADMIN_ONLY_METADATA } from '~/auth/decorators/admin-only';
 import type { AuthenticatedRequest } from '~/auth/domain/auth.types';
 import { termsLog } from '~/terms/domain/terms-log';
 import { TermsAccessService } from '~/terms/services/terms-access.service';
 
 const POLICY = 'dall-fit:terms-policy';
 export const TermsExempt = () => SetMetadata(POLICY, 'exempt');
-export const TermsAdministration = () => SetMetadata(POLICY, 'administration');
 
 @Injectable()
 export class TermsPolicyInterceptor implements NestInterceptor {
@@ -36,11 +36,20 @@ export class TermsPolicyInterceptor implements NestInterceptor {
       POLICY,
       [context.getHandler(), context.getClass()],
     );
-    if (request.currentPerson !== undefined && policy !== 'exempt') {
-      await this.access.require(
-        request.currentPerson.id,
-        policy === 'administration' && request.currentPerson.isAdmin === true,
+    const administrative =
+      this.reflector.getAllAndOverride<boolean>(ADMIN_ONLY_METADATA, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true && request.currentPerson?.isAdmin === true;
+    if (administrative) {
+      termsLog(
+        this.logger,
+        'TermsPolicyInterceptor',
+        'intercept',
+        'administrationExempt branch',
       );
+    } else if (request.currentPerson !== undefined && policy !== 'exempt') {
+      await this.access.require(request.currentPerson.id);
       termsLog(
         this.logger,
         'TermsPolicyInterceptor',

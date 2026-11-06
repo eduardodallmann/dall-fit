@@ -3,7 +3,7 @@
 ## Objetivo funcional
 
 Administradores criam rascunhos HTML, conferem a prévia canônica e publicam versões
-imutáveis. Cada publicação exige novo aceite inclusive de quem publicou. Nome do
+imutáveis. Cada publicação exige novo aceite para uso pessoal, inclusive de quem publicou. Nome do
 responsável e contato pertencem a cada versão. A minuta inicial contém o responsável
 público informado e não é publicada automaticamente.
 
@@ -38,10 +38,11 @@ inclusive preview. Respostas com conteúdo usam `Cache-Control: private, no-stor
 detalhe e mutations devolvem `X-Resource-Version`. Revisão técnica começa em zero e
 é diferente do número jurídico de publicação.
 
-`TermsAdministration` só libera bootstrap quando não existe publicação. Assim que
-existe uma vigente, falta de aceite causa o mesmo `403` de negócio. Nenhum papel
-administrativo dispensa concordância. Pessoa comum recebe `403 ADMIN_ACCESS_REQUIRED`
-antes da política de termos.
+`AdminOnly` verifica sessão/papel e registra a metadata que dispensa aceite nessa
+operação. A administração permanece acessível sem publicação, com aceite pendente
+ou após publicar outra versão; não depende da consulta de acesso jurídico. Pessoa
+comum recebe `403 ADMIN_ACCESS_REQUIRED`. A exceção não cria recibo nem libera
+funções pessoais do próprio administrador.
 
 Campos: título até 160 caracteres, responsável até 200, e-mail válido até 254,
 resumo até 1000 e corpo até 256 KiB em UTF-8; o HTML final também respeita 256 KiB.
@@ -87,7 +88,7 @@ entre a leitura e a escrita também produz `412` sem sobrescrever outra edição
 Preview devolve somente a revisão salva: alterações locais precisam ser salvas.
 
 `publish` lê o documento e, se já publicado, devolve a mesma publicação sem nova
-escrita/evento. O acesso a esse replay ainda passa pela política de termos. Para
+escrita/evento. O acesso a esse replay continua exigindo sessão e papel administrativo, sem exigir aceite. Para
 rascunho, compara revisão, recompõe o HTML/hash e confronta `previewContentHash`:
 divergência é `409 TERMS_PREVIEW_CHANGED`. Consulta a vigente e exige igualdade com
 `expectedCurrentTermsId`, anulável na primeira publicação. Divergência é
@@ -121,12 +122,47 @@ responsável/contato exige outro rascunho e nova publicação.
 | Revisão concorrente | `412` | Preserva edição vencedora |
 | Preview/vigente divergentes | `409` | Preserva rascunho e publicação anterior |
 | Mutação de publicação | `409` | Publicação preservada |
-| Sem admin ou sem aceite | `403` | Sem operação administrativa |
+| Sem admin | `403 ADMIN_ACCESS_REQUIRED` | Sem operação administrativa |
 
 ## Cenários detalhados
 
 Os arquivos de payload e sessão usados a seguir são preparados pelo seed conforme
 [seeds locais](terms.md#cenários-detalhados). Não usar tokens de ambientes publicados.
+### Administrador sem aceite mantém acesso administrativo
+
+**Seed**
+
+```bash
+pnpm -C api seed -- terms:admin-required
+```
+
+**cURL**
+
+```bash
+curl --include --request GET \
+  --url http://localhost:4000/admin/terms \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-terms-token.txt)"
+
+curl --include --request GET \
+  --url http://localhost:4000/global/training-plans \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-terms-token.txt)"
+
+curl --include --request GET \
+  --url 'http://localhost:4000/admin/dashboard?timezone=UTC' \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-terms-token.txt)"
+
+curl --include --request GET \
+  --url 'http://localhost:4000/dashboard?timezone=UTC' \
+  --header "authorization: Bearer $(cat /tmp/dall-fit-terms-token.txt)"
+```
+
+- Given: administrador autenticado com publicação vigente sem recibo.
+- When: consulta termos, modelos, métricas administrativas e seu dashboard pessoal.
+- Then: os três primeiros retornam `200`; o último responde
+  `403 TERMS_ACCEPTANCE_REQUIRED`. Não cria recibo. Mesmo sem publicação, a
+  administração continua acessível; nesse estado apenas o uso pessoal responde
+  `503 TERMS_NOT_CONFIGURED`.
+
 ### Listar, criar e copiar publicação
 
 **Seed**
@@ -190,7 +226,7 @@ curl --include --request POST \
 - When: lê, salva todos os campos e pede preview da revisão 1.
 - Then: `200`, revisão 1, HTML/hash canônicos; não publica.
 
-### Publicar e passar a exigir o novo aceite
+### Publicar e continuar administrando sem aceite implícito
 
 **Seed**
 
@@ -219,7 +255,7 @@ curl --include --request GET \
 ```
 
 - Given: vigente 1, draft 3 e hash de preview exato.
-- Then: publica número 2 uma vez; a próxima leitura administrativa responde `403 TERMS_ACCEPTANCE_REQUIRED`. Ler/aceitar a nova versão por `/terms/*` libera a administração. Não fabrica o aceite do autor.
+- Then: publica número 2 uma vez; a próxima leitura administrativa continua `200`. Ler/aceitar por `/terms/*` libera somente o uso pessoal. A publicação não fabrica o aceite do autor.
 
 ### Revisão ausente e desatualizada
 
@@ -340,7 +376,7 @@ curl --include --request GET \
   --header "authorization: Bearer $(cat /tmp/dall-fit-terms-token.txt)"
 ```
 
-- Then: `403 ADMIN_ACCESS_REQUIRED`, antes do service ou da exceção de bootstrap.
+- Then: `403 ADMIN_ACCESS_REQUIRED`, antes do service e sem qualquer dispensa de papel.
 
 ### HTML não permitido é removido antes da prévia
 

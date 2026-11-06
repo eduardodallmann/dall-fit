@@ -214,9 +214,14 @@ O primeiro request retorna `VALIDATION_ERROR`; o segundo,
 ## Aceite de termos como precondição
 
 Depois dos guards de sessão/permissão/CSRF/quota e antes dos pipes/controllers de
-negócio, a política exige recibo da publicação vigente. Pendência responde
+negócio pessoal, a política exige recibo da publicação vigente. Pendência responde
 `403 TERMS_ACCEPTANCE_REQUIRED`; ausência de publicação, `503 TERMS_NOT_CONFIGURED`;
 consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no domínio
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+`GET /admin/dashboard` usa `AdminOnly` e dispensa aceite depois de verificar papel.
+`GET /dashboard` continua exigindo aceite mesmo quando chamado pelo administrador;
+sem publicação responde `503`, e com publicação pendente, `403`, conforme os códigos
+acima. A UI de `/dash` continua priorizando a leitura quando há pendência pessoal.

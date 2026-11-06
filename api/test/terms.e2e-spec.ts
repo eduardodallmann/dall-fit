@@ -166,10 +166,45 @@ describe('Terms (e2e)', () => {
       data: { state: 'not-configured' },
     });
   });
+  it('keeps verified administrative operations accessible without terms or any receipt', async () => {
+    const { agent, person } = await login();
+    await agent.get('/admin/terms').expect(200);
+    await agent.get('/global/training-plans').expect(200);
+    await agent.get('/admin/dashboard?timezone=UTC').expect(200);
+    await mutate(agent, '/global/training-plans')
+      .send({ name: 'Modelo administrativo', description: 'Modelo de teste.' })
+      .expect(201);
+    await agent.get('/dashboard?timezone=UTC').expect(503);
+    const first = await publish(agent);
+    const second = await publish(agent, first.id);
+    expect(second.publicationNumber).toBe(2);
+    await agent.get('/admin/terms').expect(200);
+    await agent.get('/global/training-plans').expect(200);
+    await agent.get('/dashboard?timezone=UTC').expect(403);
+    const native = await app
+      .get(AuthSessionService)
+      .createSession(person.id, 'native');
+    await request(app.getHttpServer())
+      .get('/admin/terms')
+      .set('Authorization', `Bearer ${native.token}`)
+      .expect(200);
+    expect(await receipts.countDocuments()).toBe(0);
+    const ordinary = await login(false);
+    for (const path of [
+      '/admin/terms',
+      '/global/training-plans',
+      '/admin/dashboard?timezone=UTC',
+    ]) {
+      const response = await ordinary.agent.get(path).expect(403);
+      expect(response.body as unknown).toMatchObject({
+        code: 'ADMIN_ACCESS_REQUIRED',
+      });
+    }
+  });
   it('bootstraps, requires explicit declarations and keeps an idempotent immutable receipt', async () => {
     const { agent } = await login();
     const doc = await publish(agent);
-    await agent.get('/admin/terms').expect(403);
+    await agent.get('/admin/terms').expect(200);
     await agent.get('/training-plans').expect(403);
     await mutate(agent, '/terms/acceptances')
       .send({
@@ -215,7 +250,6 @@ describe('Terms (e2e)', () => {
     for (const path of [
       '/dashboard?timezone=UTC',
       '/training-plans',
-      '/global/training-plans',
       '/training',
       '/training-plans/exercise-library',
       '/training-plan-assistant/session',

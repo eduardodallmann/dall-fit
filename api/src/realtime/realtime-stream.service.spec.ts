@@ -95,4 +95,38 @@ describe('RealtimeStreamService', () => {
     expect(access).toHaveBeenCalledWith('person-a');
     subscription.unsubscribe();
   });
+  it('delivers administrative invalidations without requiring a legal receipt', () => {
+    let listener: ((event: InternalRealtimeEvent) => void) | undefined;
+    const subscriber = {
+      subscribe: vi.fn((next: (event: InternalRealtimeEvent) => void) => {
+        listener = next;
+        return vi.fn();
+      }),
+    } as unknown as RealtimeSubscriberService;
+    const access = vi.fn().mockRejectedValue(new Error('Terms unavailable'));
+    const service = new RealtimeStreamService(subscriber, { access } as never);
+    const received: unknown[] = [];
+    const subscription = service
+      .stream({
+        personId: 'admin-a',
+        clientInstanceId: 'document-a',
+        isAdmin: true,
+      })
+      .subscribe((event) => received.push(event));
+    listener?.({
+      audience: 'admin',
+      event: {
+        resource: 'global-training-plan',
+        resourceId: 'plan-a',
+        state: 'present',
+        version: 2,
+      },
+      originClientInstanceId: 'document-b',
+    });
+    expect(received[1]).toMatchObject({
+      data: { resource: 'global-training-plan' },
+    });
+    expect(access).not.toHaveBeenCalled();
+    subscription.unsubscribe();
+  });
 });

@@ -249,10 +249,10 @@ rollback e proteção acessível. E2E separado cobre API/MongoDB.
 Arquivos: `workout-page.tsx`, `workout-editor/`, `training-plan-service.ts`,
 queries e handlers/fixtures `training-plans.ts`.
 
-## Precondição jurídica compartilhada
+## Administração sem precondição de aceite
 
-Além da sessão e das permissões desta rota, é necessário o aceite vigente. A
-[barreira de termos](terms.md) intercepta entrada antes de montar negócio. Nova
-publicação descoberta durante uso oculta a atividade com efeitos pausados e
-preserva estado recuperável; concluir o aceite não repete mutation recusada.
-Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.
+Esta rota permanece acessível a administradores autenticados sem publicação ou
+aceite vigente. O menu exibe Modelos de treino e Gestão de termos; a branch `_admin`
+é reconhecida pela barreira de termos e o guard de papel continua obrigatório.
+Uma publicação nova não oculta formulários administrativos nem exige concordância
+para continuar administrando. Funções pessoais do próprio admin ainda exigem aceite.

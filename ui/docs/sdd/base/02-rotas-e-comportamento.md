@@ -145,10 +145,12 @@ testes, acessibilidade ou quality gates.
 
 ## Barreira jurídica do layout privado
 
-Todas as rotas de negócio exigem aceite vigente além da sessão. O guard conserva
-a intenção e encaminha entrada pendente a `/dash`, antes de carregar negócio.
-`/terms` é acessível com sessão sem aceite; `/admin/terms` admite somente admin e
-bootstrap enquanto não há publicação. Descoberta durante uso conserva a URL e o
+Rotas pessoais exigem aceite vigente além da sessão. O guard conserva a intenção e
+encaminha entrada pessoal pendente a `/dash`, antes de carregar negócio. `/terms`
+é acessível com sessão sem aceite. A branch administrativa é marcada por
+`staticData.termsAdministration` no layout `_admin` e continua acessível a
+`Person.isAdmin=true` com ou sem publicação/aceite; o guard administrativo ainda
+recusa pessoas comuns. Descoberta durante uso conserva a URL e o
 estado recuperável oculto. Voltar, preload ou URL direta não produzem aceite.
 
 A raiz lê o destino pendente sem consumi-lo. Somente o guard liberado consome a

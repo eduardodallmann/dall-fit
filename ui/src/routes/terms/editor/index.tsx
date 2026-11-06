@@ -371,7 +371,7 @@ export function TermsEditor({
               </AlertDialog.Header>
               <AlertDialog.Body>
                 {confirmation === 'publish'
-                  ? 'Todas as pessoas, inclusive administradores, precisarão aceitar esta versão. O texto publicado ficará imutável.'
+                  ? 'Todas as pessoas precisarão aceitar esta versão para usar as funções pessoais. A administração continuará acessível. O texto publicado ficará imutável.'
                   : 'Esta ação descarta o rascunho ou as alterações ainda não confirmadas.'}
                 {error === undefined ? null : <p role="alert">{error}</p>}
               </AlertDialog.Body>

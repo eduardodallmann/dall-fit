@@ -25,7 +25,7 @@ suas chaves públicas usam `catalogEntryId`, não o ID global do evento.
 - `GET /realtime/events?clientInstanceId=<uuid>` com cookie Web ou
   `Authorization: Bearer` nativo, exclusivamente; os dois juntos retornam `400
   AUTH_TRANSPORT_AMBIGUOUS`;
-- qualquer sessão abre o stream; eventos `terms` chegam mesmo com aceite pendente; eventos de negócio exigem recibo vigente e continuam sujeitos à audiência e à supressão de origem;
+- qualquer sessão abre o stream; eventos `terms` chegam mesmo com aceite pendente; eventos globais chegam a administradores sem exigir recibo; para pessoas comuns, eventos de negócio exigem aceite vigente. Audiência e supressão de origem continuam aplicadas;
 - 30 novas conexões/minuto por sessão e IP;
 - sucesso `200 text/event-stream`, retry 3 s, heartbeat 20 s, duração até 270 s;
 - eventos `realtime-ready`, `resource-invalidated` e `heartbeat`;
@@ -124,8 +124,9 @@ Retorna `401 AUTHENTICATION_REQUIRED` e não registra listener.
 
 `RealtimeController` é isento do aceite e passa a pessoa verificada para o stream.
 Eventos `terms` entregam somente ID/número, sem HTML, responsável ou recibo; não
-precisam de aceite vigente. Antes de entregar eventos de negócio, o stream consulta
+precisam de aceite vigente. Antes de entregar eventos de negócio a pessoas comuns, o stream consulta
 `TermsAccessService.access`; pendência ou falha suprime o evento e conserva a
-conexão. A mesma origem continua suprimida. Publicação própria aciona diretamente
+conexão. Administradores recebem invalidações administrativas independentemente do
+recibo ou disponibilidade da consulta jurídica. A mesma origem continua suprimida. Publicação própria aciona diretamente
 a barreira da UI; reconexão/ready refaz situação canônica. Testes do service cobrem
 supressão de negócio e entrega de termos para pessoa pendente.

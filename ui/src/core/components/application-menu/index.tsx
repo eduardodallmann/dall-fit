@@ -96,76 +96,80 @@ export function ApplicationMenu({
           </Chip>
         ) : null}
       </section>
-      {termsRestricted ? null : (
+      {termsRestricted && person.isAdmin !== true ? null : (
         <nav aria-label="Navegação principal" className={styles.navigation()}>
-          <Link
-            activeOptions={{ exact: true }}
-            className={styles.navigationLink()}
-            onClick={() => {
-              trackUiEvent({
-                control: 'home_link',
-                destination: 'dash',
-                eventName: 'ui_navigation_selected',
-                navigationKind: 'menu',
-                surface: 'application_menu',
-              });
-              onNavigate?.();
-            }}
-            to="/dash"
-          >
-            <House
-              aria-hidden="true"
-              className={styles.navigationIcon()}
-              focusable="false"
-            />
-            <span>Home</span>
-          </Link>
-          <Link
-            activeOptions={{ includeSearch: false }}
-            className={styles.navigationLink()}
-            onClick={() => {
-              trackUiEvent({
-                control: 'training_plans_link',
-                destination: 'training_plan_list',
-                eventName: 'ui_navigation_selected',
-                navigationKind: 'menu',
-                surface: 'application_menu',
-              });
-              onNavigate?.();
-            }}
-            search={adminSearch}
-            to="/training-plan"
-          >
-            <Dumbbell
-              aria-hidden="true"
-              className={styles.navigationIcon()}
-              focusable="false"
-            />
-            <span>Meus planos</span>
-          </Link>
-          <Link
-            activeOptions={{ includeSearch: false }}
-            className={styles.navigationLink()}
-            onClick={() => {
-              trackUiEvent({
-                control: 'training_link',
-                destination: 'training',
-                eventName: 'ui_navigation_selected',
-                navigationKind: 'menu',
-                surface: 'application_menu',
-              });
-              onNavigate?.();
-            }}
-            search={adminSearch}
-            to="/training"
-          >
-            <Play
-              aria-hidden="true"
-              className={styles.navigationIcon()}
-              focusable="false"
-            />
-            <span>Treinar</span>
-          </Link>
+          {termsRestricted ? null : (
+            <>
+              <Link
+                activeOptions={{ exact: true }}
+                className={styles.navigationLink()}
+                onClick={() => {
+                  trackUiEvent({
+                    control: 'home_link',
+                    destination: 'dash',
+                    eventName: 'ui_navigation_selected',
+                    navigationKind: 'menu',
+                    surface: 'application_menu',
+                  });
+                  onNavigate?.();
+                }}
+                to="/dash"
+              >
+                <House
+                  aria-hidden="true"
+                  className={styles.navigationIcon()}
+                  focusable="false"
+                />
+                <span>Home</span>
+              </Link>
+              <Link
+                activeOptions={{ includeSearch: false }}
+                className={styles.navigationLink()}
+                onClick={() => {
+                  trackUiEvent({
+                    control: 'training_plans_link',
+                    destination: 'training_plan_list',
+                    eventName: 'ui_navigation_selected',
+                    navigationKind: 'menu',
+                    surface: 'application_menu',
+                  });
+                  onNavigate?.();
+                }}
+                search={adminSearch}
+                to="/training-plan"
+              >
+                <Dumbbell
+                  aria-hidden="true"
+                  className={styles.navigationIcon()}
+                  focusable="false"
+                />
+                <span>Meus planos</span>
+              </Link>
+              <Link
+                activeOptions={{ includeSearch: false }}
+                className={styles.navigationLink()}
+                onClick={() => {
+                  trackUiEvent({
+                    control: 'training_link',
+                    destination: 'training',
+                    eventName: 'ui_navigation_selected',
+                    navigationKind: 'menu',
+                    surface: 'application_menu',
+                  });
+                  onNavigate?.();
+                }}
+                search={adminSearch}
+                to="/training"
+              >
+                <Play
+                  aria-hidden="true"
+                  className={styles.navigationIcon()}
+                  focusable="false"
+                />
+                <span>Treinar</span>
+              </Link>
+            </>
+          )}
           {person.isAdmin === true ? (
             <Link
               activeOptions={{ includeSearch: false }}
@@ -194,6 +198,7 @@ export function ApplicationMenu({
           <Link
             className={styles.navigationLink()}
             to="/terms"
+            search={adminSearch}
             onClick={() => {
               trackUiEvent({
                 control: 'terms_action',
@@ -216,6 +221,7 @@ export function ApplicationMenu({
             <Link
               className={styles.navigationLink()}
               to="/admin/terms"
+              search={adminSearch}
               onClick={() => {
                 trackUiEvent({
                   control: 'terms_action',

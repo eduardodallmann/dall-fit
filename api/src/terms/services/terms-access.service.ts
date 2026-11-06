@@ -71,10 +71,8 @@ export class TermsAccessService {
     }
   }
 
-  async require(personId: string, bootstrap = false): Promise<void> {
-    termsLog(this.logger, 'TermsAccessService', 'require', 'params', {
-      bootstrap,
-    });
+  async require(personId: string): Promise<void> {
+    termsLog(this.logger, 'TermsAccessService', 'require', 'params');
     const access = await this.access(personId);
     termsLog(this.logger, 'TermsAccessService', 'require', 'access return', {
       state: access.state,
@@ -90,7 +88,7 @@ export class TermsAccessService {
         { ...access.current },
       );
     }
-    if (access.state === 'not-configured' && !bootstrap) {
+    if (access.state === 'not-configured') {
       termsLog(
         this.logger,
         'TermsAccessService',

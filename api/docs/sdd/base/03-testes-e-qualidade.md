@@ -142,3 +142,8 @@ o E2E de snapshot verifica recusa antes de efeitos e prioridade da compatibilida
 Unitários substituem o port de termos e cobrem falha fechada, corrida, preview,
 CAS, sanitização, escaping e hash. Dados públicos reais da minuta ficam somente na
 fonte operacional e nunca em fixtures sintéticas.
+
+O E2E de termos distingue operações administrativas e pessoais: admin sem recibo
+lista/cria/publica (inclusive versões seguintes) e usa o dashboard administrativo,
+mas não o dashboard pessoal. A mesma exceção funciona no Bearer nativo. Pessoas
+comuns continuam recebendo `ADMIN_ACCESS_REQUIRED`, e nenhum acesso cria recibo.

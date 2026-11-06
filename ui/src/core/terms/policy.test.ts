@@ -61,6 +61,26 @@ describe('terms policy', () => {
     expect(getTermsPolicy().access?.current?.publicationNumber).toBe(2);
     expect(getTermsPolicy().blocked).toBe(true);
   });
+  it('keeps administrative HTTP boundaries available without unlocking personal business', async () => {
+    await applyTermsAccess({
+      state: 'not-configured',
+      current: null,
+      acceptance: null,
+    });
+    for (const url of [
+      '/admin/terms',
+      '/admin/dashboard?timezone=UTC',
+      '/global/training-plans',
+      '/global/training-plans/plan/workouts',
+    ]) {
+      expect(isTermsTransportBlocked(url)).toBe(false);
+    }
+    requireTerms(reference);
+    expect(isTermsTransportBlocked('/admin/terms')).toBe(false);
+    expect(isTermsTransportBlocked('/global/training-plans')).toBe(false);
+    expect(isTermsTransportBlocked('/training-plans')).toBe(true);
+    expect(isTermsTransportBlocked('/dashboard')).toBe(true);
+  });
   it('ties durable native proof to the account and rejects a late generation', async () => {
     const write = vi.fn((access: TermsAccess) => Promise.resolve(access));
     configureNativeTerms({

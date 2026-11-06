@@ -34,7 +34,7 @@ export class RealtimeStreamService {
       const unsubscribe = this.subscriber.subscribe((envelope) => {
         void (async () => {
           const isTermsEvent = envelope.event?.resource === 'terms';
-          if (!isTermsEvent) {
+          if (!isTermsEvent && !connection.isAdmin) {
             const access = await this.termsAccess.access(connection.personId);
             if (access.state !== 'accepted') return;
           }

@@ -98,7 +98,10 @@ Sem publicação retorna `503 TERMS_NOT_CONFIGURED`; falha técnica,
 `503 TERMS_UNAVAILABLE`. Não acessa plano, sessão de treino, Blob ou assistente.
 Auth, tema, saída, leitura/aceite jurídico, compatibilidade pública e probes
 continuam operacionais. SSE entrega termos, filtrando recursos de negócio por
-situação de aceite. A exceção administrativa sem publicação só cobre `/admin/terms`.
+situação de aceite para pessoas comuns. Operações `AdminOnly` permanecem acessíveis
+a administradores autenticados independentemente da publicação/recibo; inclui
+gestão de termos, modelos globais e dashboard administrativo. A dispensa é da
+operação, nunca de todas as funções da conta.
 
 Snapshot Android verifica compatibilidade antes do aceite e consulta este service
 dentro do command antes de locks/lease/escritas; detalhes no
@@ -225,7 +228,7 @@ curl --include --request GET \
 ```
 
 - Given: nenhum documento publicado.
-- Then: access `200 not-configured`; current e dashboard `503 TERMS_NOT_CONFIGURED`. Mesmo o administrador só pode configurar os termos.
+- Then: access `200 not-configured`; current e dashboard `503 TERMS_NOT_CONFIGURED`. O uso pessoal do administrador também fica fechado; as operações administrativas continuam acessíveis.
 
 ### Nova versão bloqueia negócio e rejeita aceite antigo
 

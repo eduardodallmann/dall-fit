@@ -612,9 +612,11 @@ de configuração OAuth não habilita bypass nem grava chave conhecida.
 com autenticação. `TermsModule` compõe controllers/commands administrativos e de
 leitura. `TermsPolicyInterceptor`, registrado por `APP_INTERCEPTOR`, roda depois de
 todos os guards e antes dos pipes/controllers; quando há pessoa autenticada exige
-recibo canônico salvo no MongoDB, sem carregar HTML. `TermsExempt` marca somente
-fronteiras de suporte; `TermsAdministration` admite bootstrap exclusivo sem
-publicação. Snapshot trata a exigência dentro do command depois da compatibilidade.
+recibo canônico para operações pessoais, salvo no MongoDB e sem carregar HTML.
+`TermsExempt` marca fronteiras de suporte. `AdminOnly` registra metadata administrativa;
+depois da verificação de sessão/papel, o interceptor dispensa aceite exclusivamente
+nessas operações. A exceção vale sem publicação, com aceite pendente ou falha da
+consulta jurídica; não concede recibo nem libera uso pessoal. Snapshot trata a exigência dentro do command depois da compatibilidade.
 
 `terms_versions` guarda draft e publicação no mesmo documento, com HTML restrito,
 identificação por versão, hash UTF-8, revisão e autoria interna. Índice único

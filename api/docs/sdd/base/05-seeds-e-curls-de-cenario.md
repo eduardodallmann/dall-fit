@@ -184,7 +184,7 @@ registrar a validação no resumo da mudança.
 
 ## Cenários jurídicos locais
 
-`terms:not-configured`, `terms:required`, `terms:accepted`, `terms:admin`,
+`terms:not-configured`, `terms:required`, `terms:accepted`, `terms:admin`, `terms:admin-required`,
 `terms:draft` e `terms:updated` preparam documentos/recibos sintéticos, sessão nativa
 em `/tmp/dall-fit-terms-token.txt`, cookie Web em `/tmp/dall-fit-terms-cookie.txt` e
 bodies `dall-fit-terms-{fields,acceptance,publication}.json` no mesmo diretório,
@@ -196,3 +196,6 @@ Seeds de negócio preparam recibos somente para pessoas sintéticas de cenário;
 é fixture explícita, não parte do login. Seeds `auth:*` não fabricam concordância.
 O bootstrap real da minuta possui outro comando, com confirmação/dry-run, descrito
 em [admin-terms.md](../endpoints/admin-terms.md#bootstrap-operacional-da-minuta-inicial).
+
+`terms:admin-required` prepara um administrador com publicação vigente e nenhum
+recibo, para verificar administração disponível e uso pessoal bloqueado.
