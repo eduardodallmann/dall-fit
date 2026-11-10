@@ -202,6 +202,8 @@ SDK e não são reproduzidos ao reconectar.
 | `assets/training/desktop-1440-training.png` | `1440x900` | `active-plan` | plano em uso e grade limitada a duas colunas |
 | `assets/training/mobile-390-training.png` | `390x844` | `active-plan` | cards em coluna única no mobile |
 | `assets/training/mobile-390-no-active-plan.png` | `390x844` | `no-active-plan` | empty state e ação para Meus planos |
+| `assets/training/desktop-1440-multiple-active.png` | `1440x900` | `multiple-active`, sem `catalogEntryId` | seleção entre planos em uso, com cards distribuídos em duas colunas |
+| `assets/training/mobile-390-multiple-active.png` | `390x844` | `multiple-active`, sem `catalogEntryId` | seleção entre planos em uso, com cards empilhados no mobile |
 
 ## Precondição jurídica compartilhada
 

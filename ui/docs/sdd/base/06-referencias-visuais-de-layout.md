@@ -199,7 +199,8 @@ bitmap candidato, preservando sua área de layout sem tornar conteúdo externo u
 fonte instável.
 
 Capturas base usam a página inteira para registrar conteúdo que ultrapasse o
-viewport. Overlays são capturados somente no viewport, preservando backdrop,
+viewport e retornam ao topo após as interações preparatórias, preservando a posição
+do shell fixo. Overlays são capturados somente no viewport, preservando backdrop,
 ancoragem e dimensões do painel sem estender artificialmente a camada modal pela
 altura total do documento. Cenários curados usam tema e timestamps determinísticos;
 seletores MSW exclusivos `sdd-*` podem fixar dados temporais sem alterar contratos

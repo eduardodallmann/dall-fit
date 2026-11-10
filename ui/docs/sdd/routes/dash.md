@@ -160,8 +160,9 @@ e `Typography`. Classes e variantes próprias ficam exclusivamente em
 
 | Cenário | Viewport | Estado MSW | Imagem | Aspectos de layout relevantes |
 | ------- | -------: | ---------- | ------ | ----------------------------- |
-| Administração desktop | `1440x900` | `mockAuth=admin`, `mockDashboard=admin` | `assets/dash/desktop-1440-menu.png` | menu persistente, grids pessoais e administrativos, tendência, recentes e tabela em página completa |
-| Administração mobile com menu | `390x844` | `mockAuth=admin`, `mockDashboard=admin` | `assets/dash/mobile-390-menu-open.png` | drawer, backdrop, controles da conta e conteúdo em coluna única sob o overlay |
+| Administração desktop | `1440x900` | `mockAuth=admin`, `mockDashboard=admin` | `assets/dash/desktop-1440-menu.png` | menu persistente com acessos jurídicos, grids pessoais e administrativos, tendência, recentes e tabela em página completa |
+| Administração mobile | `390x844` | `mockAuth=admin`, `mockDashboard=admin` | `assets/dash/mobile-390-dashboard.png` | dashboard completo em coluna única, sem overlay, com cards, tendência, recentes e tabela |
+| Administração mobile com menu | `390x844` | `mockAuth=admin`, `mockDashboard=admin`, abrir menu | `assets/dash/mobile-390-menu-open.png` | drawer, backdrop, controles da conta e agrupamento dos acessos pessoais, administrativos e jurídicos |
 
 São referências exclusivas de layout; conteúdo e comportamento são definidos por
 este documento.
@@ -182,6 +183,8 @@ administradores, mantém Modelos de treino, Gestão de termos e Termos de uso. S
 admin recebe `Configurar primeiro termo`; demais pessoas veem indisponibilidade e
 retry. Falha/loading nunca expõem negócio. Depois do aceite, o dashboard conserva
 sua composição e o menu acrescenta os acessos jurídicos dentro do mesmo grupo.
-Os screenshots existentes orientam somente composição/breakpoint, não o texto ou
-quantidade de links. Cenários: `http://localhost:3000/dash?mockTerms=required` e
+As referências do dashboard representam o acesso liberado. A composição da barreira
+e da consulta jurídica está documentada nas
+[referências de termos](terms.md#referências-visuais-de-layout).
+Cenários: `http://localhost:3000/dash?mockTerms=required` e
 `http://localhost:3000/dash?mockAuth=admin&mockTerms=not-configured`.

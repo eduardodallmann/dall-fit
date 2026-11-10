@@ -260,11 +260,13 @@ junto dos testes Playwright e não substituem as imagens curadas do SDD.
 `ui/test-results/sdd-screenshots/`, fora da suíte `tests/integration`, para revisão
 e promoção humanas conforme `06-referencias-visuais-de-layout.md`. Sua configuração
 sempre possui o processo Vite da porta `3100` e aguarda a mensagem de prontidão do
-servidor; não reutiliza servidor externo. A matriz vigente cobre as onze rotas
+servidor; não reutiliza servidor externo. A matriz vigente cobre as treze rotas
 documentadas com uma base em `390x844` e `1440x900` e acrescenta somente overlays,
 modos ou estados estruturais visualmente distintos. Ela não pretende representar
-todas as branches funcionais. Os critérios de profundidade, captura de página ou
-viewport e promoção estão em `06-referencias-visuais-de-layout.md`.
+todas as branches funcionais. Inclui o dashboard móvel sem overlay, a seleção entre
+planos ativos, a biblioteca de exercícios e as superfícies de leitura, aceite e
+gestão de termos descritas nas respectivas rotas. Os critérios de profundidade,
+captura de página ou viewport e promoção estão em `06-referencias-visuais-de-layout.md`.
 
 ## Estado de adoção
 

@@ -153,4 +153,24 @@ O cenário 6 é exercitado em `tests/integration/routes/terms.spec.ts`, usando V
 MSW Browser. Identificação histórica, CAS, sanitização e publicação concorrente
 real são cobertos separadamente pelos unitários/E2E da API. Mocks usam responsáveis
 sintéticos; não incluem os dados reais da minuta. A fronteira de Analytics testa
-projeção das propriedades permitidas. Não há referência visual para este slug.
+projeção das propriedades permitidas.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/admin-terms/desktop-1440-list.png` | `1440x900` | `admin`, listagem | menu administrativo, criação, tabela de versões e paginação |
+| `assets/admin-terms/mobile-390-list.png` | `390x844` | `admin`, listagem | cabeçalho e ações empilhados, tabela com rolagem horizontal |
+| `assets/admin-terms/desktop-1440-editor.png` | `1440x900` | `admin`, criar versão | campos, área de HTML e grupo de ações do rascunho |
+| `assets/admin-terms/mobile-390-editor.png` | `390x844` | `admin`, criar versão | campos em coluna única e ações distribuídas em várias linhas |
+| `assets/admin-terms/desktop-1440-preview.png` | `1440x900` | `admin`, criar versão e visualizar prévia | editor seguido da região de prévia e identificação do documento |
+| `assets/admin-terms/mobile-390-preview.png` | `390x844` | `admin`, criar versão e visualizar prévia | continuidade vertical entre formulário, ações e prévia |
+| `assets/admin-terms/desktop-1440-publish-dialog.png` | `1440x900` | `admin`, publicar a prévia | AlertDialog centralizado, backdrop, aviso e ações de confirmação |
+| `assets/admin-terms/mobile-390-publish-dialog.png` | `390x844` | `admin`, publicar a prévia | confirmação contida no viewport e ações sem corte |
+
+Link base para todas as referências:
+`http://localhost:3000/admin/terms?mockAuth=admin&mockTerms=admin`.
+No editor, acionar `Criar versão`; para a prévia, acionar também `Visualizar prévia`.
+A confirmação acrescenta `Publicar versão`, sem acionar `Confirmar`. Os cenários
+usam os dados sintéticos já preenchidos pela cópia da versão vigente. Lista, editor
+e prévia registram a página inteira; o AlertDialog registra somente o viewport.

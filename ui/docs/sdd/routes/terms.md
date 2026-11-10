@@ -195,8 +195,6 @@ usam somente identificação sintética. A suíte da fronteira de Analytics prot
 projeção e omissão de propriedades arbitrárias. Android é validado pelos testes
 instrumentados de storage/sync, sem atribuir essa cobertura ao Playwright.
 
-Referências visuais: não se aplica — não há imagens para o slug `terms`.
-
 ### Administração acessível com pendência ou falha de consulta
 
 - Links para testar: `http://localhost:3000/admin/terms?mockAuth=admin&mockTerms=required`
@@ -205,3 +203,21 @@ Referências visuais: não se aplica — não há imagens para o slug `terms`.
 - When: navega entre Gestão de termos e Modelos de treino pelo menu.
 - Then: ambas as áreas permanecem acessíveis; Home, Meus planos e Treinar não
   aparecem até aceitar. Pessoa comum não recebe esses links nem acesso por URL.
+
+## Referências visuais de layout
+
+| Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
+| --- | ---: | --- | --- |
+| `assets/terms/desktop-1440-acceptance-required.png` | `1440x900` | `mockAuth=theme-light`, `mockTerms=required`, em `/dash` | menu restrito, alerta, documento e duas declarações na região principal |
+| `assets/terms/mobile-390-acceptance-required.png` | `390x844` | `mockAuth=theme-light`, `mockTerms=required`, em `/dash` | leitura contínua em uma coluna, declarações e ações abaixo do texto |
+| `assets/terms/desktop-1440-history.png` | `1440x900` | `mockAuth=theme-light`, `mockTerms=accepted`, histórico aberto em `/terms` | documento, recibo e histórico com paginação abaixo das ações |
+| `assets/terms/mobile-390-history.png` | `390x844` | `mockAuth=theme-light`, `mockTerms=accepted`, histórico aberto em `/terms` | leitura e histórico empilhados, com ações que quebram linha |
+
+Links para reproduzir:
+
+- barreira: `http://localhost:3000/dash?mockAuth=theme-light&mockTerms=required`;
+- consulta: `http://localhost:3000/terms?mockAuth=theme-light&mockTerms=accepted`,
+  acionar `Meus aceites anteriores`.
+
+As capturas usam a página inteira e tema claro. Documento, identificação, datas e
+recibos são fictícios e determinísticos; as imagens orientam exclusivamente layout.

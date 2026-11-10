@@ -23,6 +23,7 @@ const workoutId = '64b000000000000000000101';
 const completionId = '64b000000000000000000301';
 const ownedCatalogEntryId = '74b000000000000000000001';
 const referenceCatalogEntryId = '74b000000000000000000002';
+const libraryWorkoutId = '74b000000000000000000101';
 const candidateDirectory = 'test-results/sdd-screenshots';
 
 const captures: readonly SddScreenshotCapture[] = [
@@ -56,6 +57,14 @@ const captures: readonly SddScreenshotCapture[] = [
     name: 'menu aberto mobile',
     path: '/dash?mockAuth=admin&mockDashboard=admin',
     prepare: openApplicationMenu,
+    ready: { kind: 'heading', name: 'Visão administrativa' },
+    routeSlug: 'dash',
+    viewport: mobile,
+  },
+  {
+    fileName: 'mobile-390-dashboard.png',
+    name: 'dashboard mobile sem overlay',
+    path: '/dash?mockAuth=admin&mockDashboard=admin',
     ready: { kind: 'heading', name: 'Visão administrativa' },
     routeSlug: 'dash',
     viewport: mobile,
@@ -301,6 +310,26 @@ const captures: readonly SddScreenshotCapture[] = [
     viewport: desktop,
   },
   {
+    fileName: 'desktop-1440-exercise-library-modal.png',
+    fullPage: false,
+    name: 'biblioteca de exercícios desktop',
+    path: `/training-plan/${ownedCatalogEntryId}/workout/${libraryWorkoutId}?mockAuth=theme-light&mockTrainingPlans=exercise-library-body-area`,
+    prepare: openExerciseLibrary,
+    ready: { kind: 'heading', name: 'Treino A' },
+    routeSlug: 'training-plan-workout',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-exercise-library-modal.png',
+    fullPage: false,
+    name: 'biblioteca de exercícios mobile',
+    path: `/training-plan/${ownedCatalogEntryId}/workout/${libraryWorkoutId}?mockAuth=theme-light&mockTrainingPlans=exercise-library-body-area`,
+    prepare: openExerciseLibrary,
+    ready: { kind: 'heading', name: 'Treino A' },
+    routeSlug: 'training-plan-workout',
+    viewport: mobile,
+  },
+  {
     fileName: 'desktop-1440-training.png',
     name: 'visão geral de treinos desktop',
     path: '/training?mockAuth=theme-light&mockTraining=active-plan',
@@ -321,6 +350,22 @@ const captures: readonly SddScreenshotCapture[] = [
     name: 'estado sem plano em uso mobile',
     path: '/training?mockAuth=theme-light&mockTraining=no-active-plan',
     ready: { kind: 'heading', name: 'Nenhum plano em uso' },
+    routeSlug: 'training',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-multiple-active.png',
+    name: 'seleção entre planos ativos desktop',
+    path: '/training?mockAuth=theme-light&mockTraining=multiple-active',
+    ready: { kind: 'heading', name: 'Escolha um plano' },
+    routeSlug: 'training',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-multiple-active.png',
+    name: 'seleção entre planos ativos mobile',
+    path: '/training?mockAuth=theme-light&mockTraining=multiple-active',
+    ready: { kind: 'heading', name: 'Escolha um plano' },
     routeSlug: 'training',
     viewport: mobile,
   },
@@ -420,6 +465,112 @@ const captures: readonly SddScreenshotCapture[] = [
     routeSlug: 'training-completion',
     viewport: mobile,
   },
+  {
+    fileName: 'desktop-1440-acceptance-required.png',
+    name: 'barreira de aceite desktop',
+    path: '/dash?mockAuth=theme-light&mockTerms=required',
+    ready: { kind: 'button', name: 'Aceitar e continuar' },
+    routeSlug: 'terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-acceptance-required.png',
+    name: 'barreira de aceite mobile',
+    path: '/dash?mockAuth=theme-light&mockTerms=required',
+    ready: { kind: 'button', name: 'Aceitar e continuar' },
+    routeSlug: 'terms',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-history.png',
+    name: 'consulta e histórico de aceites desktop',
+    path: '/terms?mockAuth=theme-light&mockTerms=accepted',
+    prepare: openTermsHistory,
+    ready: { kind: 'heading', name: 'Termos de uso' },
+    routeSlug: 'terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-history.png',
+    name: 'consulta e histórico de aceites mobile',
+    path: '/terms?mockAuth=theme-light&mockTerms=accepted',
+    prepare: openTermsHistory,
+    ready: { kind: 'heading', name: 'Termos de uso' },
+    routeSlug: 'terms',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-list.png',
+    name: 'gestão de termos desktop',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    ready: { kind: 'button', name: 'Abrir versão 1' },
+    routeSlug: 'admin-terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-list.png',
+    name: 'gestão de termos mobile',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    ready: { kind: 'button', name: 'Abrir versão 1' },
+    routeSlug: 'admin-terms',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-editor.png',
+    name: 'editor de termos desktop',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsDraft,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-editor.png',
+    name: 'editor de termos mobile',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsDraft,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-preview.png',
+    name: 'prévia de termos desktop',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsPreview,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-preview.png',
+    name: 'prévia de termos mobile',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsPreview,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: mobile,
+  },
+  {
+    fileName: 'desktop-1440-publish-dialog.png',
+    fullPage: false,
+    name: 'confirmação de publicação de termos desktop',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsPublishDialog,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: desktop,
+  },
+  {
+    fileName: 'mobile-390-publish-dialog.png',
+    fullPage: false,
+    name: 'confirmação de publicação de termos mobile',
+    path: '/admin/terms?mockAuth=admin&mockTerms=admin',
+    prepare: openTermsPublishDialog,
+    ready: { kind: 'button', name: 'Criar versão' },
+    routeSlug: 'admin-terms',
+    viewport: mobile,
+  },
 ];
 
 test.describe('Candidatas a referências visuais do SDD', () => {
@@ -434,6 +585,8 @@ test.describe('Candidatas a referências visuais do SDD', () => {
       await waitForCaptureReady(page, capture);
       await capture.prepare?.(page);
       await waitForStableAssets(page);
+      if (capture.fullPage !== false)
+        await page.evaluate(() => window.scrollTo(0, 0));
 
       await page.screenshot({
         animations: 'disabled',
@@ -499,6 +652,47 @@ async function openTrainingPlanAssistant(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Me ajude a criar' }).click();
   await expect(
     page.getByRole('dialog', { name: 'Me ajude a criar um plano' }),
+  ).toBeVisible();
+}
+
+async function openExerciseLibrary(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Adicionar exercício' }).click();
+  await page.getByRole('menuitem', { name: 'Copiar exercícios' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Copiar exercícios' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByText('Agachamento', { exact: true }).click();
+  await expect(
+    dialog.getByText('1 selecionado', { exact: true }),
+  ).toBeVisible();
+}
+
+async function openTermsHistory(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Meus aceites anteriores' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Ler versão 1' }),
+  ).toBeVisible();
+}
+
+async function openTermsDraft(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Criar versão' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Editar rascunho' }),
+  ).toBeVisible();
+}
+
+async function openTermsPreview(page: Page): Promise<void> {
+  await openTermsDraft(page);
+  await page.getByRole('button', { name: 'Visualizar prévia' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Prévia — ainda não publicado' }),
+  ).toBeVisible();
+}
+
+async function openTermsPublishDialog(page: Page): Promise<void> {
+  await openTermsPreview(page);
+  await page.getByRole('button', { name: 'Publicar versão' }).click();
+  await expect(
+    page.getByRole('alertdialog', { name: 'Publicar nova versão?' }),
   ).toBeVisible();
 }
 

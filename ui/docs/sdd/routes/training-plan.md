@@ -201,8 +201,8 @@ ações enumeradas `assistant_open|message|retry|abandon|preview|adjust|confirm`
 
 | Arquivo | Viewport | Estado MSW | Aspectos de layout relevantes |
 | --- | ---: | --- | --- |
-| `assets/training-plan/desktop-1440-mixed.png` | `1440x900` | `personal-mixed` | catálogo misto em tema claro no desktop |
-| `assets/training-plan/mobile-390-mixed.png` | `390x844` | `personal-mixed` | catálogo misto em tema claro no mobile |
+| `assets/training-plan/desktop-1440-mixed.png` | `1440x900` | `personal-mixed` | catálogo misto em tema claro, checkboxes independentes na coluna Em uso e menu no desktop |
+| `assets/training-plan/mobile-390-mixed.png` | `390x844` | `personal-mixed` | tabela móvel com checkboxes independentes e ações, preservando rolagem horizontal |
 | `assets/training-plan/desktop-1440-library-modal.png` | `1440x900` | `personal-mixed`, biblioteca aberta | lista paginada de modelos e ações no desktop |
 | `assets/training-plan/mobile-390-library-modal.png` | `390x844` | `personal-mixed`, biblioteca aberta | cards e rodapé fixo da biblioteca no mobile |
 | `assets/training-plan/desktop-1440-assistant-collecting-modal.png` | `1440x900` | `assistant-collecting` | histórico, pergunta, respostas e rodapé do assistente |

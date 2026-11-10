@@ -155,6 +155,13 @@ da rota pessoal cobrem ambos os modos.
 | `assets/training-plan-workout/desktop-1440-read-only.png` | `1440x900` | `personal-reference` | workout do modelo em leitura no desktop |
 | `assets/training-plan-workout/mobile-390-read-only.png` | `390x844` | `personal-reference` | cards de leitura e mídia no mobile |
 | `assets/training-plan-workout/desktop-1440-owned.png` | `1440x900` | `personal-mixed`, entrada própria | editor completo reutilizado pelo plano pessoal |
+| `assets/training-plan-workout/desktop-1440-exercise-library-modal.png` | `1440x900` | `exercise-library-body-area`, biblioteca aberta e Agachamento selecionado | modal com filtros lado a lado, lista rolável e contagem/ações no rodapé |
+| `assets/training-plan-workout/mobile-390-exercise-library-modal.png` | `390x844` | `exercise-library-body-area`, biblioteca aberta e Agachamento selecionado | modal no viewport móvel, filtros empilhados e rodapé acessível |
+
+As referências da biblioteca usam o link base de seus cenários com
+`mockAuth=theme-light` e `mockTrainingPlans=exercise-library-body-area`. Abrir
+`Adicionar exercício` → `Copiar exercícios` e marcar `Agachamento`; não confirmar a
+cópia. A captura registra somente a superfície de seleção.
 
 ## Precondição jurídica compartilhada
 
