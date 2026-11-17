@@ -45,6 +45,8 @@ interface ScenarioState {
   nextExerciseNumber: number;
   workoutReadCount: number;
   cloneJobs: PersonalTrainingPlanListItem[];
+  duplicatedWorkouts: TrainingPlanWorkoutDetails[];
+  duplicationAttempts: number;
 }
 
 const privateBlobOrigin =
@@ -107,6 +109,8 @@ function getState(scenario: string): ScenarioState {
     nextExerciseNumber: 30,
     workoutReadCount: 0,
     cloneJobs: [],
+    duplicatedWorkouts: [],
+    duplicationAttempts: 0,
   };
   if (scenario === 'empty-workout') {
     result.workout = { ...result.workout, exercises: [] };
@@ -199,6 +203,8 @@ registerMockRealtimeReplication(({ scenario, state }) => {
     libraryReadCount: 0,
     activeCatalogEntryIds: [],
     cloneJobs: [],
+    duplicatedWorkouts: [],
+    duplicationAttempts: 0,
     ...structuredClone(state),
     detail: {
       ...structuredClone(state.detail),
@@ -1179,12 +1185,82 @@ export const trainingPlanHandlers = [
   }),
   http.get(
     '*/training-plans/:catalogEntryId/workouts/:workoutId',
-    ({ request }) => {
+    ({ params, request }) => {
       const state = getState(getScenario(request));
+      const workout =
+        state.duplicatedWorkouts.find((item) => item.id === params.workoutId) ??
+        state.workout;
       return HttpResponse.json(
-        { data: state.workout },
+        { data: { ...workout, version: state.detail.version } },
         responseInit(state.detail.version),
       );
+    },
+  ),
+  http.post(
+    '*/training-plans/:catalogEntryId/workouts/:workoutId/duplicate',
+    async ({ params, request }) => {
+      const scenario = getScenario(request);
+      const state = getState(scenario);
+      const readOnly = rejectPersonalReference(params.catalogEntryId);
+      if (readOnly !== null) return readOnly;
+      const invalid = validateMutation(request, state, scenario);
+      if (invalid !== null) return invalid;
+      const sourceSummary = state.detail.workouts.find(
+        (item) => item.id === params.workoutId,
+      );
+      if (sourceSummary === undefined)
+        return apiError('WORKOUT_NOT_FOUND', 'Workout not found.', 404);
+      if (state.detail.workouts.length >= 25)
+        return apiError('WORKOUT_LIMIT_REACHED', 'Workout limit reached.', 409);
+      state.duplicationAttempts += 1;
+      await delay(500);
+      if (
+        scenario === 'duplicate-workout-error' &&
+        state.duplicationAttempts === 1
+      )
+        return apiError(
+          'EXERCISE_IMAGE_COPY_FAILED',
+          'Image copy failed.',
+          503,
+        );
+      const source =
+        state.duplicatedWorkouts.find((item) => item.id === params.workoutId) ??
+        state.workout;
+      const suffix = ' (cópia)';
+      const id = `64b00000000000000000${String(200 + state.duplicationAttempts)}`;
+      const name = `${sourceSummary.name.slice(0, 120 - suffix.length).trimEnd()}${suffix}`;
+      const exercises = source.exercises
+        .slice(0, sourceSummary.exerciseCount)
+        .map<Exercise>((exercise, index) => ({
+          ...exercise,
+          id: `65b00000000000${String(state.duplicationAttempts).padStart(4, '0')}${String(index).padStart(6, '0')}`,
+          ...(exercise.type === 'image' && exercise.image !== null
+            ? { image: signedExerciseImage('fresh', id) }
+            : {}),
+        }));
+      const summary = { id, name, exerciseCount: exercises.length };
+      state.detail = {
+        ...state.detail,
+        workouts: [...state.detail.workouts, summary],
+      };
+      const version = increment(state, request, false);
+      state.duplicatedWorkouts.push({
+        ...source,
+        id,
+        name,
+        version,
+        exercises,
+      });
+      if (
+        scenario === 'duplicate-workout-uncertain' &&
+        state.duplicationAttempts === 1
+      )
+        return apiError(
+          'WORKOUT_DUPLICATION_RESULT_UNCERTAIN',
+          'Read before another write.',
+          503,
+        );
+      return HttpResponse.json({ data: summary }, responseInit(version, 201));
     },
   ),
   http.post(

@@ -3,6 +3,7 @@ import type {
   ExerciseChanges,
   ImageWriteInput,
   NewTrainingPlan,
+  NewWorkout,
   StoredExercise,
   StoredExerciseImage,
   TargetState,
@@ -55,6 +56,13 @@ export abstract class TrainingPlanRepository {
     expectedVersion: number,
     scope: TrainingPlanAccessScope,
   ): Promise<VersionedResult<readonly StoredExerciseImage[]> | null>;
+  abstract appendWorkout(
+    trainingPlanId: string,
+    sourceWorkoutId: string,
+    expectedVersion: number,
+    workout: NewWorkout,
+    scope: TrainingPlanAccessScope,
+  ): Promise<boolean>;
   abstract findWorkout(
     trainingPlanId: string,
     workoutId: string,

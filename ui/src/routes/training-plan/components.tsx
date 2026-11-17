@@ -676,7 +676,9 @@ export function TrainingPlanConflictAlert({
 
 interface ActionsMenuProps {
   ariaLabel: string;
+  isDisabled?: boolean;
   onDelete: () => void;
+  onDuplicate?: () => void;
   onEdit?: () => void;
   surface: Extract<
     AnalyticsSurface,
@@ -686,7 +688,9 @@ interface ActionsMenuProps {
 
 export function ActionsMenu({
   ariaLabel,
+  isDisabled = false,
   onDelete,
+  onDuplicate,
   onEdit,
   surface,
 }: Readonly<ActionsMenuProps>) {
@@ -706,6 +710,7 @@ export function ActionsMenu({
       <Dropdown.Trigger
         aria-label={ariaLabel}
         className={styles.actionTrigger()}
+        isDisabled={isDisabled}
       >
         <EllipsisVertical aria-hidden="true" className={styles.icon()} />
       </Dropdown.Trigger>
@@ -713,6 +718,16 @@ export function ActionsMenu({
         <Dropdown.Menu
           aria-label={ariaLabel}
           onAction={(key) => {
+            if (key === 'duplicate') {
+              trackUiEvent({
+                action: 'duplicate',
+                control: 'row_actions',
+                eventName: 'ui_menu_action_selected',
+                menu: 'row_actions',
+                surface,
+              });
+              onDuplicate?.();
+            }
             if (key === 'edit') {
               trackUiEvent({
                 action: 'edit',
@@ -738,6 +753,11 @@ export function ActionsMenu({
           {onEdit === undefined ? null : (
             <Dropdown.Item id="edit" textValue="Editar">
               Editar
+            </Dropdown.Item>
+          )}
+          {onDuplicate === undefined ? null : (
+            <Dropdown.Item id="duplicate" textValue="Duplicar">
+              Duplicar
             </Dropdown.Item>
           )}
           <Dropdown.Item id="delete" textValue="Excluir">

@@ -4,6 +4,7 @@ import type {
   CreatePersonalTrainingPlanResponse,
   CreateTrainingPlanCloneJobRequest,
   CreateTrainingPlanRequest,
+  CreateTrainingPlanWorkoutResponse,
   GlobalTrainingPlanLibraryResponse,
   PersonalTrainingPlanCollectionResponse,
   PersonalTrainingPlanDetails,
@@ -11,14 +12,35 @@ import type {
   PersonalTrainingPlanListItem,
   TrainingPlanCloneJobResponse,
   TrainingPlanSummary,
+  TrainingPlanWorkoutSummary,
   UpdateTrainingPlanRequest,
   UpdateTrainingPlanResponse,
 } from '@dall-fit/types';
 
-import { apiClient } from '~/core/http/api-client';
-import type { MockTrainingPlansScenario } from '~/routes/training-plan/training-plan-service';
+import { apiClient, UPLOAD_REQUEST_TIMEOUT } from '~/core/http/api-client';
+import type {
+  MockTrainingPlansScenario,
+  VersionedMutationResult,
+} from '~/routes/training-plan/training-plan-service';
 
 const resourceVersionHeader = 'X-Resource-Version';
+
+export async function duplicatePersonalTrainingPlanWorkout(
+  catalogEntryId: string,
+  workoutId: string,
+  version: number,
+  scenario: MockTrainingPlansScenario,
+): Promise<VersionedMutationResult<TrainingPlanWorkoutSummary>> {
+  const response = await apiClient.post<CreateTrainingPlanWorkoutResponse>(
+    `/training-plans/${catalogEntryId}/workouts/${workoutId}/duplicate`,
+    {},
+    { ...mutationConfig(scenario, version), timeout: UPLOAD_REQUEST_TIMEOUT },
+  );
+  return {
+    data: response.data.data,
+    version: responseVersion(response.headers),
+  };
+}
 
 function requestConfig(
   scenario: MockTrainingPlansScenario,

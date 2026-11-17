@@ -59,6 +59,8 @@ export type MockTrainingPlansScenario =
   | 'create-error'
   | 'create-success'
   | 'create-workout-error'
+  | 'duplicate-workout-error'
+  | 'duplicate-workout-uncertain'
   | 'delete-error'
   | 'delete-success'
   | 'delete-workout-error'

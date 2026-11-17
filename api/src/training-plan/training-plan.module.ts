@@ -52,6 +52,7 @@ import { ExerciseImageService } from '~/training-plan/services/exercise-image.se
 import { ExerciseLibraryService } from '~/training-plan/services/exercise-library.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
+import { WorkoutDuplicationService } from '~/training-plan/services/workout-duplication.service';
 import { YoutubeReferenceService } from '~/training-plan/services/youtube-reference.service';
 import { MongoTrainingLoadProfileRepository } from '~/training/repositories/mongo-training-load-profile.repository';
 import { TrainingLoadProfileRepository } from '~/training/repositories/training-load-profile.repository';
@@ -116,6 +117,7 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
     PersonalTrainingPlanService,
     AssistantTrainingPlanMaterializationService,
     TrainingPlanService,
+    WorkoutDuplicationService,
     BlobStorageService,
     ExerciseImageService,
     YoutubeReferenceService,

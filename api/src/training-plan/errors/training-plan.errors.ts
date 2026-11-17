@@ -21,6 +21,12 @@ export const createWorkoutNotFoundException = () =>
     'WORKOUT_NOT_FOUND',
     'Workout not found.',
   );
+export const createWorkoutDuplicationUncertainException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'WORKOUT_DUPLICATION_RESULT_UNCERTAIN',
+    'Read the training plan before attempting another duplication.',
+  );
 export const createExerciseNotFoundException = () =>
   domainException(
     HttpStatus.NOT_FOUND,

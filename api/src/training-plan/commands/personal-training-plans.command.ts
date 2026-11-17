@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 
 import type {
   CreateExerciseResponse,
@@ -19,10 +19,18 @@ import type {
   UpdateTrainingPlanWorkoutResponse,
 } from '@dall-fit/types';
 
-import type { UploadedImageFile } from '~/training-plan/domain/training-plan.entity';
+import type {
+  StoredExercise,
+  UploadedImageFile,
+} from '~/training-plan/domain/training-plan.entity';
+import {
+  createExerciseImageCopyFailedException,
+  createWorkoutDuplicationUncertainException,
+} from '~/training-plan/errors/training-plan.errors';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
+import { WorkoutDuplicationService } from '~/training-plan/services/workout-duplication.service';
 
 @Injectable()
 export class PersonalTrainingPlansCommand {
@@ -32,6 +40,7 @@ export class PersonalTrainingPlansCommand {
     private readonly personalService: PersonalTrainingPlanService,
     private readonly trainingPlanService: TrainingPlanService,
     private readonly exerciseImageService: ExerciseImageService,
+    private readonly workoutDuplication: WorkoutDuplicationService,
   ) {}
 
   async list(
@@ -214,6 +223,105 @@ export class PersonalTrainingPlansCommand {
       version: result.version,
     });
     return result;
+  }
+
+  async duplicateWorkout(
+    personId: string,
+    catalogEntryId: string,
+    workoutId: string,
+    expectedVersion: number,
+  ): Promise<{ response: CreateTrainingPlanWorkoutResponse; version: number }> {
+    this.logParams('duplicateWorkout', {
+      personId,
+      catalogEntryId,
+      workoutId,
+      expectedVersion,
+    });
+    const trainingPlanId =
+      await this.personalService.resolveOwnedTrainingPlanId(
+        personId,
+        catalogEntryId,
+      );
+    this.logger.log(
+      'PersonalTrainingPlansCommand -> duplicateWorkout -> personalService return:',
+      { data: { trainingPlanId } },
+    );
+    const target = {
+      personId,
+      trainingPlanId,
+      workoutId,
+      version: expectedVersion,
+    };
+    const prepared = await this.workoutDuplication.prepare(target);
+    this.logger.log(
+      'PersonalTrainingPlansCommand -> duplicateWorkout -> workoutDuplication return:',
+      { data: { exerciseCount: prepared.exercises.length } },
+    );
+    const signal = AbortSignal.timeout(45_000);
+    let copied: readonly StoredExercise[] = [];
+    let commitStarted = false;
+    try {
+      copied = await this.exerciseImageService.copyExercises(
+        prepared.exercises,
+        signal,
+      );
+      this.logger.log(
+        'PersonalTrainingPlansCommand -> duplicateWorkout -> exerciseImageService return:',
+        { data: { exerciseCount: copied.length } },
+      );
+      if (signal.aborted) {
+        this.logger.warn(
+          'PersonalTrainingPlansCommand -> duplicateWorkout -> timeout branch:',
+          { data: {} },
+        );
+        throw createExerciseImageCopyFailedException();
+      }
+      const workout = { ...prepared, exercises: copied };
+      this.logger.log(
+        'PersonalTrainingPlansCommand -> duplicateWorkout -> workout prepared:',
+        { data: { exerciseCount: workout.exercises.length } },
+      );
+      commitStarted = true;
+      const committed = await this.workoutDuplication.commit(target, workout);
+      this.logger.log(
+        'PersonalTrainingPlansCommand -> duplicateWorkout -> commit return:',
+        { data: { version: committed.version } },
+      );
+      const result = {
+        response: { data: committed.data },
+        version: committed.version,
+      };
+      this.logReturn('duplicateWorkout', {
+        workoutId: committed.data.id,
+        version: committed.version,
+      });
+      return result;
+    } catch (error: unknown) {
+      if (!commitStarted || error instanceof HttpException) {
+        this.logger.warn(
+          'PersonalTrainingPlansCommand -> duplicateWorkout -> compensate branch:',
+          { data: { exerciseCount: copied.length } },
+        );
+        await this.exerciseImageService.deleteImages(
+          copied.flatMap((exercise) =>
+            exercise.type === 'image' && exercise.image !== null
+              ? [exercise.image]
+              : [],
+          ),
+        );
+        this.logger.log(
+          'PersonalTrainingPlansCommand -> duplicateWorkout -> compensation completed:',
+          { data: {} },
+        );
+      } else {
+        this.logger.error(
+          'PersonalTrainingPlansCommand -> duplicateWorkout -> uncertainCommit branch:',
+          { data: { exerciseCount: copied.length } },
+        );
+        throw createWorkoutDuplicationUncertainException();
+      }
+      throw error;
+    }
   }
 
   async updateWorkout(

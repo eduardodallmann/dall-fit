@@ -9,13 +9,24 @@ import type { CreateTrainingPlanRequest } from '@dall-fit/types';
 
 import type { MockAuthScenario } from '~/auth/auth-service';
 import {
+  isSessionGenerationActive,
+  requireActiveSessionGeneration,
+} from '~/auth/session-lifecycle';
+import { trackUiEvent } from '~/core/analytics';
+import { isExpectedCancellation } from '~/core/http/http-error';
+import { useAggregateMutationCoordinator } from '~/routes/training-plan/aggregate-mutation-coordinator';
+import {
   ActionsMenu,
   DeleteConfirmationDialog,
+  TrainingPlanConflictAlert,
   TrainingPlanTableState,
 } from '~/routes/training-plan/components';
 import { TrainingPlanInlineForm } from '~/routes/training-plan/inline-form';
 import { TrainingPlanPageSkeleton } from '~/routes/training-plan/loading';
-import { updatePersonalTrainingPlan } from '~/routes/training-plan/personal-training-plan-service';
+import {
+  duplicatePersonalTrainingPlanWorkout,
+  updatePersonalTrainingPlan,
+} from '~/routes/training-plan/personal-training-plan-service';
 import { trainingPlanStyles } from '~/routes/training-plan/styles';
 import {
   personalTrainingPlanDetailQueryOptions,
@@ -48,7 +59,14 @@ export function PersonalTrainingPlanDetailPage({
   );
   const [editing, setEditing] = useState(false);
   const [deleteWorkoutId, setDeleteWorkoutId] = useState<string>();
+  const [duplicationFailed, setDuplicationFailed] = useState(false);
   const plan = query.data;
+  const aggregate = useAggregateMutationCoordinator(
+    catalogEntryId,
+    plan?.version,
+    editing || deleteWorkoutId !== undefined,
+  );
+  const writeDisabled = aggregate.isPending || aggregate.paused;
   const readOnly = plan?.source === 'global-reference';
   const mockSearch = trainingPlanMockSearch(mockTrainingPlans);
   const invalidate = async () => {
@@ -60,31 +78,37 @@ export function PersonalTrainingPlanDetailPage({
         ),
       }),
       queryClient.invalidateQueries({ queryKey: trainingPlanKeys.lists() }),
+      queryClient.invalidateQueries({ queryKey: trainingPlanKeys.workouts() }),
     ]);
   };
   const updateMutation = useMutation({
     mutationFn: (input: CreateTrainingPlanRequest) =>
-      updatePersonalTrainingPlan(
-        catalogEntryId,
-        input,
-        plan?.version ?? 0,
-        mockTrainingPlans,
-      ),
+      aggregate.enqueue(async (version) => {
+        const data = await updatePersonalTrainingPlan(
+          catalogEntryId,
+          input,
+          version,
+          mockTrainingPlans,
+        );
+        return { data, version: data.version };
+      }),
     onSuccess: invalidate,
   });
   const createWorkoutMutation = useMutation({
     mutationFn: () =>
-      createTrainingPlanWorkout(
-        catalogEntryId,
-        plan?.version ?? 0,
-        mockTrainingPlans,
-        'personal',
+      aggregate.enqueue((version) =>
+        createTrainingPlanWorkout(
+          catalogEntryId,
+          version,
+          mockTrainingPlans,
+          'personal',
+        ),
       ),
     onSuccess: async (result) => {
       await invalidate();
       toast.success('Treino criado.');
       await navigate({
-        params: { catalogEntryId, workoutId: result.data.id },
+        params: { catalogEntryId, workoutId: result.id },
         search: { mockAuth, ...mockSearch },
         to: '/training-plan/$catalogEntryId/workout/$workoutId',
       });
@@ -92,14 +116,84 @@ export function PersonalTrainingPlanDetailPage({
   });
   const deleteWorkoutMutation = useMutation({
     mutationFn: (workoutId: string) =>
-      deleteTrainingPlanWorkout(
-        catalogEntryId,
-        workoutId,
-        plan?.version ?? 0,
-        mockTrainingPlans,
-        'personal',
-      ),
+      aggregate.enqueue(async (version) => {
+        const nextVersion = await deleteTrainingPlanWorkout(
+          catalogEntryId,
+          workoutId,
+          version,
+          mockTrainingPlans,
+          'personal',
+        );
+        return { data: undefined, version: nextVersion };
+      }),
     onSuccess: invalidate,
+  });
+  const duplicateWorkoutMutation = useMutation({
+    mutationFn: ({ workoutId }: { workoutId: string; generation: number }) =>
+      aggregate.enqueue(async (version) => {
+        const result = await duplicatePersonalTrainingPlanWorkout(
+          catalogEntryId,
+          workoutId,
+          version,
+          mockTrainingPlans,
+        );
+        return { data: result, version: result.version };
+      }),
+    onMutate: () => {
+      setDuplicationFailed(false);
+      trackUiEvent({
+        eventName: 'ui_operation_started',
+        operation: 'workout_duplicate',
+        control: 'row_actions',
+        surface: 'training_plan_detail',
+      });
+    },
+    onSuccess: async ({ data: workout, version }, { generation }) => {
+      if (!isSessionGenerationActive(generation)) return;
+      queryClient.setQueryData(
+        personalTrainingPlanDetailQueryOptions(
+          catalogEntryId,
+          mockTrainingPlans,
+        ).queryKey,
+        (current) =>
+          current === undefined
+            ? current
+            : {
+                ...current,
+                version: Math.max(current.version, version),
+                workouts: current.workouts.some(
+                  (item) => item.id === workout.id,
+                )
+                  ? current.workouts
+                  : [...current.workouts, workout],
+              },
+      );
+      await invalidate();
+      if (!isSessionGenerationActive(generation)) return;
+      toast.success('Treino duplicado.');
+      trackUiEvent({
+        eventName: 'ui_operation_completed',
+        operation: 'workout_duplicate',
+        outcome: 'success',
+        control: 'row_actions',
+        surface: 'training_plan_detail',
+      });
+    },
+    onError: (error, { generation }) => {
+      if (
+        !isSessionGenerationActive(generation) ||
+        isExpectedCancellation(error)
+      )
+        return;
+      setDuplicationFailed(true);
+      trackUiEvent({
+        eventName: 'ui_operation_completed',
+        operation: 'workout_duplicate',
+        outcome: 'error',
+        control: 'row_actions',
+        surface: 'training_plan_detail',
+      });
+    },
   });
 
   if (query.isLoading && plan === undefined)
@@ -110,7 +204,7 @@ export function PersonalTrainingPlanDetailPage({
       </div>
     );
 
-  if (query.isError || plan === undefined)
+  if (plan === undefined)
     return (
       <div className={styles.page()}>
         <PersonalBreadcrumbs />
@@ -147,6 +241,7 @@ export function PersonalTrainingPlanDetailPage({
         {editing && !readOnly ? (
           <TrainingPlanInlineForm
             defaultValues={{ description: plan.description, name: plan.name }}
+            isWritePaused={writeDisabled}
             onCancel={() => setEditing(false)}
             onSubmit={async (input) => {
               await updateMutation.mutateAsync(input);
@@ -161,6 +256,7 @@ export function PersonalTrainingPlanDetailPage({
               {readOnly ? null : (
                 <Button
                   aria-label="Editar plano"
+                  isDisabled={writeDisabled}
                   isIconOnly
                   onPress={() => setEditing(true)}
                   size="sm"
@@ -174,6 +270,37 @@ export function PersonalTrainingPlanDetailPage({
           </div>
         )}
       </header>
+      {aggregate.paused ? (
+        <TrainingPlanConflictAlert
+          directReload
+          reason={aggregate.pauseReason}
+          onReload={async () => {
+            const generation = requireActiveSessionGeneration();
+            const result = await query.refetch();
+            if (!isSessionGenerationActive(generation)) return;
+            if (!result.isSuccess || result.data === undefined)
+              throw new Error('Training plan reload failed.');
+            await aggregate.reset(result.data.version);
+            setEditing(false);
+            setDeleteWorkoutId(undefined);
+            setDuplicationFailed(false);
+          }}
+        />
+      ) : null}
+      {duplicationFailed && !aggregate.paused ? (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Não foi possível duplicar o treino.</Alert.Title>
+            <Alert.Description>
+              Tente novamente pelo menu de ações do treino.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
+      {duplicateWorkoutMutation.isPending ? (
+        <p role="status">Duplicando treino…</p>
+      ) : null}
       <section aria-label="Treinos do plano" className={styles.section()}>
         <header className={styles.pageHeader()}>
           <div className={styles.titleGroup()}>
@@ -186,6 +313,7 @@ export function PersonalTrainingPlanDetailPage({
           </div>
           {readOnly ? null : (
             <Button
+              isDisabled={writeDisabled || duplicateWorkoutMutation.isPending}
               isPending={createWorkoutMutation.isPending}
               onPress={() => createWorkoutMutation.mutate()}
             >
@@ -203,6 +331,10 @@ export function PersonalTrainingPlanDetailPage({
                 <Table.Column>Ações</Table.Column>
               </Table.Header>
               <Table.Body
+                dependencies={[
+                  writeDisabled,
+                  duplicateWorkoutMutation.isPending,
+                ]}
                 items={plan.workouts}
                 renderEmptyState={() => (
                   <TrainingPlanTableState
@@ -231,7 +363,21 @@ export function PersonalTrainingPlanDetailPage({
                       ) : (
                         <ActionsMenu
                           ariaLabel={`Ações de ${workout.name}`}
+                          isDisabled={
+                            writeDisabled || duplicateWorkoutMutation.isPending
+                          }
                           onDelete={() => setDeleteWorkoutId(workout.id)}
+                          onDuplicate={() => {
+                            if (
+                              duplicateWorkoutMutation.isPending ||
+                              writeDisabled
+                            )
+                              return;
+                            duplicateWorkoutMutation.mutate({
+                              workoutId: workout.id,
+                              generation: requireActiveSessionGeneration(),
+                            });
+                          }}
                           surface="training_plan_detail"
                         />
                       )}
@@ -245,6 +391,7 @@ export function PersonalTrainingPlanDetailPage({
       </section>
       <DeleteConfirmationDialog
         description="Este treino será removido do plano."
+        isWritePaused={aggregate.paused}
         onConfirm={async () => {
           if (deleteWorkoutId === undefined) return;
           await deleteWorkoutMutation.mutateAsync(deleteWorkoutId);

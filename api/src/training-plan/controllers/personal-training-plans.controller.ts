@@ -223,6 +223,45 @@ export class PersonalTrainingPlansController {
     return result.response;
   }
 
+  @Post(':catalogEntryId/workouts/:workoutId/duplicate')
+  @EditorMutation()
+  async duplicateWorkout(
+    @CurrentPerson() person: PersonEntity,
+    @Param() params: PersonalTrainingPlanWorkoutParamsDto,
+    @Headers(RESOURCE_VERSION_HEADER) resourceVersion: string | undefined,
+    @Body() _body: EmptyTrainingPlanRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<CreateTrainingPlanWorkoutResponse> {
+    const expectedVersion = parseResourceVersion(resourceVersion);
+    this.logParams('duplicateWorkout', {
+      personId: person.id,
+      ...params,
+      expectedVersion,
+    });
+    const commandResult = await this.command.duplicateWorkout(
+      person.id,
+      params.catalogEntryId,
+      params.workoutId,
+      expectedVersion,
+    );
+    this.logger.log(
+      'PersonalTrainingPlansController -> duplicateWorkout -> command return:',
+      {
+        data: {
+          workoutId: commandResult.response.data.id,
+          version: commandResult.version,
+        },
+      },
+    );
+    this.setResourceVersion(response, commandResult.version);
+    const result = commandResult.response;
+    this.logReturn('duplicateWorkout', {
+      workoutId: result.data.id,
+      version: commandResult.version,
+    });
+    return result;
+  }
+
   @Get(':catalogEntryId/workouts/:workoutId')
   @Header('Cache-Control', 'private, no-store')
   async getWorkout(

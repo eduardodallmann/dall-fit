@@ -86,6 +86,12 @@ não confiam em pessoa, owner ou escopo enviados pelo cliente.
 12. Criar um treino em plano próprio permanece no detalhe durante pending ou erro;
     somente o sucesso navega ao workout pelo ID devolvido. `Ctrl+Enter` salva os
     títulos inline de plano e treino pela mesma mutation dos botões.
+    No detalhe próprio, `Duplicar` no menu de treino acrescenta uma cópia completa
+    ao mesmo plano sem navegar. Identidades e imagens são independentes, e a
+    operação confirma tudo em uma única versão; limites e falhas preservam o
+    original. A interação pertence à
+    [rota de detalhe](../../../ui/docs/sdd/routes/training-plan-detail.md) e o
+    contrato ao [endpoint pessoal](../../../api/docs/sdd/endpoints/personal-training-plans.md).
 13. Biblioteca sem resultados mostra `Nenhum modelo disponível`, orienta tentar
     mais tarde e omite as ações de uso e clone.
 14. No workout próprio, `Adicionar exercício` → `Copiar exercícios` abre a

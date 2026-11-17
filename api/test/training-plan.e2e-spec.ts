@@ -26,6 +26,7 @@ import type {
   TrainingOverviewResponse,
   TrainingPlanAssistantSessionResponse,
   TrainingPlanDetailsResponse,
+  TrainingPlanWorkoutDetailsResponse,
 } from '@dall-fit/types';
 
 import { configureApplication } from '~/configure-application';
@@ -2097,6 +2098,282 @@ describe('Global training plans (e2e)', () => {
       .lean()
       .exec();
     expect(persisted?.workouts).toHaveLength(1);
+  });
+
+  async function duplicationSource() {
+    const destination = await libraryDestination();
+    const source = await librarySource();
+    const exercises = source.toObject().workouts[0].exercises;
+    await trainingPlanModel
+      .updateOne(
+        { _id: destination.entry.id },
+        {
+          $set: {
+            'workouts.0.name': 'Treino completo',
+            'workouts.0.exercises': [
+              ...exercises,
+              {
+                _id: new Types.ObjectId(),
+                type: 'youtube-short',
+                name: 'Agachamento',
+                bodyArea: 'quadriceps',
+                sets: 3,
+                repetitions: 12,
+                restSeconds: 60,
+                youtubeId: 'ZA8gs8XP2bs',
+              },
+              {
+                _id: new Types.ObjectId(),
+                type: 'youtube-long',
+                name: 'Mobilidade',
+                bodyArea: 'mobility',
+                youtubeId: 'ZA8gs8XP2bs',
+              },
+            ],
+          },
+        },
+      )
+      .exec();
+    return destination;
+  }
+
+  it('duplicates every exercise type with independent identities and media in one version', async () => {
+    const { agent, entry, path, workoutId } = await duplicationSource();
+    const original = (await agent.get(path).expect(200))
+      .body as TrainingPlanWorkoutDetailsResponse;
+    const duplicated = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(201);
+    const summary = (
+      duplicated.body as {
+        data: { id: string; name: string; exerciseCount: number };
+      }
+    ).data;
+    expect(summary).toMatchObject({
+      name: 'Treino completo (cópia)',
+      exerciseCount: 5,
+    });
+    expect(summary.id).not.toBe(workoutId);
+    expect(duplicated.headers['x-resource-version']).toBe('2');
+    const copiedPath = `/training-plans/${entry.catalogEntryId}/workouts/${summary.id}`;
+    const copied = (await agent.get(copiedPath).expect(200))
+      .body as TrainingPlanWorkoutDetailsResponse;
+    expect(copied.data.exercises.map((exercise) => exercise.type)).toEqual(
+      original.data.exercises.map((exercise) => exercise.type),
+    );
+    for (const [index, exercise] of copied.data.exercises.entries()) {
+      const sourceExercise = original.data.exercises[index];
+      expect(exercise.id).not.toBe(sourceExercise.id);
+      expect({
+        ...exercise,
+        id: '',
+        ...(exercise.type === 'image' ? { image: null } : {}),
+      }).toEqual({
+        ...sourceExercise,
+        id: '',
+        ...(sourceExercise.type === 'image' ? { image: null } : {}),
+      });
+      if (exercise.type === 'image' && sourceExercise.type === 'image')
+        expect(exercise.image?.displayUrl).not.toBe(
+          sourceExercise.image?.displayUrl,
+        );
+    }
+    expect(blobStorage.copyVariant).toHaveBeenCalledTimes(2);
+    await authenticatedMutation(
+      agent,
+      agent.delete(path).set('X-Resource-Version', '2'),
+    ).expect(204);
+    const afterDelete = (await agent.get(copiedPath).expect(200))
+      .body as TrainingPlanWorkoutDetailsResponse;
+    expect(afterDelete.data.exercises).toHaveLength(5);
+    const copiedImage = afterDelete.data.exercises.find(
+      (exercise) => exercise.type === 'image',
+    );
+    expect(
+      deletedBlobKeys
+        .flat()
+        .some((key) => copiedImage?.image?.displayUrl.includes(key)),
+    ).toBe(false);
+    expect(await loadProfileModel.countDocuments()).toBe(0);
+    expect(await workoutExecutionModel.countDocuments()).toBe(0);
+  });
+
+  it('duplicates an empty workout and rejects stale, missing and invalid preconditions without adding rows', async () => {
+    const { agent, entry, path } = await libraryDestination();
+    await authenticatedMutation(agent, agent.post(`${path}/duplicate`))
+      .send({})
+      .expect(428);
+    await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '01'),
+    )
+      .send({})
+      .expect(400);
+    await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({ name: 'injected' })
+      .expect(400);
+    const success = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(201);
+    expect(success.body).toMatchObject({
+      data: { name: 'Novo treino (cópia)', exerciseCount: 0 },
+    });
+    const stale = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(412);
+    expect(stale.body).toMatchObject({
+      code: 'TRAINING_PLAN_VERSION_CONFLICT',
+    });
+    const missing = await authenticatedMutation(
+      agent,
+      agent
+        .post(
+          `/training-plans/${entry.catalogEntryId}/workouts/64b000000000000000000999/duplicate`,
+        )
+        .set('X-Resource-Version', '2'),
+    )
+      .send({})
+      .expect(404);
+    expect(missing.body).toMatchObject({ code: 'WORKOUT_NOT_FOUND' });
+    expect(
+      (await trainingPlanModel.findById(entry.id).lean().exec())?.workouts,
+    ).toHaveLength(2);
+  });
+
+  it('rejects read-only references and foreign catalog entries before copying images', async () => {
+    const { agent, entry, path } = await duplicationSource();
+    const global = await createGlobalPlan();
+    const reference = await authenticatedMutation(
+      agent,
+      agent.post('/training-plans/global-references'),
+    )
+      .send({ globalTrainingPlanId: global.id })
+      .expect(201);
+    const referenceId = (reference.body as { data: { catalogEntryId: string } })
+      .data.catalogEntryId;
+    const readOnly = await authenticatedMutation(
+      agent,
+      agent
+        .post(path.replace(entry.catalogEntryId, referenceId) + '/duplicate')
+        .set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(403);
+    expect(readOnly.body).toMatchObject({
+      code: 'GLOBAL_TRAINING_PLAN_REFERENCE_READ_ONLY',
+    });
+    await catalogModel
+      .updateOne(
+        { _id: entry.catalogEntryId },
+        { $set: { personId: new Types.ObjectId() } },
+      )
+      .exec();
+    const foreign = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(404);
+    expect(foreign.body).toMatchObject({
+      code: 'TRAINING_PLAN_CATALOG_ENTRY_NOT_FOUND',
+    });
+    expect(blobStorage.copyVariant).not.toHaveBeenCalled();
+  });
+
+  it('rejects the workout limit and the resulting BSON size without a partial copy', async () => {
+    const { agent, entry, path } = await libraryDestination();
+    const extras = Array.from({ length: 24 }, () => ({
+      _id: new Types.ObjectId(),
+      name: 'Extra',
+      exercises: [],
+    }));
+    await trainingPlanModel
+      .updateOne({ _id: entry.id }, { $push: { workouts: { $each: extras } } })
+      .exec();
+    const limit = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(409);
+    expect(limit.body).toMatchObject({ code: 'WORKOUT_LIMIT_REACHED' });
+    await trainingPlanModel
+      .updateOne({ _id: entry.id }, { $pull: { workouts: { name: 'Extra' } } })
+      .exec();
+    const [metrics] = await trainingPlanModel.aggregate<{ bytes: number }>([
+      { $match: { _id: new Types.ObjectId(entry.id) } },
+      { $project: { bytes: { $bsonSize: '$$ROOT' } } },
+    ]);
+    // Prepare a legacy document just below the operational cap to exercise the post-append guard.
+    const oldDescription =
+      (await trainingPlanModel.findById(entry.id).lean().exec())?.description ??
+      '';
+    await trainingPlanModel.collection.updateOne(
+      { _id: new Types.ObjectId(entry.id) },
+      {
+        $set: {
+          description: 'x'.repeat(
+            12 * 1024 * 1024 -
+              metrics.bytes +
+              Buffer.byteLength(oldDescription) -
+              80,
+          ),
+        },
+      },
+    );
+    const size = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(409);
+    expect(size.body).toMatchObject({
+      code: 'TRAINING_PLAN_SIZE_LIMIT_REACHED',
+    });
+    const unchanged = await trainingPlanModel.findById(entry.id).lean().exec();
+    expect(unchanged?.workouts).toHaveLength(1);
+    expect(unchanged?.version).toBe(1);
+  });
+
+  it('compensates failed image copies and allows only one concurrent duplicate at the same version', async () => {
+    const { agent, entry, path } = await duplicationSource();
+    blobStorage.copyVariant.mockRejectedValueOnce(new Error('Copy failed'));
+    const failed = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+    )
+      .send({})
+      .expect(503);
+    expect(failed.body).toMatchObject({ code: 'EXERCISE_IMAGE_COPY_FAILED' });
+    expect(
+      (await trainingPlanModel.findById(entry.id).lean().exec())?.workouts,
+    ).toHaveLength(1);
+    const results = await Promise.all(
+      [0, 1].map(() =>
+        authenticatedMutation(
+          agent,
+          agent.post(`${path}/duplicate`).set('X-Resource-Version', '1'),
+        ).send({}),
+      ),
+    );
+    expect(results.map((response) => response.status).sort()).toEqual([
+      201, 412,
+    ]);
+    const persisted = await trainingPlanModel.findById(entry.id).lean().exec();
+    expect(persisted?.version).toBe(2);
+    expect(persisted?.workouts).toHaveLength(2);
   });
 
   it('persists an invisible clone job before scheduling and exposes only its blocked row', async () => {

@@ -10,6 +10,7 @@ import type {
   ExerciseChanges,
   ImageWriteInput,
   NewTrainingPlan,
+  NewWorkout,
   StoredExercise,
   StoredExerciseImage,
   TargetState,
@@ -26,6 +27,7 @@ import type {
 import { TrainingPlanCloneJobDocument } from '~/training-plan/repositories/personal-training-plan.schema';
 import { TrainingPlanRepository } from '~/training-plan/repositories/training-plan.repository';
 import { TrainingPlanDocument } from '~/training-plan/repositories/training-plan.schema';
+import { TRAINING_PLAN_OPERATIONAL_SIZE_LIMIT } from '~/training-plan/training-plan.constants';
 
 interface PlainImageVariant {
   key: string;
@@ -396,6 +398,87 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
         trainingPlanId,
         workoutId: result?.data.id,
       },
+    });
+    return result;
+  }
+
+  async appendWorkout(
+    trainingPlanId: string,
+    sourceWorkoutId: string,
+    expectedVersion: number,
+    workout: NewWorkout,
+    scope: TrainingPlanAccessScope,
+  ): Promise<boolean> {
+    this.logger.log('MongoTrainingPlanRepository -> appendWorkout -> params:', {
+      params: {
+        trainingPlanId,
+        sourceWorkoutId,
+        expectedVersion,
+        exerciseCount: workout.exercises.length,
+      },
+    });
+    const prepared = {
+      _id: new Types.ObjectId(workout.id),
+      name: workout.name,
+      createdAt: new Date(workout.createdAt),
+      updatedAt: new Date(workout.updatedAt),
+      exercises: workout.exercises.map(({ id, ...exercise }) => ({
+        ...exercise,
+        _id: new Types.ObjectId(id),
+      })),
+    };
+    const now = new Date();
+    this.logger.log(
+      'MongoTrainingPlanRepository -> appendWorkout -> document prepared:',
+      {
+        data: { exerciseCount: prepared.exercises.length },
+      },
+    );
+    const updated = await this.trainingPlanModel
+      .updateOne(
+        {
+          _id: trainingPlanId,
+          ownerPersonId: scope.ownerPersonId,
+          version: expectedVersion,
+          'workouts._id': sourceWorkoutId,
+          'workouts.24': { $exists: false },
+          $expr: {
+            $lt: [
+              {
+                $bsonSize: {
+                  $mergeObjects: [
+                    '$$ROOT',
+                    {
+                      workouts: {
+                        $concatArrays: ['$workouts', { $literal: [prepared] }],
+                      },
+                      version: { $add: ['$version', 1] },
+                      updatedAt: now,
+                    },
+                  ],
+                },
+              },
+              TRAINING_PLAN_OPERATIONAL_SIZE_LIMIT,
+            ],
+          },
+        },
+        {
+          $push: { workouts: prepared },
+          $inc: { version: 1 },
+          $set: { updatedAt: now },
+        },
+        { runValidators: true },
+      )
+      .exec();
+    this.logger.log(
+      'MongoTrainingPlanRepository -> appendWorkout -> mongoose return:',
+      {
+        data: { modified: updated.modifiedCount },
+      },
+    );
+    const result = updated.modifiedCount === 1;
+    this.logger.log('MongoTrainingPlanRepository -> appendWorkout -> return:', {
+      data: { appended: result },
     });
     return result;
   }

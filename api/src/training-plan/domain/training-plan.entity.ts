@@ -71,6 +71,11 @@ export interface WorkoutAggregate extends Omit<
   exercises: readonly StoredExercise[];
 }
 
+export type NewWorkout = Pick<
+  WorkoutAggregate,
+  'id' | 'name' | 'exercises' | 'createdAt' | 'updatedAt'
+>;
+
 export interface TrainingPlanExecutionTree extends Omit<
   TrainingPlanEntity,
   'workouts'

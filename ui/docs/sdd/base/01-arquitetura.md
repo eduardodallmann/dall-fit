@@ -620,7 +620,7 @@ completa e valores concretos dos segmentos nunca são propriedades.
 | `ui_navigation_selected`  | `destination`, `navigation_kind` (`menu`, `breadcrumb`, `row_link`, `pagination`, `dashboard_action`)                  |
 | `ui_button_pressed`       | `action` enumerada pela fronteira                                                                                      |
 | `ui_menu_opened`          | `menu` (`application`, `row_actions`)                                                                                  |
-| `ui_menu_action_selected` | `menu`, `action` (`edit`, `delete`)                                                                                    |
+| `ui_menu_action_selected` | `menu`, `action` (`edit`, `duplicate`, `delete`)                                                                       |
 | `ui_overlay_opened`       | `overlay`, `mode` opcional (`create`, `edit`)                                                                          |
 | `ui_overlay_closed`       | `overlay`, `reason` (`cancel`, `close_trigger`, `backdrop`, `escape`, `submit`, `confirm`, `navigation`, `breakpoint`) |
 | `ui_field_focused`        | `form`, `field`                                                                                                        |
@@ -650,6 +650,10 @@ O catálogo do workout inclui nome, tipo/adicionar, campo, handle/drop, exclusã
 upload/substituição/remoção, conflito e retry. Operações de workout/exercício/mídia
 emitem início e terminal `success|error`; movimento intermediário do drag não
 emite evento e nenhuma propriedade inclui IDs, ordem, URL, arquivo ou valor.
+
+Duplicar treino próprio usa a ação de menu `duplicate` e a operação
+`workout_duplicate`, com um início e um terminal por tentativa. Não transporta
+nome, IDs, quantidade de exercícios ou conteúdo copiado.
 
 Todo novo botão, link acionável, campo, seleção, paginação, menu, disclosure,
 overlay, toast com ação ou fluxo assíncrono deve mapear a interação a um evento do

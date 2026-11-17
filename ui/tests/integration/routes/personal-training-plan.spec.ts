@@ -338,6 +338,9 @@ test.describe('Rotas pessoais de planos de treino', () => {
     await expect(
       page.getByRole('button', { name: 'Editar plano' }),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /Ações de Treino/ }),
+    ).toHaveCount(0);
     await page.getByRole('link', { name: 'Treino A' }).click();
     await expect(
       page.getByText('Nenhuma informação pode ser alterada'),
@@ -509,6 +512,154 @@ test.describe('Rotas pessoais de planos de treino', () => {
       page.getByRole('heading', { name: 'Plano ABC 1' }),
     ).toBeVisible();
     expect(trainingReads).toBeGreaterThan(readsAfterEmptyState);
+  });
+
+  test('Duplicar treino próprio — preserva o conteúdo, bloqueia duplicidade e usa a versão confirmada', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/training-plan/${ownedCatalogEntryId}?mockAuth=person&mockTrainingPlans=personal-mixed`,
+    );
+    const versions: string[] = [];
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/duplicate'))
+        versions.push(request.headers()['x-resource-version']);
+    });
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await expect(page.getByRole('menuitem')).toHaveText([
+      'Duplicar',
+      'Excluir',
+    ]);
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Duplicando treino' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Novo treino' }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Ações de Treino A', exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page
+        .getByRole('row', { name: /Treino A \(cópia\)/ })
+        .getByRole('gridcell', { name: '5', exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(
+      new RegExp(`/training-plan/${ownedCatalogEntryId}\\?`),
+    );
+    await expect(
+      page.getByRole('button', { name: 'Ações de Treino A', exact: true }),
+    ).toBeEnabled();
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Treino A (cópia)', exact: true }),
+    ).toHaveCount(2);
+    expect(versions).toEqual(['0', '1']);
+    await page
+      .getByRole('link', { name: 'Treino A (cópia)', exact: true })
+      .first()
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Treino A (cópia)' }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('list', { name: 'Exercícios em ordem' })
+        .getByRole('listitem'),
+    ).toHaveCount(5);
+  });
+
+  test('Duplicar treino próprio — falha preserva a lista e permite nova tentativa explícita', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/training-plan/${ownedCatalogEntryId}?mockAuth=person&mockTrainingPlans=duplicate-workout-error`,
+    );
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByText('Não foi possível duplicar o treino.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Treino A (cópia)', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { name: 'Treino B', exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Treino A (cópia)', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Não foi possível duplicar o treino.'),
+    ).toHaveCount(0);
+  });
+
+  test('Duplicar treino próprio — resultado incerto exige releitura sem repetir a operação', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/training-plan/${ownedCatalogEntryId}?mockAuth=person&mockTrainingPlans=duplicate-workout-uncertain`,
+    );
+    let writes = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().endsWith('/duplicate'))
+        writes += 1;
+    });
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByText('Confirme o estado antes de continuar.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Novo treino' }),
+    ).toBeDisabled();
+    await page.getByRole('button', { name: 'Verificar dados' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Treino A (cópia)', exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Novo treino' }),
+    ).toBeEnabled();
+    expect(writes).toBe(1);
+  });
+
+  test('Duplicar treino próprio — conflito pausa gravações até a leitura canônica', async ({
+    page,
+  }) => {
+    await page.goto(
+      `/training-plan/${ownedCatalogEntryId}?mockAuth=person&mockTrainingPlans=version-conflict`,
+    );
+    await page
+      .getByRole('button', { name: 'Ações de Treino A', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Duplicar' }).click();
+    await expect(
+      page.getByText('Este plano foi alterado em outro lugar.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Novo treino' }),
+    ).toBeDisabled();
+    await page.getByRole('button', { name: 'Descartar e recarregar' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Novo treino' }),
+    ).toBeEnabled();
+    await expect(
+      page.getByRole('link', { name: 'Treino A (cópia)', exact: true }),
+    ).toHaveCount(0);
   });
 
   test('mantém o editor completo para um plano próprio', async ({ page }) => {

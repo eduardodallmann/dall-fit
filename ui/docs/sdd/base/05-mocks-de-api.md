@@ -278,6 +278,15 @@ automáticas (tentativa inicial e único retry transitório) e aceitam a repeti�
 explícita seguinte, permitindo validar erro, Analytics e recuperação reais. O
 estado de tentativas é limpo pelo setup global entre testes.
 
+## Duplicação de treinos
+
+O POST pessoal de duplicação de workout reutiliza as fixtures tipadas de treino,
+preserva os cinco tipos, cria IDs/mídias fictícias independentes e incrementa a
+versão uma vez. `duplicate-workout-error` recusa a primeira tentativa sem write;
+`duplicate-workout-uncertain` grava e devolve o erro de resultado incerto, exigindo
+releitura sem replay. Pending usa latência MSW e o estado reinicia entre testes.
+`version-conflict` conserva o mesmo código de conflito do aggregate.
+
 ## Biblioteca de exercícios
 
 Os seletores `exercise-library`, `exercise-library-body-area`,

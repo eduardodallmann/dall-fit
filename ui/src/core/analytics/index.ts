@@ -133,7 +133,7 @@ type UiAnalyticsEvent =
       menu: 'application' | 'row_actions';
     })
   | (CommonEvent & {
-      action: 'delete' | 'edit';
+      action: 'delete' | 'duplicate' | 'edit';
       eventName: 'ui_menu_action_selected';
       menu: 'row_actions';
     })
@@ -226,6 +226,7 @@ type UiAnalyticsEvent =
         | 'training_plan_delete'
         | 'training_plan_update'
         | 'workout_create'
+        | 'workout_duplicate'
         | 'workout_delete'
         | 'workout_update';
     })
@@ -258,6 +259,7 @@ type UiAnalyticsEvent =
         | 'training_plan_delete'
         | 'training_plan_update'
         | 'workout_create'
+        | 'workout_duplicate'
         | 'workout_delete'
         | 'workout_update';
       outcome: 'dismissed' | 'error' | 'success' | 'unavailable';

@@ -46,9 +46,14 @@ import {
   termsSeedModels,
   termsSeeds,
 } from './terms';
+import {
+  seedWorkoutDuplication,
+  workoutDuplicationSeeds,
+} from './workout-duplication';
 
 const trainingPlanScenarios = [
   ...exerciseLibrarySeeds,
+  ...workoutDuplicationSeeds,
   'training-plans:create',
   'training-plans:create-workout',
   'training-plans:delete',
@@ -756,6 +761,15 @@ async function main(): Promise<void> {
             trainingPlanId: null,
           },
         ]);
+        if (scenario?.startsWith('personal-training-plans:duplicate-workout')) {
+          await seedWorkoutDuplication(
+            trainingPlanModel,
+            personalPlanId,
+            workoutId,
+            scenario,
+          );
+          await seedSession(personId.toString());
+        }
         if (scenario === 'personal-training-plans:reference')
           await activeModel.create({
             catalogEntryIds: [referenceEntryId],
