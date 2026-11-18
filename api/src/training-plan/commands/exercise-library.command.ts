@@ -115,7 +115,7 @@ export class ExerciseLibraryCommand {
         );
         await this.images.deleteImages(
           copied.flatMap((exercise) =>
-            exercise.type === 'image' && exercise.image !== null
+            'image' in exercise && exercise.image != null
               ? [exercise.image]
               : [],
           ),
@@ -147,7 +147,7 @@ export class ExerciseLibraryCommand {
           const exercise = exercises[index];
           if (signal.aborted) throw createExerciseImageCopyFailedException();
           result[index] =
-            exercise.type === 'image' && exercise.image !== null
+            'image' in exercise && exercise.image != null
               ? {
                   ...exercise,
                   image: await this.images.createSignedImage(

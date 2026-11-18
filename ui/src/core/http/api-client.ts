@@ -32,6 +32,11 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
+  if (
+    config.url?.startsWith('/training') ||
+    config.url?.startsWith('/global/training-plans')
+  )
+    config.headers.set('X-Training-Media-Version', '1');
   if (isTermsTransportBlocked(config.url))
     throw new axios.CanceledError('Terms acceptance required.');
   const sessionChannel = getSessionChannel();

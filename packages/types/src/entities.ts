@@ -178,6 +178,7 @@ export interface DurationExercise extends NamedExercise {
   durationMinutes: number;
   instructions?: string;
   youtubeId?: string;
+  image?: ExerciseImage | null;
 }
 
 export type Exercise =
@@ -212,7 +213,7 @@ export interface TrainingPlanAssistantAnswerOption {
 }
 
 export type TrainingPlanAssistantDraftExercise = { catalogKey: string } & (
-  Omit<YoutubeShortExercise, 'id'> | Omit<DurationExercise, 'id'>
+  Omit<YoutubeShortExercise, 'id'> | Omit<DurationExercise, 'id' | 'image'>
 );
 
 export interface TrainingPlanAssistantDraftWorkout {
@@ -261,6 +262,7 @@ export type TrainingWorkoutMedia =
   | {
       type: 'image';
       image: ExerciseImage;
+      sourceExerciseType?: 'duration';
     }
   | {
       type: 'youtube-long' | 'youtube-short';
@@ -315,7 +317,7 @@ export type TrainingExercisePreview =
     })
   | YoutubeLongExercise
   | PauseExercise
-  | DurationExercise;
+  | (Omit<DurationExercise, 'image'> & { image?: TrainingPreviewImage | null });
 
 export interface TrainingWorkoutPreview {
   exercises: readonly TrainingExercisePreview[];
@@ -405,7 +407,7 @@ export type OfflineTrainingSnapshotExerciseV1 =
       })
   | (YoutubeLongExercise & OfflineTrainingSnapshotExerciseStateV1)
   | (PauseExercise & OfflineTrainingSnapshotExerciseStateV1)
-  | (DurationExercise & OfflineTrainingSnapshotExerciseStateV1);
+  | (Omit<DurationExercise, 'image'> & OfflineTrainingSnapshotExerciseStateV1);
 
 export interface OfflineTrainingSnapshotWorkoutV1 {
   exercises: readonly OfflineTrainingSnapshotExerciseV1[];

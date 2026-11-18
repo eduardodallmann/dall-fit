@@ -699,7 +699,7 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
       jobs.flatMap((job) =>
         job.snapshot.workouts.flatMap((workout) =>
           workout.exercises.flatMap((exercise) =>
-            exercise.type !== 'image' || exercise.image === null
+            !('image' in exercise) || exercise.image == null
               ? []
               : [exercise.image.thumbnail.key, exercise.image.display.key],
           ),
@@ -992,6 +992,17 @@ export class MongoPersonalTrainingPlanRepository extends PersonalTrainingPlanRep
         ...common,
         ...named,
         durationMinutes: exercise.durationMinutes ?? 1,
+        ...(exercise.image === undefined
+          ? {}
+          : {
+              image:
+                exercise.image === null
+                  ? null
+                  : {
+                      display: { ...exercise.image.display },
+                      thumbnail: { ...exercise.image.thumbnail },
+                    },
+            }),
         ...(exercise.instructions === undefined
           ? {}
           : { instructions: exercise.instructions }),

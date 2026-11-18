@@ -149,7 +149,14 @@ export class UpdateExerciseDto {
   @MinLength(1)
   @Transform(trimString)
   @IsOptional()
-  youtubeId?: string;
+  youtubeId?: string | null;
+
+  @IsString()
+  @MaxLength(300)
+  @MinLength(1)
+  @Transform(trimString)
+  @IsOptional()
+  instructions?: string | null;
 
   @IsIn(BODY_AREAS)
   @IsOptional()

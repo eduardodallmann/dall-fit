@@ -314,7 +314,7 @@ describe('Global training plans (e2e)', () => {
     };
   }
 
-  async function librarySource() {
+  async function librarySource(imageType: 'image' | 'duration' = 'image') {
     const workoutId = new Types.ObjectId();
     return createGlobalPlan({
       workouts: [
@@ -334,12 +334,12 @@ describe('Global training plans (e2e)', () => {
             { _id: new Types.ObjectId(), type: 'pause', restSeconds: 45 },
             {
               _id: new Types.ObjectId(),
-              type: 'image',
+              type: imageType,
               name: 'Supino',
               bodyArea: 'chest',
-              sets: 3,
-              repetitions: 12,
-              restSeconds: 60,
+              ...(imageType === 'image'
+                ? { sets: 3, repetitions: 12, restSeconds: 60 }
+                : { durationMinutes: 2, instructions: 'Com conforto.' }),
               image: {
                 thumbnail: {
                   key: 'exercise-images/source/thumbnail.webp',
@@ -358,6 +358,59 @@ describe('Global training plans (e2e)', () => {
       ],
     });
   }
+
+  it('FIT-110 copies and duplicates a duration image independently of its source', async () => {
+    const { agent, path, entry } = await libraryDestination();
+    const source = await librarySource('duration');
+    const library = await agent
+      .get('/training-plans/exercise-library?search=Supino')
+      .set('X-Training-Media-Version', '1')
+      .expect(200);
+    const row = (library.body as ExerciseLibraryResponse).data[0];
+    expect(row.exercise).toMatchObject({
+      type: 'duration',
+      durationMinutes: 2,
+      image: expect.objectContaining({
+        displayUrl: expect.any(String) as unknown,
+      }) as unknown,
+    });
+    const { exercise: _exercise, ...selection } = row;
+    const copy = await authenticatedMutation(
+      agent,
+      agent
+        .post(`${path}/exercises/copy`)
+        .set('X-Resource-Version', '1')
+        .set('X-Training-Media-Version', '1'),
+    )
+      .send({ selections: [selection] })
+      .expect(201);
+    expect((copy.body as CopyExercisesResponse).data[0]).toMatchObject({
+      type: 'duration',
+      durationMinutes: 2,
+      instructions: 'Com conforto.',
+    });
+    const duplicate = await authenticatedMutation(
+      agent,
+      agent.post(`${path}/duplicate`).set('X-Resource-Version', '2'),
+    )
+      .send({})
+      .expect(201);
+    expect(blobStorage.copyVariant).toHaveBeenCalledTimes(4);
+    const stored = await trainingPlanModel.findById(entry.id).lean().exec();
+    const serialized = JSON.stringify(stored?.workouts);
+    expect(serialized).not.toContain('"key":"exercise-images/source/');
+    const distinctKeys = new Set(
+      serialized.match(/exercise-images\/[a-f0-9]{24}\/display.webp/gu),
+    );
+    expect(distinctKeys.size).toBe(2);
+    await trainingPlanModel.deleteOne({ _id: source._id }).exec();
+    const duplicatedId = (duplicate.body as { data: { id: string } }).data.id;
+    const read = await agent
+      .get(`/training-plans/${entry.catalogEntryId}/workouts/${duplicatedId}`)
+      .set('X-Training-Media-Version', '1')
+      .expect(200);
+    expect(JSON.stringify(read.body)).toContain('displayUrl');
+  });
 
   it('FIT-107 groups by normalized name, chooses the newest plan and filters its representative before pagination', async () => {
     const { agent } = await libraryDestination();
@@ -1560,6 +1613,190 @@ describe('Global training plans (e2e)', () => {
     ).toEqual(reversedIds);
   });
 
+  it.each(['global', 'personal'] as const)(
+    'FIT-110 atomically switches duration media in %s plans and negotiates legacy reads',
+    async (scope) => {
+      const agent = await login(scope === 'global');
+      const owner = await personModel
+        .findOne({ googleSubject: 'google-person-001' })
+        .lean()
+        .exec();
+      const workoutId = new Types.ObjectId();
+      const exerciseId = new Types.ObjectId();
+      const plan = await createGlobalPlan({
+        ownerPersonId: scope === 'personal' ? owner!._id : null,
+        workouts: [
+          {
+            _id: workoutId,
+            name: 'Duração',
+            exercises: [
+              {
+                _id: exerciseId,
+                type: 'duration',
+                name: 'Alongamento',
+                bodyArea: 'other',
+                durationMinutes: 2,
+                youtubeId: 'ir-XXTWVm7g',
+                instructions: 'Com conforto.',
+              },
+            ],
+          },
+        ],
+      });
+      const catalog =
+        scope === 'personal'
+          ? await catalogModel.create({
+              kind: 'owned',
+              personId: owner!._id,
+              trainingPlanId: plan._id,
+              globalTrainingPlanId: null,
+            })
+          : null;
+      const base =
+        scope === 'global'
+          ? `/global/training-plans/${plan.id}`
+          : `/training-plans/${catalog!.id}`;
+      const workoutPath = `${base}/workouts/${workoutId.toString()}`;
+      const path = `${workoutPath}/exercises/${exerciseId.toString()}`;
+      const image = await sharp({
+        create: { width: 80, height: 80, channels: 3, background: '#336699' },
+      })
+        .png()
+        .toBuffer();
+      const upload = () =>
+        authenticatedMutation(
+          agent,
+          agent
+            .put(`${path}/image`)
+            .set('X-Resource-Version', '0')
+            .set('X-Training-Media-Version', '1'),
+        ).attach('file', image, {
+          contentType: 'image/png',
+          filename: 'duration.png',
+        });
+      await upload().expect(200).expect('X-Resource-Version', '1');
+      const current = await agent
+        .get(workoutPath)
+        .set('X-Training-Media-Version', '1')
+        .expect(200);
+      expect(current.body).toMatchObject({
+        data: {
+          exercises: [
+            {
+              type: 'duration',
+              durationMinutes: 2,
+              instructions: 'Com conforto.',
+              image: expect.objectContaining({
+                displayUrl: expect.any(String) as unknown,
+              }) as unknown,
+            },
+          ],
+        },
+      });
+      expect(JSON.stringify(current.body)).not.toContain('youtubeId');
+      const legacy = await agent.get(workoutPath).expect(200);
+      expect(JSON.stringify(legacy.body)).not.toContain('displayUrl');
+      if (catalog !== null) {
+        await activeModel.create({
+          personId: owner!._id,
+          catalogEntryIds: [catalog._id],
+        });
+        const previewPath = `/training/workouts/${workoutId.toString()}`;
+        const preview = await agent
+          .get(previewPath)
+          .set('X-Training-Media-Version', '1')
+          .expect(200);
+        expect(preview.body).toMatchObject({
+          data: {
+            exercises: [
+              {
+                type: 'duration',
+                image: expect.objectContaining({
+                  offlineMediaId: expect.any(String) as unknown,
+                }) as unknown,
+              },
+            ],
+          },
+        });
+        expect(
+          JSON.stringify((await agent.get(previewPath).expect(200)).body),
+        ).not.toContain('displayUrl');
+        const session = await authenticatedMutation(
+          agent,
+          agent
+            .post(`${previewPath}/session`)
+            .set('X-Training-Media-Version', '1'),
+        )
+          .send({})
+          .expect(201);
+        expect(JSON.stringify(session.body)).toContain('displayUrl');
+        expect(JSON.stringify(session.body)).not.toContain('"series"');
+        await authenticatedMutation(
+          agent,
+          agent
+            .post(`/training/session/exercises/${exerciseId.toString()}/timer`)
+            .set('X-Resource-Version', '0')
+            .set('X-Training-Media-Version', '1'),
+        )
+          .send({ kind: 'duration' })
+          .expect(201);
+        const timed = await agent.get('/training/session').expect(200);
+        expect(timed.body).toMatchObject({
+          data: {
+            activeTimer: { kind: 'duration' },
+            exercises: [{ durationMinutes: 2, type: 'duration' }],
+          },
+        });
+        expect(JSON.stringify(timed.body)).not.toContain('displayUrl');
+      }
+      await upload().expect(412);
+      await authenticatedMutation(
+        agent,
+        agent
+          .patch(path)
+          .set('X-Resource-Version', '1')
+          .set('X-Training-Media-Version', '1'),
+      )
+        .send({
+          instructions: null,
+          youtubeId: 'https://youtube.com/watch?v=ZA8gs8XP2bs',
+        })
+        .expect(200)
+        .expect('X-Resource-Version', '2');
+      const stored = await trainingPlanModel.findById(plan.id).lean().exec();
+      expect(stored!.workouts[0].exercises[0]).toMatchObject({
+        type: 'duration',
+        youtubeId: 'ZA8gs8XP2bs',
+        image: null,
+        durationMinutes: 2,
+      });
+      expect(JSON.stringify(stored!.workouts[0].exercises[0])).not.toContain(
+        'instructions',
+      );
+      await authenticatedMutation(
+        agent,
+        agent.delete(`${path}/image`).set('X-Resource-Version', '2'),
+      )
+        .expect(204)
+        .expect('X-Resource-Version', '2');
+      await authenticatedMutation(
+        agent,
+        agent.patch(path).set('X-Resource-Version', '2'),
+      )
+        .send({ youtubeId: null })
+        .expect(200)
+        .expect('X-Resource-Version', '3');
+      const empty = await agent
+        .get(workoutPath)
+        .set('X-Training-Media-Version', '1')
+        .expect(200);
+      expect(JSON.stringify(empty.body)).not.toContain('youtubeId');
+      expect(deletedBlobKeys.flat()).toEqual(
+        expect.arrayContaining(uploadedBlobs.slice(0, 2).map(({ key }) => key)),
+      );
+    },
+  );
+
   it('processes multipart images through Sharp and keeps Blob cleanup consistent', async () => {
     const agent = await login(true);
     const workoutId = new Types.ObjectId();
@@ -2376,96 +2613,102 @@ describe('Global training plans (e2e)', () => {
     expect(persisted?.workouts).toHaveLength(2);
   });
 
-  it('persists an invisible clone job before scheduling and exposes only its blocked row', async () => {
-    const person = await login(false);
-    const global = await createGlobalPlan({
-      workouts: [
-        {
-          _id: new Types.ObjectId(),
-          name: 'Treino com imagem',
-          exercises: [
-            {
-              _id: new Types.ObjectId(),
-              bodyArea: 'chest',
-              image: {
-                display: {
-                  height: 640,
-                  key: 'source/display.webp',
-                  width: 640,
+  it.each(['image', 'duration'] as const)(
+    'captures %s media in a durable clone job before scheduling',
+    async (type) => {
+      const person = await login(false);
+      const global = await createGlobalPlan({
+        workouts: [
+          {
+            _id: new Types.ObjectId(),
+            name: 'Treino com imagem',
+            exercises: [
+              {
+                _id: new Types.ObjectId(),
+                bodyArea: 'chest',
+                image: {
+                  display: {
+                    height: 640,
+                    key: 'source/display.webp',
+                    width: 640,
+                  },
+                  thumbnail: {
+                    height: 160,
+                    key: 'source/thumbnail.webp',
+                    width: 160,
+                  },
                 },
-                thumbnail: {
-                  height: 160,
-                  key: 'source/thumbnail.webp',
-                  width: 160,
+                name: 'Supino',
+                ...(type === 'image'
+                  ? { repetitions: 12, restSeconds: 60, sets: 3 }
+                  : { durationMinutes: 2, instructions: 'Com conforto.' }),
+                type,
+              },
+            ],
+          },
+        ],
+      });
+      const start = await authenticatedMutation(
+        person,
+        person.post('/training-plan-clone-jobs'),
+      ).send({ globalTrainingPlanId: global.id });
+      expect(start.status).toBe(202);
+      expect(start.body).toMatchObject({
+        data: {
+          completedImages: 0,
+          itemType: 'clone-job',
+          sourceName: global.name,
+          state: 'queued',
+          totalImages: 1,
+        },
+      });
+      const cloneJobId = (start.body as { data: { cloneJobId: string } }).data
+        .cloneJobId;
+      expect(cloneStarter.start).toHaveBeenCalledWith({
+        cloneJobId,
+        generation: 1,
+      });
+      const persistedJob = await cloneJobModel
+        .findById(cloneJobId)
+        .lean()
+        .exec();
+      expect(persistedJob?.snapshot).toMatchObject({
+        workouts: [
+          {
+            exercises: [
+              {
+                image: {
+                  display: { etag: 'etag:source/display.webp' },
+                  thumbnail: { etag: 'etag:source/thumbnail.webp' },
                 },
               },
-              name: 'Supino',
-              repetitions: 12,
-              restSeconds: 60,
-              sets: 3,
-              type: 'image',
-            },
-          ],
-        },
-      ],
-    });
-    const start = await authenticatedMutation(
-      person,
-      person.post('/training-plan-clone-jobs'),
-    ).send({ globalTrainingPlanId: global.id });
-    expect(start.status).toBe(202);
-    expect(start.body).toMatchObject({
-      data: {
-        completedImages: 0,
-        itemType: 'clone-job',
-        sourceName: global.name,
-        state: 'queued',
-        totalImages: 1,
-      },
-    });
-    const cloneJobId = (start.body as { data: { cloneJobId: string } }).data
-      .cloneJobId;
-    expect(cloneStarter.start).toHaveBeenCalledWith({
-      cloneJobId,
-      generation: 1,
-    });
-    const persistedJob = await cloneJobModel.findById(cloneJobId).lean().exec();
-    expect(persistedJob?.snapshot).toMatchObject({
-      workouts: [
-        {
-          exercises: [
-            {
-              image: {
-                display: { etag: 'etag:source/display.webp' },
-                thumbnail: { etag: 'etag:source/thumbnail.webp' },
-              },
-            },
-          ],
-        },
-      ],
-    });
-    await expect(
-      trainingPlanModel.countDocuments({ ownerPersonId: { $ne: null } }),
-    ).resolves.toBe(0);
+            ],
+          },
+        ],
+      });
+      await expect(
+        trainingPlanModel.countDocuments({ ownerPersonId: { $ne: null } }),
+      ).resolves.toBe(0);
 
-    const list = await person.get('/training-plans?page=1').expect(200);
-    expect(list.body).toMatchObject({
-      data: [expect.objectContaining({ cloneJobId, itemType: 'clone-job' })],
-      total: 1,
-    });
-    const library = await person
-      .get('/training-plans/library?page=1')
-      .expect(200);
-    const libraryBody = library.body as GlobalTrainingPlanLibraryResponse;
-    expect(libraryBody.data[0]).toMatchObject({ cloneBlocked: true });
+      const list = await person.get('/training-plans?page=1').expect(200);
+      expect(list.body).toMatchObject({
+        data: [expect.objectContaining({ cloneJobId, itemType: 'clone-job' })],
+        total: 1,
+      });
+      const library = await person
+        .get('/training-plans/library?page=1')
+        .expect(200);
+      const libraryBody = library.body as GlobalTrainingPlanLibraryResponse;
+      expect(libraryBody.data[0]).toMatchObject({ cloneBlocked: true });
 
-    const cancel = await authenticatedMutation(
-      person,
-      person.delete(`/training-plan-clone-jobs/${cloneJobId}`),
-    );
-    expect(cancel.status).toBe(202);
-    expect(cancel.body).toMatchObject({ data: { state: 'cancelling' } });
-  });
+      const cancel = await authenticatedMutation(
+        person,
+        person.delete(`/training-plan-clone-jobs/${cloneJobId}`),
+      );
+      expect(cancel.status).toBe(202);
+      expect(cancel.body).toMatchObject({ data: { state: 'cancelling' } });
+    },
+  );
 
   it('executes an active workout with optional integer load and persists its completion', async () => {
     const person = await login(false);

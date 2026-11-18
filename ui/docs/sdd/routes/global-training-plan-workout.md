@@ -99,7 +99,7 @@ e emita `pointercancel`; o restante do card e da página continua rolável.
 | Imagem        | nome, imagem, body area, descanso, séries, repetições                   |
 | YouTube Longo | nome, vídeo/miniatura derivada, body area                               |
 | Pausa         | descanso                                                                |
-| Duração       | nome, body area, minutos                                                |
+| Duração       | nome, body area, minutos, instruções e mídia opcional                      |
 
 TextField/Input, NumberField, Select/ListBox, Chip, Spinner, Dropdown, Popover,
 Button, Modal e Alert são HeroUI. `ImageFilePicker` é a composição transversal
@@ -256,3 +256,32 @@ aceite vigente. O menu exibe Modelos de treino e Gestão de termos; a branch `_a
 é reconhecida pela barreira de termos e o guard de papel continua obrigatório.
 Uma publicação nova não oculta formulários administrativos nem exige concordância
 para continuar administrando. Funções pessoais do próprio admin ainda exigem aceite.
+
+## Duração com mídia opcional
+
+`DurationFields` apresenta nome, área, minutos, instruções opcionais (máximo 300)
+e seletor HeroUI `Mídia demonstrativa`: `Sem mídia`, `Imagem`, `Vídeo`. O modo deriva
+da mídia confirmada/draft, sem discriminador persistido. A demonstração é opcional;
+`ImageFilePicker` e `ExerciseVideoPreview` preservam upload/player existentes.
+
+Escolher modo sem conteúdo é somente draft; cancelar arquivo ou troca não apaga a
+mídia confirmada. Texto/vídeo usam debounce de três segundos e a FIFO do plano.
+Upload salva imagem e remove vídeo no mesmo CAS; vídeo normalizado substitui imagem
+no mesmo PATCH. Escolher sem mídia limpa apenas o meio atual pela operação adequada.
+Remover imagem não limpa um vídeo, limpar vídeo não apaga imagem, instruções são
+independentes. O player usa o conteúdo confirmado, abre sob demanda e não controla
+o cronômetro.
+
+Pending bloqueia outra troca. Falha mantém valor/arquivo, erro persistente e retry
+ou cancelamento. Conflito ou `EXERCISE_IMAGE_RESULT_UNCERTAIN` pausa a fila e exige
+releitura; uploads não são repetidos automaticamente. Drafts/mídia/fila/erros
+participam dos bloqueadores de navegação e reload. Recuperação descarta o draft
+somente após releitura explícita; sessão encerrada impede efeitos tardios. URLs
+assinadas permanecem em memória e sua renovação não sobrescreve vídeo ainda dirty.
+
+Axios envia `X-Training-Media-Version: 1`. O seletor emite ações enumeradas
+`duration_media_none|image|video`; foco/conclusão de `instructions|youtubeId` usa
+`form: duration_exercise`, sem texto livre, vídeo, URLs ou arquivo em Analytics.
+
+Cenários: `/global/training-plan/64b000000000000000000001/workout/64b000000000000000000101?mockAuth=admin&mockTrainingPlans=duration-no-media`
+e os estados de [mídia do editor pessoal](training-plan-workout.md#duração-com-mídia-opcional).

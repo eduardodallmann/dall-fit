@@ -22,6 +22,7 @@ import { apiClient } from '~/core/http/api-client';
 export type MockTrainingScenario =
   | 'active-plan'
   | 'multiple-active'
+  | 'duration-media'
   | 'duration-running'
   | 'exercise-completed'
   | 'load-pending'

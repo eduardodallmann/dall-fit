@@ -138,57 +138,72 @@ function createPlugin() {
 }
 
 describe('OfflinePreparationCoordinator', () => {
-  it('commits essential data without signed URLs before downloading display media', async () => {
-    const { downloadFile, plugin, readPrepared } = createPlugin();
-    let releaseDownload: (() => void) | undefined;
-    downloadFile.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          releaseDownload = () =>
-            resolve({
-              file: {
-                contentType: 'image/webp',
-                fileId: 'display-plan-a-opaque-a',
-                planId: 'plan-a',
-                revision: 1,
-                sizeBytes: 10,
-                status: 'ready',
-                updatedAt: validity.validatedAt,
-              },
-            });
+  it.each(['image', 'duration'] as const)(
+    'prepares %s without persisting signed URLs',
+    async (type) => {
+      const { downloadFile, plugin, readPrepared } = createPlugin();
+      let releaseDownload: (() => void) | undefined;
+      downloadFile.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseDownload = () =>
+              resolve({
+                file: {
+                  contentType: 'image/webp',
+                  fileId: 'display-plan-a-opaque-a',
+                  planId: 'plan-a',
+                  revision: 1,
+                  sizeBytes: 10,
+                  status: 'ready',
+                  updatedAt: validity.validatedAt,
+                },
+              });
+          }),
+      );
+      const coordinator = new OfflinePreparationCoordinator({
+        ...preparationDependencies(),
+        getOverview: vi.fn().mockResolvedValue(overview),
+        getPreview: vi.fn().mockResolvedValue({
+          ...preview,
+          exercises:
+            type === 'duration'
+              ? [
+                  {
+                    ...preview.exercises[0],
+                    type: 'duration',
+                    durationMinutes: 2,
+                  },
+                ]
+              : preview.exercises,
         }),
-    );
-    const coordinator = new OfflinePreparationCoordinator({
-      ...preparationDependencies(),
-      getOverview: vi.fn().mockResolvedValue(overview),
-      getPreview: vi.fn().mockResolvedValue(preview),
-      now: () => Date.parse(validity.validatedAt),
-      plugin,
-    });
+        now: () => Date.parse(validity.validatedAt),
+        plugin,
+      });
 
-    const preparing = coordinator.enter();
-    await vi.waitFor(() =>
-      expect(coordinator.getSnapshot().status).toBe(
-        'data-ready-media-in-progress',
-      ),
-    );
-    expect(JSON.stringify(readPrepared()?.payload)).not.toContain('https://');
-    expect(JSON.stringify(readPrepared()?.payload)).toContain(
-      'display-plan-a-opaque-a',
-    );
-    expect(downloadFile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fileId: 'display-plan-a-opaque-a',
-        url:
-          preview.exercises[0]?.type === 'image'
-            ? preview.exercises[0].image?.displayUrl
-            : undefined,
-      }),
-    );
-    releaseDownload?.();
-    await preparing;
-    expect(coordinator.getSnapshot().status).toBe('ready');
-  });
+      const preparing = coordinator.enter();
+      await vi.waitFor(() =>
+        expect(coordinator.getSnapshot().status).toBe(
+          'data-ready-media-in-progress',
+        ),
+      );
+      expect(JSON.stringify(readPrepared()?.payload)).not.toContain('https://');
+      expect(JSON.stringify(readPrepared()?.payload)).toContain(
+        'display-plan-a-opaque-a',
+      );
+      expect(downloadFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileId: 'display-plan-a-opaque-a',
+          url:
+            preview.exercises[0]?.type === 'image'
+              ? preview.exercises[0].image?.displayUrl
+              : undefined,
+        }),
+      );
+      releaseDownload?.();
+      await preparing;
+      expect(coordinator.getSnapshot().status).toBe('ready');
+    },
+  );
 
   it('coalesces concurrent entries into one overview composition', async () => {
     const { plugin } = createPlugin();

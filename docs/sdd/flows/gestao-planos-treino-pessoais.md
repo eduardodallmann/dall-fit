@@ -200,3 +200,12 @@ atividade e pausa novos efeitos, preservando estado confirmado e recuperável;
 ação HTTP recusada não é repetida automaticamente depois do aceite. Android
 preserva treino offline com comprovante confirmado até conhecer requisito novo e
 pausa a fila compartilhada, sem tratar pendência como revogação de sessão.
+
+## Mídia de duração em edição e cópias
+
+Plano próprio permite instruções e uma mídia opcional em duração; referência
+mantém leitura. Biblioteca, duplicação e clone preservam mídia/instruções com
+assets independentes. A [rota](../../../ui/docs/sdd/routes/training-plan-workout.md),
+o [endpoint](../../../api/docs/sdd/endpoints/personal-training-plans.md) e o
+[Workflow](../../../workflow/docs/sdd/workflows/training-plan-clone.md) descrevem
+transições, CAS e compensação. Publicar API/Workflow antes da UI que escreve imagem.

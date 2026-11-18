@@ -340,3 +340,10 @@ consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no dom�
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+## Mídia de duração no plano materializado
+
+O draft do assistente continua sem imagem gerada/arbitrária; instruções e vídeos
+curados são preservados. Depois de materializado, a edição de mídia usa o CRUD do
+[plano pessoal](personal-training-plans.md#mídia-demonstrativa-por-duração). O
+assistente não pesquisa ou seleciona uma imagem demonstrativa.

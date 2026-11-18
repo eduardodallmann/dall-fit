@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { AuthModule } from '~/auth/auth.module';
@@ -27,6 +28,7 @@ import {
   PersonalTrainingPlansController,
   TrainingPlanCloneJobsController,
 } from '~/training-plan/controllers/personal-training-plans.controller';
+import { TrainingMediaRepresentationInterceptor } from '~/training-plan/interceptors/training-media-representation.interceptor';
 import { ExerciseLibraryRepository } from '~/training-plan/repositories/exercise-library.repository';
 import { MongoExerciseLibraryRepository } from '~/training-plan/repositories/mongo-exercise-library.repository';
 import { MongoPersonalTrainingPlanRepository } from '~/training-plan/repositories/mongo-personal-training-plan.repository';
@@ -92,6 +94,10 @@ import { TrainingLoadProfileService } from '~/training/services/training-load-pr
     TrainingPlanCloneJobsController,
   ],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TrainingMediaRepresentationInterceptor,
+    },
     ExerciseLibraryCommand,
     ExerciseCopyService,
     ExerciseLibraryService,

@@ -123,6 +123,9 @@ type UiAnalyticsEvent =
   | (CommonEvent & {
       action:
         | 'cancel_inline_edit'
+        | 'duration_media_none'
+        | 'duration_media_image'
+        | 'duration_media_video'
         | 'dismiss_update'
         | 'open_create_plan'
         | 'open_inline_edit';
@@ -170,6 +173,8 @@ type UiAnalyticsEvent =
   | (CommonEvent & {
       eventName: 'ui_field_focused';
       field:
+        | 'instructions'
+        | 'youtubeId'
         | 'description'
         | 'name'
         | 'title'
@@ -177,11 +182,13 @@ type UiAnalyticsEvent =
         | 'operatorEmail'
         | 'changeSummary'
         | 'bodyHtml';
-      form: 'training_plan' | 'terms_editor';
+      form: 'training_plan' | 'terms_editor' | 'duration_exercise';
     })
   | (CommonEvent & {
       eventName: 'ui_field_completed';
       field:
+        | 'instructions'
+        | 'youtubeId'
         | 'description'
         | 'name'
         | 'title'
@@ -189,7 +196,7 @@ type UiAnalyticsEvent =
         | 'operatorEmail'
         | 'changeSummary'
         | 'bodyHtml';
-      form: 'training_plan' | 'terms_editor';
+      form: 'training_plan' | 'terms_editor' | 'duration_exercise';
       state: 'empty' | 'invalid' | 'valid';
     })
   | (CommonEvent & {

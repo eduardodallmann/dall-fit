@@ -69,6 +69,10 @@ pnpm -C api seed -- <endpoint-slug>:<scenario-slug>
 
 Identificadores vigentes incluem:
 
+- `duration-media:ready`, que prepara pessoa própria, plano ativo, exercício de
+  duração com vídeo/instruções, PNG sintético em `/tmp/dall-fit-duration.png` e sessão
+  em `/tmp/dall-fit-duration-token.txt`; upload segue o Blob privado configurado;
+
 - `exercise-library:ready`, `exercise-library:limit`, `exercise-library:size`,
   `exercise-library:stale`, `exercise-library:read-only`,
   `exercise-library:not-found` e `exercise-library:image-failure`; preparam IDs

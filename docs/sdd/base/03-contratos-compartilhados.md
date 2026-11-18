@@ -90,11 +90,17 @@ audiência, identidade e conteúdo permanecem internos da API.
   plano pai mínimo, timestamps, versão e exercícios na ordem persistida.
 - `BodyArea`/`BODY_AREAS` definem os 16 locais aceitos. `Exercise` é uma union
   discriminada por `type` entre `youtube-short`, `image`, `youtube-long`, `pause`
-  e `duration`; campos alheios ao discriminador não existem e somente
-  `ImageExercise.image` aceita `null`.
-- `DurationExercise` exige minutos e pode transportar instrução curta e ID de
-  vídeo demonstrativo. Ambos são opcionais para manter compatibilidade com os
-  exercícios por duração já existentes.
+  e `duration`; campos alheios ao discriminador não existem e imagens nulas representam ausência em `image` e `duration`.
+- `DurationExercise` exige minutos; instruções (até 300 caracteres) e uma mídia
+  demonstrativa são opcionais. `image?: ExerciseImage | null` e `youtubeId?: string`
+  são alternativas exclusivas. PATCH permite `null` para limpar vídeo/instruções;
+  omissão preserva. Imagem entra pelo upload privado. Prévia/sessão e capa admitem
+  a imagem de duração; snapshot offline v1 exclui explicitamente `image`.
+- `X-Training-Media-Version: 1` negocia mídia de duração nos consumidores novos.
+  Ausência omite essa imagem de todas as projeções HTTP (inclusive capas e upload),
+  sem remover dados armazenados. A resposta de upload pode informar
+  `sourceExerciseType`; a capa de imagem de duração inclui esse marcador. O header
+  não concede acesso; as respostas continuam `private, no-store`.
 - requests do editor cobrem nome do treino, criação por tipo, PATCH parcial do
   exercício, ordem final completa e imagem. Respostas de mutação expõem o recurso
   público; leituras e sucessos que preservam o aggregate transportam a versão

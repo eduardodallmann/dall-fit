@@ -170,3 +170,26 @@ Além da sessão e das permissões desta rota, é necessário o aceite vigente. 
 publicação descoberta durante uso oculta a atividade com efeitos pausados e
 preserva estado recuperável; concluir o aceite não repete mutation recusada.
 Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.
+
+## Duração com mídia opcional
+
+O editor pessoal próprio compartilha o [editor global](global-training-plan-workout.md#duração-com-mídia-opcional):
+instruções, seletor `Sem mídia | Imagem | Vídeo`, drafts canceláveis, FIFO, upload
+atômico, recuperação e negociação de representação. A referência somente leitura
+mostra instruções, imagem ou vídeo sem controles de escrita. A biblioteca mantém
+`Duração` com thumbnail de imagem, YouTube ou fallback; cópia e duplicação preservam
+minutos/instruções com novos IDs e assets independentes.
+
+| Seletor `mockTrainingPlans` | Estado e validação |
+| --- | --- |
+| `duration-no-media` | editor vazio de mídia; instruções opcionais |
+| `duration-video` | vídeo/instruções existentes; trocar e cancelar sem escrita |
+| `duration-image` | imagem confirmada; trocar vídeo ou remover |
+| `duration-media-conflict` | CAS recusado; pausa e releitura antes de continuar |
+| `duration-media-error` | primeira troca falha; arquivo retido permite retry explícito |
+| `duration-reference` | catálogo `74b000000000000000000002`, três estados em leitura |
+| `duration-library` | copiar lote de durações sem mídia, vídeo e imagem |
+
+Usar `/training-plan/74b000000000000000000001/workout/64b000000000000000000101?mockAuth=person&mockTrainingPlans=<seletor>`
+(trocar o catálogo para a referência no cenário correspondente). Playwright cobre
+editor pessoal/global, leitura, cancelamento, retry e transições em 390/1440px.

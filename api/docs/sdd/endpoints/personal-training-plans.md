@@ -375,3 +375,54 @@ consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no dom�
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+## Mídia demonstrativa por duração
+
+Os endpoints pessoais aninhados reutilizam as transições atômicas, normalização,
+compensação e negociação descritas em [planos globais](global-training-plans.md#mídia-opcional-de-duração-e-compatibilidade).
+`PersonalTrainingPlansCommand.uploadImage` resolve ownership antes de processar
+arquivo; referência global continua somente leitura. Instruções, tempo e ordem
+sobrevivem a upload, remoção e cópia. Duplicação usa novos IDs e variantes privadas
+independentes também para `duration`.
+
+### Cenário — trocas de mídia em duration
+
+**Seed**
+
+```bash
+pnpm -C api seed -- duration-media:ready
+```
+
+**cURL** (sequência; API local e Blob privado configurados para upload)
+
+```bash
+TOKEN=$(cat /tmp/dall-fit-duration-token.txt)
+curl --include --request PUT \
+  --url http://localhost:4000/training-plans/110000000000000000000020/workouts/110000000000000000000101/exercises/110000000000000000000201/image \
+  --header "Authorization: Bearer $TOKEN" \
+  --header 'X-Training-Media-Version: 1' --header 'X-Resource-Version: 0' \
+  --form 'file=@/tmp/dall-fit-duration.png;type=image/png'
+curl --include --request PATCH \
+  --url http://localhost:4000/training-plans/110000000000000000000020/workouts/110000000000000000000101/exercises/110000000000000000000201 \
+  --header "Authorization: Bearer $TOKEN" --header 'content-type: application/json' \
+  --header 'X-Training-Media-Version: 1' --header 'X-Resource-Version: 1' \
+  --data '{"youtubeId":"ir-XXTWVm7g","instructions":null}'
+curl --include --request PATCH \
+  --url http://localhost:4000/training-plans/110000000000000000000020/workouts/110000000000000000000101/exercises/110000000000000000000201 \
+  --header "Authorization: Bearer $TOKEN" --header 'content-type: application/json' \
+  --header 'X-Training-Media-Version: 1' --header 'X-Resource-Version: 2' \
+  --data '{"youtubeId":null}'
+```
+
+- Given: duração com vídeo/instruções, versão zero, arquivo PNG sintético local e
+  sessão nativa própria com termos aceitos.
+- When: troca para imagem, depois vídeo e depois sem mídia.
+- Then: cada transição efetiva incrementa uma vez; minutos são preservados;
+  instrução/vídeo removidos são omitidos; não há estado com dois meios ativos.
+  Repetir versão antiga retorna `412`, sem perda da mídia anterior. Falha conhecida
+  de upload/assinatura conserva a mídia; banco ambíguo retorna
+  `EXERCISE_IMAGE_RESULT_UNCERTAIN`, conserva assets e exige releitura.
+
+Testes seriais em `training-plan.e2e-spec.ts` exercitam ambas as fronteiras com
+Sharp real e Blob controlado; unitários do command verificam compensação conhecida
+versus gravação ambígua.

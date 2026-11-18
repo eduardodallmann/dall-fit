@@ -21,7 +21,8 @@ export class CloneBlobService {
       .flatMap((workout) => workout.exercises)
       .find((candidate) => candidate.id === exerciseId);
     if (
-      exercise?.type !== 'image' ||
+      exercise === undefined ||
+      (exercise.type !== 'image' && exercise.type !== 'duration') ||
       exercise.image === null ||
       exercise.image === undefined
     )

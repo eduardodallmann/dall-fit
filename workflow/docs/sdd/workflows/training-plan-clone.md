@@ -36,3 +36,16 @@ de origem são retidos até um estado terminal.
 - finalização prevalece quando já entrou em `materializing`;
 - progresso conta imagens confirmadas, não variantes individuais;
 - nenhuma URL assinada ou árvore parcial atravessa o bridge.
+
+## Imagens opcionais em duração
+
+A captura da API conta e conserva `image` em `duration`, incluindo ETags e retenção
+de origem. `MongoTrainingPlanCloneRepository.nextDecision` inclui esses exercícios
+nos mesmos lotes de três; `CloneBlobService.copyExerciseImage` copia ambas as
+variantes com destinos determinísticos. Confirmação/progresso, redelivery, falha,
+retry e cancelamento mantêm os mesmos fences. Na materialização, `mapExercise`
+aplica metadata copiada a `image` e `duration`; neste último preserva minutos e
+instruções sem criar séries. Durações antigas sem imagem continuam válidas. A
+compensação/reconciliação considera também origens e destinos de duração; nenhum
+novo protocolo, HMAC ou schema de job é exigido. API e Workflow atualizados devem
+preceder a publicação da UI que escreve esse campo.

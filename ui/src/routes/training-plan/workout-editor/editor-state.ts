@@ -32,7 +32,39 @@ export function mergeExercise(
   exercise: Exercise,
   changes: UpdateExerciseRequest,
 ): Exercise {
-  return { ...exercise, ...changes };
+  const merged = { ...exercise, ...changes } as Exercise;
+  if (merged.type === 'duration') {
+    if (changes.youtubeId === null) delete merged.youtubeId;
+    else if (typeof changes.youtubeId === 'string') merged.image = null;
+    if (changes.instructions === null) delete merged.instructions;
+  }
+  return merged;
+}
+
+export function applyExerciseImage(
+  exercise: Exercise,
+  image: Extract<Exercise, { type: 'image' }>['image'],
+): Exercise {
+  if (exercise.type !== 'image' && exercise.type !== 'duration')
+    return exercise;
+  const result = { ...exercise, image };
+  if (result.type === 'duration' && image !== null) delete result.youtubeId;
+  return result;
+}
+
+export function refreshExerciseMedia(
+  exercise: Exercise,
+  source: Exercise,
+): Exercise {
+  const result = applyExerciseImage(
+    exercise,
+    'image' in source ? (source.image ?? null) : null,
+  );
+  if (result.type === 'duration' && source.type === 'duration') {
+    if (source.youtubeId === undefined) delete result.youtubeId;
+    else result.youtubeId = source.youtubeId;
+  }
+  return result;
 }
 
 export function mergeSavedExercise(

@@ -65,8 +65,12 @@ pertença a esse plano, leem os perfis da pessoa e hidratam signed URLs
 somente na resposta; nenhuma URL temporária é persistida. Imagens da prévia incluem
 `offlineMediaId`, SHA-256 estável derivado internamente da chave do asset display,
 sem revelar essa chave nem autorizar acesso.
-Atividades por duração preservam instrução curta e vídeo demonstrativo opcional
-tanto na prévia quanto no snapshot da execução.
+Atividades por duração preservam instruções e uma demonstração opcional (imagem
+ou vídeo) na prévia e sessão. Imagem recebe `offlineMediaId`; a capa também pode
+vir de duração, com `sourceExerciseType: duration` quando for imagem. Reprodução
+não modifica o cronômetro, séries ou progresso. O snapshot de sincronização v1
+continua sem imagem. A negociação `X-Training-Media-Version: 1` é aplicada também
+a leituras/mutações de sessão, omitindo imagens novas nos clientes legados.
 
 ### Criação, leitura e abandono
 
@@ -222,3 +226,30 @@ consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no dom�
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+### Cenário — representação legada e mídia de duração
+
+**Seed**
+
+```bash
+pnpm -C api seed -- duration-media:ready
+```
+
+**cURL** (upload inicial com versão zero; API/Blob privados locais configurados)
+
+```bash
+TOKEN=$(cat /tmp/dall-fit-duration-token.txt)
+curl --include --request PUT \
+  --url http://localhost:4000/training-plans/110000000000000000000020/workouts/110000000000000000000101/exercises/110000000000000000000201/image \
+  --header "Authorization: Bearer $TOKEN" --header 'X-Resource-Version: 0' \
+  --header 'X-Training-Media-Version: 1' --form 'file=@/tmp/dall-fit-duration.png;type=image/png'
+curl --include --request GET --url http://localhost:4000/training/workouts/110000000000000000000101 \
+  --header "Authorization: Bearer $TOKEN"
+curl --include --request GET --url http://localhost:4000/training/workouts/110000000000000000000101 \
+  --header "Authorization: Bearer $TOKEN" --header 'X-Training-Media-Version: 1'
+```
+
+- Given: plano pessoal ativo com imagem de duração.
+- When: a mesma pessoa lê sem/com header de representação.
+- Then: legado omite `image`, novo recebe variantes assinadas e `offlineMediaId`,
+  ambos continuam por tempo. Dados persistidos são idênticos e não contêm URLs.

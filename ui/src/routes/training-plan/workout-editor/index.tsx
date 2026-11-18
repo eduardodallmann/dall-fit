@@ -86,11 +86,13 @@ import {
 import { trainingKeys } from '~/routes/training/training-queries';
 
 import {
+  applyExerciseImage,
   createEditorExercise,
   insertEditorItem,
   mergeExercise,
   mergeSavedExercise,
   orderEditorItems,
+  refreshExerciseMedia,
   updateEditorItem,
   type EditorExercise,
   type ExerciseSaveStatus,
@@ -231,6 +233,22 @@ export function WorkoutEditor({
   const [structuralPending, setStructuralPending] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryDirty, setLibraryDirty] = useState(false);
+  const [mediaRevision, setMediaRevision] = useState(0);
+  const [mediaDraftOwners, setMediaDraftOwners] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+  const onMediaDraftChange = useCallback(
+    (exerciseId: string, dirty: boolean) => {
+      setMediaDraftOwners((current) => {
+        if (current.has(exerciseId) === dirty) return current;
+        const next = new Set(current);
+        if (dirty) next.add(exerciseId);
+        else next.delete(exerciseId);
+        return next;
+      });
+    },
+    [],
+  );
   const [copyNotice, setCopyNotice] = useState<string>();
   const copyPending = useRef(false);
   const addTriggerRef = useRef<HTMLButtonElement>(null);
@@ -288,20 +306,26 @@ export function WorkoutEditor({
       current.map((item) => {
         if (
           item.temporary ||
-          item.draft.type !== 'image' ||
-          item.confirmed.type !== 'image' ||
+          (item.draft.type !== 'image' && item.draft.type !== 'duration') ||
+          (item.confirmed.type !== 'image' &&
+            item.confirmed.type !== 'duration') ||
           savingImageIds.has(item.draft.id)
         )
           return item;
         const refreshed = data.exercises.find(
           (exercise) =>
-            exercise.id === item.draft.id && exercise.type === 'image',
+            exercise.id === item.draft.id &&
+            (exercise.type === 'image' || exercise.type === 'duration'),
         );
-        if (refreshed?.type !== 'image') return item;
+        if (refreshed?.type !== 'image' && refreshed?.type !== 'duration')
+          return item;
         const result = {
           ...item,
-          confirmed: { ...item.confirmed, image: refreshed.image },
-          draft: { ...item.draft, image: refreshed.image },
+          confirmed: refreshExerciseMedia(item.confirmed, refreshed),
+          draft:
+            item.dirty.youtubeId !== undefined
+              ? item.draft
+              : refreshExerciseMedia(item.draft, refreshed),
         };
         return result;
       }),
@@ -715,6 +739,8 @@ export function WorkoutEditor({
     if (!isSessionGenerationActive(generation))
       throw new DOMException('Session ended.', 'AbortError');
     clearAllTimers();
+    setMediaRevision((current) => current + 1);
+    setMediaDraftOwners(new Set());
     setItems(() => fresh.exercises.map(createEditorExercise));
     setWorkoutName(fresh.name);
     setNameDraft(fresh.name);
@@ -951,13 +977,13 @@ export function WorkoutEditor({
   };
 
   const uploadImage = (exerciseId: string, file: File) => {
-    if (queue.paused) return;
+    if (queue.paused) return Promise.resolve(false);
     markSavingImage(exerciseId, true);
     const replacing = itemsRef.current.some(
       (item) =>
         item.draft.id === exerciseId &&
-        item.draft.type === 'image' &&
-        item.draft.image !== null,
+        'image' in item.draft &&
+        item.draft.image != null,
     );
     const operation = replacing
       ? 'exercise_image_replace'
@@ -965,7 +991,7 @@ export function WorkoutEditor({
     const control = replacing ? 'image_replace' : 'image_upload';
     trackStarted(operation, control);
     let confirmedVersion = data.version;
-    void queue
+    return queue
       .enqueue(async (version) => {
         const result = await uploadTrainingPlanExerciseImage(
           data.trainingPlan.id,
@@ -982,11 +1008,13 @@ export function WorkoutEditor({
       .then((image) => {
         setItems((current) =>
           updateEditorItem(current, exerciseId, (item) =>
-            item.draft.type === 'image' && item.confirmed.type === 'image'
+            (item.draft.type === 'image' || item.draft.type === 'duration') &&
+            (item.confirmed.type === 'image' ||
+              item.confirmed.type === 'duration')
               ? {
                   ...item,
-                  confirmed: { ...item.confirmed, image },
-                  draft: { ...item.draft, image },
+                  confirmed: applyExerciseImage(item.confirmed, image),
+                  draft: applyExerciseImage(item.draft, image),
                 }
               : item,
           ),
@@ -998,8 +1026,8 @@ export function WorkoutEditor({
           updateWorkout: (workout) => ({
             ...workout,
             exercises: workout.exercises.map((exercise) =>
-              exercise.id === exerciseId && exercise.type === 'image'
-                ? { ...exercise, image }
+              exercise.id === exerciseId
+                ? applyExerciseImage(exercise, image)
                 : exercise,
             ),
           }),
@@ -1007,21 +1035,23 @@ export function WorkoutEditor({
           workoutId: data.id,
         });
         trackCompleted(operation, control, 'success');
+        return true;
       })
       .catch((error: unknown) => {
-        if (isExpectedCancellation(error)) return;
+        if (isExpectedCancellation(error)) return false;
         trackCompleted(operation, control, 'error');
         toast.danger('Não foi possível processar a imagem.');
+        return false;
       })
       .finally(() => markSavingImage(exerciseId, false));
   };
 
   const removeImage = (exerciseId: string) => {
-    if (queue.paused) return;
+    if (queue.paused) return Promise.resolve(false);
     markSavingImage(exerciseId, true);
     trackStarted('exercise_image_remove', 'image_remove');
     let confirmedVersion = data.version;
-    void queue
+    return queue
       .enqueue(async (version) => {
         const nextVersion = await removeTrainingPlanExerciseImage(
           data.trainingPlan.id,
@@ -1037,11 +1067,13 @@ export function WorkoutEditor({
       .then(() => {
         setItems((current) =>
           updateEditorItem(current, exerciseId, (item) =>
-            item.draft.type === 'image' && item.confirmed.type === 'image'
+            (item.draft.type === 'image' || item.draft.type === 'duration') &&
+            (item.confirmed.type === 'image' ||
+              item.confirmed.type === 'duration')
               ? {
                   ...item,
-                  confirmed: { ...item.confirmed, image: null },
-                  draft: { ...item.draft, image: null },
+                  confirmed: applyExerciseImage(item.confirmed, null),
+                  draft: applyExerciseImage(item.draft, null),
                 }
               : item,
           ),
@@ -1053,8 +1085,8 @@ export function WorkoutEditor({
           updateWorkout: (workout) => ({
             ...workout,
             exercises: workout.exercises.map((exercise) =>
-              exercise.id === exerciseId && exercise.type === 'image'
-                ? { ...exercise, image: null }
+              exercise.id === exerciseId
+                ? applyExerciseImage(exercise, null)
                 : exercise,
             ),
           }),
@@ -1062,16 +1094,19 @@ export function WorkoutEditor({
           workoutId: data.id,
         });
         trackCompleted('exercise_image_remove', 'image_remove', 'success');
+        return true;
       })
       .catch((error: unknown) => {
-        if (isExpectedCancellation(error)) return;
+        if (isExpectedCancellation(error)) return false;
         trackCompleted('exercise_image_remove', 'image_remove', 'error');
         toast.danger('Não foi possível remover a imagem.');
+        return false;
       })
       .finally(() => markSavingImage(exerciseId, false));
   };
 
   const hasUnsavedWork =
+    mediaDraftOwners.size > 0 ||
     libraryDirty ||
     structuralPending ||
     queue.isPending ||
@@ -1224,10 +1259,40 @@ export function WorkoutEditor({
             {items.map((item) => (
               <ExerciseRow
                 exercise={item.draft}
+                confirmedExercise={item.confirmed}
+                onMediaDraftChange={onMediaDraftChange}
+                onCancelMediaDraft={() => {
+                  clearTimer(item.draft.id);
+                  setItems((current) =>
+                    updateEditorItem(current, item.draft.id, (candidate) => {
+                      const { youtubeId: _removed, ...dirty } = candidate.dirty;
+                      const draft = { ...candidate.draft };
+                      if (
+                        draft.type === 'duration' &&
+                        candidate.confirmed.type === 'duration'
+                      ) {
+                        draft.image = candidate.confirmed.image;
+                        if (candidate.confirmed.youtubeId === undefined)
+                          delete draft.youtubeId;
+                        else draft.youtubeId = candidate.confirmed.youtubeId;
+                      }
+                      return {
+                        ...candidate,
+                        draft,
+                        dirty,
+                        status:
+                          Object.keys(dirty).length === 0
+                            ? 'idle'
+                            : 'debouncing',
+                      };
+                    }),
+                  );
+                  scheduleTimer(item.draft.id);
+                }}
                 isDisabled={item.temporary}
                 isSavingImage={savingImageIds.has(item.draft.id)}
                 isStructureDisabled={structureDisabled}
-                key={item.draft.id}
+                key={`${mediaRevision}:${item.draft.id}`}
                 onChange={(changes) => changeExercise(item.draft.id, changes)}
                 onDelete={() => deleteExercise(item.draft.id)}
                 onImageError={(message) => toast.danger(message)}

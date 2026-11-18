@@ -199,8 +199,12 @@ export const trainingHandlers = [
     });
   }),
 
-  http.get(`${apiBaseUrl}/training/workouts/:workoutId`, () =>
-    HttpResponse.json({ data: createTrainingPreviewFixture() }),
+  http.get(`${apiBaseUrl}/training/workouts/:workoutId`, ({ request }) =>
+    HttpResponse.json({
+      data: createTrainingPreviewFixture(
+        scenario(request) === 'duration-media',
+      ),
+    }),
   ),
 
   http.post(
@@ -213,7 +217,11 @@ export const trainingHandlers = [
           'A session is already active.',
           409,
         );
-      state.session = createTrainingSessionFixture('session-running');
+      state.session = createTrainingSessionFixture(
+        scenario(request) === 'duration-media'
+          ? 'duration-media'
+          : 'session-running',
+      );
       return sessionResponse(state.session);
     },
   ),

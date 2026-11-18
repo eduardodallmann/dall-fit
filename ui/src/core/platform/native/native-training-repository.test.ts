@@ -215,40 +215,51 @@ describe('NativeTrainingRepository', () => {
     expect(resolved.version).toBe(running.version + 1);
   });
 
-  it('projects a ready local image without persisting its content URI', async () => {
-    const imagePreview = {
-      ...preview,
-      exercises: [
-        {
-          bodyArea: 'chest',
-          id: 'exercise-image',
-          image: { fileId: 'display-image-a' },
-          lastLoadsKg: [null],
-          name: 'Crucifixo',
-          repetitions: 10,
-          restSeconds: 30,
-          sets: 1,
-          type: 'image',
-        },
-      ],
-    } as unknown as TrainingWorkoutPreview;
-    const harness = createHarness(
-      Date.parse('2030-01-02T00:00:00.000Z'),
-      imagePreview,
-    );
+  it.each(['image', 'duration'] as const)(
+    'projects a ready %s image and excludes media from sync',
+    async (type) => {
+      const imagePreview = {
+        ...preview,
+        exercises: [
+          {
+            bodyArea: 'chest',
+            id: 'exercise-image',
+            image: { fileId: 'display-image-a' },
+            lastLoadsKg: [null],
+            name: 'Crucifixo',
+            repetitions: 10,
+            restSeconds: 30,
+            sets: 1,
+            type,
+            ...(type === 'duration' ? { durationMinutes: 2 } : {}),
+          },
+        ],
+      } as unknown as TrainingWorkoutPreview;
+      const harness = createHarness(
+        Date.parse('2030-01-02T00:00:00.000Z'),
+        imagePreview,
+      );
 
-    const projected = await harness.repository.getPreview('workout-a');
-    expect(projected.exercises[0]).toMatchObject({
-      image: {
-        displayUrl: 'content://com.dallfit.app.fileprovider/media',
-        offlineMediaId: 'display-image-a',
-      },
-    });
-    await harness.repository.startSession('workout-a');
-    expect(
-      JSON.stringify(harness.commitTrainingSession.mock.calls[0]?.[0]),
-    ).not.toContain('content://');
-  });
+      const projected = await harness.repository.getPreview('workout-a');
+      expect(projected.exercises[0]).toMatchObject({
+        image: {
+          displayUrl: 'content://com.dallfit.app.fileprovider/media',
+          offlineMediaId: 'display-image-a',
+        },
+      });
+      const session = await harness.repository.startSession('workout-a');
+      expect(session.exercises[0]).toMatchObject({
+        type,
+        image: { displayUrl: 'content://com.dallfit.app.fileprovider/media' },
+      });
+      expect(
+        JSON.stringify([...harness.snapshots.values()][0]?.payload),
+      ).not.toMatch(/"image":|"fileId":|display-image-a|https:/u);
+      expect(
+        JSON.stringify(harness.commitTrainingSession.mock.calls[0]?.[0]),
+      ).not.toContain('content://');
+    },
+  );
 
   it('confirms start only after atomically persisting session and snapshot', async () => {
     const harness = createHarness();

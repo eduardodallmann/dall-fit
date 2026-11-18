@@ -54,6 +54,7 @@ export function isAmbiguousMutationFailure(error: unknown): boolean {
     failure.kind === 'timeout' ||
     (failure.status === 503 &&
       (failure.code === 'EXERCISE_COPY_RESULT_UNCERTAIN' ||
+        failure.code === 'EXERCISE_IMAGE_RESULT_UNCERTAIN' ||
         failure.code === 'WORKOUT_DUPLICATION_RESULT_UNCERTAIN'))
   );
 }

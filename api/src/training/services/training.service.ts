@@ -215,12 +215,13 @@ export class TrainingService {
     );
     const exercises = publicExercises.map(
       (exercise, index): TrainingExercisePreview => {
-        if (exercise.type === 'image') {
+        if (exercise.type === 'image' || exercise.type === 'duration') {
           const storedExercise = workout.exercises[index];
           const image =
-            exercise.image !== null &&
-            storedExercise?.type === 'image' &&
-            storedExercise.image !== null
+            exercise.image != null &&
+            storedExercise !== undefined &&
+            'image' in storedExercise &&
+            storedExercise.image != null
               ? {
                   ...exercise.image,
                   offlineMediaId: this.images.createOfflineMediaId(
@@ -228,6 +229,7 @@ export class TrainingService {
                   ),
                 }
               : null;
+          if (exercise.type === 'duration') return { ...exercise, image };
           return {
             ...exercise,
             image,
@@ -946,7 +948,8 @@ export class TrainingService {
         (exercise) =>
           exercise.type === 'youtube-long' ||
           exercise.type === 'youtube-short' ||
-          (exercise.type === 'image' && exercise.image !== null),
+          ('image' in exercise && exercise.image != null) ||
+          (exercise.type === 'duration' && Boolean(exercise.youtubeId)),
       ) ?? null;
     const result = {
       bodyAreas,
@@ -962,16 +965,23 @@ export class TrainingService {
   ): Promise<Omit<TrainingWorkoutCard, 'indicator'>> {
     let media: TrainingWorkoutMedia | null = null;
     const exercise = workout.firstMediaExercise;
-    if (exercise?.type === 'image' && exercise.image !== null) {
+    if (exercise !== null && 'image' in exercise && exercise.image != null) {
       media = {
         image: await this.images.createSignedImage(exercise.image),
         type: 'image',
+        ...(exercise.type === 'duration'
+          ? { sourceExerciseType: 'duration' as const }
+          : {}),
       };
     } else if (
       exercise?.type === 'youtube-long' ||
-      exercise?.type === 'youtube-short'
+      exercise?.type === 'youtube-short' ||
+      (exercise?.type === 'duration' && exercise.youtubeId !== undefined)
     ) {
-      media = { type: exercise.type, youtubeId: exercise.youtubeId };
+      media = {
+        type: exercise.type === 'duration' ? 'youtube-long' : exercise.type,
+        youtubeId: exercise.youtubeId ?? '',
+      };
     }
     const result = {
       bodyAreas: workout.bodyAreas,

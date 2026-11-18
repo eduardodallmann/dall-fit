@@ -37,7 +37,9 @@ const offlineValidity = {
   validatedAt: '2030-01-01T00:00:00.000Z',
 } as const;
 
-export function createTrainingPreviewFixture(): TrainingWorkoutPreview {
+export function createTrainingPreviewFixture(
+  media = false,
+): TrainingWorkoutPreview {
   return {
     exercises: [
       {
@@ -80,6 +82,19 @@ export function createTrainingPreviewFixture(): TrainingWorkoutPreview {
         id: mockTrainingIds.exercises[4],
         name: 'Prancha',
         type: 'duration',
+        ...(media
+          ? {
+              instructions: 'Mantenha a postura confortável.',
+              image: {
+                displayUrl:
+                  'https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com/exercise-images/display.webp?mock-status=fresh',
+                thumbnailUrl:
+                  'https://8u9fq5re0oenmrtc.private.blob.vercel-storage.com/exercise-images/thumbnail.webp?mock-status=fresh',
+                signedUrlExpiresAt: '2030-01-01T00:00:00.000Z',
+                offlineMediaId: 'duration-image',
+              },
+            }
+          : {}),
       },
     ],
     plan: trainingPlanExecutionFixture,
@@ -185,24 +200,24 @@ export function createTrainingSessionFixture(
   scenario: string,
   now = new Date(),
 ): TrainingSession {
-  const exercises = createTrainingPreviewFixture().exercises.map(
-    (exercise): TrainingExerciseExecution => {
-      if (exercise.type === 'image' || exercise.type === 'youtube-short') {
-        const { lastLoadsKg, ...base } = exercise;
-        return {
-          ...base,
+  const exercises = createTrainingPreviewFixture(
+    scenario === 'duration-media',
+  ).exercises.map((exercise): TrainingExerciseExecution => {
+    if (exercise.type === 'image' || exercise.type === 'youtube-short') {
+      const { lastLoadsKg, ...base } = exercise;
+      return {
+        ...base,
+        completedAt: null,
+        series: Array.from({ length: exercise.sets }, (_, index) => ({
           completedAt: null,
-          series: Array.from({ length: exercise.sets }, (_, index) => ({
-            completedAt: null,
-            loadKg: lastLoadsKg[index] ?? null,
-            number: index + 1,
-            repetitions: exercise.repetitions,
-          })),
-        };
-      }
-      return { ...exercise, completedAt: null };
-    },
-  );
+          loadKg: lastLoadsKg[index] ?? null,
+          number: index + 1,
+          repetitions: exercise.repetitions,
+        })),
+      };
+    }
+    return { ...exercise, completedAt: null };
+  });
   if (scenario === 'exercise-completed' || scenario === 'workout-complete')
     completeFirstExercise(exercises, now);
   if (scenario === 'workout-complete') completeAllExercises(exercises, now);

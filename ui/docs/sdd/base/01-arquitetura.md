@@ -927,3 +927,12 @@ A recusa jurídica do Worker só grava o requisito e libera o claim em uma mesma
 transação se execução, revisão e sequência ainda identificarem o item em voo.
 Resposta atrasada de uma fila removida por troca de conta não cria requisito na
 conta seguinte. O teste instrumentado de termos protege esse caminho.
+
+## Analytics da mídia opcional de duração
+
+`ui_button_pressed.action` inclui `duration_media_none`, `duration_media_image` e
+`duration_media_video` com `control: exercise_field`, `surface: workout`.
+`ui_field_focused|ui_field_completed` admite `form: duration_exercise` e campos
+`instructions|youtubeId`; conclusão envia apenas `state: empty|valid|invalid`.
+Upload/remoção/PATCH reutilizam início/terminal das operações de exercício. Não
+transportam instruções, nome de arquivo, URL, ID YouTube ou conteúdo da mídia.

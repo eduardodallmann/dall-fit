@@ -452,7 +452,7 @@ export class PersonalTrainingPlanService {
       (total, workout) =>
         total +
         workout.exercises.filter(
-          (exercise) => exercise.type === 'image' && exercise.image !== null,
+          (exercise) => 'image' in exercise && exercise.image != null,
         ).length,
       0,
     );

@@ -425,3 +425,12 @@ consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no dom�
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+## Imagens em exercícios de duração
+
+A biblioteca identifica capacidade de imagem em `image` e `duration`, mantendo o
+rótulo e os campos temporizados. `ExerciseImageService.toPublicExercise` assina
+ambas; `copyExercises` copia suas duas variantes para um novo asset antes do CAS.
+Compensação inclui duração, assinatura falha não publica lote parcial e resultado
+incerto conserva destinos para releitura. A negociação de representação também
+vale nesta resposta. Cópia, duplicação e exclusão da origem não compartilham assets.

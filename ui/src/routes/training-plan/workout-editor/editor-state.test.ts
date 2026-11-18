@@ -6,10 +6,47 @@ import {
   insertEditorItem,
   mergeSavedExercise,
   orderEditorItems,
+  refreshExerciseMedia,
   type EditorExercise,
 } from './editor-state';
 
 describe('workout editor state', () => {
+  it('reconciles a duration video after an uncertain image transition while preserving independent drafts', () => {
+    const base = {
+      id: 'duration-1',
+      type: 'duration' as const,
+      name: 'Nome em edição',
+      bodyArea: 'other' as const,
+      durationMinutes: 2,
+      instructions: 'Instrução em edição.',
+    };
+    const image = {
+      displayUrl: 'private-display',
+      thumbnailUrl: 'private-thumbnail',
+      signedUrlExpiresAt: '2030-01-01T00:00:00.000Z',
+    };
+    const canonical = {
+      ...base,
+      name: 'Nome no servidor',
+      instructions: 'Instrução no servidor.',
+      image: null,
+      youtubeId: 'ir-XXTWVm7g',
+    };
+    const refreshed = refreshExerciseMedia({ ...base, image }, canonical);
+    expect(refreshed).toEqual({
+      ...base,
+      image: null,
+      youtubeId: canonical.youtubeId,
+    });
+    expect(
+      refreshExerciseMedia(refreshed, { ...canonical, youtubeId: undefined }),
+    ).toEqual({ ...base, image: null });
+    expect(refreshExerciseMedia(refreshed, { ...base, image })).toEqual({
+      ...base,
+      image,
+    });
+  });
+
   it('applies canonical fields without overwriting a newer draft revision', () => {
     const current = editorExercise({
       id: 'exercise-1',

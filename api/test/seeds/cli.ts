@@ -39,6 +39,7 @@ import {
   WorkoutExecutionSchema,
 } from '~/training/repositories/workout-execution.schema';
 
+import { seedDurationMedia } from './duration-media';
 import { exerciseLibrarySeeds, seedExerciseLibrary } from './exercise-library';
 import {
   seedBusinessTerms,
@@ -52,6 +53,7 @@ import {
 } from './workout-duplication';
 
 const trainingPlanScenarios = [
+  'duration-media:ready',
   ...exerciseLibrarySeeds,
   ...workoutDuplicationSeeds,
   'training-plans:create',
@@ -539,7 +541,12 @@ async function main(): Promise<void> {
       WorkoutExecutionSchema,
     );
 
-    if (scenario?.startsWith('terms:')) {
+    if (scenario === 'duration-media:ready') {
+      await seedDurationMedia(
+        { personModel, trainingPlanModel, catalogModel, activeModel },
+        seedSession,
+      );
+    } else if (scenario?.startsWith('terms:')) {
       await seedTermsScenario(personModel, scenario, seedSession);
     } else if (scenario?.startsWith('exercise-library:')) {
       await seedExerciseLibrary(

@@ -46,7 +46,7 @@ async function main(): Promise<void> {
           { $unwind: '$workouts.exercises' },
           {
             $match: {
-              'workouts.exercises.type': 'image',
+              'workouts.exercises.type': { $in: ['image', 'duration'] },
               'workouts.exercises.image': { $ne: null },
             },
           },
@@ -69,7 +69,8 @@ async function main(): Promise<void> {
     const cloneReferences = cloneJobs.flatMap((job) => [
       ...job.snapshot.workouts.flatMap((workout) =>
         workout.exercises.flatMap((exercise) =>
-          exercise.type === 'image' && exercise.image != null
+          (exercise.type === 'image' || exercise.type === 'duration') &&
+          exercise.image != null
             ? [exercise.image.thumbnail.key, exercise.image.display.key]
             : [],
         ),

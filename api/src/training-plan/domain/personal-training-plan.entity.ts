@@ -52,9 +52,12 @@ export interface CloneSnapshotImage {
 }
 
 export type CloneSnapshotExercise =
-  | Exclude<StoredExercise, { type: 'image' }>
+  | Exclude<StoredExercise, { type: 'image' | 'duration' }>
   | (Omit<Extract<StoredExercise, { type: 'image' }>, 'image'> & {
       image: CloneSnapshotImage | null;
+    })
+  | (Omit<Extract<StoredExercise, { type: 'duration' }>, 'image'> & {
+      image?: CloneSnapshotImage | null;
     });
 
 export interface CloneSnapshotWorkoutDraft {

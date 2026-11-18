@@ -222,10 +222,10 @@ export type CopyExercisesResponse = ApiResponse<readonly Exercise[]>;
 export type UpdateExerciseRequest = Partial<
   Pick<
     Extract<Exercise, { type: 'youtube-short' }>,
-    'bodyArea' | 'name' | 'repetitions' | 'restSeconds' | 'sets' | 'youtubeId'
+    'bodyArea' | 'name' | 'repetitions' | 'restSeconds' | 'sets'
   > &
     Pick<Extract<Exercise, { type: 'duration' }>, 'durationMinutes'>
->;
+> & { youtubeId?: string | null; instructions?: string | null };
 
 export type UpdateExerciseResponse = ApiResponse<Exercise>;
 
@@ -234,6 +234,7 @@ export interface ReorderExercisesRequest {
 }
 
 export type UpdateExerciseImageResponse = ApiResponse<{
+  sourceExerciseType?: 'image' | 'duration';
   image: ExerciseImage;
 }>;
 

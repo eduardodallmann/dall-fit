@@ -662,6 +662,11 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       return result;
     }
     const updated = { ...target, ...changes } as StoredExercise;
+    if (updated.type === 'duration') {
+      if (changes.youtubeId === null) delete updated.youtubeId;
+      else if (typeof changes.youtubeId === 'string') updated.image = null;
+      if (changes.instructions === null) delete updated.instructions;
+    }
     const stored = {
       ...updated,
       _id: new Types.ObjectId(exerciseId),
@@ -736,7 +741,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       const result = null;
       return result;
     }
-    const image = target.type === 'image' ? target.image : null;
+    const image = 'image' in target ? (target.image ?? null) : null;
     const document = await this.trainingPlanModel
       .findOneAndUpdate(
         {
@@ -848,16 +853,18 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       return result;
     }
     const target = before.exercises.find((item) => item.id === exerciseId);
-    if (target?.type !== 'image') {
+    if (target?.type !== 'image' && target?.type !== 'duration') {
       const result = null;
       return result;
     }
-    const previous = target.image;
+    const previous = target.image ?? null;
     if (input.image === null && previous === null) {
       const result = { data: null, version: expectedVersion };
       return result;
     }
     const updated = { ...target, image: input.image };
+    if (updated.type === 'duration' && input.image !== null)
+      delete updated.youtubeId;
     const stored = {
       ...updated,
       _id: new Types.ObjectId(exerciseId),
@@ -871,7 +878,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
           version: expectedVersion,
           'workouts._id': workoutId,
           'workouts.exercises._id': exerciseId,
-          'workouts.exercises.type': 'image',
+          'workouts.exercises.type': target.type,
         },
         {
           $inc: { version: 1 },
@@ -1023,7 +1030,8 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       .exec();
     let exerciseImage: StoredExerciseImage | null | undefined;
     if (
-      document?.exerciseType === 'image' &&
+      (document?.exerciseType === 'image' ||
+        document?.exerciseType === 'duration') &&
       document.exerciseImage !== undefined
     ) {
       exerciseImage =
@@ -1082,7 +1090,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
       ...cloneJobs.flatMap((job) =>
         job.snapshot.workouts.flatMap((workout) =>
           workout.exercises.flatMap((exercise) =>
-            exercise.type !== 'image' || exercise.image === null
+            !('image' in exercise) || exercise.image == null
               ? []
               : [exercise.image.thumbnail.key, exercise.image.display.key],
           ),
@@ -1229,6 +1237,14 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
             { type: 'duration' }
           >['bodyArea'],
           durationMinutes: exercise.durationMinutes ?? 1,
+          ...(exercise.image === undefined
+            ? {}
+            : {
+                image:
+                  exercise.image === null
+                    ? null
+                    : this.mapStoredImage(exercise.image),
+              }),
           ...(exercise.instructions === undefined
             ? {}
             : { instructions: exercise.instructions }),
@@ -1254,9 +1270,7 @@ export class MongoTrainingPlanRepository extends TrainingPlanRepository {
   ): StoredExerciseImage[] {
     const result = workouts.flatMap((workout) =>
       workout.exercises.flatMap((exercise) =>
-        exercise.type === 'image' && exercise.image != null
-          ? [exercise.image]
-          : [],
+        'image' in exercise && exercise.image != null ? [exercise.image] : [],
       ),
     );
     return result;

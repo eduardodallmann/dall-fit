@@ -212,3 +212,10 @@ Além da sessão e das permissões desta rota, é necessário o aceite vigente. 
 publicação descoberta durante uso oculta a atividade com efeitos pausados e
 preserva estado recuperável; concluir o aceite não repete mutation recusada.
 Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.
+
+## Capas de exercícios por duração
+
+O card admite capa de imagem ou vídeo de duração, sem alterar o tipo de execução.
+Imagem mantém URLs privadas somente em memória; o preparo Android remove a capa
+do payload essencial e resolve a demonstração pelo arquivo do exercício. Abrir
+continua navegando para o mesmo workout.

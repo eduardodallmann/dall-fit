@@ -322,3 +322,11 @@ curl --include --request PUT \
 - Then: `403 TERMS_ACCEPTANCE_REQUIRED` com referência mínima, antes de lock,
   renovação do lease, snapshot Redis ou execução/recibo terminal MongoDB.
 - Recuperação: abrir a aplicação e aceitar online; a mesma fila pode ser retomada.
+
+## Exclusão de mídia de duração
+
+`OfflineTrainingSnapshotExerciseV1` exclui explicitamente `DurationExercise.image`.
+O schema estrito v1 não aceita `image`, signed URL ou `fileId` em duração. Instruções,
+vídeo opcional e estado temporal continuam permitidos. O repository nativo remove
+imagem antes da serialização; não altera hashes/envelopes pendentes antigos, fences,
+recibos ou sequências. Nenhum header de mídia é necessário no Worker de sync.

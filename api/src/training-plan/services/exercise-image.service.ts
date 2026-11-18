@@ -50,7 +50,12 @@ export class ExerciseImageService {
         while (nextIndex < exercises.length && !failed) {
           const index = nextIndex++;
           const exercise = exercises[index];
-          if (exercise?.type !== 'image' || exercise.image === null) continue;
+          if (
+            exercise === undefined ||
+            !('image' in exercise) ||
+            exercise.image == null
+          )
+            continue;
           const source = exercise.image;
           const prefix = `exercise-images/${randomBytes(12).toString('hex')}`;
           const thumbnailKey = `${prefix}/thumbnail.webp`;
@@ -267,13 +272,13 @@ export class ExerciseImageService {
       params: { exerciseId: exercise.id, type: exercise.type },
     });
     let result: Exercise;
-    if (exercise.type !== 'image') {
+    if (exercise.type !== 'image' && exercise.type !== 'duration') {
       this.logger.log(
         'ExerciseImageService -> toPublicExercise -> unsigned branch:',
         { data: { hasImage: false } },
       );
       result = exercise;
-    } else if (exercise.image === null) {
+    } else if (exercise.image == null) {
       this.logger.log(
         'ExerciseImageService -> toPublicExercise -> emptyImage branch:',
         { data: { hasImage: false } },
@@ -344,11 +349,11 @@ export class ExerciseImageService {
         nextIndex += 1;
         const exercise = exercises[index];
         if (exercise === undefined) continue;
-        if (exercise.type !== 'image') {
+        if (exercise.type !== 'image' && exercise.type !== 'duration') {
           result[index] = exercise;
           continue;
         }
-        if (exercise.image === null) {
+        if (exercise.image == null) {
           result[index] = { ...exercise, image: null };
           continue;
         }

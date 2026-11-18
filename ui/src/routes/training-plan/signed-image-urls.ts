@@ -7,7 +7,7 @@ export function getSignedImageRefreshDelay(
   now = Date.now(),
 ): number | undefined {
   const expirations = exercises.flatMap((exercise) =>
-    exercise.type === 'image' && exercise.image !== null
+    'image' in exercise && exercise.image != null
       ? [Date.parse(exercise.image.signedUrlExpiresAt)]
       : [],
   );

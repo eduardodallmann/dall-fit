@@ -324,6 +324,21 @@ function PreviewExercises({
                   {exerciseTypeLabels[exercise.type]}
                 </Chip>
               </div>
+              {exercise.type === 'duration' &&
+              (exercise.instructions ||
+                exercise.image != null ||
+                exercise.youtubeId) ? (
+                <div className={styles.exerciseContent()}>
+                  {exercise.instructions ? (
+                    <p>{exercise.instructions}</p>
+                  ) : null}
+                  {exercise.image != null || exercise.youtubeId ? (
+                    <TrainingMediaViewer
+                      exercise={{ ...exercise, completedAt: null }}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
             </Card>
           </li>
         );

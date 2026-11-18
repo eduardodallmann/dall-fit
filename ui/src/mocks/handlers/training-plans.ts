@@ -34,6 +34,10 @@ import {
   createMockApiError,
   createMockResponseInit,
 } from '~/mocks/mock-response';
+import {
+  applyExerciseImage,
+  mergeExercise,
+} from '~/routes/training-plan/workout-editor/editor-state';
 
 interface ScenarioState {
   copyAttempts: number;
@@ -67,6 +71,51 @@ function signedExerciseImage(status: 'expired' | 'fresh', assetId?: string) {
     thumbnailUrl: `${privateBlobOrigin}/exercise-images/${assetId === undefined ? '' : `${assetId}-`}thumbnail.webp?${query}`,
   };
   return result;
+}
+
+function durationExercises(): Exercise[] {
+  const base = {
+    type: 'duration' as const,
+    bodyArea: 'adductors' as const,
+    durationMinutes: 2,
+    instructions: 'Mantenha a posição com conforto.',
+  };
+  return [
+    {
+      ...base,
+      bodyArea: 'other',
+      id: '64b000000000000000000401',
+      name: 'Duração sem mídia',
+    },
+    {
+      ...base,
+      bodyArea: 'other',
+      id: '64b000000000000000000402',
+      name: 'Duração com vídeo',
+      youtubeId: 'ir-XXTWVm7g',
+    },
+    {
+      ...base,
+      bodyArea: 'other',
+      id: '64b000000000000000000403',
+      name: 'Duração com imagem',
+      image: signedExerciseImage('fresh'),
+    },
+  ];
+}
+function libraryFixtures(scenario: string) {
+  if (scenario !== 'duration-library')
+    return exerciseLibraryFixtures(
+      scenario === 'exercise-library-stale' ? 1 : 0,
+    );
+  return durationExercises().map((exercise) => ({
+    exercise,
+    exerciseId: exercise.id,
+    groupId: `duration:${exercise.id}`,
+    version: 0,
+    trainingPlanId: '64b000000000000000000001',
+    workoutId: trainingPlanWorkoutFixture.id,
+  }));
 }
 
 const scenarioStates = new Map<string, ScenarioState>();
@@ -192,6 +241,7 @@ function getState(scenario: string): ScenarioState {
       ),
     };
   }
+  applyDurationScenario(scenario, result);
   scenarioStates.set(scenario, result);
   return result;
 }
@@ -212,6 +262,25 @@ registerMockRealtimeReplication(({ scenario, state }) => {
     },
   });
 });
+
+function applyDurationScenario(scenario: string, state: ScenarioState): void {
+  if (!scenario.startsWith('duration-')) return;
+  const exercises = durationExercises();
+  let selected = exercises;
+  if (scenario === 'duration-library') selected = [];
+  else if (scenario !== 'duration-reference') {
+    let index = 1;
+    if (scenario === 'duration-no-media') index = 0;
+    else if (
+      scenario === 'duration-image' ||
+      scenario === 'duration-media-conflict'
+    )
+      index = 2;
+    selected = [exercises[index]];
+  }
+  state.workout = { ...state.workout, exercises: selected };
+  synchronizeExerciseCount(state);
+}
 
 function synchronizeExerciseCount(state: ScenarioState): void {
   state.detail = {
@@ -248,7 +317,7 @@ function validateMutation(
     request.headers.get('x-csrf-token') !== refreshedMockCsrfToken
   )
     return apiError('CSRF_VALIDATION_FAILED', 'CSRF token is invalid.', 403);
-  if (scenario === 'version-conflict')
+  if (scenario === 'version-conflict' || scenario === 'duration-media-conflict')
     return apiError(
       'TRAINING_PLAN_VERSION_CONFLICT',
       'Training plan version conflict.',
@@ -373,14 +442,10 @@ export const trainingPlanHandlers = [
       value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
     const search = normalize(url.searchParams.get('search') ?? '');
     const area = url.searchParams.get('bodyArea');
-    const fixtures =
-      scenario === 'exercise-library-empty'
-        ? []
-        : exerciseLibraryFixtures(
-            scenario === 'exercise-library-stale' && state.copyAttempts > 0
-              ? 1
-              : 0,
-          );
+    let fixtures = libraryFixtures(scenario);
+    if (scenario === 'exercise-library-empty') fixtures = [];
+    else if (scenario === 'exercise-library-stale' && state.copyAttempts > 0)
+      fixtures = exerciseLibraryFixtures(1);
     const filtered = fixtures
       .filter(
         ({ exercise }) =>
@@ -475,9 +540,7 @@ export const trainingPlanHandlers = [
         );
       if (state.workout.exercises.length + selections.length > 50)
         return apiError('EXERCISE_LIMIT_REACHED', 'Exercise limit.', 409);
-      const fixtures = exerciseLibraryFixtures(
-        scenario === 'exercise-library-stale' ? 1 : 0,
-      );
+      const fixtures = libraryFixtures(scenario);
       const sources = selections.map((selection) =>
         fixtures.find(
           (item) =>
@@ -497,8 +560,8 @@ export const trainingPlanHandlers = [
       const copied = sources.map((source) => {
         const id = `74b000000000000000000${String(500 + state.nextExerciseNumber++).padStart(3, '0')}`;
         const exercise = source!.exercise;
-        return exercise.type === 'image' &&
-          scenario === 'exercise-library-media'
+        return ('image' in exercise && exercise.image != null) ||
+          (exercise.type === 'image' && scenario === 'exercise-library-media')
           ? { ...exercise, id, image: signedExerciseImage('fresh', id) }
           : { ...exercise, id };
       });
@@ -722,10 +785,7 @@ export const trainingPlanHandlers = [
       );
       if (index < 0)
         return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
-      const updated = {
-        ...state.workout.exercises[index],
-        ...changes,
-      } as Exercise;
+      const updated = mergeExercise(state.workout.exercises[index], changes);
       state.workout = {
         ...state.workout,
         exercises: state.workout.exercises.map((exercise, itemIndex) =>
@@ -773,8 +833,9 @@ export const trainingPlanHandlers = [
       state.workout = {
         ...state.workout,
         exercises: state.workout.exercises.map((exercise) =>
-          exercise.id === params.exerciseId && exercise.type === 'image'
-            ? { ...exercise, image }
+          exercise.id === params.exerciseId &&
+          (exercise.type === 'image' || exercise.type === 'duration')
+            ? applyExerciseImage(exercise, image)
             : exercise,
         ),
       };
@@ -795,7 +856,7 @@ export const trainingPlanHandlers = [
       const target = state.workout.exercises.find(
         (exercise) => exercise.id === params.exerciseId,
       );
-      if (target?.type !== 'image')
+      if (target?.type !== 'image' && target?.type !== 'duration')
         return apiError(
           'INVALID_EXERCISE_TYPE',
           'Exercise type is invalid.',
@@ -805,7 +866,8 @@ export const trainingPlanHandlers = [
         state.workout = {
           ...state.workout,
           exercises: state.workout.exercises.map((exercise) =>
-            exercise.id === target.id && exercise.type === 'image'
+            exercise.id === target.id &&
+            (exercise.type === 'image' || exercise.type === 'duration')
               ? { ...exercise, image: null }
               : exercise,
           ),
@@ -1234,7 +1296,7 @@ export const trainingPlanHandlers = [
         .map<Exercise>((exercise, index) => ({
           ...exercise,
           id: `65b00000000000${String(state.duplicationAttempts).padStart(4, '0')}${String(index).padStart(6, '0')}`,
-          ...(exercise.type === 'image' && exercise.image !== null
+          ...('image' in exercise && exercise.image != null
             ? { image: signedExerciseImage('fresh', id) }
             : {}),
         }));
@@ -1345,7 +1407,7 @@ export const trainingPlanHandlers = [
       );
       if (current === undefined)
         return apiError('EXERCISE_NOT_FOUND', 'Exercise not found.', 404);
-      const updated = { ...current, ...changes } as Exercise;
+      const updated = mergeExercise(current, changes);
       state.workout = {
         ...state.workout,
         exercises: state.workout.exercises.map((exercise) =>
@@ -1505,12 +1567,16 @@ function personalNestedDelete(
   return new HttpResponse(null, responseInit(version, 204));
 }
 
-function personalImageMutation(
+async function personalImageMutation(
   params: Record<string, string | readonly string[] | undefined>,
   request: Request,
   removing: boolean,
 ) {
-  const state = getState(getScenario(request));
+  const scenario = getScenario(request);
+  const state = getState(scenario);
+  await delay(150);
+  if (scenario === 'duration-media-error' && state.copyAttempts++ === 0)
+    return apiError('IMAGE_UPLOAD_FAILED', 'Image upload failed.', 503);
   const readOnly = rejectPersonalReference(params.catalogEntryId);
   if (readOnly !== null) return readOnly;
   const invalid = validateMutation(request, state, getScenario(request));
@@ -1519,8 +1585,9 @@ function personalImageMutation(
   state.workout = {
     ...state.workout,
     exercises: state.workout.exercises.map((exercise) =>
-      exercise.id === params.exerciseId && exercise.type === 'image'
-        ? { ...exercise, image }
+      exercise.id === params.exerciseId &&
+      (exercise.type === 'image' || exercise.type === 'duration')
+        ? applyExerciseImage(exercise, image)
         : exercise,
     ),
   };

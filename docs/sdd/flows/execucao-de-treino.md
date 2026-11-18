@@ -254,3 +254,11 @@ atividade e pausa novos efeitos, preservando estado confirmado e recuperável;
 ação HTTP recusada não é repetida automaticamente depois do aceite. Android
 preserva treino offline com comprovante confirmado até conhecer requisito novo e
 pausa a fila compartilhada, sem tratar pendência como revogação de sessão.
+
+## Demonstração de duração e representação
+
+Duração admite instruções e demonstração opcional de imagem ou vídeo, sem vínculo
+entre reprodução e timer. Clientes negociam a nova mídia; legado omite a imagem
+nova. Android prepara arquivo privado e continua por tempo offline; sync v1 exclui
+mídia. Os detalhes pertencem à [rota de execução](../../../ui/docs/sdd/routes/training-workout.md)
+e ao [endpoint de treino](../../../api/docs/sdd/endpoints/training.md).

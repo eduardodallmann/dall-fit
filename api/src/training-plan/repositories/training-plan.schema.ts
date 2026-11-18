@@ -124,6 +124,7 @@ if (exercisePath instanceof MongooseSchema.Types.DocumentArray) {
         ...namedFields,
         durationMinutes: { max: 1440, min: 1, required: true, type: Number },
         instructions: { maxlength: 300, required: false, type: String },
+        image: { required: false, type: exerciseImageSchema },
         youtubeId: {
           match: /^[A-Za-z0-9_-]{11}$/,
           required: false,

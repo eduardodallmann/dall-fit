@@ -236,7 +236,9 @@ test.describe('Rotas administrativas de planos de treino', () => {
     const list = page.getByRole('list', { name: 'Exercícios em ordem' });
     await expect(list.getByRole('listitem')).toHaveCount(5);
     await expect(list.getByText('YouTube Short')).toBeVisible();
-    await expect(list.getByText('Imagem', { exact: true })).toBeVisible();
+    await expect(
+      list.getByText('Imagem', { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
     await expect(list.getByText('YouTube Longo')).toBeVisible();
     await expect(list.getByText('Pausa')).toBeVisible();
     await expect(list.getByText('Duração', { exact: true })).toBeVisible();

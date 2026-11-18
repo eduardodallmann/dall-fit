@@ -31,6 +31,7 @@ import {
 } from '~/routes/training-plan/exercise-presentation';
 import { ExerciseVideoPreview } from '~/routes/training-plan/exercise-video-preview';
 
+import { DurationFields } from './duration-fields';
 import type { ExerciseSaveStatus } from './editor-state';
 import { workoutEditorStyles } from './styles';
 
@@ -38,6 +39,9 @@ const styles = workoutEditorStyles();
 
 interface ExerciseRowProps {
   exercise: Exercise;
+  confirmedExercise: Exercise;
+  onMediaDraftChange: (exerciseId: string, dirty: boolean) => void;
+  onCancelMediaDraft: () => void;
   isDisabled: boolean;
   isSavingImage: boolean;
   isStructureDisabled: boolean;
@@ -45,17 +49,16 @@ interface ExerciseRowProps {
   onDelete: () => void;
   onImageError: (message: string) => void;
   onImageLoadError: (signedUrlExpiresAt: string) => void;
-  onRemoveImage: () => void;
+  onRemoveImage: () => Promise<boolean>;
   onRetry: () => void;
   onRetryImage: () => void;
-  onUploadImage: (file: File) => void;
+  onUploadImage: (file: File) => Promise<boolean>;
   status: ExerciseSaveStatus;
 }
 
 type ExerciseFieldProps = Readonly<
   Pick<
     ExerciseRowProps,
-    | 'exercise'
     | 'isDisabled'
     | 'isSavingImage'
     | 'isStructureDisabled'
@@ -65,11 +68,14 @@ type ExerciseFieldProps = Readonly<
     | 'onRemoveImage'
     | 'onRetryImage'
     | 'onUploadImage'
-  >
+  > & { exercise: Exclude<Exercise, { type: 'duration' }> }
 >;
 
 export function ExerciseRow({
   exercise,
+  confirmedExercise,
+  onMediaDraftChange,
+  onCancelMediaDraft,
   isDisabled,
   isSavingImage,
   isStructureDisabled,
@@ -176,18 +182,40 @@ export function ExerciseRow({
           </div>
         </div>
       </ExerciseCardHeader>
-      <ExerciseFields
-        exercise={exercise}
-        isDisabled={isDisabled}
-        isSavingImage={isSavingImage}
-        isStructureDisabled={isStructureDisabled}
-        onChange={onChange}
-        onImageError={onImageError}
-        onImageLoadError={onImageLoadError}
-        onRemoveImage={onRemoveImage}
-        onRetryImage={onRetryImage}
-        onUploadImage={onUploadImage}
-      />
+      {exercise.type === 'duration' ? (
+        <DurationFields
+          exercise={exercise}
+          confirmed={
+            confirmedExercise.type === 'duration' ? confirmedExercise : exercise
+          }
+          isDisabled={isDisabled || isStructureDisabled}
+          mediaDisabled={
+            isDisabled || isStructureDisabled || isSaving || isSavingImage
+          }
+          isSavingImage={isSavingImage}
+          onChange={onChange}
+          onCancelMediaDraft={onCancelMediaDraft}
+          onMediaDraftChange={onMediaDraftChange}
+          onImageError={onImageError}
+          onImageLoadError={onImageLoadError}
+          onRetryImage={onRetryImage}
+          onRemoveImage={onRemoveImage}
+          onUploadImage={onUploadImage}
+        />
+      ) : (
+        <ExerciseFields
+          exercise={exercise}
+          isDisabled={isDisabled}
+          isSavingImage={isSavingImage}
+          isStructureDisabled={isStructureDisabled}
+          onChange={onChange}
+          onImageError={onImageError}
+          onImageLoadError={onImageLoadError}
+          onRemoveImage={onRemoveImage}
+          onRetryImage={onRetryImage}
+          onUploadImage={onUploadImage}
+        />
+      )}
       {status === 'error' ? (
         <p className={styles.status()} role="alert">
           Não foi possível salvar. O rascunho foi preservado.
@@ -257,8 +285,7 @@ function ExerciseFields({
   onUploadImage,
 }: ExerciseFieldProps) {
   const hasInformationFields = 'name' in exercise;
-  const hasNumericFields =
-    'restSeconds' in exercise || 'durationMinutes' in exercise;
+  const hasNumericFields = 'restSeconds' in exercise;
 
   return (
     <div className={styles.exerciseFields()}>
@@ -344,9 +371,17 @@ function ExerciseInformationFields({
                   surface: 'workout',
                 });
               }}
-              onRemove={exercise.image === null ? undefined : onRemoveImage}
+              onRemove={
+                exercise.image === null
+                  ? undefined
+                  : () => {
+                      void onRemoveImage();
+                    }
+              }
               onRetry={onRetryImage}
-              onSelect={onUploadImage}
+              onSelect={(file) => {
+                void onUploadImage(file);
+              }}
               previewTitle={exercise.name}
             />
           </div>
@@ -424,17 +459,6 @@ function ExerciseNumericFields({
           min={1}
           onChange={(repetitions) => onChange({ repetitions })}
           value={exercise.repetitions}
-        />
-      ) : null}
-      {'durationMinutes' in exercise ? (
-        <NumericInput
-          className={styles.numericField()}
-          isDisabled={isDisabled}
-          label="Duração (min)"
-          max={1440}
-          min={1}
-          onChange={(durationMinutes) => onChange({ durationMinutes })}
-          value={exercise.durationMinutes}
         />
       ) : null}
     </div>

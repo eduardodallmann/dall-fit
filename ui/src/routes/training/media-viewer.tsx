@@ -29,7 +29,7 @@ export function TrainingMediaViewer({
   const platform = usePlatform();
   const online = useConnectivity();
   const state = useOverlayState();
-  const hasImage = exercise.type === 'image' && exercise.image !== null;
+  const hasImage = 'image' in exercise && exercise.image != null;
   const hasRemoteVideo =
     'youtubeId' in exercise &&
     exercise.youtubeId !== undefined &&
@@ -121,7 +121,7 @@ export function TrainingMediaViewer({
 function MediaThumbnail({
   exercise,
 }: Readonly<{ exercise: TrainingExerciseExecution }>) {
-  if (exercise.type === 'image' && exercise.image !== null) {
+  if ('image' in exercise && exercise.image != null) {
     return (
       <img
         alt=""
@@ -147,7 +147,7 @@ function MediaThumbnail({
 function MediaContent({
   exercise,
 }: Readonly<{ exercise: TrainingExerciseExecution }>) {
-  if (exercise.type === 'image' && exercise.image !== null) {
+  if ('image' in exercise && exercise.image != null) {
     return (
       <img
         alt={`Imagem de ${exercise.name}`}

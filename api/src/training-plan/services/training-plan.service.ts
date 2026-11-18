@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 
 import type {
   CreateTrainingPlanRequest,
@@ -26,6 +26,7 @@ import type {
 import {
   createExerciseLimitException,
   createExerciseNotFoundException,
+  createImageWriteUncertainException,
   createInvalidExerciseOrderException,
   createInvalidExerciseTypeException,
   createTrainingPlanNotFoundException,
@@ -62,7 +63,13 @@ const editableFields: Record<ExerciseType, ReadonlySet<string>> = {
   image: new Set(['name', 'bodyArea', 'restSeconds', 'sets', 'repetitions']),
   'youtube-long': new Set(['name', 'youtubeId', 'bodyArea']),
   pause: new Set(['restSeconds']),
-  duration: new Set(['name', 'bodyArea', 'durationMinutes']),
+  duration: new Set([
+    'name',
+    'bodyArea',
+    'durationMinutes',
+    'youtubeId',
+    'instructions',
+  ]),
 };
 
 @Injectable()
@@ -220,7 +227,7 @@ export class TrainingPlanService {
       );
       return failure;
     }
-    await this.exerciseImageService.deleteImages(images);
+    await this.cleanupImages(images);
     await this.trainingLoadProfiles.cleanupPlan(trainingPlanId);
     this.logger.log('TrainingPlanService -> deleteOwned -> completed:', {
       data: { imageCount: images.length, ownerPersonId, trainingPlanId },
@@ -300,7 +307,7 @@ export class TrainingPlanService {
         !retainedImageKeys.has(image.thumbnail.key) &&
         !retainedImageKeys.has(image.display.key),
     );
-    await this.exerciseImageService.deleteImages(deletableImages);
+    await this.cleanupImages(deletableImages);
     await this.trainingLoadProfiles.cleanupPlan(trainingPlanId);
     this.logger.log('TrainingPlanService -> deleteGlobal -> completed:', {
       data: {
@@ -391,7 +398,7 @@ export class TrainingPlanService {
         result.version,
         ownerPersonId,
       );
-    await this.exerciseImageService.deleteImages(result.data);
+    await this.cleanupImages(result.data);
     await this.trainingLoadProfiles.cleanupWorkout(trainingPlanId, workoutId);
     this.logger.log('TrainingPlanService -> deleteWorkout -> return:', {
       data: { trainingPlanId, version: result.version, workoutId },
@@ -607,18 +614,30 @@ export class TrainingPlanService {
     )
       throw createInvalidExerciseTypeException();
     const normalized = { ...definedChanges };
-    if ('youtubeId' in normalized && normalized.youtubeId !== undefined)
+    if (
+      type !== 'duration' &&
+      (normalized.youtubeId === null || normalized.instructions !== undefined)
+    ) {
+      this.logger.warn(
+        'TrainingPlanService -> updateExercise -> invalidFields branch:',
+        { data: { type } },
+      );
+      throw createInvalidExerciseTypeException();
+    }
+    if (typeof normalized.youtubeId === 'string')
       normalized.youtubeId =
         await this.youtubeReferenceService.normalizeAndValidate(
           normalized.youtubeId,
         );
-    const repositoryResult = await this.trainingPlanRepository.updateExercise(
-      trainingPlanId,
-      workoutId,
-      exerciseId,
-      expectedVersion,
-      normalized,
-      { ownerPersonId },
+    const repositoryResult = await this.writeMedia(() =>
+      this.trainingPlanRepository.updateExercise(
+        trainingPlanId,
+        workoutId,
+        exerciseId,
+        expectedVersion,
+        normalized,
+        { ownerPersonId },
+      ),
     );
     if (repositoryResult === null) {
       const failure = this.throwMutationFailure(
@@ -636,6 +655,12 @@ export class TrainingPlanService {
         repositoryResult.version,
         ownerPersonId,
       );
+    if (
+      type === 'duration' &&
+      typeof normalized.youtubeId === 'string' &&
+      state.exerciseImage != null
+    )
+      await this.cleanupImages([state.exerciseImage]);
     this.logger.log('TrainingPlanService -> updateExercise -> return:', {
       data: {
         exerciseId,
@@ -677,8 +702,7 @@ export class TrainingPlanService {
         result.version,
         ownerPersonId,
       );
-    if (result.data !== null)
-      await this.exerciseImageService.deleteImages([result.data]);
+    if (result.data !== null) await this.cleanupImages([result.data]);
     await this.trainingLoadProfiles.cleanupExercise(trainingPlanId, exerciseId);
     return result.version;
   }
@@ -759,7 +783,7 @@ export class TrainingPlanService {
     exerciseId: string,
     expectedVersion: number,
     ownerPersonId: string | null = null,
-  ): Promise<void> {
+  ): Promise<'image' | 'duration'> {
     this.logger.log(
       'TrainingPlanService -> validateExerciseImageUpload -> params:',
       {
@@ -780,12 +804,14 @@ export class TrainingPlanService {
       exerciseId,
     );
     this.assertAggregateCapacity(state);
-    if (state.exerciseType !== 'image')
+    if (state.exerciseType !== 'image' && state.exerciseType !== 'duration')
       throw createInvalidExerciseTypeException();
+    const result = state.exerciseType;
     this.logger.log(
       'TrainingPlanService -> validateExerciseImageUpload -> completed:',
       { data: { exerciseId, trainingPlanId, workoutId } },
     );
+    return result;
   }
 
   async commitExerciseImage(
@@ -799,13 +825,15 @@ export class TrainingPlanService {
     this.logger.log('TrainingPlanService -> commitExerciseImage -> params:', {
       params: { exerciseId, expectedVersion, trainingPlanId, workoutId },
     });
-    const result = await this.trainingPlanRepository.updateExerciseImage(
-      trainingPlanId,
-      workoutId,
-      exerciseId,
-      expectedVersion,
-      { image },
-      { ownerPersonId },
+    const result = await this.writeMedia(() =>
+      this.trainingPlanRepository.updateExerciseImage(
+        trainingPlanId,
+        workoutId,
+        exerciseId,
+        expectedVersion,
+        { image },
+        { ownerPersonId },
+      ),
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
@@ -823,8 +851,7 @@ export class TrainingPlanService {
         result.version,
         ownerPersonId,
       );
-    if (result.data !== null)
-      await this.exerciseImageService.deleteImages([result.data]);
+    if (result.data !== null) await this.cleanupImages([result.data]);
     this.logger.log('TrainingPlanService -> commitExerciseImage -> return:', {
       data: { exerciseId, trainingPlanId, version: result.version, workoutId },
     });
@@ -851,15 +878,17 @@ export class TrainingPlanService {
       workoutId,
       exerciseId,
     );
-    if (state.exerciseType !== 'image')
+    if (state.exerciseType !== 'image' && state.exerciseType !== 'duration')
       throw createInvalidExerciseTypeException();
-    const result = await this.trainingPlanRepository.updateExerciseImage(
-      trainingPlanId,
-      workoutId,
-      exerciseId,
-      expectedVersion,
-      { image: null },
-      { ownerPersonId },
+    const result = await this.writeMedia(() =>
+      this.trainingPlanRepository.updateExerciseImage(
+        trainingPlanId,
+        workoutId,
+        exerciseId,
+        expectedVersion,
+        { image: null },
+        { ownerPersonId },
+      ),
     );
     if (result === null) {
       const failure = this.throwMutationFailure(
@@ -877,9 +906,74 @@ export class TrainingPlanService {
         result.version,
         ownerPersonId,
       );
-    if (result.data !== null)
-      await this.exerciseImageService.deleteImages([result.data]);
+    if (result.data !== null) await this.cleanupImages([result.data]);
     return result.version;
+  }
+
+  private async writeMedia<T>(operation: () => Promise<T>): Promise<T> {
+    this.logger.log('TrainingPlanService -> writeMedia -> params:', {
+      params: {},
+    });
+    try {
+      const result = await operation();
+      this.logger.log(
+        'TrainingPlanService -> writeMedia -> repository return:',
+        { data: { matched: result !== null } },
+      );
+      this.logger.log('TrainingPlanService -> writeMedia -> return:', {
+        data: { matched: result !== null },
+      });
+      return result;
+    } catch (error: unknown) {
+      if (error instanceof HttpException) {
+        this.logger.warn(
+          'TrainingPlanService -> writeMedia -> rejected branch:',
+          { data: { status: error.getStatus() } },
+        );
+        throw error;
+      }
+      this.logger.error(
+        'TrainingPlanService -> writeMedia -> uncertainCommit branch:',
+        { data: {} },
+      );
+      throw createImageWriteUncertainException();
+    }
+  }
+
+  private async cleanupImages(
+    images: readonly StoredExerciseImage[],
+  ): Promise<void> {
+    this.logger.log('TrainingPlanService -> cleanupImages -> params:', {
+      params: { count: images.length },
+    });
+    if (images.length > 0) {
+      try {
+        const retained =
+          await this.trainingPlanRepository.listReferencedImageKeys();
+        this.logger.log(
+          'TrainingPlanService -> cleanupImages -> repository return:',
+          { data: { retainedCount: retained.size } },
+        );
+        const removable = images.filter(
+          (image) =>
+            !retained.has(image.thumbnail.key) &&
+            !retained.has(image.display.key),
+        );
+        await this.exerciseImageService.deleteImages(removable);
+        this.logger.log(
+          'TrainingPlanService -> cleanupImages -> exerciseImageService completed:',
+          { data: { count: removable.length } },
+        );
+      } catch {
+        this.logger.warn(
+          'TrainingPlanService -> cleanupImages -> reconciliationRequired branch:',
+          { data: { count: images.length } },
+        );
+      }
+    }
+    this.logger.log('TrainingPlanService -> cleanupImages -> completed:', {
+      data: { count: images.length },
+    });
   }
 
   private async throwMutationFailure(

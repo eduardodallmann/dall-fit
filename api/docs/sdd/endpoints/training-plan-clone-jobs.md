@@ -89,3 +89,41 @@ consulta necessária indisponível, `503 TERMS_UNAVAILABLE`. Sem efeitos no dom�
 deste endpoint. Os [cenários reproduzíveis de termos](terms.md) são proprietários
 dessa fronteira; os seeds de negócio preparam recibos sintéticos explicitamente,
 sem transformá-los em efeito do login.
+
+## Imagem de duração no clone
+
+Captura, `totalImages`, ETags, retenção e progresso incluem imagens não nulas de
+`duration`. O [Workflow](../../../../workflow/docs/sdd/workflows/training-plan-clone.md)
+copia variantes e materializa minutos/instruções com novos assets; sessões/jobs
+anteriores sem imagem continuam válidos. Falha/cancelamento não publica árvore
+parcial. API e Workflow devem ser publicados antes da UI que escreve imagem.
+
+### Cenário — clone de plano com imagem em duration
+
+**Seed**
+
+```bash
+pnpm -C api seed -- duration-media:ready
+```
+
+**cURL** (API/Workflow/Blob privados locais configurados)
+
+```bash
+ADMIN_TOKEN=$(cat /tmp/dall-fit-duration-admin-token.txt)
+TOKEN=$(cat /tmp/dall-fit-duration-token.txt)
+curl --include --request PUT \
+  --url http://localhost:4000/global/training-plans/110000000000000000000003/workouts/110000000000000000000101/exercises/110000000000000000000201/image \
+  --header "Authorization: Bearer $ADMIN_TOKEN" --header 'X-Resource-Version: 0' \
+  --header 'X-Training-Media-Version: 1' --form 'file=@/tmp/dall-fit-duration.png;type=image/png'
+curl --include --request POST --url http://localhost:4000/training-plan-clone-jobs \
+  --header "Authorization: Bearer $TOKEN" --header 'content-type: application/json' \
+  --data '{"globalTrainingPlanId":"110000000000000000000003"}'
+```
+
+- Given: modelo global com uma imagem em duração e pessoa regular autenticada.
+- When: solicita clone.
+- Then: retorna `202`, `totalImages: 1`; captura ambas as variantes com ETags.
+  Worker copia/conta/materializa com IDs independentes e conserva minutos/instruções.
+  Redelivery usa destinos determinísticos; falha/retry/cancelamento mantêm fences.
+  Os testes da API verificam captura/progresso; os do repository/Blob do Workflow
+  verificam decisão, retomada, materialização e compensação controladas.

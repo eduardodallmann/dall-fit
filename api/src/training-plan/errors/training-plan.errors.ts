@@ -99,6 +99,22 @@ export const createImageTooLargeException = () =>
     'IMAGE_TOO_LARGE',
     'Image is too large.',
   );
+export const createImageWriteUncertainException = () =>
+  domainException(
+    HttpStatus.SERVICE_UNAVAILABLE,
+    'EXERCISE_IMAGE_RESULT_UNCERTAIN',
+    'Read the exercise before attempting another media write.',
+  );
+
+export function isImageWriteUncertain(error: unknown): boolean {
+  if (!(error instanceof HttpException)) return false;
+  const response = error.getResponse();
+  return (
+    typeof response === 'object' &&
+    'code' in response &&
+    response.code === 'EXERCISE_IMAGE_RESULT_UNCERTAIN'
+  );
+}
 export const createUnsupportedImageTypeException = () =>
   domainException(
     HttpStatus.UNSUPPORTED_MEDIA_TYPE,

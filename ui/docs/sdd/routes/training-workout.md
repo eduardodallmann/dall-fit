@@ -66,7 +66,7 @@ estado reorganizam-se em duas linhas.
 
 `pause` e `duration` abrem timer; descanso de série/pausa pode ser pulado, duração
 pode ser finalizada ou cancelada. Atividade por duração apresenta também sua
-instrução e demonstração em vídeo quando fornecidas pelo plano. Timestamps do
+instruções e demonstração em imagem ou vídeo quando fornecidas pelo plano. Timestamps do
 servidor dirigem o contador Web. No Android, timestamp civil, duração e âncora de
 `elapsedRealtime` persistidos recompõem o contador; background não pausa, reboot
 usa fallback civil limitado e nenhum tick grava SQLite. Ao zerar, `series-rest`
@@ -282,3 +282,24 @@ Além da sessão e das permissões desta rota, é necessário o aceite vigente. 
 publicação descoberta durante uso oculta a atividade com efeitos pausados e
 preserva estado recuperável; concluir o aceite não repete mutation recusada.
 Android continua sujeito às regras de comprovante e requisito mínimo desse fluxo.
+
+## Demonstração opcional de duração
+
+Prévia e sessão mostram instruções e uma imagem ou vídeo opcionais em duração.
+`TrainingMediaViewer` reutiliza imagem/player, modal desktop e drawer mobile.
+Abrir/fechar ou terminar vídeo não altera timer/progresso; falha de mídia não
+bloqueia início, resolução manual, finalização ou sync. Não há séries/cargas.
+
+Axios negocia `X-Training-Media-Version: 1`. No Android, o coordenador prepara a
+imagem de duração com `offlineMediaId`, baixa display com a concorrência vigente
+e persiste somente `fileId` em payload v2. Preview/sessão resolvem URI privada
+apenas na projeção; arquivo ausente dá fallback. Vídeo offline informa
+`Mídia indisponível offline`, conservando instruções e timer. `snapshotFrom` exclui
+`image` antes do envelope v1. Sessões, planos preparados e envelopes antigos
+continuam legíveis sem reset, novo hash ou alteração do mínimo Android.
+
+Cenário reproduzível: `http://localhost:3000/training/workout/64b000000000000000000101?mockAuth=person&mockTraining=duration-media`.
+Na prévia abra/feche imagem; inicie treino, abra duração e inicie timer. Mídia não
+resolve nem reconfigura o timer. Vitest do preparo/repository nativo valida ausência
+de URL em armazenamento e ausência de mídia no snapshot; smoke Android real
+com modo avião e atualização continua sendo validação de dispositivo.

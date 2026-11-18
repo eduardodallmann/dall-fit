@@ -206,3 +206,10 @@ vigente ou publicação. Menu, branch administrativa e endpoints `AdminOnly` usa
 mesma exceção, mantendo autorização de papel, CSRF e quota. Publicação nova não
 interrompe rascunhos administrativos. Treino, catálogo e dashboard pessoais do
 mesmo administrador continuam sujeitos ao [aceite de termos](aceite-de-termos.md).
+
+## Mídia demonstrativa por duração
+
+A administração pode manter instruções e uma demonstração opcional, imagem ou
+vídeo, preservando duração e execução por tempo. Editor, atomicidade, recuperação e
+negociação pertencem à [rota](../../../ui/docs/sdd/routes/global-training-plan-workout.md)
+e ao [endpoint](../../../api/docs/sdd/endpoints/global-training-plans.md).

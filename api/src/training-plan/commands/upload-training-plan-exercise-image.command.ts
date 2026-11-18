@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { UpdateExerciseImageResponse } from '@dall-fit/types';
 
 import type { UploadedImageFile } from '~/training-plan/domain/training-plan.entity';
+import { isImageWriteUncertain } from '~/training-plan/errors/training-plan.errors';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { TrainingPlanService } from '~/training-plan/services/training-plan.service';
 
@@ -34,7 +35,7 @@ export class UploadTrainingPlanExerciseImageCommand {
         },
       },
     );
-    await this.service.validateExerciseImageUpload(
+    const sourceExerciseType = await this.service.validateExerciseImageUpload(
       trainingPlanId,
       workoutId,
       exerciseId,
@@ -70,10 +71,13 @@ export class UploadTrainingPlanExerciseImageCommand {
         { data: { version } },
       );
       const result = {
-        response: { data: { image } },
+        response: { data: { image, sourceExerciseType } },
         version,
       };
       return result;
+    } catch (error: unknown) {
+      if (isImageWriteUncertain(error)) committed = true;
+      throw error;
     } finally {
       if (!committed) {
         await this.exerciseImageService.deleteImages([storedImage]);

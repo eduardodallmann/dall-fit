@@ -26,6 +26,7 @@ import type {
 import {
   createExerciseImageCopyFailedException,
   createWorkoutDuplicationUncertainException,
+  isImageWriteUncertain,
 } from '~/training-plan/errors/training-plan.errors';
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 import { PersonalTrainingPlanService } from '~/training-plan/services/personal-training-plan.service';
@@ -304,7 +305,7 @@ export class PersonalTrainingPlansCommand {
         );
         await this.exerciseImageService.deleteImages(
           copied.flatMap((exercise) =>
-            exercise.type === 'image' && exercise.image !== null
+            'image' in exercise && exercise.image != null
               ? [exercise.image]
               : [],
           ),
@@ -517,13 +518,14 @@ export class PersonalTrainingPlansCommand {
         personId,
         catalogEntryId,
       );
-    await this.trainingPlanService.validateExerciseImageUpload(
-      trainingPlanId,
-      workoutId,
-      exerciseId,
-      expectedVersion,
-      personId,
-    );
+    const sourceExerciseType =
+      await this.trainingPlanService.validateExerciseImageUpload(
+        trainingPlanId,
+        workoutId,
+        exerciseId,
+        expectedVersion,
+        personId,
+      );
     const storedImage = await this.exerciseImageService.processAndUpload(file);
     let committed = false;
     try {
@@ -538,7 +540,10 @@ export class PersonalTrainingPlansCommand {
         personId,
       );
       committed = true;
-      const result = { response: { data: { image } }, version };
+      const result = {
+        response: { data: { image, sourceExerciseType } },
+        version,
+      };
       this.logReturn('uploadImage', {
         catalogEntryId,
         exerciseId,
@@ -546,6 +551,9 @@ export class PersonalTrainingPlansCommand {
         version,
       });
       return result;
+    } catch (error: unknown) {
+      if (isImageWriteUncertain(error)) committed = true;
+      throw error;
     } finally {
       if (!committed)
         await this.exerciseImageService.deleteImages([storedImage]);

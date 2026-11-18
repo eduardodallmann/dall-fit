@@ -61,8 +61,17 @@ export interface StoredImageExercise extends Omit<
   image: StoredExerciseImage | null;
 }
 
+export interface StoredDurationExercise extends Omit<
+  Extract<Exercise, { type: 'duration' }>,
+  'image'
+> {
+  image?: StoredExerciseImage | null;
+}
+
 export type StoredExercise =
-  Exclude<Exercise, { type: 'image' }> | StoredImageExercise;
+  | Exclude<Exercise, { type: 'image' | 'duration' }>
+  | StoredImageExercise
+  | StoredDurationExercise;
 
 export interface WorkoutAggregate extends Omit<
   TrainingPlanWorkoutDetails,

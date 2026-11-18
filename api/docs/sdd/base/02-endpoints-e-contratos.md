@@ -42,7 +42,7 @@ Toda response, inclusive `204`, redirect, erro e preflight, devolve
 header e ele possui de 1 a 128 caracteres ASCII no formato
 `^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`; ausência, repetição, combinação pelo parser
 ou formato inválido gera UUID novo. O CORS permite `X-Request-Id` e os headers
-funcionais declarados pelos contratos, incluindo `Idempotency-Key`, na request;
+funcionais declarados pelos contratos, incluindo `Idempotency-Key` e `X-Training-Media-Version`, na request;
 expõe somente `X-Request-Id` e `X-Resource-Version` na response, sem ampliar origem
 ou métodos.
 

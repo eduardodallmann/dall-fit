@@ -181,7 +181,7 @@ export class MongoTrainingPlanCloneRepository extends TrainingPlanCloneRepositor
       );
       const pending = document.snapshot.workouts.flatMap((workout) =>
         workout.exercises.flatMap((exercise) =>
-          exercise.type === 'image' &&
+          (exercise.type === 'image' || exercise.type === 'duration') &&
           exercise.image !== null &&
           exercise.image !== undefined &&
           !copied.has(exercise.id)
@@ -467,7 +467,7 @@ export class MongoTrainingPlanCloneRepository extends TrainingPlanCloneRepositor
         cloneJobId,
         `exercise:${workoutIndex}:${exerciseIndex}`,
       ),
-      ...(exercise.type === 'image'
+      ...(exercise.type === 'image' || exercise.type === 'duration'
         ? {
             image:
               copied === undefined

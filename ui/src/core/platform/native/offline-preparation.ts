@@ -36,7 +36,11 @@ interface PreparedImageExercise extends Omit<
 }
 
 type PreparedExercise =
-  Exclude<TrainingExercisePreview, { type: 'image' }> | PreparedImageExercise;
+  | Exclude<TrainingExercisePreview, { type: 'image' | 'duration' }>
+  | PreparedImageExercise
+  | (Omit<Extract<TrainingExercisePreview, { type: 'duration' }>, 'image'> & {
+      image?: { fileId: string } | null;
+    });
 
 interface PreparedPlanPayload extends Readonly<Record<string, unknown>> {
   lease: OfflineTrainingLeaseResponse['data'] & {
@@ -280,8 +284,9 @@ export class OfflinePreparationCoordinator {
     const media: MediaJob[] = [];
     const workouts = previews.map((preview) => ({
       exercises: preview.exercises.map((exercise): PreparedExercise => {
-        if (exercise.type !== 'image') return exercise;
-        if (exercise.image === null) return { ...exercise, image: null };
+        if (exercise.type !== 'image' && exercise.type !== 'duration')
+          return exercise;
+        if (exercise.image == null) return { ...exercise, image: null };
         const fileId = `display-${plan.id}-${exercise.image.offlineMediaId}`;
         media.push({ fileId, url: exercise.image.displayUrl });
         return { ...exercise, image: { fileId } };

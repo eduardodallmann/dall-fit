@@ -43,6 +43,7 @@ function createRepositoryMock() {
       'updateWorkoutName',
     ].map((name) => [name, vi.fn()]),
   ) as Record<keyof TrainingPlanRepository, ReturnType<typeof vi.fn>>;
+  result.listReferencedImageKeys.mockResolvedValue(new Set());
   return result as typeof result & TrainingPlanRepository;
 }
 

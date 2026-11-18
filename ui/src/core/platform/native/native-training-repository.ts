@@ -527,8 +527,7 @@ export class NativeTrainingRepository implements TrainingRepository {
       ...preview,
       exercises: await Promise.all(
         preview.exercises.map(async (exercise) => {
-          if (exercise.type !== 'image' || exercise.image === null)
-            return exercise;
+          if (!('image' in exercise) || exercise.image == null) return exercise;
           const fileId = preparedFileId(exercise.image);
           if (fileId === undefined) return { ...exercise, image: null };
           const { url } = await this.plugin.getReadyFileUrl({ fileId });
@@ -556,7 +555,8 @@ export class NativeTrainingRepository implements TrainingRepository {
       ...active.session,
       exercises: await Promise.all(
         active.session.exercises.map(async (exercise) => {
-          if (exercise.type !== 'image') return exercise;
+          if (exercise.type !== 'image' && exercise.type !== 'duration')
+            return exercise;
           const fileId = active.mediaFiles[exercise.id];
           if (fileId === undefined) return exercise;
           const { url } = await this.plugin.getReadyFileUrl({ fileId });
@@ -639,7 +639,7 @@ function mediaFilesFrom(
 ): Readonly<Record<string, string>> {
   return Object.fromEntries(
     preview.exercises.flatMap((exercise) => {
-      if (exercise.type !== 'image' || exercise.image === null) return [];
+      if (!('image' in exercise) || exercise.image == null) return [];
       const fileId = preparedFileId(exercise.image);
       return fileId === undefined ? [] : [[exercise.id, fileId]];
     }),
@@ -685,7 +685,11 @@ function materializeExercise(
       })),
     };
   }
-  return { ...exercise, completedAt: null };
+  return {
+    ...exercise,
+    ...(exercise.type === 'duration' ? { image: null } : {}),
+    completedAt: null,
+  };
 }
 
 function replaceExercise(
@@ -768,11 +772,13 @@ function snapshotFrom(
     plan: active.snapshotPlan,
     startedAt: active.session.startedAt,
     workout: {
-      exercises: active.session.exercises.map((exercise) =>
-        exercise.type === 'image'
-          ? { ...exercise, image: undefined }
-          : exercise,
-      ),
+      exercises: active.session.exercises.map((exercise) => {
+        if ('image' in exercise) {
+          const { image: _image, ...withoutImage } = exercise;
+          return withoutImage;
+        }
+        return exercise;
+      }),
       ...active.session.workout,
     },
   };

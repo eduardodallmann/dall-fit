@@ -5,50 +5,56 @@ import type { BlobStorageService } from '~/training-plan/services/blob-storage.s
 import { ExerciseImageService } from '~/training-plan/services/exercise-image.service';
 
 describe('ExerciseImageService', () => {
-  it('waits for late variants before compensating a failed copy batch', async () => {
-    let finishThumbnail:
-      ((value: { key: string; etag: string }) => void) | undefined;
-    const thumbnail = new Promise<{ key: string; etag: string }>((resolve) => {
-      finishThumbnail = resolve;
-    });
-    const copyVariant = vi
-      .fn()
-      .mockReturnValueOnce(thumbnail)
-      .mockRejectedValueOnce(new Error('display failed'));
-    const deletion = vi.fn().mockResolvedValue(undefined);
-    const service = new ExerciseImageService({
-      copyVariant,
-      delete: deletion,
-    } as unknown as BlobStorageService);
-    const copying = service.copyExercises(
-      [
-        {
-          id: 'new-exercise',
-          type: 'image',
-          name: 'Supino',
-          bodyArea: 'chest',
-          sets: 3,
-          repetitions: 12,
-          restSeconds: 60,
-          image: {
-            thumbnail: { key: 'old/thumb', width: 160, height: 160 },
-            display: { key: 'old/display', width: 800, height: 800 },
-          },
+  it.each(['image', 'duration'] as const)(
+    'waits for late variants before compensating a failed %s copy batch',
+    async (type) => {
+      let finishThumbnail:
+        ((value: { key: string; etag: string }) => void) | undefined;
+      const thumbnail = new Promise<{ key: string; etag: string }>(
+        (resolve) => {
+          finishThumbnail = resolve;
         },
-      ],
-      new AbortController().signal,
-    );
-    await vi.waitFor(() => expect(copyVariant).toHaveBeenCalledTimes(2));
-    expect(deletion).not.toHaveBeenCalled();
-    finishThumbnail?.({ key: 'new/thumb', etag: 'copy-etag' });
-    await expect(copying).rejects.toMatchObject({
-      response: { code: 'EXERCISE_IMAGE_COPY_FAILED' },
-    });
-    expect(deletion).toHaveBeenCalledWith([
-      expect.stringMatching(/^exercise-images\/[^/]+\/thumbnail.webp$/),
-      expect.stringMatching(/^exercise-images\/[^/]+\/display.webp$/),
-    ]);
-  });
+      );
+      const copyVariant = vi
+        .fn()
+        .mockReturnValueOnce(thumbnail)
+        .mockRejectedValueOnce(new Error('display failed'));
+      const deletion = vi.fn().mockResolvedValue(undefined);
+      const service = new ExerciseImageService({
+        copyVariant,
+        delete: deletion,
+      } as unknown as BlobStorageService);
+      const copying = service.copyExercises(
+        [
+          {
+            id: 'new-exercise',
+            type,
+            durationMinutes: 2,
+            name: 'Supino',
+            bodyArea: 'chest',
+            sets: 3,
+            repetitions: 12,
+            restSeconds: 60,
+            image: {
+              thumbnail: { key: 'old/thumb', width: 160, height: 160 },
+              display: { key: 'old/display', width: 800, height: 800 },
+            },
+          },
+        ],
+        new AbortController().signal,
+      );
+      await vi.waitFor(() => expect(copyVariant).toHaveBeenCalledTimes(2));
+      expect(deletion).not.toHaveBeenCalled();
+      finishThumbnail?.({ key: 'new/thumb', etag: 'copy-etag' });
+      await expect(copying).rejects.toMatchObject({
+        response: { code: 'EXERCISE_IMAGE_COPY_FAILED' },
+      });
+      expect(deletion).toHaveBeenCalledWith([
+        expect.stringMatching(/^exercise-images\/[^/]+\/thumbnail.webp$/),
+        expect.stringMatching(/^exercise-images\/[^/]+\/display.webp$/),
+      ]);
+    },
+  );
   async function imageBuffer(): Promise<Buffer> {
     const result = await sharp({
       create: { width: 320, height: 640, channels: 3, background: '#336699' },
@@ -117,48 +123,54 @@ describe('ExerciseImageService', () => {
     expect(result.display).toMatchObject({ width: 320, height: 640 });
   });
 
-  it('captures persisted ETags and resolves metadata for legacy variants', async () => {
-    const getMetadata = vi
-      .fn()
-      .mockResolvedValueOnce({ etag: 'legacy-thumbnail-etag' });
-    const service = new ExerciseImageService({
-      getMetadata,
-    } as unknown as BlobStorageService);
+  it.each(['image', 'duration'] as const)(
+    'captures ETags and legacy metadata for %s',
+    async (type) => {
+      const getMetadata = vi
+        .fn()
+        .mockResolvedValueOnce({ etag: 'legacy-thumbnail-etag' });
+      const service = new ExerciseImageService({
+        getMetadata,
+      } as unknown as BlobStorageService);
 
-    const [exercise] = await service.captureCloneExercises([
-      {
-        bodyArea: 'other',
-        id: 'image-1',
-        image: {
-          display: {
-            etag: 'persisted-display-etag',
-            height: 640,
-            key: 'exercise-images/display.webp',
-            width: 320,
+      const [exercise] = await service.captureCloneExercises([
+        {
+          bodyArea: 'other',
+          id: 'image-1',
+          image: {
+            display: {
+              etag: 'persisted-display-etag',
+              height: 640,
+              key: 'exercise-images/display.webp',
+              width: 320,
+            },
+            thumbnail: {
+              height: 160,
+              key: 'exercise-images/thumbnail.webp',
+              width: 160,
+            },
           },
-          thumbnail: {
-            height: 160,
-            key: 'exercise-images/thumbnail.webp',
-            width: 160,
-          },
+          name: 'Imagem',
+          repetitions: 12,
+          restSeconds: 60,
+          sets: 3,
+          type,
+          durationMinutes: 2,
         },
-        name: 'Imagem',
-        repetitions: 12,
-        restSeconds: 60,
-        sets: 3,
-        type: 'image',
-      },
-    ]);
+      ]);
 
-    expect(getMetadata).toHaveBeenCalledOnce();
-    expect(getMetadata).toHaveBeenCalledWith('exercise-images/thumbnail.webp');
-    expect(exercise).toMatchObject({
-      image: {
-        display: { etag: 'persisted-display-etag' },
-        thumbnail: { etag: 'legacy-thumbnail-etag' },
-      },
-    });
-  });
+      expect(getMetadata).toHaveBeenCalledOnce();
+      expect(getMetadata).toHaveBeenCalledWith(
+        'exercise-images/thumbnail.webp',
+      );
+      expect(exercise).toMatchObject({
+        image: {
+          display: { etag: 'persisted-display-etag' },
+          thumbnail: { etag: 'legacy-thumbnail-etag' },
+        },
+      });
+    },
+  );
 
   it('compensates a partial upload and rejects animated/unsupported input', async () => {
     const deleteKeys = vi.fn().mockResolvedValue(undefined);

@@ -16,7 +16,8 @@ export function LibraryThumbnail({
 }>) {
   const exercise = item.exercise;
   let source: string | undefined;
-  if (exercise.type === 'image') source = exercise.image?.thumbnailUrl;
+  if ('image' in exercise && exercise.image != null)
+    source = exercise.image.thumbnailUrl;
   else if ('youtubeId' in exercise && exercise.youtubeId)
     source = `https://img.youtube.com/vi/${exercise.youtubeId}/default.jpg`;
   const [failedSource, setFailedSource] = useState<string>();
@@ -35,7 +36,7 @@ export function LibraryThumbnail({
       loading="lazy"
       onError={() => {
         setFailedSource(source);
-        if (exercise.type === 'image' && exercise.image !== null)
+        if ('image' in exercise && exercise.image != null)
           onImageFailure(exercise.image.signedUrlExpiresAt);
       }}
       referrerPolicy="no-referrer"

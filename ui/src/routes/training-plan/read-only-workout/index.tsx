@@ -88,7 +88,8 @@ function ReadOnlyExerciseCard({
     exercise.type === 'image' ||
     exercise.type === 'youtube-long' ||
     exercise.type === 'youtube-short' ||
-    (exercise.type === 'duration' && exercise.youtubeId !== undefined);
+    (exercise.type === 'duration' &&
+      (exercise.youtubeId !== undefined || exercise.image != null));
   const exerciseName = exercise.type === 'pause' ? 'Pausa' : exercise.name;
 
   return (
@@ -160,8 +161,11 @@ function ExerciseMedia({
   onImageLoadError: () => void;
   onRetryImage: () => void;
 }>) {
-  if (exercise.type === 'image') {
-    if (exercise.image === null)
+  if (
+    exercise.type === 'image' ||
+    (exercise.type === 'duration' && exercise.image != null)
+  ) {
+    if (exercise.image == null)
       return (
         <div className={styles.mediaPlaceholder()} role="status">
           <ImageOff aria-hidden="true" className={styles.icon()} />

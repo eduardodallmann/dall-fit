@@ -68,8 +68,11 @@ GET do workout retorna plano mínimo, timestamps e exercícios na ordem física.
 tipos/limites/defaults são os publicados em `@dall-fit/types`: nomes 120/40,
 25 workouts, 50 exercícios, números finitos, 16 body areas. Página 101 é inválida.
 YouTube persiste só ID de 11 caracteres e deriva thumbnail no cliente. Exercícios
-de duração gerados pelo assistente podem retornar também instrução curta e ID
-opcional de demonstração; esses metadados não são editáveis pelo CRUD. Imagem
+de duração permitem instruções opcionais (até 300 caracteres) e uma demonstração
+opcional, imagem ou vídeo YouTube. PATCH edita `instructions` e `youtubeId`; `null`
+limpa o respectivo campo, ausência preserva. Um vídeo normalizado substitui a
+imagem no mesmo CAS. PUT multipart permite `image` e `duration`, substitui o vídeo
+somente após upload e assinatura bem-sucedidos. DELETE de imagem preserva vídeo. Imagem
 expõe `thumbnailUrl`, `displayUrl` assinadas e `signedUrlExpiresAt`; keys,
 dimensões internas, pathnames, delegation token e original não atravessam HTTP.
 Responses JSON que podem conter essas URLs usam `Cache-Control: private, no-store`.
@@ -361,3 +364,27 @@ termos. A metadata do decorator é reconhecida pelo interceptor depois dos guard
 O administrador pode listar/criar/editar modelos sem aceitar; nenhuma operação
 cria recibo ou autoriza suas funções pessoais. Pessoa comum recebe
 `403 ADMIN_ACCESS_REQUIRED`. Os [cenários de termos](admin-terms.md) cobrem a exceção.
+
+## Mídia opcional de duração e compatibilidade
+
+`TrainingPlanService.updateExercise`, `commitExerciseImage` e `removeExerciseImage`
+validam o tipo, delegam a gravação ao repository e só depois limpam a associação
+anterior. `MongoTrainingPlanRepository` substitui o exercício inteiro no documento
+embutido, condicionado à versão, incluindo exclusão do meio anterior e timestamps.
+Um conflito não altera mídia. YouTube inválido, arquivo inválido ou assinatura
+indisponível falham antes do commit. Bytes/base64, URLs e keys não entram por PATCH.
+
+`writeMedia` distingue rejeição de domínio de falha ambígua de infraestrutura:
+`503 EXERCISE_IMAGE_RESULT_UNCERTAIN` exige releitura, conserva assets recém-criados
+e não autoriza retry automático. O command compensa assets novos somente quando a
+rejeição é conhecida. Após sucesso, `cleanupImages` consulta referências dos planos
+e snapshots de jobs; falha na limpeza não desfaz o sucesso e fica para reconciliação.
+O script `images:reconcile` inclui imagens de duração e mantém a janela de graça.
+
+`TrainingMediaRepresentationInterceptor` aplica a negociação em planos globais,
+pessoais, biblioteca e execução. `X-Training-Media-Version: 1` retorna a nova imagem;
+ausência omite a imagem de duração, preserva vídeo/instruções e não modifica MongoDB
+ou Redis. Valor desconhecido retorna `400 VALIDATION_ERROR`. Upload inclui
+`sourceExerciseType` para aplicar a mesma política à response de mídia. CORS permite
+somente o novo header de request, conservando origens e headers expostos. Os
+cenários de transição reproduzíveis ficam no [endpoint pessoal](personal-training-plans.md#cenário--trocas-de-mídia-em-duration).

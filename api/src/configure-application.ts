@@ -36,6 +36,7 @@ export function configureApplication(app: INestApplication): void {
       'X-App-Version-Code',
       'X-Request-Id',
       'X-Sync-Contract-Version',
+      'X-Training-Media-Version',
     ],
     credentials: true,
     exposedHeaders: ['X-Resource-Version', 'X-Request-Id'],
